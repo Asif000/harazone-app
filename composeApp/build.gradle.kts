@@ -58,6 +58,7 @@ kotlin {
             implementation(libs.maplibre.android)
             implementation(libs.koin.android)
             implementation(libs.kotlinx.coroutines.android)
+            implementation(libs.play.services.location)
         }
         commonMain.dependencies {
             implementation(libs.compose.runtime)

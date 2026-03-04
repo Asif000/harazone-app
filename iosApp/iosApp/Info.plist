@@ -4,5 +4,7 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>AreaDiscovery uses your location to show you a portrait of the area you're in.</string>
 </dict>
 </plist>
