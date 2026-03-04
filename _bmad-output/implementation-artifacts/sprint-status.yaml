@@ -58,8 +58,8 @@ development_status:
 
   # Epic 2: Live Area Portrait & AI Integration (Phase 1a)
   epic-2: in-progress
-  2-1-location-service-and-privacy-pipeline: review
-  2-2-gemini-adapter-and-sse-streaming: backlog
+  2-1-location-service-and-privacy-pipeline: done
+  2-2-gemini-adapter-and-sse-streaming: review
   2-3-area-repository-and-caching-foundation: backlog
   2-4-connectivity-monitor-and-error-resilience: backlog
   2-5-live-summary-screen-integration: backlog
