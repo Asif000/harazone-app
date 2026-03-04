@@ -87,7 +87,7 @@ class GeminiResponseParser {
             for (bucketString in bucketStrings) {
                 val bucketContent = parseBucketJson(bucketString)
                 if (bucketContent != null) {
-                    updates.add(BucketUpdate.ContentDelta(bucketContent.type, bucketContent.highlight + " " + bucketContent.content))
+                    updates.add(BucketUpdate.ContentDelta(bucketContent.type, bucketContent.content))
                     updates.add(BucketUpdate.BucketComplete(bucketContent))
                 }
             }
@@ -163,7 +163,10 @@ class GeminiResponseParser {
             "COST" -> BucketType.COST
             "HISTORY" -> BucketType.HISTORY
             "NEARBY" -> BucketType.NEARBY
-            else -> BucketType.NEARBY
+            else -> {
+                AppLogger.d { "GeminiResponseParser: unknown bucket type '$type', defaulting to NEARBY" }
+                BucketType.NEARBY
+            }
         }
     }
 
@@ -172,7 +175,114 @@ class GeminiResponseParser {
             "HIGH" -> Confidence.HIGH
             "MEDIUM" -> Confidence.MEDIUM
             "LOW" -> Confidence.LOW
-            else -> Confidence.MEDIUM
+            else -> {
+                AppLogger.d { "GeminiResponseParser: unknown confidence '$confidence', defaulting to MEDIUM" }
+                Confidence.MEDIUM
+            }
+        }
+    }
+
+    fun createStreamingParser(): StreamingParser = StreamingParser()
+
+    inner class StreamingParser {
+        private val buffer = StringBuilder()
+        private val currentBucketText = StringBuilder()
+        private val poisText = StringBuilder()
+        private var inPoisSection = false
+
+        fun processChunk(text: String): List<BucketUpdate> {
+            buffer.append(text)
+            val results = mutableListOf<BucketUpdate>()
+            drainBuffer(results)
+            return results
+        }
+
+        fun finish(): List<BucketUpdate> {
+            val results = mutableListOf<BucketUpdate>()
+
+            // Flush remaining buffer
+            val remaining = buffer.toString()
+            if (remaining.isNotEmpty()) {
+                if (inPoisSection) {
+                    poisText.append(remaining)
+                } else {
+                    currentBucketText.append(remaining)
+                }
+                buffer.clear()
+            }
+
+            // Complete any remaining bucket
+            if (!inPoisSection) {
+                val bucketJson = currentBucketText.toString().trim()
+                if (bucketJson.isNotEmpty()) {
+                    val bucketContent = parseBucketJson(bucketJson)
+                    if (bucketContent != null) {
+                        results.add(BucketUpdate.ContentDelta(bucketContent.type, bucketContent.content))
+                        results.add(BucketUpdate.BucketComplete(bucketContent))
+                    }
+                }
+            }
+
+            // Parse POIs
+            val poisStr = poisText.toString().trim()
+            val pois = if (poisStr.isNotEmpty()) parsePoisJson(poisStr) else emptyList()
+            results.add(BucketUpdate.PortraitComplete(pois))
+
+            return results
+        }
+
+        private fun drainBuffer(results: MutableList<BucketUpdate>) {
+            while (true) {
+                val str = buffer.toString()
+                if (str.isEmpty()) return
+
+                if (inPoisSection) {
+                    poisText.append(str)
+                    buffer.clear()
+                    return
+                }
+
+                // Find earliest delimiter
+                val poisIdx = str.indexOf(POIS_DELIMITER)
+                val bucketIdx = str.indexOf(BUCKET_DELIMITER)
+
+                val delimIdx: Int
+                val delimLen: Int
+                val isPois: Boolean
+
+                when {
+                    poisIdx >= 0 && (bucketIdx < 0 || poisIdx < bucketIdx) -> {
+                        delimIdx = poisIdx; delimLen = POIS_DELIMITER.length; isPois = true
+                    }
+                    bucketIdx >= 0 -> {
+                        delimIdx = bucketIdx; delimLen = BUCKET_DELIMITER.length; isPois = false
+                    }
+                    else -> return // No complete delimiter yet, keep buffering
+                }
+
+                // Text before delimiter belongs to current bucket
+                val beforeDelim = str.substring(0, delimIdx)
+                currentBucketText.append(beforeDelim)
+
+                // Complete current bucket
+                val bucketJson = currentBucketText.toString().trim()
+                if (bucketJson.isNotEmpty()) {
+                    val bucketContent = parseBucketJson(bucketJson)
+                    if (bucketContent != null) {
+                        results.add(BucketUpdate.ContentDelta(bucketContent.type, bucketContent.content))
+                        results.add(BucketUpdate.BucketComplete(bucketContent))
+                    }
+                }
+                currentBucketText.clear()
+
+                // Advance past delimiter
+                buffer.clear()
+                buffer.append(str.substring(delimIdx + delimLen))
+
+                if (isPois) {
+                    inPoisSection = true
+                }
+            }
         }
     }
 }

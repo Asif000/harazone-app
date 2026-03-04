@@ -135,4 +135,88 @@ not valid json either"""
         val text = parser.extractTextFromSseEvent(MALFORMED_SSE_EVENT)
         assertNull(text)
     }
+
+    // --- StreamingParser tests ---
+
+    @Test
+    fun streamingParser_emitsBucketIncrementallyOnDelimiter() {
+        val streaming = parser.createStreamingParser()
+
+        // Feed first bucket JSON (no delimiter yet)
+        val chunk1 = """{"type":"SAFETY","highlight":"Safe area","content":"Low crime area.","confidence":"HIGH","sources":[]}"""
+        val updates1 = streaming.processChunk(chunk1)
+        assertTrue(updates1.isEmpty(), "No emissions before delimiter")
+
+        // Feed delimiter + start of next bucket
+        val chunk2 = "\n---BUCKET---\n{\"type\":\"CHARACTER\""
+        val updates2 = streaming.processChunk(chunk2)
+        assertEquals(2, updates2.size, "Should emit ContentDelta + BucketComplete for first bucket")
+        val delta = updates2[0] as BucketUpdate.ContentDelta
+        assertEquals(BucketType.SAFETY, delta.bucketType)
+        assertEquals("Low crime area.", delta.textDelta)
+        val complete = updates2[1] as BucketUpdate.BucketComplete
+        assertEquals(BucketType.SAFETY, complete.content.type)
+        assertEquals("Safe area", complete.content.highlight)
+
+        // Feed rest of second bucket + POIS delimiter + POIs
+        val chunk3 = ""","highlight":"Vibrant","content":"Great culture.","confidence":"MEDIUM","sources":[]}
+---POIS---
+[{"name":"Park","type":"park","description":"Nice park","confidence":"HIGH"}]"""
+        val updates3 = streaming.processChunk(chunk3)
+        assertEquals(2, updates3.size, "Should emit ContentDelta + BucketComplete for second bucket")
+        assertEquals(BucketType.CHARACTER, (updates3[0] as BucketUpdate.ContentDelta).bucketType)
+
+        // Finish
+        val finalUpdates = streaming.finish()
+        assertEquals(1, finalUpdates.size)
+        val portrait = finalUpdates[0] as BucketUpdate.PortraitComplete
+        assertEquals(1, portrait.pois.size)
+        assertEquals("Park", portrait.pois[0].name)
+    }
+
+    @Test
+    fun streamingParser_handlesCompleteResponseInOneChunk() {
+        val streaming = parser.createStreamingParser()
+
+        val allUpdates = mutableListOf<BucketUpdate>()
+        allUpdates.addAll(streaming.processChunk(COMPLETE_RESPONSE))
+        allUpdates.addAll(streaming.finish())
+
+        // 6 buckets × 2 (ContentDelta + BucketComplete) + 1 PortraitComplete = 13
+        assertEquals(13, allUpdates.size)
+
+        // Verify first and last
+        assertEquals(BucketType.SAFETY, (allUpdates[0] as BucketUpdate.ContentDelta).bucketType)
+        val portrait = allUpdates.last() as BucketUpdate.PortraitComplete
+        assertEquals(2, portrait.pois.size)
+    }
+
+    @Test
+    fun streamingParser_skipsMalformedBuckets() {
+        val streaming = parser.createStreamingParser()
+
+        val allUpdates = mutableListOf<BucketUpdate>()
+        allUpdates.addAll(streaming.processChunk(MALFORMED_SSE))
+        allUpdates.addAll(streaming.finish())
+
+        // 2 valid buckets × 2 + 1 PortraitComplete = 5
+        assertEquals(5, allUpdates.size)
+        val firstComplete = allUpdates[1] as BucketUpdate.BucketComplete
+        assertEquals(BucketType.SAFETY, firstComplete.content.type)
+        val secondComplete = allUpdates[3] as BucketUpdate.BucketComplete
+        assertEquals(BucketType.HISTORY, secondComplete.content.type)
+        assertTrue((allUpdates.last() as BucketUpdate.PortraitComplete).pois.isEmpty())
+    }
+
+    @Test
+    fun streamingParser_emptyBuckets_returnsOnlyPortraitComplete() {
+        val streaming = parser.createStreamingParser()
+
+        val allUpdates = mutableListOf<BucketUpdate>()
+        allUpdates.addAll(streaming.processChunk(EMPTY_BUCKETS))
+        allUpdates.addAll(streaming.finish())
+
+        assertEquals(1, allUpdates.size)
+        assertTrue((allUpdates[0] as BucketUpdate.PortraitComplete).pois.isEmpty())
+    }
 }
