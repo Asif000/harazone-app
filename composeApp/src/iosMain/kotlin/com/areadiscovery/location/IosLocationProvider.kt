@@ -3,7 +3,9 @@ package com.areadiscovery.location
 import com.areadiscovery.util.AppLogger
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
 import platform.CoreLocation.CLGeocoder
 import platform.CoreLocation.CLLocation
 import platform.CoreLocation.CLLocationManager
@@ -14,44 +16,55 @@ import kotlin.coroutines.resume
 
 class IosLocationProvider : LocationProvider {
 
+    // Strong reference to prevent GC — CLLocationManager holds only a weak ref to its delegate
+    private var activeDelegate: NSObject? = null
+
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun getCurrentLocation(): Result<GpsCoordinates> =
-        suspendCancellableCoroutine { cont ->
-            val manager = CLLocationManager()
-            manager.desiredAccuracy = kCLLocationAccuracyBest
+        withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { cont ->
+                val manager = CLLocationManager()
+                manager.desiredAccuracy = kCLLocationAccuracyBest
 
-            val delegate = object : NSObject(), CLLocationManagerDelegateProtocol {
-                override fun locationManager(
-                    manager: CLLocationManager,
-                    didUpdateLocations: List<*>
-                ) {
-                    val location = didUpdateLocations.firstOrNull() as? CLLocation
-                    if (location != null) {
+                val delegate = object : NSObject(), CLLocationManagerDelegateProtocol {
+                    override fun locationManager(
+                        manager: CLLocationManager,
+                        didUpdateLocations: List<*>
+                    ) {
+                        val location = didUpdateLocations.firstOrNull() as? CLLocation
+                        if (location != null) {
+                            manager.stopUpdatingLocation()
+                            activeDelegate = null
+                            cont.resume(Result.success(
+                                GpsCoordinates(
+                                    latitude = location.coordinate.useContents { latitude },
+                                    longitude = location.coordinate.useContents { longitude }
+                                )
+                            ))
+                        }
+                    }
+
+                    override fun locationManager(
+                        manager: CLLocationManager,
+                        didFailWithError: platform.Foundation.NSError
+                    ) {
                         manager.stopUpdatingLocation()
-                        cont.resume(Result.success(
-                            GpsCoordinates(
-                                latitude = location.coordinate.useContents { latitude },
-                                longitude = location.coordinate.useContents { longitude }
-                            )
-                        ))
+                        activeDelegate = null
+                        AppLogger.e { "CLLocationManager failed: ${didFailWithError.localizedDescription}" }
+                        cont.resume(Result.failure(Exception(didFailWithError.localizedDescription)))
                     }
                 }
 
-                override fun locationManager(
-                    manager: CLLocationManager,
-                    didFailWithError: platform.Foundation.NSError
-                ) {
+                activeDelegate = delegate
+                manager.delegate = delegate
+                manager.requestWhenInUseAuthorization()
+                manager.startUpdatingLocation()
+
+                cont.invokeOnCancellation {
                     manager.stopUpdatingLocation()
-                    AppLogger.e { "CLLocationManager failed: ${didFailWithError.localizedDescription}" }
-                    cont.resume(Result.failure(Exception(didFailWithError.localizedDescription)))
+                    activeDelegate = null
                 }
             }
-
-            manager.delegate = delegate
-            manager.requestWhenInUseAuthorization()
-            manager.startUpdatingLocation()
-
-            cont.invokeOnCancellation { manager.stopUpdatingLocation() }
         }
 
     override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> =

@@ -20,7 +20,7 @@ class PrivacyPipeline(private val locationProvider: LocationProvider) {
         val coordsResult = locationProvider.getCurrentLocation()
         if (coordsResult.isFailure) {
             AppLogger.e { "PrivacyPipeline: location unavailable — ${coordsResult.exceptionOrNull()?.message}" }
-            return Result.failure(coordsResult.exceptionOrNull()!!)
+            return Result.failure(coordsResult.exceptionOrNull() ?: Exception("Unknown location error"))
         }
 
         val coords = coordsResult.getOrThrow()
