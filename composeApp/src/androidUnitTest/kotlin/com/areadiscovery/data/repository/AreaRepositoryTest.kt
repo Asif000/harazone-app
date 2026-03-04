@@ -97,7 +97,7 @@ class AreaRepositoryTest {
         }
 
         repository.getAreaPortrait("Test Area", defaultContext).test {
-            // Should get stale 6 BucketComplete + 1 PortraitComplete
+            // Should get 6 stale BucketComplete + 1 PortraitComplete
             repeat(BucketType.entries.size) {
                 val item = awaitItem()
                 assertIs<BucketUpdate.BucketComplete>(item)
@@ -197,5 +197,62 @@ class AreaRepositoryTest {
                 "TTL for $bucketType should be correct"
             )
         }
+    }
+
+    @Test
+    fun unknownBucketTypeInCacheIsSkipped() = testScope.runTest {
+        // Insert a row with an unknown bucket type
+        database.area_bucket_cacheQueries.insertOrReplace(
+            area_name = "Test Area",
+            bucket_type = "UNKNOWN_TYPE",
+            language = "en",
+            highlight = "h",
+            content = "c",
+            confidence = "HIGH",
+            sources_json = "[]",
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs()
+        )
+
+        // Should fall through to cache miss (not enough valid buckets)
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+            }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+
+        assertEquals(1, fakeProvider.callCount, "Should call AI provider when unknown types in cache")
+    }
+
+    @Test
+    fun deleteExpiredBucketsCalledOnAccess() = testScope.runTest {
+        // Insert expired bucket
+        database.area_bucket_cacheQueries.insertOrReplace(
+            area_name = "Old Area",
+            bucket_type = BucketType.SAFETY.name,
+            language = "en",
+            highlight = "h",
+            content = "c",
+            confidence = "HIGH",
+            sources_json = "[]",
+            expires_at = fakeClock.nowMs() - 1000L, // expired
+            created_at = fakeClock.nowMs() - 100_000L
+        )
+
+        // Access a different area — triggers cleanup
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size + 1) { awaitItem() }
+            awaitComplete()
+        }
+
+        // The expired "Old Area" bucket should have been cleaned up
+        val oldCached = database.area_bucket_cacheQueries
+            .getBucketsByAreaAndLanguage("Old Area", "en")
+            .executeAsList()
+        assertEquals(0, oldCached.size, "Expired buckets should be cleaned up")
     }
 }

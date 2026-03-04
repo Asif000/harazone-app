@@ -11,10 +11,15 @@ import com.areadiscovery.domain.model.Source
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.util.AppClock
+import com.areadiscovery.util.AppLogger
 import com.areadiscovery.util.SystemClock
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -32,9 +37,8 @@ class AreaRepositoryImpl(
         const val CACHE_TTL_STATIC_MS = 14 * MS_PER_DAY
         const val CACHE_TTL_SEMI_STATIC_MS = 3 * MS_PER_DAY
         const val CACHE_TTL_DYNAMIC_MS = 12 * MS_PER_HOUR
+        private val json = Json { ignoreUnknownKeys = true }
     }
-
-    private val json = Json { ignoreUnknownKeys = true }
 
     private fun getTtlMs(bucketType: BucketType): Long = when (bucketType) {
         BucketType.HISTORY, BucketType.CHARACTER -> CACHE_TTL_STATIC_MS
@@ -45,9 +49,13 @@ class AreaRepositoryImpl(
     override fun getAreaPortrait(areaName: String, context: AreaContext): Flow<BucketUpdate> = flow {
         val language = context.preferredLanguage
         val now = clock.nowMs()
+
         val cached = database.area_bucket_cacheQueries
             .getBucketsByAreaAndLanguage(areaName, language)
             .executeAsList()
+
+        // M1: Clean up expired cache entries after reading current area's data
+        database.area_bucket_cacheQueries.deleteExpiredBuckets(now)
 
         val validBuckets = cached.filter { it.expires_at > now }
         val staleBuckets = cached.filter { it.expires_at <= now }
@@ -55,24 +63,30 @@ class AreaRepositoryImpl(
         if (validBuckets.size == BucketType.entries.size) {
             // Full cache hit — emit all from cache
             validBuckets.forEach { row ->
-                emit(BucketUpdate.BucketComplete(row.toBucketContent()))
+                row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
             }
             emit(BucketUpdate.PortraitComplete(pois = emptyList()))
             return@flow
         }
 
-        if (cached.isNotEmpty() && staleBuckets.isNotEmpty()) {
-            // Stale-while-revalidate — emit stale immediately
-            cached.forEach { row ->
-                emit(BucketUpdate.BucketComplete(row.toBucketContent()))
+        if (staleBuckets.isNotEmpty()) {
+            // Stale-while-revalidate — emit only stale buckets immediately (M2)
+            staleBuckets.forEach { row ->
+                row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
             }
-            // Trigger background refresh — do NOT await
+            // Also emit any still-valid buckets
+            validBuckets.forEach { row ->
+                row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
+            }
+            // H1: Background refresh with exception handling
             scope.launch {
-                aiProvider.streamAreaPortrait(areaName, context).collect { update ->
-                    if (update is BucketUpdate.BucketComplete) {
-                        writeToCache(update.content, areaName, language)
+                aiProvider.streamAreaPortrait(areaName, context)
+                    .catch { e -> AppLogger.e(e) { "Background refresh failed for area: $areaName" } }
+                    .collect { update ->
+                        if (update is BucketUpdate.BucketComplete) {
+                            writeToCache(update.content, areaName, language)
+                        }
                     }
-                }
             }
             emit(BucketUpdate.PortraitComplete(pois = emptyList()))
             return@flow
@@ -85,7 +99,7 @@ class AreaRepositoryImpl(
                 writeToCache(update.content, areaName, language)
             }
         }
-    }
+    }.flowOn(Dispatchers.IO) // H2: DB reads/writes off Main thread
 
     private fun writeToCache(bucket: BucketContent, areaName: String, language: String) {
         val now = clock.nowMs()
@@ -104,11 +118,22 @@ class AreaRepositoryImpl(
         )
     }
 
-    private fun Area_bucket_cache.toBucketContent(): BucketContent = BucketContent(
-        type = BucketType.valueOf(bucket_type),
-        highlight = highlight,
-        content = content,
-        confidence = Confidence.valueOf(confidence),
-        sources = json.decodeFromString(sources_json)
-    )
+    // H3: Safe enum parsing — returns null for unrecognized values
+    private fun Area_bucket_cache.toBucketContent(): BucketContent? {
+        val type = BucketType.entries.firstOrNull { it.name == bucket_type } ?: run {
+            AppLogger.d { "Skipping unknown bucket type in cache: $bucket_type" }
+            return null
+        }
+        val conf = Confidence.entries.firstOrNull { it.name == confidence } ?: run {
+            AppLogger.d { "Skipping unknown confidence in cache: $confidence" }
+            return null
+        }
+        return BucketContent(
+            type = type,
+            highlight = highlight,
+            content = content,
+            confidence = conf,
+            sources = json.decodeFromString(sources_json)
+        )
+    }
 }
