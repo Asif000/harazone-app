@@ -5,6 +5,8 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import platform.CoreLocation.CLGeocoder
 import platform.CoreLocation.CLLocation
@@ -18,15 +20,17 @@ class IosLocationProvider : LocationProvider {
 
     // Strong reference to prevent GC — CLLocationManager holds only a weak ref to its delegate
     private var activeDelegate: NSObject? = null
+    private val locationMutex = Mutex()
 
     @OptIn(ExperimentalForeignApi::class)
     override suspend fun getCurrentLocation(): Result<GpsCoordinates> =
-        withContext(Dispatchers.Main) {
-            suspendCancellableCoroutine { cont ->
-                val manager = CLLocationManager()
-                manager.desiredAccuracy = kCLLocationAccuracyBest
+        locationMutex.withLock {
+            withContext(Dispatchers.Main) {
+                suspendCancellableCoroutine { cont ->
+                    val manager = CLLocationManager()
+                    manager.desiredAccuracy = kCLLocationAccuracyBest
 
-                val delegate = object : NSObject(), CLLocationManagerDelegateProtocol {
+                    val delegate = object : NSObject(), CLLocationManagerDelegateProtocol {
                     override fun locationManager(
                         manager: CLLocationManager,
                         didUpdateLocations: List<*>
@@ -60,9 +64,10 @@ class IosLocationProvider : LocationProvider {
                 manager.requestWhenInUseAuthorization()
                 manager.startUpdatingLocation()
 
-                cont.invokeOnCancellation {
-                    manager.stopUpdatingLocation()
-                    activeDelegate = null
+                    cont.invokeOnCancellation {
+                        manager.stopUpdatingLocation()
+                        activeDelegate = null
+                    }
                 }
             }
         }

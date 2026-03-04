@@ -6,6 +6,7 @@ import android.os.Build
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.areadiscovery.util.AppLogger
+import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
@@ -38,12 +39,12 @@ class AndroidLocationProvider(private val context: Context) : LocationProvider {
         }
 
     override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> =
-        runCatching {
+        try {
             if (!Geocoder.isPresent()) {
                 return Result.failure(Exception("Geocoder service unavailable on this device"))
             }
             val geocoder = Geocoder(context)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val areaName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 suspendCancellableCoroutine { cont ->
                     geocoder.getFromLocation(latitude, longitude, 1) { addresses ->
                         cont.resume(extractAreaName(addresses))
@@ -56,6 +57,11 @@ class AndroidLocationProvider(private val context: Context) : LocationProvider {
                     extractAreaName(addresses ?: emptyList())
                 }
             }
+            Result.success(areaName)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
         }
 
     private fun extractAreaName(addresses: List<android.location.Address>): String {
