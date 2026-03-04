@@ -1,13 +1,23 @@
 package com.areadiscovery.di
 
+import com.areadiscovery.data.local.AreaDiscoveryDatabase
+import com.areadiscovery.data.local.DatabaseDriverFactory
 import com.areadiscovery.data.remote.BuildKonfigApiKeyProvider
 import com.areadiscovery.data.remote.GeminiAreaIntelligenceProvider
 import com.areadiscovery.data.remote.GeminiPromptBuilder
 import com.areadiscovery.data.remote.GeminiResponseParser
 import com.areadiscovery.data.remote.HttpClientFactory
+import com.areadiscovery.data.repository.AreaRepositoryImpl
 import com.areadiscovery.domain.provider.ApiKeyProvider
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
+import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.service.PrivacyPipeline
+import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
+import com.areadiscovery.util.AppClock
+import com.areadiscovery.util.SystemClock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.koin.dsl.module
 
 val dataModule = module {
@@ -20,4 +30,11 @@ val dataModule = module {
     single { HttpClientFactory.create() }
     single<AreaIntelligenceProvider> { GeminiAreaIntelligenceProvider(get(), get(), get(), get()) }
     single { PrivacyPipeline(get()) }
+
+    // Database & caching (Story 2.3)
+    single { AreaDiscoveryDatabase(get<DatabaseDriverFactory>().createDriver()) }
+    single<AppClock> { SystemClock() }
+    single { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+    single<AreaRepository> { AreaRepositoryImpl(get(), get(), get(), get()) }
+    factory { GetAreaPortraitUseCase(get()) }
 }

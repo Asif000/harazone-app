@@ -1,5 +1,6 @@
 package com.areadiscovery.di
 
+import com.areadiscovery.data.local.DatabaseDriverFactory
 import com.areadiscovery.location.AndroidLocationProvider
 import com.areadiscovery.location.LocationProvider
 import com.areadiscovery.util.AnalyticsTracker
@@ -10,4 +11,5 @@ import org.koin.dsl.module
 actual fun platformModule() = module {
     single<AnalyticsTracker> { AndroidAnalyticsTracker() }
     single<LocationProvider> { AndroidLocationProvider(androidContext()) }
+    single { DatabaseDriverFactory(androidContext()) }
 }

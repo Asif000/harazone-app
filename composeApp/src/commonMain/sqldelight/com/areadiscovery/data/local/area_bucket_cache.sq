@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS area_bucket_cache (
+    area_name TEXT NOT NULL,
+    bucket_type TEXT NOT NULL,
+    language TEXT NOT NULL,
+    highlight TEXT NOT NULL,
+    content TEXT NOT NULL,
+    confidence TEXT NOT NULL,
+    sources_json TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (area_name, bucket_type, language)
+);
+
+CREATE INDEX IF NOT EXISTS idx_area_bucket_cache_expires_at
+    ON area_bucket_cache(expires_at);
+
+getBucketsByAreaAndLanguage:
+SELECT *
+FROM area_bucket_cache
+WHERE area_name = :area_name AND language = :language;
+
+getBucket:
+SELECT *
+FROM area_bucket_cache
+WHERE area_name = :area_name AND bucket_type = :bucket_type AND language = :language;
+
+insertOrReplace:
+INSERT OR REPLACE INTO area_bucket_cache(
+    area_name, bucket_type, language, highlight, content, confidence, sources_json, expires_at, created_at
+) VALUES (
+    :area_name, :bucket_type, :language, :highlight, :content, :confidence, :sources_json, :expires_at, :created_at
+);
+
+deleteExpiredBuckets:
+DELETE FROM area_bucket_cache
+WHERE expires_at < :current_time;
+
+deleteByArea:
+DELETE FROM area_bucket_cache
+WHERE area_name = :area_name;
