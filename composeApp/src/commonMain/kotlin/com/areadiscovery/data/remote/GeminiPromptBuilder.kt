@@ -2,7 +2,7 @@ package com.areadiscovery.data.remote
 
 import com.areadiscovery.domain.model.AreaContext
 
-class GeminiPromptBuilder {
+internal class GeminiPromptBuilder {
 
     fun buildAreaPortraitPrompt(areaName: String, context: AreaContext): String {
         return """

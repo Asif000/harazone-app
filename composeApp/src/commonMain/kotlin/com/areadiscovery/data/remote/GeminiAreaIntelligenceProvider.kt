@@ -54,6 +54,7 @@ internal class GeminiAreaIntelligenceProvider(
         private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
         private const val MAX_RETRY_ATTEMPTS = 3
         private val RETRY_DELAYS_MS = longArrayOf(0L, 1000L, 2000L)
+        private const val STREAMING_WORD_DELAY_MS = 30L
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -108,6 +109,9 @@ internal class GeminiAreaIntelligenceProvider(
                         for (update in streamingParser.processChunk(text)) {
                             hasEmitted = true
                             emit(update)
+                            if (update is BucketUpdate.ContentDelta) {
+                                delay(STREAMING_WORD_DELAY_MS)
+                            }
                         }
                     }
                 }
@@ -116,6 +120,9 @@ internal class GeminiAreaIntelligenceProvider(
                 for (update in streamingParser.finish()) {
                     hasEmitted = true
                     emit(update)
+                    if (update is BucketUpdate.ContentDelta) {
+                        delay(STREAMING_WORD_DELAY_MS)
+                    }
                 }
 
                 AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete" }
