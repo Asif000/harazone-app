@@ -1,0 +1,119 @@
+# generated: 2026-03-04
+# project: AreaDiscovery
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-04
+project: AreaDiscovery
+project_key: NOKEY
+tracking_system: file-system
+story_location: _bmad-output/implementation-artifacts
+
+development_status:
+  # Epic 1: Project Skeleton & Streaming UX Spike (Phase 1a)
+  epic-1: in-progress
+  1-1-kmp-project-initialization-and-package-structure: done
+  1-2-ci-cd-pipeline: done
+  1-3-design-system-and-theme: done
+  1-4-domain-models-and-mock-ai-provider: backlog
+  1-5-streaming-composables-and-shared-ui-components: backlog
+  1-6-summary-screen-with-mock-data-and-navigation-shell: backlog
+  1-7-analytics-and-crash-reporting-foundation: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Live Area Portrait & AI Integration (Phase 1a)
+  epic-2: backlog
+  2-1-location-service-and-privacy-pipeline: backlog
+  2-2-gemini-adapter-and-sse-streaming: backlog
+  2-3-area-repository-and-caching-foundation: backlog
+  2-4-connectivity-monitor-and-error-resilience: backlog
+  2-5-live-summary-screen-integration: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Interactive Map & POI Discovery (Phase 1a)
+  epic-3: backlog
+  3-1-maplibre-integration-and-base-map: backlog
+  3-2-ai-generated-poi-markers: backlog
+  3-3-poi-detail-card-and-bottom-sheet: backlog
+  3-4-poi-accessible-list-view: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: AI Chat — Ask About Your Area (Phase 1a + 1b)
+  epic-4: backlog
+  4-1-simple-chat-screen-and-streaming-responses: backlog
+  4-2-multi-turn-conversation-with-context: backlog
+  4-3-source-links-and-deep-reading: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Manual Search & Onboarding (Phase 1b)
+  epic-5: backlog
+  5-1-manual-area-search: backlog
+  5-2-location-permission-flow-and-value-first-onboarding: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: Bookmarks & Saved Areas (Phase 1b)
+  epic-6: backlog
+  6-1-bookmark-an-area: backlog
+  6-2-saved-areas-list-and-navigation: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Offline Experience & Caching (Phase 1b)
+  epic-7: backlog
+  7-1-offline-area-summary-access: backlog
+  7-2-offline-question-queue: backlog
+  7-3-nearby-cached-area-suggestions: backlog
+  7-4-cache-management-and-storage-budget: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: Adaptive Intelligence & Return Visits (Phase 1b)
+  epic-8: backlog
+  8-1-visit-tracking-and-return-visit-differentiation: backlog
+  8-2-home-area-detection: backlog
+  8-3-configurable-briefing-behavior: backlog
+  epic-8-retrospective: optional
+
+  # Epic 9: Safety, Trust & Engagement (Phase 1b)
+  epic-9: backlog
+  9-1-emergency-information: backlog
+  9-2-ai-content-feedback: backlog
+  9-3-data-management-and-deletion: backlog
+  9-4-share-area-discoveries: backlog
+  epic-9-retrospective: optional
+
+  # Epic 10: Voice Interaction & Push Notifications (Phase 2 — Placeholder)
+  epic-10: backlog
+  epic-10-retrospective: optional
+
+  # Epic 11: Advanced Exploration (Phase 3-4 — Placeholder)
+  epic-11: backlog
+  epic-11-retrospective: optional

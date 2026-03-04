@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AreaDiscovery — Design Direction Mockups</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --orange: #E8722A;
+    --orange-deep: #C45A1C;
+    --orange-light: #F4A66A;
+    --beige: #F5EDE3;
+    --beige-dark: #E8DDD0;
+    --white: #FFFFFF;
+    --charcoal: #2D2926;
+    --warm-gray: #6B5E54;
+    --green: #4A8C5C;
+    --amber: #C49A3C;
+    --red: #B85C4A;
+    --shadow: 0 1px 3px rgba(45, 41, 38, 0.12);
+    --shadow-md: 0 4px 12px rgba(45, 41, 38, 0.1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Inter', sans-serif; background: #f0ebe5; color: var(--charcoal); }
+
+  .showcase-header {
+    background: var(--charcoal);
+    color: var(--white);
+    padding: 40px 32px;
+    text-align: center;
+  }
+  .showcase-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .showcase-header p { font-size: 14px; color: var(--beige-dark); max-width: 600px; margin: 0 auto; line-height: 1.5; }
+
+  .directions-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(375px, 1fr));
+    gap: 32px;
+    padding: 32px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .direction-card {
+    background: var(--white);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+  }
+  .direction-label {
+    background: var(--charcoal);
+    color: var(--white);
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .direction-label h2 { font-size: 16px; font-weight: 600; }
+  .direction-label .tag {
+    font-size: 11px;
+    background: var(--orange);
+    color: var(--white);
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+
+  /* Phone frame */
+  .phone-frame {
+    width: 375px;
+    height: 720px;
+    margin: 20px auto;
+    border-radius: 32px;
+    border: 3px solid #ddd;
+    overflow: hidden;
+    position: relative;
+    background: var(--white);
+  }
+
+  .status-bar {
+    height: 44px;
+    background: var(--white);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .status-bar .time { font-size: 14px; }
+  .status-bar .icons { display: flex; gap: 4px; font-size: 11px; }
+
+  /* ===== DIRECTION A: Card Stack ===== */
+  .dir-a .app-header {
+    padding: 12px 16px 8px;
+    background: var(--white);
+  }
+  .dir-a .location-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dir-a .location-dot {
+    width: 10px; height: 10px;
+    background: var(--orange);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(232, 114, 42, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(232, 114, 42, 0); }
+  }
+  .dir-a .location-name { font-size: 24px; font-weight: 700; }
+  .dir-a .location-sub { font-size: 13px; color: var(--warm-gray); margin-top: 2px; margin-left: 18px; }
+
+  .dir-a .summary-scroll {
+    height: 540px;
+    overflow-y: auto;
+    padding: 8px 16px 80px;
+    background: var(--white);
+  }
+  .dir-a .bucket-card {
+    background: var(--beige);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .dir-a .bucket-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .dir-a .bucket-icon {
+    width: 28px; height: 28px;
+    background: var(--orange);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+  }
+  .dir-a .bucket-title { font-size: 16px; font-weight: 600; }
+  .dir-a .bucket-text { font-size: 14px; line-height: 1.6; color: var(--charcoal); }
+  .dir-a .confidence-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin-top: 8px;
+    background: rgba(74, 140, 92, 0.12);
+    color: var(--green);
+  }
+
+  .dir-a .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    border-top: 1px solid var(--beige-dark);
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+  }
+  .dir-a .map-btn {
+    background: var(--orange);
+    color: white;
+    border: none;
+    border-radius: 24px;
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .dir-a .chat-input {
+    flex: 1;
+    background: var(--beige);
+    border: none;
+    border-radius: 24px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--warm-gray);
+  }
+
+  /* ===== DIRECTION B: Continuous Scroll (Apple Weather) ===== */
+  .dir-b .app-header {
+    background: linear-gradient(135deg, var(--orange), var(--orange-deep));
+    padding: 16px 16px 20px;
+    color: white;
+  }
+  .dir-b .location-name { font-size: 26px; font-weight: 700; }
+  .dir-b .location-sub { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+  .dir-b .time-context {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 8px;
+    padding: 4px 10px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    display: inline-block;
+  }
+
+  .dir-b .summary-scroll {
+    height: 540px;
+    overflow-y: auto;
+    padding: 0 0 80px;
+    background: var(--white);
+  }
+  .dir-b .bucket-section {
+    padding: 20px 16px;
+    border-bottom: 1px solid var(--beige);
+  }
+  .dir-b .bucket-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .dir-b .bucket-icon {
+    font-size: 20px;
+    color: var(--orange);
+  }
+  .dir-b .bucket-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--charcoal);
+  }
+  .dir-b .bucket-text {
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--charcoal);
+  }
+  .dir-b .highlight-fact {
+    background: var(--beige);
+    border-left: 3px solid var(--orange);
+    padding: 10px 14px;
+    margin: 10px 0;
+    border-radius: 0 8px 8px 0;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .dir-b .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--white);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-around;
+  }
+  .dir-b .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--warm-gray);
+    cursor: pointer;
+  }
+  .dir-b .nav-item.active { color: var(--orange); }
+  .dir-b .nav-icon { font-size: 20px; }
+
+  /* ===== DIRECTION C: Tabbed Buckets ===== */
+  .dir-c .app-header {
+    padding: 12px 16px;
+    background: var(--white);
+  }
+  .dir-c .location-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dir-c .location-name { font-size: 22px; font-weight: 700; }
+  .dir-c .share-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: var(--beige);
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dir-c .bucket-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 8px 16px;
+    overflow-x: auto;
+    background: var(--white);
+  }
+  .dir-c .bucket-tab {
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+    border: none;
+    background: var(--beige);
+    color: var(--warm-gray);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .dir-c .bucket-tab.active {
+    background: var(--orange);
+    color: white;
+  }
+
+  .dir-c .bucket-content {
+    height: 480px;
+    overflow-y: auto;
+    padding: 16px;
+    background: var(--beige);
+    margin: 0 12px;
+    border-radius: 16px;
+  }
+  .dir-c .bucket-content h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+  }
+  .dir-c .bucket-content p {
+    font-size: 15px;
+    line-height: 1.65;
+    margin-bottom: 12px;
+  }
+  .dir-c .fact-card {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 14px;
+    margin: 12px 0;
+    box-shadow: var(--shadow);
+  }
+  .dir-c .fact-card .label {
+    font-size: 11px;
+    color: var(--orange);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 4px;
+  }
+
+  .dir-c .bottom-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    border-top: 1px solid var(--beige-dark);
+    padding: 10px 16px;
+    display: flex;
+    gap: 8px;
+  }
+  .dir-c .map-btn {
+    background: var(--orange);
+    color: white;
+    border: none;
+    border-radius: 24px;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .dir-c .chat-input {
+    flex: 1;
+    background: var(--beige);
+    border: none;
+    border-radius: 24px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: var(--warm-gray);
+  }
+
+  /* ===== DIRECTION D: Hero Fact + Expandable ===== */
+  .dir-d .hero-section {
+    background: linear-gradient(135deg, var(--orange) 0%, var(--orange-deep) 100%);
+    padding: 16px 16px 24px;
+    color: white;
+    position: relative;
+  }
+  .dir-d .location-name { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+  .dir-d .location-sub { font-size: 13px; opacity: 0.8; }
+  .dir-d .hero-fact {
+    margin-top: 16px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 12px;
+    padding: 14px;
+    font-size: 15px;
+    line-height: 1.5;
+    backdrop-filter: blur(4px);
+  }
+  .dir-d .hero-fact .prefix {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    opacity: 0.7;
+    margin-bottom: 6px;
+    display: block;
+  }
+
+  .dir-d .bucket-list {
+    height: 410px;
+    overflow-y: auto;
+    padding: 12px 16px 80px;
+    background: var(--white);
+  }
+  .dir-d .bucket-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--beige);
+    cursor: pointer;
+  }
+  .dir-d .bucket-icon {
+    width: 40px; height: 40px;
+    background: var(--beige);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--orange);
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .dir-d .bucket-info { flex: 1; }
+  .dir-d .bucket-title { font-size: 15px; font-weight: 600; }
+  .dir-d .bucket-preview { font-size: 13px; color: var(--warm-gray); margin-top: 2px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .dir-d .bucket-arrow { color: var(--warm-gray); font-size: 18px; }
+
+  .dir-d .bottom-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.08);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-around;
+  }
+  .dir-d .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: var(--warm-gray);
+  }
+  .dir-d .nav-item.active { color: var(--orange); }
+  .dir-d .nav-icon { font-size: 20px; }
+
+  /* ===== DIRECTION E: Map-Forward Split ===== */
+  .dir-e .map-area {
+    height: 280px;
+    background: linear-gradient(145deg, #d4e8d0 0%, #c8dbc4 40%, #b8d0b4 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .dir-e .map-area::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background:
+      linear-gradient(90deg, transparent 39%, rgba(200,180,160,0.3) 39%, rgba(200,180,160,0.3) 41%, transparent 41%),
+      linear-gradient(0deg, transparent 49%, rgba(200,180,160,0.3) 49%, rgba(200,180,160,0.3) 51%, transparent 51%);
+    opacity: 0.5;
+  }
+  .dir-e .map-pin {
+    position: absolute;
+    width: 24px; height: 24px;
+    background: var(--orange);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    border: 2px solid white;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  }
+  .dir-e .pin-1 { top: 100px; left: 120px; }
+  .dir-e .pin-2 { top: 80px; left: 220px; }
+  .dir-e .pin-3 { top: 150px; left: 180px; }
+  .dir-e .pin-4 { top: 60px; left: 300px; }
+  .dir-e .pin-5 { top: 180px; left: 90px; }
+
+  .dir-e .location-banner {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.6));
+    padding: 20px 16px 12px;
+    color: white;
+  }
+  .dir-e .location-name { font-size: 22px; font-weight: 700; }
+  .dir-e .location-sub { font-size: 12px; opacity: 0.8; }
+
+  .dir-e .bottom-sheet {
+    background: var(--white);
+    border-radius: 16px 16px 0 0;
+    padding: 8px 16px 80px;
+    height: 352px;
+    overflow-y: auto;
+    margin-top: -12px;
+    position: relative;
+    z-index: 2;
+  }
+  .dir-e .sheet-handle {
+    width: 36px; height: 4px;
+    background: var(--beige-dark);
+    border-radius: 2px;
+    margin: 0 auto 12px;
+  }
+  .dir-e .bucket-pill-row {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .dir-e .bucket-pill {
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    background: var(--beige);
+    color: var(--warm-gray);
+    border: none;
+    cursor: pointer;
+  }
+  .dir-e .bucket-pill.active { background: var(--orange); color: white; }
+  .dir-e .sheet-content p {
+    font-size: 15px;
+    line-height: 1.6;
+    margin-bottom: 10px;
+  }
+  .dir-e .sheet-content .fact-highlight {
+    background: var(--beige);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    margin: 8px 0;
+  }
+
+  .dir-e .bottom-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    border-top: 1px solid var(--beige-dark);
+    padding: 10px 16px;
+  }
+  .dir-e .chat-input {
+    width: 100%;
+    background: var(--beige);
+    border: none;
+    border-radius: 24px;
+    padding: 12px 16px;
+    font-size: 14px;
+    color: var(--warm-gray);
+  }
+
+  /* ===== DIRECTION F: Story Mode ===== */
+  .dir-f .story-header {
+    padding: 12px 16px 8px;
+    background: var(--white);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dir-f .location-name { font-size: 22px; font-weight: 700; }
+  .dir-f .story-dots {
+    display: flex;
+    gap: 4px;
+    padding: 0 16px 12px;
+    background: var(--white);
+  }
+  .dir-f .dot {
+    height: 3px;
+    flex: 1;
+    border-radius: 2px;
+    background: var(--beige-dark);
+  }
+  .dir-f .dot.active { background: var(--orange); }
+  .dir-f .dot.done { background: var(--orange-light); }
+
+  .dir-f .story-content {
+    height: 530px;
+    background: var(--beige);
+    margin: 0 12px;
+    border-radius: 16px;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    position: relative;
+    overflow: hidden;
+  }
+  .dir-f .story-bucket-icon {
+    font-size: 32px;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  .dir-f .story-bucket-title {
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+  .dir-f .story-text {
+    font-size: 16px;
+    line-height: 1.65;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .dir-f .story-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--beige-dark);
+  }
+  .dir-f .story-action {
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    background: var(--white);
+    color: var(--charcoal);
+  }
+  .dir-f .story-action.primary {
+    background: var(--orange);
+    color: white;
+  }
+
+  .dir-f .bottom-bar {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: var(--white);
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .dir-f .swipe-hint {
+    font-size: 12px;
+    color: var(--warm-gray);
+  }
+  .dir-f .nav-dots {
+    display: flex;
+    gap: 6px;
+  }
+
+  .description {
+    padding: 16px 20px;
+    background: #fafaf8;
+    border-top: 1px solid var(--beige);
+  }
+  .description h3 { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+  .description p { font-size: 13px; line-height: 1.5; color: var(--warm-gray); }
+  .description .pros, .description .cons {
+    margin-top: 8px;
+    font-size: 12px;
+    line-height: 1.6;
+  }
+  .description .pros span { color: var(--green); }
+  .description .cons span { color: var(--red); }
+</style>
+</head>
+<body>
+
+<div class="showcase-header">
+  <h1>AreaDiscovery — Design Direction Mockups</h1>
+  <p>Six layout approaches for the summary screen using the orange/beige/white palette. Each shows the same content (Alfama, Lisbon) in a different structure.</p>
+</div>
+
+<div class="directions-grid">
+
+  <!-- DIRECTION A: Card Stack -->
+  <div class="direction-card">
+    <div class="direction-label">
+      <h2>A: Card Stack</h2>
+      <span class="tag">RECOMMENDED</span>
+    </div>
+    <div class="phone-frame dir-a">
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">LTE 100%</span>
+      </div>
+      <div class="app-header">
+        <div class="location-row">
+          <div class="location-dot"></div>
+          <span class="location-name">Alfama, Lisbon</span>
+        </div>
+        <div class="location-sub">Tuesday morning · First visit</div>
+      </div>
+      <div class="summary-scroll">
+        <div class="bucket-card">
+          <div class="bucket-header">
+            <div class="bucket-icon">🛡</div>
+            <span class="bucket-title">Safety</span>
+          </div>
+          <div class="bucket-text">Generally safe during day. Pickpocket-prone near tourist clusters at night. Well-lit main routes along Rua de São Miguel. Avoid dimly lit alleys after midnight.</div>
+          <div class="confidence-chip">✓ Verified sources</div>
+        </div>
+        <div class="bucket-card">
+          <div class="bucket-header">
+            <div class="bucket-icon">🎨</div>
+            <span class="bucket-title">Character</span>
+          </div>
+          <div class="bucket-text">One of the oldest districts in Lisbon — Moorish origins visible in the winding street layout. Residential, aging population mixed with growing tourism. Fado music birthplace. Laundry hanging from windows is a cultural signature, not poverty.</div>
+        </div>
+        <div class="bucket-card">
+          <div class="bucket-header">
+            <div class="bucket-icon">📅</div>
+            <span class="bucket-title">What's Happening</span>
+          </div>
+          <div class="bucket-text">Local fado festival this weekend. Construction on Rua de São Miguel causing detours through Thursday.</div>
+        </div>
+        <div class="bucket-card">
+          <div class="bucket-header">
+            <div class="bucket-icon">💰</div>
+            <span class="bucket-title">Cost</span>
+          </div>
+          <div class="bucket-text">Property values up 40% in 5 years. Gentrification tension rising. Average meal €8-12 at local spots, €15-25 at tourist-facing restaurants.</div>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <button class="map-btn">🗺 Map (7)</button>
+        <div class="chat-input">Ask about Alfama...</div>
+      </div>
+    </div>
+    <div class="description">
+      <h3>Card Stack — Stacked beige cards on white</h3>
+      <p>Each bucket is a distinct card with icon header. Cards stack vertically with clear separation. Scroll to explore deeper. Most similar to a news feed layout.</p>
+      <div class="pros"><span>+</span> Clear bucket separation · Easy to scan · Familiar pattern · Natural sharing unit (each card)</div>
+      <div class="cons"><span>−</span> Cards create visual rhythm breaks · More vertical space used by card chrome</div>
+    </div>
+  </div>
+
+  <!-- DIRECTION B: Continuous Scroll -->
+  <div class="direction-card">
+    <div class="direction-label">
+      <h2>B: Continuous Scroll</h2>
+      <span class="tag">APPLE WEATHER</span>
+    </div>
+    <div class="phone-frame dir-b">
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">LTE 100%</span>
+      </div>
+      <div class="app-header">
+        <div class="location-name">Alfama, Lisbon</div>
+        <div class="location-sub">First visit · Tuesday morning</div>
+        <div class="time-context">☀️ Morning — cafés, markets, quiet streets</div>
+      </div>
+      <div class="summary-scroll">
+        <div class="bucket-section">
+          <div class="bucket-header">
+            <span class="bucket-icon">🛡️</span>
+            <span class="bucket-title">Safety</span>
+          </div>
+          <div class="bucket-text">Generally safe during day. Pickpocket-prone near tourist clusters at night.</div>
+          <div class="highlight-fact">💡 Well-lit main routes along Rua de São Miguel — locals recommend this path after dark.</div>
+        </div>
+        <div class="bucket-section">
+          <div class="bucket-header">
+            <span class="bucket-icon">🎨</span>
+            <span class="bucket-title">Character</span>
+          </div>
+          <div class="bucket-text">One of the oldest districts in Lisbon, surviving the devastating 1755 earthquake that destroyed most of the city. Moorish origins visible in the winding streets.</div>
+          <div class="highlight-fact">💡 Laundry hanging from windows is a cultural signature, not poverty — it's a point of neighborhood pride.</div>
+          <div class="bucket-text" style="margin-top: 8px">Fado music birthplace. Residential, aging population increasingly mixed with international visitors.</div>
+        </div>
+        <div class="bucket-section">
+          <div class="bucket-header">
+            <span class="bucket-icon">📅</span>
+            <span class="bucket-title">What's Happening</span>
+          </div>
+          <div class="bucket-text">Local fado festival this weekend at Largo do Chafariz de Dentro. Construction on Rua de São Miguel causing detours.</div>
+        </div>
+        <div class="bucket-section">
+          <div class="bucket-header">
+            <span class="bucket-icon">💰</span>
+            <span class="bucket-title">Cost</span>
+          </div>
+          <div class="bucket-text">Average meal €8-12 local, €15-25 tourist-facing. Property values up 40% in 5 years.</div>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <div class="nav-item active"><span class="nav-icon">📍</span>Summary</div>
+        <div class="nav-item"><span class="nav-icon">🗺</span>Map</div>
+        <div class="nav-item"><span class="nav-icon">💬</span>Chat</div>
+        <div class="nav-item"><span class="nav-icon">🔖</span>Saved</div>
+      </div>
+    </div>
+    <div class="description">
+      <h3>Continuous Scroll — Apple Weather model</h3>
+      <p>One continuous reading experience with subtle section dividers. Orange header with time context. Highlight facts in beige callout boxes break up the text flow. Bottom nav for switching views.</p>
+      <div class="pros"><span>+</span> Most readable for long-form · Natural flow · Highlight facts draw eye · Time context in header</div>
+      <div class="cons"><span>−</span> Less visual separation between buckets · Header takes screen space</div>
+    </div>
+  </div>
+
+  <!-- DIRECTION C: Tabbed Buckets -->
+  <div class="direction-card">
+    <div class="direction-label">
+      <h2>C: Tabbed Buckets</h2>
+      <span class="tag">COMPACT</span>
+    </div>
+    <div class="phone-frame dir-c">
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">LTE 100%</span>
+      </div>
+      <div class="app-header">
+        <div class="location-row">
+          <span class="location-name">Alfama, Lisbon</span>
+          <button class="share-btn">↗</button>
+        </div>
+        <div style="font-size: 12px; color: var(--warm-gray); margin-top: 4px;">Tuesday morning · First visit</div>
+      </div>
+      <div class="bucket-tabs">
+        <button class="bucket-tab active">🛡 Safety</button>
+        <button class="bucket-tab">🎨 Character</button>
+        <button class="bucket-tab">📅 Happening</button>
+        <button class="bucket-tab">💰 Cost</button>
+        <button class="bucket-tab">🕐 History</button>
+        <button class="bucket-tab">🧭 Nearby</button>
+      </div>
+      <div class="bucket-content">
+        <h3>Safety</h3>
+        <p>Alfama is generally safe during daytime hours. The narrow, winding streets can feel isolated but crime rates are low for the neighborhood itself.</p>
+        <div class="fact-card">
+          <div class="label">Key Insight</div>
+          <div>Pickpocketing increases near tourist clusters at night, especially around Miradouro das Portas do Sol.</div>
+        </div>
+        <p>Well-lit main routes along Rua de São Miguel — locals recommend this path after dark. The area around the Sé Cathedral is well-patrolled.</p>
+        <div class="fact-card">
+          <div class="label">Tip</div>
+          <div>Avoid dimly lit alleys branching off from Largo de São Rafael after midnight. Stick to streets with open restaurants.</div>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <button class="map-btn">🗺 Map</button>
+        <div class="chat-input">Ask about Alfama...</div>
+      </div>
+    </div>
+    <div class="description">
+      <h3>Tabbed Buckets — One bucket at a time</h3>
+      <p>Horizontal tabs let users jump to any bucket. Each tab shows deep content for one bucket. Reduces overwhelm by showing one topic at a time. White fact cards on beige background.</p>
+      <div class="pros"><span>+</span> Zero overwhelm · Deep focus per bucket · Quick bucket switching · Great for reference</div>
+      <div class="cons"><span>−</span> Breaks the "story unfolding" feeling · User must actively navigate · Streaming reveal less natural</div>
+    </div>
+  </div>
+
+  <!-- DIRECTION D: Hero Fact + List -->
+  <div class="direction-card">
+    <div class="direction-label">
+      <h2>D: Hero Fact + List</h2>
+      <span class="tag">HOOK FIRST</span>
+    </div>
+    <div class="phone-frame dir-d">
+      <div class="status-bar" style="background: var(--orange); color: white;">
+        <span class="time">9:41</span>
+        <span class="icons">LTE 100%</span>
+      </div>
+      <div class="hero-section">
+        <div class="location-name">Alfama, Lisbon</div>
+        <div class="location-sub">Tuesday morning · First visit</div>
+        <div class="hero-fact">
+          <span class="prefix">Did you know?</span>
+          Alfama survived the devastating 1755 earthquake that destroyed most of Lisbon — its Moorish foundations and hilltop position protected it while the lower city was swept away by the tsunami.
+        </div>
+      </div>
+      <div class="bucket-list">
+        <div class="bucket-row">
+          <div class="bucket-icon">🛡️</div>
+          <div class="bucket-info">
+            <div class="bucket-title">Safety</div>
+            <div class="bucket-preview">Generally safe during day. Pickpocket-prone near tourist clusters at night...</div>
+          </div>
+          <span class="bucket-arrow">›</span>
+        </div>
+        <div class="bucket-row">
+          <div class="bucket-icon">🎨</div>
+          <div class="bucket-info">
+            <div class="bucket-title">Character</div>
+            <div class="bucket-preview">Oldest district in Lisbon, Moorish origins, fado birthplace, residential with growing tourism...</div>
+          </div>
+          <span class="bucket-arrow">›</span>
+        </div>
+        <div class="bucket-row">
+          <div class="bucket-icon">📅</div>
+          <div class="bucket-info">
+            <div class="bucket-title">What's Happening</div>
+            <div class="bucket-preview">Fado festival this weekend, construction on Rua de São Miguel...</div>
+          </div>
+          <span class="bucket-arrow">›</span>
+        </div>
+        <div class="bucket-row">
+          <div class="bucket-icon">💰</div>
+          <div class="bucket-info">
+            <div class="bucket-title">Cost</div>
+            <div class="bucket-preview">Average meal €8-12. Property values up 40% in 5 years...</div>
+          </div>
+          <span class="bucket-arrow">›</span>
+        </div>
+        <div class="bucket-row">
+          <div class="bucket-icon">🕐</div>
+          <div class="bucket-info">
+            <div class="bucket-title">History</div>
+            <div class="bucket-preview">Survived the 1755 earthquake, Moorish origins, winding medieval streets...</div>
+          </div>
+          <span class="bucket-arrow">›</span>
+        </div>
+        <div class="bucket-row">
+          <div class="bucket-icon">🧭</div>
+          <div class="bucket-info">
+            <div class="bucket-title">Nearby</div>
+            <div class="bucket-preview">Castelo de São Jorge (10 min), Miradouro da Graça, Feira da Ladra...</div>
+          </div>
+          <span class="bucket-arrow">›</span>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <div class="nav-item active"><span class="nav-icon">📍</span>Summary</div>
+        <div class="nav-item"><span class="nav-icon">🗺</span>Map</div>
+        <div class="nav-item"><span class="nav-icon">💬</span>Chat</div>
+        <div class="nav-item"><span class="nav-icon">🔖</span>Saved</div>
+      </div>
+    </div>
+    <div class="description">
+      <h3>Hero Fact + Expandable List</h3>
+      <p>Leads with the most surprising fact in an orange hero section. Buckets shown as a tappable list with preview text. Tap to expand. Maximizes the "whoa" moment by putting the hook above the fold.</p>
+      <div class="pros"><span>+</span> Strongest "whoa" hook · All 6 buckets visible at once · Low overwhelm · Clean navigation</div>
+      <div class="cons"><span>−</span> Requires tap to read full bucket · Two-level navigation · Streaming reveal is just the hero fact</div>
+    </div>
+  </div>
+
+  <!-- DIRECTION E: Map-Forward Split -->
+  <div class="direction-card">
+    <div class="direction-label">
+      <h2>E: Map-Forward Split</h2>
+      <span class="tag">VISUAL DISCOVERY</span>
+    </div>
+    <div class="phone-frame dir-e">
+      <div class="status-bar" style="position:absolute; z-index:10; background:transparent; color: white;">
+        <span class="time">9:41</span>
+        <span class="icons">LTE 100%</span>
+      </div>
+      <div class="map-area">
+        <div class="map-pin pin-1"></div>
+        <div class="map-pin pin-2"></div>
+        <div class="map-pin pin-3"></div>
+        <div class="map-pin pin-4"></div>
+        <div class="map-pin pin-5"></div>
+        <div class="location-banner">
+          <div class="location-name">Alfama, Lisbon</div>
+          <div class="location-sub">5 places nearby · Tuesday morning</div>
+        </div>
+      </div>
+      <div class="bottom-sheet">
+        <div class="sheet-handle"></div>
+        <div class="bucket-pill-row">
+          <button class="bucket-pill active">🛡 Safety</button>
+          <button class="bucket-pill">🎨 Character</button>
+          <button class="bucket-pill">📅 Happening</button>
+          <button class="bucket-pill">💰 Cost</button>
+          <button class="bucket-pill">🕐 History</button>
+          <button class="bucket-pill">🧭 Nearby</button>
+        </div>
+        <div class="sheet-content">
+          <p>Alfama is generally safe during daytime hours. The narrow, winding streets can feel isolated but violent crime is rare.</p>
+          <div class="fact-highlight">⚠️ Pickpocketing increases near tourist clusters at night, especially around Miradouro das Portas do Sol.</div>
+          <p>Well-lit main routes along Rua de São Miguel. The area around the Sé Cathedral is well-patrolled. Stick to streets with open restaurants after midnight.</p>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <div class="chat-input">Ask about Alfama...</div>
+      </div>
+    </div>
+    <div class="description">
+      <h3>Map-Forward with Bottom Sheet</h3>
+      <p>Map dominates the top half with POI pins. Bottom sheet slides up with bucket pill navigation and content. Drag up for full summary, drag down for more map. Google Maps pattern.</p>
+      <div class="pros"><span>+</span> Visual + text together · Proven bottom sheet pattern · Great for spatial learners · POIs visible immediately</div>
+      <div class="cons"><span>−</span> Split attention · Less reading space · Streaming text in small area · Better as Phase 1b enhancement</div>
+    </div>
+  </div>
+
+  <!-- DIRECTION F: Story Mode -->
+  <div class="direction-card">
+    <div class="direction-label">
+      <h2>F: Story Mode</h2>
+      <span class="tag">IMMERSIVE</span>
+    </div>
+    <div class="phone-frame dir-f">
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">LTE 100%</span>
+      </div>
+      <div class="story-header">
+        <span class="location-name">Alfama, Lisbon</span>
+        <span style="font-size: 13px; color: var(--warm-gray);">1/6</span>
+      </div>
+      <div class="story-dots">
+        <div class="dot active"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+        <div class="dot"></div>
+      </div>
+      <div class="story-content">
+        <div>
+          <div class="story-bucket-icon">🛡️</div>
+          <div class="story-bucket-title">Safety</div>
+        </div>
+        <div class="story-text">
+          Alfama is generally safe during daytime. The narrow, winding streets can feel isolated, but violent crime is rare in this neighborhood.<br><br>
+          <strong>Watch for:</strong> Pickpocketing increases near tourist clusters at night, especially around Miradouro das Portas do Sol and the Sé Cathedral area.<br><br>
+          <strong>Local tip:</strong> Stick to Rua de São Miguel after dark — it's well-lit and locals use it as their primary route. The streets around Largo do Chafariz de Dentro are also well-patrolled and have open restaurants late.
+        </div>
+        <div class="story-actions">
+          <button class="story-action">🔖 Save</button>
+          <button class="story-action">↗ Share</button>
+          <button class="story-action primary">Next → Character</button>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <span class="swipe-hint">← Swipe or tap to navigate →</span>
+      </div>
+    </div>
+    <div class="description">
+      <h3>Story Mode — Instagram Stories meets area portraits</h3>
+      <p>Each bucket is a full-screen "story" with progress dots. Swipe horizontally between buckets. One bucket fills the entire screen for immersive reading. Actions at the bottom of each story.</p>
+      <div class="pros"><span>+</span> Most immersive · Zero overwhelm · Familiar swipe pattern · Great for sharing individual buckets</div>
+      <div class="cons"><span>−</span> Can't scan all buckets at once · Requires 6 swipes for full portrait · Streaming reveal per-story only</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
