@@ -47,6 +47,9 @@ jobs:
           key: konan-${{ hashFiles('gradle/libs.versions.toml') }}
           restore-keys: konan-
 
+      - name: Provide Firebase config for CI
+        run: cp composeApp/google-services.ci.json composeApp/google-services.json
+
       - name: Build Android Debug APK
         run: ./gradlew :composeApp:assembleDebug
 

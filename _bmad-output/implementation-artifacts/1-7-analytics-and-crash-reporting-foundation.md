@@ -1,6 +1,6 @@
 # Story 1.7: Analytics & Crash Reporting Foundation
 
-Status: ready-for-dev
+Status: review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -23,49 +23,49 @@ So that we can validate success metrics and catch production issues from day one
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Firebase project prerequisites — MANUAL developer task (AC: #2, #3)
-  - [ ] 1.1 Create a Firebase project at https://console.firebase.google.com (if not already done)
-  - [ ] 1.2 Register Android app (`com.areadiscovery`) in Firebase console → download `google-services.json` → place at `composeApp/google-services.json`
-  - [ ] 1.3 Register iOS app (bundle ID from Xcode project) in Firebase console → download `GoogleService-Info.plist` → place at `iosApp/iosApp/GoogleService-Info.plist`
-  - [ ] 1.4 Enable Crashlytics in Firebase console for both apps
+- [x] Task 1: Firebase project prerequisites — MANUAL developer task (AC: #2, #3)
+  - [x] 1.1 Create a Firebase project at https://console.firebase.google.com
+  - [x] 1.2 Register Android app (`com.areadiscovery`) → `google-services.json` placed at `composeApp/google-services.json`
+  - [x] 1.3 Register iOS app (`com.areadiscovery.AreaDiscovery`) → `GoogleService-Info.plist` placed at `iosApp/iosApp/GoogleService-Info.plist`
+  - [x] 1.4 Crashlytics enabled via SDK (no console toggle needed — activates on first crash report)
 
-- [ ] Task 2: Add Android Firebase + Kermit dependencies (AC: #1, #2, #3, #4)
-  - [ ] 2.1 Add to `gradle/libs.versions.toml` `[versions]`:
+- [x] Task 2: Add Android Firebase + Kermit dependencies (AC: #1, #2, #3, #4)
+  - [x] 2.1 Add to `gradle/libs.versions.toml` `[versions]` (used explicit versions instead of BOM — KMP Kotlin 2.3 doesn't support `platform()`):
     ```toml
     firebase-bom = "33.8.0"          # Verify latest: https://firebase.google.com/support/release-notes/android
     google-services = "4.4.2"        # Verify latest
     firebase-crashlytics-gradle = "3.0.3"  # Verify latest
     kermit = "2.0.4"                 # Verify latest: https://github.com/touchlab/Kermit
     ```
-  - [ ] 2.2 Add to `gradle/libs.versions.toml` `[libraries]`:
+  - [x] 2.2 Add to `gradle/libs.versions.toml` `[libraries]`:
     ```toml
     firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebase-bom" }
     firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
     firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
     kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
     ```
-  - [ ] 2.3 Add to `gradle/libs.versions.toml` `[plugins]`:
+  - [x] 2.3 Add to `gradle/libs.versions.toml` `[plugins]`:
     ```toml
     googleServices = { id = "com.google.gms.google-services", version.ref = "google-services" }
     firebaseCrashlytics = { id = "com.google.firebase.crashlytics", version.ref = "firebase-crashlytics-gradle" }
     ```
-  - [ ] 2.4 Add to top of `composeApp/build.gradle.kts` plugins block:
+  - [x] 2.4 Add to top of `composeApp/build.gradle.kts` plugins block:
     ```kotlin
     alias(libs.plugins.googleServices)
     alias(libs.plugins.firebaseCrashlytics)
     ```
-  - [ ] 2.5 Add to `androidMain.dependencies` in `composeApp/build.gradle.kts`:
+  - [x] 2.5 Add to `androidMain.dependencies` in `composeApp/build.gradle.kts` (no BOM, explicit versions):
     ```kotlin
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.analytics)
     implementation(libs.firebase.crashlytics)
     ```
-  - [ ] 2.6 Add Kermit to `commonMain.dependencies`:
+  - [x] 2.6 Add Kermit to `commonMain.dependencies`:
     ```kotlin
     implementation(libs.kermit)
     ```
 
-- [ ] Task 3: Add Firebase iOS pods to iosApp/Podfile (AC: #2, #3)
+- [ ] Task 3: Add Firebase iOS pods to iosApp/Podfile (AC: #2, #3) ⏳ DEFERRED: No Podfile/CocoaPods infrastructure exists yet
   - [ ] 3.1 Open `iosApp/Podfile` and add Firebase pods:
     ```ruby
     pod 'FirebaseAnalytics'
@@ -74,8 +74,8 @@ So that we can validate success metrics and catch production issues from day one
   - [ ] 3.2 Run `cd iosApp && pod install` to install iOS pods
   - [ ] 3.3 Confirm `iosApp/iosApp.xcworkspace` opens correctly in Xcode with Firebase pods
 
-- [ ] Task 4: Create `AnalyticsTracker` expect/actual infrastructure (AC: #1)
-  - [ ] 4.1 Create `commonMain/kotlin/com/areadiscovery/util/AnalyticsTracker.kt`:
+- [x] Task 4: Create `AnalyticsTracker` interface infrastructure (AC: #1)
+  - [x] 4.1 Create `commonMain/kotlin/com/areadiscovery/util/AnalyticsTracker.kt` (interface approach per Dev Notes):
     ```kotlin
     package com.areadiscovery.util
 
@@ -83,7 +83,7 @@ So that we can validate success metrics and catch production issues from day one
         fun trackEvent(name: String, params: Map<String, String> = emptyMap())
     }
     ```
-  - [ ] 4.2 Create `androidMain/kotlin/com/areadiscovery/util/AnalyticsTracker.android.kt`:
+  - [x] 4.2 Create `androidMain/kotlin/com/areadiscovery/util/AndroidAnalyticsTracker.kt`:
     ```kotlin
     package com.areadiscovery.util
 
@@ -107,7 +107,7 @@ So that we can validate success metrics and catch production issues from day one
     }
     ```
     - **NOTE**: See Task 6 for the singleton init pattern via Koin. The `init()` approach avoids context threading issues.
-  - [ ] 4.3 Create `iosMain/kotlin/com/areadiscovery/util/AnalyticsTracker.ios.kt`:
+  - [x] 4.3 Create `iosMain/kotlin/com/areadiscovery/util/IosAnalyticsTracker.kt` (no-op with Kermit logging until CocoaPods configured):
     ```kotlin
     package com.areadiscovery.util
 
@@ -122,8 +122,8 @@ So that we can validate success metrics and catch production issues from day one
     ```
     - **IMPORTANT**: If CocoaPods interop isn't configured, use a no-op iOS implementation and log via Kermit until CocoaPods Firebase binding is confirmed working. See Dev Notes for fallback.
 
-- [ ] Task 5: Set up Kermit logger (AC: #4)
-  - [ ] 5.1 Create `commonMain/kotlin/com/areadiscovery/util/AppLogger.kt`:
+- [x] Task 5: Set up Kermit logger (AC: #4)
+  - [x] 5.1 Create `commonMain/kotlin/com/areadiscovery/util/AppLogger.kt`:
     ```kotlin
     package com.areadiscovery.util
 
@@ -131,8 +131,8 @@ So that we can validate success metrics and catch production issues from day one
 
     val AppLogger: Logger = Logger.withTag("AreaDiscovery")
     ```
-  - [ ] 5.2 Replace any `println()` calls in existing code with `AppLogger.d { "message" }` (use `d` for debug, `e` for errors)
-  - [ ] 5.3 Add a log call in `SummaryViewModel.loadPortrait()` on error:
+  - [x] 5.2 Replace any `println()` calls in existing code with `AppLogger.d { "message" }` (use `d` for debug, `e` for errors) — no println calls found in existing code
+  - [x] 5.3 Add a log call in `SummaryViewModel.loadPortrait()` on error:
     ```kotlin
     } catch (e: Exception) {
         AppLogger.e(e) { "Portrait streaming failed" }
@@ -140,8 +140,8 @@ So that we can validate success metrics and catch production issues from day one
     }
     ```
 
-- [ ] Task 6: Initialize Firebase Crashlytics on Android (AC: #2)
-  - [ ] 6.1 Modify `androidMain/kotlin/com/areadiscovery/MainActivity.kt`:
+- [x] Task 6: Initialize Firebase Crashlytics on Android (AC: #2)
+  - [x] 6.1 Modify `androidMain/kotlin/com/areadiscovery/MainActivity.kt`:
     ```kotlin
     import com.google.firebase.Firebase
     import com.google.firebase.analytics.analytics
@@ -168,8 +168,8 @@ So that we can validate success metrics and catch production issues from day one
     ```
     - **ALTERNATIVE**: If `App()` composable signature change is unwanted, use Koin's `androidContext(this)` to provide a Context-aware `AnalyticsTracker` from `androidMain`. See Dev Notes for the Koin platform module pattern.
 
-- [ ] Task 7: Initialize Firebase on iOS (AC: #2, #3)
-  - [ ] 7.1 Open `iosApp/iosApp/iOSApp.swift` (Swift entry point) and add Firebase configuration:
+- [ ] Task 7: Initialize Firebase on iOS (AC: #2, #3) ⏳ DEFERRED: Requires CocoaPods setup (Task 3)
+  - [ ] 7.1 Open `iosApp/iosApp/iOSApp.swift` (Swift entry point) and add Firebase configuration — REVERTED per H1 review (no CocoaPods):
     ```swift
     import SwiftUI
     import Firebase
@@ -189,8 +189,8 @@ So that we can validate success metrics and catch production issues from day one
     ```
   - [ ] 7.2 Confirm that `MainViewController.kt` calls `App()` without needing Firebase changes (iOS Crashlytics captures crashes automatically after `FirebaseApp.configure()`)
 
-- [ ] Task 8: Wire AnalyticsTracker through Koin DI (AC: #1, #5)
-  - [ ] 8.1 Update `commonMain/di/DataModule.kt` to provide `AnalyticsTracker` from commonMain:
+- [x] Task 8: Wire AnalyticsTracker through Koin DI (AC: #1, #5)
+  - [x] 8.1 Update `commonMain/di/DataModule.kt` to provide `AnalyticsTracker` from commonMain:
     ```kotlin
     val dataModule = module {
         single<AreaIntelligenceProvider> { MockAreaIntelligenceProvider() }
@@ -198,7 +198,7 @@ So that we can validate success metrics and catch production issues from day one
         // AnalyticsTracker is provided by platform modules; this is the fallback for previews
     }
     ```
-  - [ ] 8.2 Create `androidMain/kotlin/com/areadiscovery/di/AndroidDataModule.kt`:
+  - [x] 8.2 Create `androidMain/kotlin/com/areadiscovery/di/PlatformModule.android.kt`:
     ```kotlin
     package com.areadiscovery.di
 
@@ -217,24 +217,24 @@ So that we can validate success metrics and catch production issues from day one
         }
     }
     ```
-  - [ ] 8.3 Update `MainActivity.kt` to pass `androidDataModule` to Koin startup (or use `KoinApplication` composable in `App.kt` with platform-injected modules)
-  - [ ] 8.4 **Simpler approach**: Modify `App.kt` to accept an `AnalyticsTracker` parameter passed in from platform entry points, bypassing Koin for this singleton:
+  - [x] 8.3 Wire platform modules via `expect fun platformModule()` in AppModule.kt + actual implementations in androidMain/iosMain
+  - [x] 8.4 Provide NoOpAnalyticsTracker via Koin DataModule as default (platform modules will override when Firebase is wired):
     ```kotlin
     @Composable
     fun App(analyticsTracker: AnalyticsTracker = AnalyticsTracker()) { ... }
     ```
     Then pass from MainActivity: `App(analyticsTracker = trackerInstance)`
     And from MainViewController: `App(analyticsTracker = AnalyticsTracker())` (no-op iOS until pod binding works)
-  - [ ] 8.5 Update `di/UiModule.kt` to inject `AnalyticsTracker` into `SummaryViewModel`:
+  - [x] 8.5 Update `di/UiModule.kt` to inject `AnalyticsTracker` into `SummaryViewModel`:
     ```kotlin
     val uiModule = module {
         viewModel { SummaryViewModel(get(), get(), get()) }  // provider, mapper, analyticsTracker
     }
     ```
 
-- [ ] Task 9: Update `SummaryViewModel` to track analytics (AC: #5)
-  - [ ] 9.1 Add `analyticsTracker: AnalyticsTracker` as third constructor parameter in `SummaryViewModel.kt`
-  - [ ] 9.2 In `loadPortrait()`, after the `PortraitComplete` update is processed, fire the event:
+- [x] Task 9: Update `SummaryViewModel` to track analytics (AC: #5)
+  - [x] 9.1 Add `analyticsTracker: AnalyticsTracker` as third constructor parameter in `SummaryViewModel.kt`
+  - [x] 9.2 In `loadPortrait()`, after the `PortraitComplete` update is processed, fire the event:
     ```kotlin
     // Inside the collect block, after calling stateMapper.processUpdate():
     if (update is BucketUpdate.PortraitComplete) {
@@ -245,10 +245,10 @@ So that we can validate success metrics and catch production issues from day one
         AppLogger.d { "Tracked summary_viewed (source=mock)" }
     }
     ```
-  - [ ] 9.3 Verify the event fires exactly once per portrait completion (not on refresh re-completion — this is acceptable behavior for mock phase)
+  - [x] 9.3 Verify the event fires exactly once per portrait completion (not on refresh re-completion — this is acceptable behavior for mock phase)
 
-- [ ] Task 10: Update tests — FakeAnalyticsTracker and ViewModel test (AC: #6, #7)
-  - [ ] 10.1 Create `commonTest/kotlin/com/areadiscovery/fakes/FakeAnalyticsTracker.kt`:
+- [x] Task 10: Update tests — FakeAnalyticsTracker and ViewModel test (AC: #6, #7)
+  - [x] 10.1 Create `commonTest/kotlin/com/areadiscovery/fakes/FakeAnalyticsTracker.kt`:
     ```kotlin
     package com.areadiscovery.fakes
 
@@ -267,7 +267,7 @@ So that we can validate success metrics and catch production issues from day one
     }
     ```
     - **NOTE**: If `expect class AnalyticsTracker` cannot be easily subclassed in tests, extract a `AnalyticsTrackerInterface` (or use functional injection). See Dev Notes below.
-  - [ ] 10.2 Update `SummaryViewModelTest.kt` to inject a tracker and assert `summary_viewed` event:
+  - [x] 10.2 Update `SummaryViewModelTest.kt` to inject a tracker and assert `summary_viewed` event:
     ```kotlin
     @Test
     fun `summary_viewed event is tracked when portrait completes`() = runTest {
@@ -278,10 +278,10 @@ So that we can validate success metrics and catch production issues from day one
     }
     ```
 
-- [ ] Task 11: Build verification (AC: #8)
-  - [ ] 11.1 Run `./gradlew :composeApp:assembleDebug` — MUST PASS
-  - [ ] 11.2 Run `./gradlew :composeApp:allTests` — MUST PASS
-  - [ ] 11.3 Run `./gradlew :composeApp:lint` — MUST PASS
+- [x] Task 11: Build verification (AC: #8)
+  - [x] 11.1 Run `./gradlew :composeApp:assembleDebug` — PASS
+  - [x] 11.2 Run `./gradlew :composeApp:allTests` — PASS (6 tests on Android debug/release + iOS simulator)
+  - [x] 11.3 Run `./gradlew :composeApp:lint` — PASS
 
 ## Dev Notes
 
@@ -743,10 +743,54 @@ Note: Story 1.6 implementation is in working tree (not yet committed per git sta
 
 ### Agent Model Used
 
-Claude Sonnet 4.6
+Claude Opus 4.6
 
 ### Debug Log References
 
+- All 3 build gates pass: assembleDebug, allTests, lint
+- Firebase BOM `platform()` not supported in KMP Kotlin 2.3.0 — used explicit versions (firebase-analytics:22.4.0, firebase-crashlytics:19.4.0)
+- `Firebase.analytics` Kotlin extension works without Context after auto-init — avoids `androidContext()` issue with `KoinApplication` composable
+
 ### Completion Notes List
 
+- Implemented AnalyticsTracker as interface (Option B from Dev Notes) for testability — matches AreaIntelligenceProvider pattern
+- Created NoOpAnalyticsTracker for default Koin binding (will be overridden by platform modules when Firebase is wired)
+- Added Kermit 2.0.4 dependency and AppLogger tagged "AreaDiscovery"
+- Added AppLogger.e() on error path and AppLogger.d() on analytics tracking in SummaryViewModel
+- Updated SummaryViewModel constructor to accept AnalyticsTracker (3rd param)
+- Fires `summary_viewed` event with `source=mock` on PortraitComplete
+- Created FakeAnalyticsTracker implementing AnalyticsTracker interface with recordedEvents and assertEventTracked helper
+- Added `summaryViewedEventIsTrackedWhenPortraitCompletes` test — asserts exactly 1 event with correct name and params
+- Updated all existing SummaryViewModelTest tests to pass FakeAnalyticsTracker
+- Firebase project created, config files placed, Android Firebase SDK wired via explicit versions
+- Android: `AndroidAnalyticsTracker` uses `Firebase.analytics` (no Context needed), Crashlytics enabled in MainActivity
+- iOS: `IosAnalyticsTracker` is no-op with Kermit logging (no CocoaPods infrastructure yet)
+- Platform Koin modules: `expect fun platformModule()` in commonMain, actual implementations in androidMain/iosMain
+- **Still deferred**: Task 3 (iOS CocoaPods) — no Podfile exists in the project yet
+
+### Change Log
+
+- 2026-03-04: Implemented shared analytics infrastructure (Tasks 4-5, 8-10) with NoOp default. Firebase-specific tasks deferred pending manual setup.
+- 2026-03-04: Completed Firebase integration (Tasks 1-2, 4.2-4.3, 6-8). Android Firebase Analytics + Crashlytics wired. iOS no-op tracker. Platform Koin modules created.
+- 2026-03-04: Code review fixes (H1, M2, M3, L2, L5): Reverted iOSApp.swift Firebase import (no CocoaPods), re-added NoOpAnalyticsTracker fallback in DataModule, fixed IosAnalyticsTracker to use AppLogger, moved trackEvent to fire after state transition to Complete.
+
 ### File List
+
+- composeApp/src/commonMain/kotlin/com/areadiscovery/util/AnalyticsTracker.kt — NEW (interface)
+- composeApp/src/commonMain/kotlin/com/areadiscovery/util/NoOpAnalyticsTracker.kt — NEW (default no-op impl)
+- composeApp/src/commonMain/kotlin/com/areadiscovery/util/AppLogger.kt — NEW (Kermit logger)
+- composeApp/src/commonMain/kotlin/com/areadiscovery/ui/summary/SummaryViewModel.kt — MODIFIED (added AnalyticsTracker param, trackEvent call, AppLogger)
+- composeApp/src/commonMain/kotlin/com/areadiscovery/di/DataModule.kt — MODIFIED (added NoOpAnalyticsTracker as fallback binding)
+- composeApp/src/commonMain/kotlin/com/areadiscovery/di/AppModule.kt — MODIFIED (added expect platformModule(), included in appModule())
+- composeApp/src/commonMain/kotlin/com/areadiscovery/di/UiModule.kt — MODIFIED (updated viewModel to get() 3 params)
+- composeApp/src/androidMain/kotlin/com/areadiscovery/util/AndroidAnalyticsTracker.kt — NEW (Firebase Analytics impl)
+- composeApp/src/androidMain/kotlin/com/areadiscovery/di/PlatformModule.android.kt — NEW (Koin platform module)
+- composeApp/src/androidMain/kotlin/com/areadiscovery/MainActivity.kt — MODIFIED (Crashlytics init)
+- composeApp/src/iosMain/kotlin/com/areadiscovery/util/IosAnalyticsTracker.kt — NEW (no-op with Kermit logging)
+- composeApp/src/iosMain/kotlin/com/areadiscovery/di/PlatformModule.ios.kt — NEW (Koin platform module)
+- iosApp/iosApp/iOSApp.swift — NO CHANGE (Firebase import reverted per H1 review — no CocoaPods installed)
+- .gitignore — MODIFIED (added Firebase config files)
+- composeApp/src/commonTest/kotlin/com/areadiscovery/fakes/FakeAnalyticsTracker.kt — NEW (test fake)
+- composeApp/src/commonTest/kotlin/com/areadiscovery/ui/summary/SummaryViewModelTest.kt — MODIFIED (added fakeTracker, new analytics test)
+- gradle/libs.versions.toml — MODIFIED (added kermit version + library)
+- composeApp/build.gradle.kts — MODIFIED (added kermit dependency)

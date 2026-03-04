@@ -46,12 +46,13 @@ class SummaryViewModel(
             try {
                 provider.streamAreaPortrait("Alfama, Lisbon", mockContext)
                     .collect { update ->
-                        _uiState.value = stateMapper.processUpdate(
+                        val newState = stateMapper.processUpdate(
                             _uiState.value,
                             update,
                             "Alfama, Lisbon",
                         )
-                        if (update is BucketUpdate.PortraitComplete) {
+                        _uiState.value = newState
+                        if (newState is SummaryUiState.Complete) {
                             analyticsTracker.trackEvent(
                                 "summary_viewed",
                                 mapOf("source" to "mock"),

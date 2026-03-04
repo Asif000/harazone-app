@@ -48,8 +48,13 @@ development_status:
   1-4-domain-models-and-mock-ai-provider: done
   1-5-streaming-composables-and-shared-ui-components: done
   1-6-summary-screen-with-mock-data-and-navigation-shell: done
-  1-7-analytics-and-crash-reporting-foundation: in-progress
+  1-7-analytics-and-crash-reporting-foundation: review
   epic-1-retrospective: optional
+
+# BACKLOG NOTES:
+# - iOS CocoaPods + Firebase (Story 1.7 Tasks 3 + 7): Deferred — no Podfile exists yet.
+#   Wire FirebaseAnalytics + FirebaseCrashlytics pods, then add FirebaseApp.configure()
+#   to iOSApp.swift. IosAnalyticsTracker is currently a no-op logging via Kermit.
 
   # Epic 2: Live Area Portrait & AI Integration (Phase 1a)
   epic-2: backlog

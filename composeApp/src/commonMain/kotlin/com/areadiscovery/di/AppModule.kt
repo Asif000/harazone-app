@@ -1,3 +1,7 @@
 package com.areadiscovery.di
 
-fun appModule() = listOf(dataModule, uiModule)
+import org.koin.core.module.Module
+
+expect fun platformModule(): Module
+
+fun appModule() = listOf(dataModule, uiModule, platformModule())
