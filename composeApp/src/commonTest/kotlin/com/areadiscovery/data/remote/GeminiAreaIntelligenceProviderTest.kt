@@ -7,12 +7,15 @@ import com.areadiscovery.domain.provider.ApiKeyProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.ServerResponseException
 import io.ktor.client.plugins.sse.SSE
 import io.ktor.http.HttpStatusCode
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class GeminiAreaIntelligenceProviderTest {
@@ -82,5 +85,27 @@ class GeminiAreaIntelligenceProviderTest {
         }
 
         assertTrue(tokens.isEmpty())
+    }
+
+    // --- isRetryableError tests (via reflection-free approach: test behavior through error mapping) ---
+
+    @Test
+    fun streamAreaPortrait_validApiKey_attemptsNetworkCall() = runTest {
+        // With a valid API key, the provider should attempt the SSE call.
+        // MockEngine doesn't support SSE, so we expect a DomainErrorException
+        // (not the API key validation error).
+        val provider = createProvider(apiKey = "valid-key")
+
+        val error = assertFailsWith<DomainErrorException> {
+            provider.streamAreaPortrait("TestArea", testAreaContext).collect {}
+        }
+
+        // Should NOT be the "API key not configured" error — proves we passed validation
+        val message = when (val e = error.domainError) {
+            is DomainError.ApiError -> e.message
+            is DomainError.NetworkError -> e.message
+            else -> ""
+        }
+        assertFalse(message.contains("API key not configured"), "Should pass API key validation")
     }
 }

@@ -292,9 +292,11 @@ Claude Opus 4.6 (claude-opus-4-6)
 - `composeApp/src/commonMain/kotlin/com/areadiscovery/data/remote/GeminiAreaIntelligenceProvider.kt`
 - `composeApp/src/commonTest/kotlin/com/areadiscovery/data/remote/GeminiPromptBuilderTest.kt`
 - `composeApp/src/commonTest/kotlin/com/areadiscovery/data/remote/GeminiResponseParserTest.kt`
+- `composeApp/src/commonTest/kotlin/com/areadiscovery/data/remote/GeminiAreaIntelligenceProviderTest.kt`
 
 **Modified files:**
 - `composeApp/src/commonMain/kotlin/com/areadiscovery/di/DataModule.kt`
+- `composeApp/src/commonMain/kotlin/com/areadiscovery/domain/model/DomainError.kt` (added `DomainErrorException` wrapper class)
 
 ## Change Log
 

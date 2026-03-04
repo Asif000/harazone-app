@@ -54,7 +54,6 @@ internal class GeminiAreaIntelligenceProvider(
         private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
         private const val MAX_RETRY_ATTEMPTS = 3
         private val RETRY_DELAYS_MS = longArrayOf(0L, 1000L, 2000L)
-        private const val STREAMING_WORD_DELAY_MS = 30L
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -109,9 +108,6 @@ internal class GeminiAreaIntelligenceProvider(
                         for (update in streamingParser.processChunk(text)) {
                             hasEmitted = true
                             emit(update)
-                            if (update is BucketUpdate.ContentDelta) {
-                                delay(STREAMING_WORD_DELAY_MS)
-                            }
                         }
                     }
                 }
@@ -120,9 +116,6 @@ internal class GeminiAreaIntelligenceProvider(
                 for (update in streamingParser.finish()) {
                     hasEmitted = true
                     emit(update)
-                    if (update is BucketUpdate.ContentDelta) {
-                        delay(STREAMING_WORD_DELAY_MS)
-                    }
                 }
 
                 AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete" }
@@ -155,6 +148,8 @@ internal class GeminiAreaIntelligenceProvider(
     private fun isRetryableError(e: Exception): Boolean = when (e) {
         is ServerResponseException -> true  // 5xx — transient server errors
         is ClientRequestException -> false  // 4xx — client errors, never retry
+        is kotlinx.serialization.SerializationException -> false  // Structural failure, never retry
+        is IllegalArgumentException, is IllegalStateException -> false  // Programming errors, never retry
         else -> true  // Timeouts, network errors — retryable
     }
 

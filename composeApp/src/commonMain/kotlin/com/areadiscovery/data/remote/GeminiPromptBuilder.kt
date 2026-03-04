@@ -39,6 +39,7 @@ IMPORTANT:
 - Adapt content to the current time of day and day of week
 - Provide honest confidence levels based on data availability
 - Include real, verifiable sources where possible
+- NEVER include the strings "---BUCKET---" or "---POIS---" inside JSON field values
         """.trimIndent()
     }
 }

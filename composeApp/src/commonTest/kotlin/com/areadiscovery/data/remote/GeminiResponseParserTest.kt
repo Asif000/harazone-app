@@ -225,6 +225,55 @@ not valid json either"""
     }
 
     @Test
+    fun streamingParser_handlesDelimiterSplitAcrossChunks() {
+        val streaming = parser.createStreamingParser()
+
+        // Chunk 1: first bucket JSON + partial delimiter "---BUCK"
+        val chunk1 = """{"type":"SAFETY","highlight":"Safe","content":"Low crime.","confidence":"HIGH","sources":[]}
+---BUCK"""
+        val updates1 = streaming.processChunk(chunk1)
+        // Delimiter not yet complete, so no bucket emitted
+        assertTrue(updates1.isEmpty(), "No emissions until delimiter is complete")
+
+        // Chunk 2: rest of delimiter "ET---" + second bucket + POIS
+        val chunk2 = """ET---
+{"type":"CHARACTER","highlight":"Vibrant","content":"Great culture.","confidence":"MEDIUM","sources":[]}
+---POIS---
+[]"""
+        val updates2 = streaming.processChunk(chunk2)
+        // Both buckets emitted once the delimiter completes and POIS delimiter is found
+        val bucketCompletes = updates2.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(2, bucketCompletes.size)
+        assertEquals(BucketType.SAFETY, bucketCompletes[0].content.type)
+        assertEquals(BucketType.CHARACTER, bucketCompletes[1].content.type)
+
+        // Finish should emit PortraitComplete with empty POIs
+        val finalUpdates = streaming.finish()
+        assertEquals(1, finalUpdates.size)
+        val portrait = finalUpdates[0] as BucketUpdate.PortraitComplete
+        assertTrue(portrait.pois.isEmpty())
+    }
+
+    @Test
+    fun streamingParser_skipsUnknownBucketType() {
+        val streaming = parser.createStreamingParser()
+
+        val input = """{"type":"UNKNOWN_TYPE","highlight":"Mystery","content":"Something.","confidence":"HIGH","sources":[]}
+---BUCKET---
+{"type":"SAFETY","highlight":"Safe","content":"Low crime.","confidence":"HIGH","sources":[]}
+---POIS---
+[]"""
+        val allUpdates = mutableListOf<BucketUpdate>()
+        allUpdates.addAll(streaming.processChunk(input))
+        allUpdates.addAll(streaming.finish())
+
+        // Unknown type bucket should be skipped, only SAFETY emitted
+        val bucketCompletes = allUpdates.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(1, bucketCompletes.size)
+        assertEquals(BucketType.SAFETY, bucketCompletes[0].content.type)
+    }
+
+    @Test
     fun streamingParser_cannotBeReusedAfterFinish() {
         val streaming = parser.createStreamingParser()
         streaming.finish()

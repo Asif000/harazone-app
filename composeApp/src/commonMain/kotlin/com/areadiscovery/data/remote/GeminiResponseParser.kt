@@ -123,8 +123,9 @@ internal class GeminiResponseParser {
     private fun parseBucketJson(jsonString: String): BucketContent? {
         return try {
             val bucketJson = json.decodeFromString<BucketJson>(jsonString)
+            val bucketType = parseBucketType(bucketJson.type) ?: return null
             BucketContent(
-                type = parseBucketType(bucketJson.type),
+                type = bucketType,
                 highlight = bucketJson.highlight,
                 content = bucketJson.content,
                 confidence = parseConfidence(bucketJson.confidence),
@@ -155,7 +156,7 @@ internal class GeminiResponseParser {
         }
     }
 
-    private fun parseBucketType(type: String): BucketType {
+    private fun parseBucketType(type: String): BucketType? {
         return when (type.uppercase()) {
             "SAFETY" -> BucketType.SAFETY
             "CHARACTER" -> BucketType.CHARACTER
@@ -164,8 +165,8 @@ internal class GeminiResponseParser {
             "HISTORY" -> BucketType.HISTORY
             "NEARBY" -> BucketType.NEARBY
             else -> {
-                AppLogger.d { "GeminiResponseParser: unknown bucket type '$type', defaulting to NEARBY" }
-                BucketType.NEARBY
+                AppLogger.d { "GeminiResponseParser: unknown bucket type '$type', skipping bucket" }
+                null
             }
         }
     }
@@ -186,7 +187,7 @@ internal class GeminiResponseParser {
         bucketContent: BucketContent,
         results: MutableList<BucketUpdate>
     ) {
-        val words = bucketContent.content.split(" ")
+        val words = bucketContent.content.split(Regex("\\s+")).filter { it.isNotEmpty() }
         for (word in words) {
             results.add(BucketUpdate.ContentDelta(bucketContent.type, "$word "))
         }
