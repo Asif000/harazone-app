@@ -14,6 +14,13 @@ object Spacing {
     val lg = 24.dp
     val xl = 32.dp
     val touchTarget = 48.dp
+
+    // Component-specific size tokens
+    val iconMd = 24.dp
+    val indicatorDot = 8.dp
+    val borderAccent = 3.dp
+    val skeletonTextWidth = 120.dp
+    val skeletonTextHeight = 20.dp
 }
 
 val LocalSpacing = staticCompositionLocalOf { Spacing }

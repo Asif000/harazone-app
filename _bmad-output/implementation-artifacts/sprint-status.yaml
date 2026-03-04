@@ -45,8 +45,8 @@ development_status:
   1-1-kmp-project-initialization-and-package-structure: done
   1-2-ci-cd-pipeline: done
   1-3-design-system-and-theme: done
-  1-4-domain-models-and-mock-ai-provider: backlog
-  1-5-streaming-composables-and-shared-ui-components: backlog
+  1-4-domain-models-and-mock-ai-provider: done
+  1-5-streaming-composables-and-shared-ui-components: done
   1-6-summary-screen-with-mock-data-and-navigation-shell: backlog
   1-7-analytics-and-crash-reporting-foundation: backlog
   epic-1-retrospective: optional
