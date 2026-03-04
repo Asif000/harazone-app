@@ -58,7 +58,7 @@ internal data class PoiJson(
     val longitude: Double? = null
 )
 
-class GeminiResponseParser {
+internal class GeminiResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -87,7 +87,7 @@ class GeminiResponseParser {
             for (bucketString in bucketStrings) {
                 val bucketContent = parseBucketJson(bucketString)
                 if (bucketContent != null) {
-                    updates.add(BucketUpdate.ContentDelta(bucketContent.type, bucketContent.content))
+                    emitWordByWordDeltas(bucketContent, updates)
                     updates.add(BucketUpdate.BucketComplete(bucketContent))
                 }
             }
@@ -182,6 +182,16 @@ class GeminiResponseParser {
         }
     }
 
+    private fun emitWordByWordDeltas(
+        bucketContent: BucketContent,
+        results: MutableList<BucketUpdate>
+    ) {
+        val words = bucketContent.content.split(" ")
+        for (word in words) {
+            results.add(BucketUpdate.ContentDelta(bucketContent.type, "$word "))
+        }
+    }
+
     fun createStreamingParser(): StreamingParser = StreamingParser()
 
     inner class StreamingParser {
@@ -189,8 +199,10 @@ class GeminiResponseParser {
         private val currentBucketText = StringBuilder()
         private val poisText = StringBuilder()
         private var inPoisSection = false
+        private var finished = false
 
         fun processChunk(text: String): List<BucketUpdate> {
+            check(!finished) { "StreamingParser cannot be reused after finish()" }
             buffer.append(text)
             val results = mutableListOf<BucketUpdate>()
             drainBuffer(results)
@@ -198,6 +210,8 @@ class GeminiResponseParser {
         }
 
         fun finish(): List<BucketUpdate> {
+            check(!finished) { "StreamingParser.finish() already called" }
+            finished = true
             val results = mutableListOf<BucketUpdate>()
 
             // Flush remaining buffer
@@ -213,14 +227,7 @@ class GeminiResponseParser {
 
             // Complete any remaining bucket
             if (!inPoisSection) {
-                val bucketJson = currentBucketText.toString().trim()
-                if (bucketJson.isNotEmpty()) {
-                    val bucketContent = parseBucketJson(bucketJson)
-                    if (bucketContent != null) {
-                        results.add(BucketUpdate.ContentDelta(bucketContent.type, bucketContent.content))
-                        results.add(BucketUpdate.BucketComplete(bucketContent))
-                    }
-                }
+                completeBucket(results)
             }
 
             // Parse POIs
@@ -231,20 +238,35 @@ class GeminiResponseParser {
             return results
         }
 
-        private fun drainBuffer(results: MutableList<BucketUpdate>) {
-            while (true) {
-                val str = buffer.toString()
-                if (str.isEmpty()) return
-
-                if (inPoisSection) {
-                    poisText.append(str)
-                    buffer.clear()
-                    return
+        private fun completeBucket(results: MutableList<BucketUpdate>) {
+            val bucketJson = currentBucketText.toString().trim()
+            if (bucketJson.isNotEmpty()) {
+                val bucketContent = parseBucketJson(bucketJson)
+                if (bucketContent != null) {
+                    emitWordByWordDeltas(bucketContent, results)
+                    results.add(BucketUpdate.BucketComplete(bucketContent))
                 }
+            }
+            currentBucketText.clear()
+        }
 
-                // Find earliest delimiter
-                val poisIdx = str.indexOf(POIS_DELIMITER)
-                val bucketIdx = str.indexOf(BUCKET_DELIMITER)
+        private fun drainBuffer(results: MutableList<BucketUpdate>) {
+            if (buffer.isEmpty()) return
+
+            if (inPoisSection) {
+                poisText.append(buffer)
+                buffer.clear()
+                return
+            }
+
+            // Single-pass: convert to string once, scan with position tracking
+            val str = buffer.toString()
+            var pos = 0
+
+            while (pos < str.length) {
+                // Find earliest delimiter from current position
+                val poisIdx = str.indexOf(POIS_DELIMITER, pos)
+                val bucketIdx = str.indexOf(BUCKET_DELIMITER, pos)
 
                 val delimIdx: Int
                 val delimLen: Int
@@ -257,31 +279,26 @@ class GeminiResponseParser {
                     bucketIdx >= 0 -> {
                         delimIdx = bucketIdx; delimLen = BUCKET_DELIMITER.length; isPois = false
                     }
-                    else -> return // No complete delimiter yet, keep buffering
+                    else -> break // No more delimiters
                 }
 
                 // Text before delimiter belongs to current bucket
-                val beforeDelim = str.substring(0, delimIdx)
-                currentBucketText.append(beforeDelim)
+                currentBucketText.append(str, pos, delimIdx)
+                completeBucket(results)
 
-                // Complete current bucket
-                val bucketJson = currentBucketText.toString().trim()
-                if (bucketJson.isNotEmpty()) {
-                    val bucketContent = parseBucketJson(bucketJson)
-                    if (bucketContent != null) {
-                        results.add(BucketUpdate.ContentDelta(bucketContent.type, bucketContent.content))
-                        results.add(BucketUpdate.BucketComplete(bucketContent))
-                    }
-                }
-                currentBucketText.clear()
-
-                // Advance past delimiter
-                buffer.clear()
-                buffer.append(str.substring(delimIdx + delimLen))
+                pos = delimIdx + delimLen
 
                 if (isPois) {
                     inPoisSection = true
+                    poisText.append(str, pos, str.length)
+                    pos = str.length
                 }
+            }
+
+            // Keep unprocessed remainder in buffer
+            buffer.clear()
+            if (pos < str.length) {
+                buffer.append(str, pos, str.length)
             }
         }
     }

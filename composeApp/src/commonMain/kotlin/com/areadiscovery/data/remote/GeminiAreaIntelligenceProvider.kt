@@ -5,6 +5,7 @@ import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.ChatMessage
 import com.areadiscovery.domain.model.ChatToken
 import com.areadiscovery.domain.model.DomainError
+import com.areadiscovery.domain.model.DomainErrorException
 import com.areadiscovery.domain.provider.ApiKeyProvider
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.util.AppLogger
@@ -41,7 +42,7 @@ private data class GeminiRequestPart(
     val text: String
 )
 
-class GeminiAreaIntelligenceProvider(
+internal class GeminiAreaIntelligenceProvider(
     private val httpClient: HttpClient,
     private val apiKeyProvider: ApiKeyProvider,
     private val promptBuilder: GeminiPromptBuilder,
@@ -77,6 +78,7 @@ class GeminiAreaIntelligenceProvider(
         )
 
         var lastError: Exception? = null
+        var hasEmitted = false
 
         for (attempt in 0 until MAX_RETRY_ATTEMPTS) {
             if (attempt > 0) {
@@ -104,6 +106,7 @@ class GeminiAreaIntelligenceProvider(
 
                         // Emit updates incrementally as SSE chunks arrive
                         for (update in streamingParser.processChunk(text)) {
+                            hasEmitted = true
                             emit(update)
                         }
                     }
@@ -111,6 +114,7 @@ class GeminiAreaIntelligenceProvider(
 
                 // Finalize: emit any remaining bucket + PortraitComplete
                 for (update in streamingParser.finish()) {
+                    hasEmitted = true
                     emit(update)
                 }
 
@@ -125,7 +129,8 @@ class GeminiAreaIntelligenceProvider(
                 lastError = e
                 AppLogger.e(e) { "GeminiAreaIntelligenceProvider: attempt ${attempt + 1} failed" }
 
-                if (!isRetryableError(e)) {
+                // Never retry if partial data already emitted — collector has stale state
+                if (hasEmitted || !isRetryableError(e)) {
                     throw mapToDomainErrorException(e)
                 }
             }
@@ -163,19 +168,16 @@ class GeminiAreaIntelligenceProvider(
                 val message = e.message?.lowercase() ?: ""
                 when {
                     message.contains("timeout") -> DomainError.NetworkError("Request timed out")
-                    else -> DomainError.NetworkError("No internet connection")
+                    message.contains("dns") || message.contains("unknownhost") || message.contains("unresolved") ->
+                        DomainError.NetworkError("DNS resolution failed")
+                    message.contains("ssl") || message.contains("tls") || message.contains("certificate") ->
+                        DomainError.NetworkError("SSL/TLS error")
+                    message.contains("refused") ->
+                        DomainError.NetworkError("Connection refused")
+                    else -> DomainError.NetworkError("Network error")
                 }
             }
         }
         return DomainErrorException(domainError)
     }
 }
-
-class DomainErrorException(val domainError: DomainError) : Exception(
-    when (domainError) {
-        is DomainError.NetworkError -> domainError.message
-        is DomainError.ApiError -> domainError.message
-        is DomainError.CacheError -> domainError.message
-        is DomainError.LocationError -> domainError.message
-    }
-)

@@ -5,6 +5,7 @@ import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.Confidence
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -56,18 +57,23 @@ not valid json either"""
         assertTrue(result.isSuccess)
         val updates = result.getOrThrow()
 
-        // 6 buckets × 2 (ContentDelta + BucketComplete) + 1 PortraitComplete = 13
-        assertEquals(13, updates.size)
-
-        // Check first bucket
+        // Word-by-word ContentDelta emissions + 6 BucketComplete + 1 PortraitComplete
+        // First emission is a word-level ContentDelta for SAFETY
         val firstDelta = updates[0] as BucketUpdate.ContentDelta
         assertEquals(BucketType.SAFETY, firstDelta.bucketType)
 
-        val firstComplete = updates[1] as BucketUpdate.BucketComplete
-        assertEquals(BucketType.SAFETY, firstComplete.content.type)
-        assertEquals("Alfama is generally safe.", firstComplete.content.highlight)
-        assertEquals(Confidence.HIGH, firstComplete.content.confidence)
-        assertEquals(1, firstComplete.content.sources.size)
+        // Count BucketComplete emissions — should be exactly 6
+        val bucketCompletes = updates.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(6, bucketCompletes.size)
+        assertEquals(BucketType.SAFETY, bucketCompletes[0].content.type)
+        assertEquals("Alfama is generally safe.", bucketCompletes[0].content.highlight)
+        assertEquals(Confidence.HIGH, bucketCompletes[0].content.confidence)
+        assertEquals(1, bucketCompletes[0].content.sources.size)
+
+        // Multiple ContentDelta per bucket (word-by-word streaming)
+        val safetyDeltas = updates.filterIsInstance<BucketUpdate.ContentDelta>()
+            .filter { it.bucketType == BucketType.SAFETY }
+        assertTrue(safetyDeltas.size > 1, "Should emit multiple ContentDelta per bucket")
 
         // Check last emission is PortraitComplete with POIs
         val portrait = updates.last() as BucketUpdate.PortraitComplete
@@ -83,8 +89,8 @@ not valid json either"""
         assertTrue(result.isSuccess)
         val updates = result.getOrThrow()
 
-        // 2 buckets × 2 + 1 PortraitComplete = 5
-        assertEquals(5, updates.size)
+        val bucketCompletes = updates.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(2, bucketCompletes.size)
 
         val portrait = updates.last() as BucketUpdate.PortraitComplete
         assertTrue(portrait.pois.isEmpty())
@@ -97,14 +103,11 @@ not valid json either"""
         assertTrue(result.isSuccess)
         val updates = result.getOrThrow()
 
-        // 2 valid buckets × 2 + 1 PortraitComplete = 5 (malformed bucket skipped)
-        assertEquals(5, updates.size)
-
-        val firstComplete = updates[1] as BucketUpdate.BucketComplete
-        assertEquals(BucketType.SAFETY, firstComplete.content.type)
-
-        val secondComplete = updates[3] as BucketUpdate.BucketComplete
-        assertEquals(BucketType.HISTORY, secondComplete.content.type)
+        // 2 valid buckets (malformed bucket skipped)
+        val bucketCompletes = updates.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(2, bucketCompletes.size)
+        assertEquals(BucketType.SAFETY, bucketCompletes[0].content.type)
+        assertEquals(BucketType.HISTORY, bucketCompletes[1].content.type)
 
         // POIs should be empty due to malformed JSON
         val portrait = updates.last() as BucketUpdate.PortraitComplete
@@ -150,21 +153,24 @@ not valid json either"""
         // Feed delimiter + start of next bucket
         val chunk2 = "\n---BUCKET---\n{\"type\":\"CHARACTER\""
         val updates2 = streaming.processChunk(chunk2)
-        assertEquals(2, updates2.size, "Should emit ContentDelta + BucketComplete for first bucket")
-        val delta = updates2[0] as BucketUpdate.ContentDelta
-        assertEquals(BucketType.SAFETY, delta.bucketType)
-        assertEquals("Low crime area.", delta.textDelta)
-        val complete = updates2[1] as BucketUpdate.BucketComplete
-        assertEquals(BucketType.SAFETY, complete.content.type)
-        assertEquals("Safe area", complete.content.highlight)
+        // Word-by-word deltas + BucketComplete for first bucket
+        val bucket1Completes = updates2.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(1, bucket1Completes.size)
+        assertEquals(BucketType.SAFETY, bucket1Completes[0].content.type)
+        assertEquals("Safe area", bucket1Completes[0].content.highlight)
+        // Multiple word-level ContentDelta emissions
+        val bucket1Deltas = updates2.filterIsInstance<BucketUpdate.ContentDelta>()
+        assertTrue(bucket1Deltas.isNotEmpty())
+        assertTrue(bucket1Deltas.all { it.bucketType == BucketType.SAFETY })
 
         // Feed rest of second bucket + POIS delimiter + POIs
         val chunk3 = ""","highlight":"Vibrant","content":"Great culture.","confidence":"MEDIUM","sources":[]}
 ---POIS---
 [{"name":"Park","type":"park","description":"Nice park","confidence":"HIGH"}]"""
         val updates3 = streaming.processChunk(chunk3)
-        assertEquals(2, updates3.size, "Should emit ContentDelta + BucketComplete for second bucket")
-        assertEquals(BucketType.CHARACTER, (updates3[0] as BucketUpdate.ContentDelta).bucketType)
+        val bucket2Completes = updates3.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(1, bucket2Completes.size)
+        assertEquals(BucketType.CHARACTER, bucket2Completes[0].content.type)
 
         // Finish
         val finalUpdates = streaming.finish()
@@ -182,10 +188,9 @@ not valid json either"""
         allUpdates.addAll(streaming.processChunk(COMPLETE_RESPONSE))
         allUpdates.addAll(streaming.finish())
 
-        // 6 buckets × 2 (ContentDelta + BucketComplete) + 1 PortraitComplete = 13
-        assertEquals(13, allUpdates.size)
-
-        // Verify first and last
+        // 6 BucketComplete + 1 PortraitComplete + many word-level ContentDeltas
+        val bucketCompletes = allUpdates.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(6, bucketCompletes.size)
         assertEquals(BucketType.SAFETY, (allUpdates[0] as BucketUpdate.ContentDelta).bucketType)
         val portrait = allUpdates.last() as BucketUpdate.PortraitComplete
         assertEquals(2, portrait.pois.size)
@@ -199,12 +204,11 @@ not valid json either"""
         allUpdates.addAll(streaming.processChunk(MALFORMED_SSE))
         allUpdates.addAll(streaming.finish())
 
-        // 2 valid buckets × 2 + 1 PortraitComplete = 5
-        assertEquals(5, allUpdates.size)
-        val firstComplete = allUpdates[1] as BucketUpdate.BucketComplete
-        assertEquals(BucketType.SAFETY, firstComplete.content.type)
-        val secondComplete = allUpdates[3] as BucketUpdate.BucketComplete
-        assertEquals(BucketType.HISTORY, secondComplete.content.type)
+        // 2 valid buckets (malformed bucket skipped)
+        val bucketCompletes = allUpdates.filterIsInstance<BucketUpdate.BucketComplete>()
+        assertEquals(2, bucketCompletes.size)
+        assertEquals(BucketType.SAFETY, bucketCompletes[0].content.type)
+        assertEquals(BucketType.HISTORY, bucketCompletes[1].content.type)
         assertTrue((allUpdates.last() as BucketUpdate.PortraitComplete).pois.isEmpty())
     }
 
@@ -218,5 +222,18 @@ not valid json either"""
 
         assertEquals(1, allUpdates.size)
         assertTrue((allUpdates[0] as BucketUpdate.PortraitComplete).pois.isEmpty())
+    }
+
+    @Test
+    fun streamingParser_cannotBeReusedAfterFinish() {
+        val streaming = parser.createStreamingParser()
+        streaming.finish()
+
+        assertFailsWith<IllegalStateException> {
+            streaming.processChunk("text")
+        }
+        assertFailsWith<IllegalStateException> {
+            streaming.finish()
+        }
     }
 }
