@@ -1,5 +1,6 @@
 package com.areadiscovery.ui.theme
 
+import androidx.compose.ui.unit.sp
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
