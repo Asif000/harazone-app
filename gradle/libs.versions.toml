@@ -23,6 +23,8 @@ buildkonfig = "0.17.1"
 kotlinx-serialization = "1.8.1"
 kotlinx-coroutines = "1.10.2"
 turbine = "1.2.0"
+kermit = "2.0.4"
+androidx-navigation = "2.9.1"
 
 [libraries]
 kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
@@ -43,6 +45,7 @@ compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "composeMul
 compose-components-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "composeMultiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "composeMultiplatform" }
 compose-material-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version = "1.7.3" }
+androidx-navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "androidx-navigation" }
 
 # Ktor
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -72,6 +75,9 @@ sqldelight-native-driver = { module = "app.cash.sqldelight:native-driver", versi
 
 # MapLibre (Android only)
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
+
+# Logging
+kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }
 
 # Testing
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
