@@ -186,6 +186,7 @@ class MapViewModelTest {
         )
 
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, analyticsTracker.recordedEvents.count { it.first == "map_opened" })
         analyticsTracker.assertEventTracked(
             "map_opened",
             mapOf("area_name" to "Manhattan, New York", "poi_count" to "1"),

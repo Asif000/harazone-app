@@ -235,7 +235,8 @@ claude-opus-4-6
 ### Change Log
 
 - 2026-03-04: Story 3.2 implementation complete — all 4 tasks, 9 passing tests
-- 2026-03-05: Address code review findings (1C, 3M, 3L): C1 fix duplicate ViewModel (App.kt→AppNavigation→MapScreen param pass-through), M1 AC2 partial noted, M3 createViewModel() uses interface types, L1 test renamed
+- 2026-03-05: Address round 1 code review findings (1C, 3M, 3L): C1 fix duplicate ViewModel (App.kt→AppNavigation→MapScreen param pass-through), M1 AC2 partial noted, M3 createViewModel() uses interface types, L1 test renamed
+- 2026-03-05: Address round 2 code review findings (1M, 2L): M1 stale markers fix (remove early return on empty pois), L2 assert map_opened fires exactly once, L1/M4/L3 already fixed in round 1
 
 ### File List
 

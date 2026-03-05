@@ -56,7 +56,6 @@ actual fun MapComposable(
     // TODO: Replace default pin markers with custom icons per POI type using
     //  org.maplibre.gl:android-plugin-annotation-v9 SymbolManager (deferred to next cycle)
     LaunchedEffect(pois) {
-        if (pois.isEmpty()) return@LaunchedEffect
         mapView.getMapAsync { map ->
             map.markers.forEach { map.removeMarker(it) }
             pois.filter { it.latitude != null && it.longitude != null }.forEach { poi ->
