@@ -6,8 +6,13 @@ import com.areadiscovery.data.local.AreaDiscoveryDatabase
 import com.areadiscovery.domain.model.AreaContext
 import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.domain.model.BucketUpdate
+import com.areadiscovery.domain.model.ConnectivityState
+import com.areadiscovery.domain.model.DomainError
+import com.areadiscovery.domain.model.DomainErrorException
 import com.areadiscovery.fakes.FakeAreaIntelligenceProvider
 import com.areadiscovery.fakes.FakeClock
+import com.areadiscovery.fakes.FakeConnectivityMonitor
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -24,6 +29,7 @@ class AreaRepositoryTest {
     private lateinit var database: AreaDiscoveryDatabase
     private lateinit var fakeProvider: FakeAreaIntelligenceProvider
     private lateinit var fakeClock: FakeClock
+    private lateinit var fakeConnectivity: FakeConnectivityMonitor
     private lateinit var repository: AreaRepositoryImpl
     private val testScope = TestScope()
 
@@ -41,8 +47,13 @@ class AreaRepositoryTest {
         database = AreaDiscoveryDatabase(driver)
         fakeProvider = FakeAreaIntelligenceProvider()
         fakeClock = FakeClock(nowMs = 1_000_000_000L)
+        fakeConnectivity = FakeConnectivityMonitor()
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
-        repository = AreaRepositoryImpl(fakeProvider, database, testScope, fakeClock, testDispatcher)
+        repository = AreaRepositoryImpl(
+            fakeProvider, database, testScope, fakeClock,
+            connectivityObserver = { fakeConnectivity.observe() },
+            ioDispatcher = testDispatcher
+        )
     }
 
     @AfterTest
@@ -357,5 +368,141 @@ class AreaRepositoryTest {
         // (c) Background refresh triggered
         testScheduler.advanceUntilIdle()
         assertEquals(1, fakeProvider.callCount, "Background refresh should be triggered for mixed stale/valid")
+    }
+
+    // --- Resilience tests (Story 2.4) ---
+
+    @Test
+    fun offlineWithCacheServesCachedContentWithNote() = testScope.runTest {
+        fakeConnectivity.setState(ConnectivityState.Offline)
+
+        // Pre-populate stale cache
+        BucketType.entries.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = "Test Area",
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Cached $type",
+                content = "Cached content $type",
+                confidence = "MEDIUM",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() - 1L,
+                created_at = fakeClock.nowMs() - 100_000L
+            )
+        }
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+            }
+            val note = awaitItem()
+            assertIs<BucketUpdate.ContentAvailabilityNote>(note)
+            assertEquals("You're offline — showing last known content", note.message)
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+
+        assertEquals(0, fakeProvider.callCount, "AI provider should NOT be called when offline")
+    }
+
+    @Test
+    fun offlineNoCacheEmitsNoteAndPortraitComplete() = testScope.runTest {
+        fakeConnectivity.setState(ConnectivityState.Offline)
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val note = awaitItem()
+            assertIs<BucketUpdate.ContentAvailabilityNote>(note)
+            assertEquals("No content available offline for this area", note.message)
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+
+        assertEquals(0, fakeProvider.callCount, "AI provider should NOT be called when offline")
+    }
+
+    @Test
+    fun aiFailureWithPartialCacheServesCachedWithNote() = testScope.runTest {
+        fakeConnectivity.setState(ConnectivityState.Online)
+
+        // Insert 3 valid buckets (not all 6 — so not a full cache hit)
+        val partialTypes = listOf(BucketType.HISTORY, BucketType.CHARACTER, BucketType.SAFETY)
+        partialTypes.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = "Test Area",
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Cached $type",
+                content = "Cached content $type",
+                confidence = "HIGH",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() + 100_000L,
+                created_at = fakeClock.nowMs()
+            )
+        }
+
+        // AI provider throws
+        fakeProvider.responseFlow = flow {
+            throw DomainErrorException(DomainError.NetworkError("Connection failed"))
+        }
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            // Catch block re-queries DB — finds 3 cached entries
+            repeat(partialTypes.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+            }
+            val note = awaitItem()
+            assertIs<BucketUpdate.ContentAvailabilityNote>(note)
+            assertEquals("Content from cache — may not be current", note.message)
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun aiFailureNoCacheEmitsNoteAndPortraitComplete() = testScope.runTest {
+        fakeConnectivity.setState(ConnectivityState.Online)
+
+        // No cache, AI fails
+        fakeProvider.responseFlow = flow {
+            throw DomainErrorException(DomainError.NetworkError("Connection failed"))
+        }
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val note = awaitItem()
+            assertIs<BucketUpdate.ContentAvailabilityNote>(note)
+            assertEquals("Could not load area content — please try again", note.message)
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun onlineNormalPathUnchanged() = testScope.runTest {
+        fakeConnectivity.setState(ConnectivityState.Online)
+
+        // Cache miss, provider succeeds — normal path
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+            }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+
+        assertEquals(1, fakeProvider.callCount, "AI provider should be called once for cache miss")
+
+        // Verify cache was populated
+        val cached = database.area_bucket_cacheQueries
+            .getBucketsByAreaAndLanguage("Test Area", "en")
+            .executeAsList()
+        assertEquals(BucketType.entries.size, cached.size)
     }
 }

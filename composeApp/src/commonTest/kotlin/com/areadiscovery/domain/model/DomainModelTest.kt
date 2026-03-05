@@ -146,6 +146,7 @@ class DomainModelTest {
                 is BucketUpdate.ContentDelta -> "delta"
                 is BucketUpdate.BucketComplete -> "complete"
                 is BucketUpdate.PortraitComplete -> "portrait"
+                is BucketUpdate.ContentAvailabilityNote -> "note"
             }
         }
         assertEquals(listOf("delta", "complete", "portrait"), types)

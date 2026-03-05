@@ -13,4 +13,8 @@ sealed class BucketUpdate {
     data class PortraitComplete(
         val pois: List<POI>
     ) : BucketUpdate()
+
+    data class ContentAvailabilityNote(
+        val message: String
+    ) : BucketUpdate()
 }

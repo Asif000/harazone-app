@@ -7,18 +7,21 @@ import com.areadiscovery.domain.model.BucketContent
 import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.Confidence
+import com.areadiscovery.domain.model.ConnectivityState
 import com.areadiscovery.domain.model.Source
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.util.AppClock
 import com.areadiscovery.util.AppLogger
 import com.areadiscovery.util.SystemClock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
@@ -31,6 +34,7 @@ class AreaRepositoryImpl(
     private val database: AreaDiscoveryDatabase,
     private val scope: CoroutineScope,
     private val clock: AppClock = SystemClock(),
+    private val connectivityObserver: () -> Flow<ConnectivityState>,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AreaRepository {
 
@@ -71,6 +75,21 @@ class AreaRepositoryImpl(
             return@flow
         }
 
+        // Check connectivity before attempting AI call
+        val connectivity = connectivityObserver().first()
+
+        if (connectivity is ConnectivityState.Offline) {
+            val allCached = validParsed + staleParsed
+            if (allCached.isNotEmpty()) {
+                allCached.forEach { emit(BucketUpdate.BucketComplete(it)) }
+                emit(BucketUpdate.ContentAvailabilityNote("You're offline — showing last known content"))
+            } else {
+                emit(BucketUpdate.ContentAvailabilityNote("No content available offline for this area"))
+            }
+            emit(BucketUpdate.PortraitComplete(pois = emptyList()))
+            return@flow
+        }
+
         if (staleParsed.isNotEmpty()) {
             // Stale-while-revalidate: emit cached content immediately, refresh in background.
             // Errors in the background refresh are silently logged — intentional:
@@ -93,14 +112,29 @@ class AreaRepositoryImpl(
             return@flow
         }
 
-        // Cache miss — stream from AI, write each bucket as it completes.
-        // Unlike stale-revalidate, errors here propagate to the caller —
-        // there is no cached content to fall back on.
-        aiProvider.streamAreaPortrait(areaName, context).collect { update ->
-            emit(update)
-            if (update is BucketUpdate.BucketComplete) {
-                writeToCache(update.content, areaName, language)
+        // Cache miss — stream from AI with error fallback
+        try {
+            aiProvider.streamAreaPortrait(areaName, context).collect { update ->
+                emit(update)
+                if (update is BucketUpdate.BucketComplete) {
+                    writeToCache(update.content, areaName, language)
+                }
             }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.e(e) { "AI provider failed — falling back to cache" }
+            val allCached = database.area_bucket_cacheQueries
+                .getBucketsByAreaAndLanguage(areaName, language)
+                .executeAsList()
+                .mapNotNull { it.toBucketContent() }
+            if (allCached.isNotEmpty()) {
+                allCached.forEach { emit(BucketUpdate.BucketComplete(it)) }
+                emit(BucketUpdate.ContentAvailabilityNote("Content from cache — may not be current"))
+            } else {
+                emit(BucketUpdate.ContentAvailabilityNote("Could not load area content — please try again"))
+            }
+            emit(BucketUpdate.PortraitComplete(pois = emptyList()))
         }
     }.flowOn(ioDispatcher)
 

@@ -14,6 +14,7 @@ import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.service.PrivacyPipeline
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
 import com.areadiscovery.util.AppClock
+import com.areadiscovery.util.ConnectivityMonitor
 import com.areadiscovery.util.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,14 @@ val dataModule = module {
     single { AreaDiscoveryDatabase(get<DatabaseDriverFactory>().createDriver()) }
     single<AppClock> { SystemClock() }
     single(named("appScope")) { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
-    single<AreaRepository> { AreaRepositoryImpl(get(), get(), get(named("appScope")), get()) }
+    single<AreaRepository> {
+        AreaRepositoryImpl(
+            aiProvider = get(),
+            database = get(),
+            scope = get(named("appScope")),
+            clock = get(),
+            connectivityObserver = { get<ConnectivityMonitor>().observe() }
+        )
+    }
     factory { GetAreaPortraitUseCase(get()) }
 }

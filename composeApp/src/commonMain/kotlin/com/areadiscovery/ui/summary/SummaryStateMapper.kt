@@ -13,6 +13,7 @@ class SummaryStateMapper {
             is BucketUpdate.ContentDelta -> handleContentDelta(currentState, update, areaName)
             is BucketUpdate.BucketComplete -> handleBucketComplete(currentState, update)
             is BucketUpdate.PortraitComplete -> handlePortraitComplete(currentState, update)
+            is BucketUpdate.ContentAvailabilityNote -> currentState
         }
     }
 

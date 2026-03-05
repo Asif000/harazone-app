@@ -9,6 +9,7 @@ import com.areadiscovery.domain.model.DomainErrorException
 import com.areadiscovery.domain.provider.ApiKeyProvider
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.util.AppLogger
+import com.areadiscovery.util.withRetry
 import io.ktor.client.HttpClient
 import io.ktor.client.plugins.sse.sse
 import io.ktor.http.ContentType
@@ -19,7 +20,6 @@ import io.ktor.client.request.setBody
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
@@ -53,7 +53,6 @@ internal class GeminiAreaIntelligenceProvider(
         const val GEMINI_MODEL = "gemini-2.5-flash"
         private const val BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
         private const val MAX_RETRY_ATTEMPTS = 3
-        private val RETRY_DELAYS_MS = longArrayOf(0L, 1000L, 2000L)
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -77,16 +76,9 @@ internal class GeminiAreaIntelligenceProvider(
             )
         )
 
-        var lastError: Exception? = null
         var hasEmitted = false
 
-        for (attempt in 0 until MAX_RETRY_ATTEMPTS) {
-            if (attempt > 0) {
-                val delayMs = RETRY_DELAYS_MS[attempt]
-                AppLogger.d { "GeminiAreaIntelligenceProvider: retry attempt ${attempt + 1} after ${delayMs}ms" }
-                delay(delayMs)
-            }
-
+        val result = withRetry(maxAttempts = MAX_RETRY_ATTEMPTS) {
             try {
                 val streamingParser = responseParser.createStreamingParser()
 
@@ -104,7 +96,6 @@ internal class GeminiAreaIntelligenceProvider(
                         val data = event.data ?: return@collect
                         val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
 
-                        // Emit updates incrementally as SSE chunks arrive
                         for (update in streamingParser.processChunk(text)) {
                             hasEmitted = true
                             emit(update)
@@ -112,31 +103,25 @@ internal class GeminiAreaIntelligenceProvider(
                     }
                 }
 
-                // Finalize: emit any remaining bucket + PortraitComplete
                 for (update in streamingParser.finish()) {
                     hasEmitted = true
                     emit(update)
                 }
 
                 AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete" }
-                return@flow
-
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: DomainErrorException) {
-                throw e
             } catch (e: Exception) {
-                lastError = e
-                AppLogger.e(e) { "GeminiAreaIntelligenceProvider: attempt ${attempt + 1} failed" }
-
-                // Never retry if partial data already emitted — collector has stale state
-                if (hasEmitted || !isRetryableError(e)) {
-                    throw mapToDomainErrorException(e)
-                }
+                // Never retry if partial data already emitted or error is non-retryable
+                if (hasEmitted || !isRetryableError(e)) throw mapToDomainErrorException(e)
+                throw e // retryable — let withRetry catch and retry
             }
         }
 
-        throw mapToDomainErrorException(lastError ?: Exception("Unknown error after $MAX_RETRY_ATTEMPTS attempts"))
+        if (result.isFailure) {
+            val error = result.exceptionOrNull() ?: Exception("Unknown error")
+            throw if (error is DomainErrorException) error else mapToDomainErrorException(error as Exception)
+        }
     }
 
     override fun streamChatResponse(
