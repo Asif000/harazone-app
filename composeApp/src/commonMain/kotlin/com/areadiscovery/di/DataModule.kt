@@ -17,6 +17,7 @@ import com.areadiscovery.util.AppClock
 import com.areadiscovery.util.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.SupervisorJob
 import org.koin.core.qualifier.named
 import org.koin.dsl.module
@@ -35,7 +36,7 @@ val dataModule = module {
     // Database & caching (Story 2.3)
     single { AreaDiscoveryDatabase(get<DatabaseDriverFactory>().createDriver()) }
     single<AppClock> { SystemClock() }
-    single(named("appScope")) { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+    single(named("appScope")) { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
     single<AreaRepository> { AreaRepositoryImpl(get(), get(), get(named("appScope")), get()) }
     factory { GetAreaPortraitUseCase(get()) }
 }

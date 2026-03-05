@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -54,13 +55,18 @@ class AreaRepositoryImpl(
             .getBucketsByAreaAndLanguage(areaName, language)
             .executeAsList()
 
-        // M1: Clean up expired cache entries after reading current area's data
+        // Clean up expired cache entries after reading current area's data
         database.area_bucket_cacheQueries.deleteExpiredBuckets(now)
 
         val validBuckets = cached.filter { it.expires_at > now }
         val staleBuckets = cached.filter { it.expires_at <= now }
 
-        if (validBuckets.size == BucketType.entries.size) {
+        // M2: Count only rows that map to known types for cache hit check
+        val knownValidCount = validBuckets.count { row ->
+            BucketType.entries.any { it.name == row.bucket_type }
+        }
+
+        if (knownValidCount == BucketType.entries.size) {
             // Full cache hit — emit all from cache
             validBuckets.forEach { row ->
                 row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
@@ -70,21 +76,25 @@ class AreaRepositoryImpl(
         }
 
         if (staleBuckets.isNotEmpty()) {
-            // Stale-while-revalidate — emit only stale buckets immediately (M2)
+            // Stale-while-revalidate: emit cached content immediately, refresh in background.
+            // Errors in the background refresh are silently logged (L3: intentional —
+            // the caller already has stale content to display; propagating a refresh
+            // failure would disrupt the UI for no user benefit).
             staleBuckets.forEach { row ->
                 row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
             }
-            // Also emit any still-valid buckets
             validBuckets.forEach { row ->
                 row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
             }
-            // H1: Background refresh with exception handling
+            // M3: Use withContext(IO) for DB writes in background refresh
             scope.launch {
                 aiProvider.streamAreaPortrait(areaName, context)
                     .catch { e -> AppLogger.e(e) { "Background refresh failed for area: $areaName" } }
                     .collect { update ->
                         if (update is BucketUpdate.BucketComplete) {
-                            writeToCache(update.content, areaName, language)
+                            withContext(Dispatchers.IO) {
+                                writeToCache(update.content, areaName, language)
+                            }
                         }
                     }
             }
@@ -92,14 +102,16 @@ class AreaRepositoryImpl(
             return@flow
         }
 
-        // Cache miss — stream from AI, write each bucket as it completes
+        // Cache miss — stream from AI, write each bucket as it completes.
+        // Unlike stale-revalidate, errors here propagate to the caller (L3: intentional —
+        // there is no cached content to fall back on).
         aiProvider.streamAreaPortrait(areaName, context).collect { update ->
             emit(update)
             if (update is BucketUpdate.BucketComplete) {
                 writeToCache(update.content, areaName, language)
             }
         }
-    }.flowOn(Dispatchers.IO) // H2: DB reads/writes off Main thread
+    }.flowOn(Dispatchers.IO) // DB reads/writes off Main thread
 
     private fun writeToCache(bucket: BucketContent, areaName: String, language: String) {
         val now = clock.nowMs()
@@ -118,7 +130,7 @@ class AreaRepositoryImpl(
         )
     }
 
-    // H3: Safe enum parsing — returns null for unrecognized values
+    // Safe parsing — returns null for unrecognized values or corrupted JSON
     private fun Area_bucket_cache.toBucketContent(): BucketContent? {
         val type = BucketType.entries.firstOrNull { it.name == bucket_type } ?: run {
             AppLogger.d { "Skipping unknown bucket type in cache: $bucket_type" }
@@ -128,12 +140,19 @@ class AreaRepositoryImpl(
             AppLogger.d { "Skipping unknown confidence in cache: $confidence" }
             return null
         }
+        // M1: Protect against corrupted sources_json
+        val parsedSources = try {
+            json.decodeFromString<List<Source>>(sources_json)
+        } catch (e: Exception) {
+            AppLogger.e(e) { "Failed to parse sources_json for $bucket_type in $area_name" }
+            emptyList()
+        }
         return BucketContent(
             type = type,
             highlight = highlight,
             content = content,
             confidence = conf,
-            sources = json.decodeFromString(sources_json)
+            sources = parsedSources
         )
     }
 }
