@@ -67,7 +67,7 @@ development_status:
 
   # Epic 3: Interactive Map & POI Discovery (Phase 1a)
   epic-3: in-progress
-  3-1-maplibre-integration-and-base-map: review
+  3-1-maplibre-integration-and-base-map: done
   3-2-ai-generated-poi-markers: backlog
   3-3-poi-detail-card-and-bottom-sheet: backlog
   3-4-poi-accessible-list-view: backlog
