@@ -96,14 +96,20 @@ class MapViewModelTest {
     @Test
     fun geocodeFailureTransitionsToLocationFailed() = runTest(testDispatcher) {
 
+        val areaRepository = FakeAreaRepository()
+        val contextFactory = FakeAreaContextFactory()
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
                 geocodeResult = Result.failure(RuntimeException("Geocoding failed")),
             ),
+            areaRepository = areaRepository,
+            areaContextFactory = contextFactory,
         )
 
         val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
         assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
+        assertEquals(0, areaRepository.callCount)
+        assertEquals(0, contextFactory.callCount)
     }
 
     @Test

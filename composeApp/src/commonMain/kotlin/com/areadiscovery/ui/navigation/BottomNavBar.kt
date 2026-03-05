@@ -69,7 +69,9 @@ fun BottomNavBar(navController: NavController, mapPoiCount: Int = 0) {
                 icon = {
                     if (isMapItem) {
                         BadgedBox(badge = {
-                            if (mapPoiCount > 0) Badge { Text(mapPoiCount.toString()) }
+                            if (mapPoiCount > 0) Badge {
+                                Text(if (mapPoiCount > 99) "99+" else mapPoiCount.toString())
+                            }
                         }) {
                             Icon(imageVector = item.icon, contentDescription = null)
                         }

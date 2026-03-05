@@ -36,6 +36,7 @@ actual fun MapComposable(
 
     val poiMarkers = remember { mutableListOf<Marker>() }
     val poiVersion = remember { intArrayOf(0) }
+    val isDestroyed = remember { booleanArrayOf(false) }
 
     val mapView = remember {
         /* Initialize MapLibre singleton — return value unused (side-effect only) */
@@ -66,8 +67,8 @@ actual fun MapComposable(
     LaunchedEffect(pois) {
         val version = ++poiVersion[0]
         mapView.getMapAsync { map ->
-            // Discard stale callback if pois changed while getMapAsync was queued
-            if (poiVersion[0] != version) return@getMapAsync
+            // Discard callback if map was destroyed or pois changed while getMapAsync was queued
+            if (isDestroyed[0] || poiVersion[0] != version) return@getMapAsync
             // Remove only POI markers (preserves any non-POI markers added by future stories)
             poiMarkers.forEach { map.removeMarker(it) }
             poiMarkers.clear()
@@ -111,6 +112,8 @@ actual fun MapComposable(
         lifecycleOwner.lifecycle.addObserver(observer)
         context.registerComponentCallbacks(lowMemoryCallback)
         onDispose {
+            isDestroyed[0] = true
+            poiMarkers.clear()
             context.unregisterComponentCallbacks(lowMemoryCallback)
             lifecycleOwner.lifecycle.removeObserver(observer)
             mapView.onPause()

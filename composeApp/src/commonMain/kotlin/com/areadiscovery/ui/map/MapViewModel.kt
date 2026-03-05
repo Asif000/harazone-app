@@ -43,9 +43,20 @@ class MapViewModel(
     private fun loadLocation() {
         loadJob = viewModelScope.launch {
             try {
-                val locationResult = withTimeoutOrNull(GPS_TIMEOUT_MS) {
-                    locationProvider.getCurrentLocation()
-                } ?: Result.failure(Exception("GPS timeout"))
+                val locationAndGeocode = withTimeoutOrNull(GPS_TIMEOUT_MS) {
+                    val locResult = locationProvider.getCurrentLocation()
+                    if (locResult.isFailure) return@withTimeoutOrNull locResult to null
+                    val coords = locResult.getOrThrow()
+                    locResult to locationProvider.reverseGeocode(coords.latitude, coords.longitude)
+                }
+
+                if (locationAndGeocode == null) {
+                    AppLogger.e(null) { "Map: GPS/geocode timeout" }
+                    _uiState.value = MapUiState.LocationFailed(LOCATION_FAILURE_MESSAGE)
+                    return@launch
+                }
+
+                val (locationResult, areaNameResult) = locationAndGeocode
 
                 if (locationResult.isFailure) {
                     AppLogger.e(locationResult.exceptionOrNull()) { "Map: location unavailable" }
@@ -54,10 +65,9 @@ class MapViewModel(
                 }
 
                 val coords = locationResult.getOrThrow()
-                val areaNameResult = locationProvider.reverseGeocode(coords.latitude, coords.longitude)
 
-                if (areaNameResult.isFailure) {
-                    AppLogger.e(areaNameResult.exceptionOrNull()) { "Map: area name resolution failed" }
+                if (areaNameResult == null || areaNameResult.isFailure) {
+                    AppLogger.e(areaNameResult?.exceptionOrNull()) { "Map: area name resolution failed" }
                     _uiState.value = MapUiState.LocationFailed(LOCATION_FAILURE_MESSAGE)
                     return@launch
                 }

@@ -168,7 +168,7 @@ Dev agent should choose option 1 for this story scope.
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt` (pass `pois` to `MapComposable`) |
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/navigation/BottomNavBar.kt` (add `mapPoiCount` param + `BadgedBox`) |
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/App.kt` (get badge count, pass to `BottomNavBar`) |
-| MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/di/UiModule.kt` (update `MapViewModel` Koin binding with 5 params) |
+| MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/di/UiModule.kt` (update `MapViewModel` Koin binding with 4 params) |
 | MODIFY | `composeApp/src/commonTest/kotlin/com/areadiscovery/fakes/FakeAreaRepository.kt` (configurable updates) |
 | MODIFY | `composeApp/src/commonTest/kotlin/com/areadiscovery/ui/map/MapViewModelTest.kt` (new tests + update existing) |
 | MODIFY | `_bmad-output/implementation-artifacts/sprint-status.yaml` (update story status) |
@@ -208,6 +208,21 @@ Dev agent should choose option 1 for this story scope.
 - `UiModule.kt` — current Koin registrations: `composeApp/src/commonMain/kotlin/com/areadiscovery/di/UiModule.kt`
 - `App.kt` — `BottomNavBar` call site: `composeApp/src/commonMain/kotlin/com/areadiscovery/App.kt:20`
 
+## Senior Developer Review (AI)
+
+**Review Date:** 2026-03-05
+**Review Outcome:** Changes Requested
+**Total Action Items:** 6 (0 High, 2 Medium, 4 Low)
+
+### Action Items
+
+- [x] **[M1]** reverseGeocode() has no timeout — `withTimeoutOrNull` now wraps both `getCurrentLocation()` and `reverseGeocode()` together
+- [x] **[M2]** getMapAsync callback survives composable disposal — added `isDestroyed` flag, checked in getMapAsync callback
+- [x] **[L1]** Badge count not capped at "99+" — added `if (mapPoiCount > 99) "99+"` guard
+- [x] **[L2]** Test gap: no coverage for geocode failure verifying repository not called — added `areaRepository.callCount == 0` and `contextFactory.callCount == 0` assertions
+- [x] **[L3]** poiMarkers not cleared in onDispose — added `poiMarkers.clear()` to onDispose
+- [x] **[L4]** Story File List stale "5 params" annotation — corrected to "4 params"
+
 ## Dev Agent Record
 
 ### Agent Model Used
@@ -237,6 +252,7 @@ claude-opus-4-6
 - 2026-03-05: Address round 5 code review findings (1M): C1 already fixed in round 3 (reviewer on stale code). M10 fix GPS timeout — wrap locationProvider.getCurrentLocation() with withTimeoutOrNull(10s) matching PrivacyPipeline. M9 (double GPS) is pre-existing from Story 3.1, not a 3.2 regression.
 - 2026-03-05: Address round 6 code review findings (9 fixes): C2 prompt coords, M2 poiVersion staleness guard, M11 CancellationToken, L1/L4/L7/L11/L13/L14. Fix-now triage: M9 (remove double GPS — dropped PrivacyPipeline, use reverseGeocode directly), M12 (retry delay 200ms/2s), L8 (lazy context), L10 (UseCase instead of Repository).
 - 2026-03-05: Address round 7 code review findings (1H, 3M, 3L): H1 analytics inside Ready guard, M1 mutableStateListOf→mutableListOf, M3 mutableIntStateOf→intArrayOf, L1 zero-POI analytics test, L3 @BeforeTest setMain. M2/L2 story doc updated.
+- 2026-03-05: Address round 8 code review findings (0H, 2M, 4L): M1 reverseGeocode timeout (wrap both GPS+geocode in withTimeoutOrNull), M2 getMapAsync destroyed-map guard (isDestroyed flag), L1 badge "99+" cap, L2 geocode failure test assertions, L3 poiMarkers.clear() in onDispose, L4 story doc "5 params"→"4 params".
 
 ### File List
 
