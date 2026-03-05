@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.areadiscovery.ui.summary.ContentNoteBanner
+import com.areadiscovery.ui.theme.spacing
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -45,12 +46,12 @@ fun MapScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = MaterialTheme.spacing.md),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
                 ContentNoteBanner(message = state.message)
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
                 Button(onClick = { viewModel.retry() }) {
                     Text("Retry")
                 }

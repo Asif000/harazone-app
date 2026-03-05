@@ -1,5 +1,7 @@
 package com.areadiscovery.ui.map
 
+import android.content.ComponentCallbacks2
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -14,7 +16,6 @@ import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 
 private const val MAP_STYLE_URL = "https://demotiles.maplibre.org/style.json"
-private const val DEFAULT_ZOOM = 14.0
 
 @Composable
 actual fun MapComposable(
@@ -31,6 +32,15 @@ actual fun MapComposable(
         MapLibre.getInstance(context)
         MapView(context).apply {
             onCreate(Bundle())
+            getMapAsync { map ->
+                map.setStyle(MAP_STYLE_URL)
+                map.moveCamera(
+                    CameraUpdateFactory.newLatLngZoom(
+                        LatLng(latitude, longitude),
+                        zoomLevel,
+                    ),
+                )
+            }
         }
     }
 
@@ -39,7 +49,6 @@ actual fun MapComposable(
         modifier = modifier,
         update = { view ->
             view.getMapAsync { map ->
-                map.setStyle(MAP_STYLE_URL)
                 map.moveCamera(
                     CameraUpdateFactory.newLatLngZoom(
                         LatLng(currentLatitude.value, currentLongitude.value),
@@ -50,10 +59,20 @@ actual fun MapComposable(
         },
     )
 
+    val lowMemoryCallback = remember {
+        object : ComponentCallbacks2 {
+            override fun onConfigurationChanged(newConfig: Configuration) {}
+            override fun onLowMemory() { mapView.onLowMemory() }
+            override fun onTrimMemory(level: Int) {}
+        }
+    }
+
     DisposableEffect(Unit) {
         mapView.onStart()
         mapView.onResume()
+        context.registerComponentCallbacks(lowMemoryCallback)
         onDispose {
+            context.unregisterComponentCallbacks(lowMemoryCallback)
             mapView.onPause()
             mapView.onStop()
             mapView.onDestroy()

@@ -203,6 +203,7 @@ None — clean implementation with no debug issues.
 ## Change Log
 
 - 2026-03-04: Implemented Story 3.1 — MapLibre integration with expect/actual composable wrapper, MapViewModel with parallel location resolution, MapScreen with BottomSheetScaffold, and 5 unit tests.
+- 2026-03-04: Address code review findings (0H, 2M, 2L): M1 setStyle moved to factory one-shot, M2 sprint-status.yaml added to File List, L1 removed unused DEFAULT_ZOOM, L2 added onLowMemory lifecycle callback, L4 theme spacing in MapScreen.
 
 ### File List
 
@@ -217,4 +218,5 @@ None — clean implementation with no debug issues.
 | CREATE | `composeApp/src/commonTest/kotlin/com/areadiscovery/ui/map/MapViewModelTest.kt` |
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/di/UiModule.kt` |
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/navigation/AppNavigation.kt` |
+| MODIFY | `_bmad-output/implementation-artifacts/sprint-status.yaml` |
 | DELETE | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapPlaceholderScreen.kt` |
