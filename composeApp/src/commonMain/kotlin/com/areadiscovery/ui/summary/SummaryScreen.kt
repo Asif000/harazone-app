@@ -1,5 +1,6 @@
 package com.areadiscovery.ui.summary
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -21,11 +23,16 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.ui.components.BucketCard
@@ -45,7 +52,11 @@ fun SummaryScreen(
     val areaName = when (val state = uiState) {
         is SummaryUiState.Streaming -> state.areaName
         is SummaryUiState.Complete -> state.areaName
-        else -> "Alfama, Lisbon"
+        else -> "Discovering area..."
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { viewModel.onScreenExit() }
     }
 
     Scaffold(
@@ -61,7 +72,7 @@ fun SummaryScreen(
                             overflow = TextOverflow.Ellipsis,
                         )
                         Text(
-                            text = "First visit \u00b7 Morning",
+                            text = "First visit",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                             maxLines = 1,
@@ -88,12 +99,14 @@ fun SummaryScreen(
                 .padding(innerPadding),
         ) {
             when (val state = uiState) {
-                is SummaryUiState.Loading -> {
+                is SummaryUiState.Loading, is SummaryUiState.LocationResolving -> {
                     BucketList(
                         buckets = BucketType.entries.associateWith { BucketDisplayState(bucketType = it) },
                         areaName = areaName,
                         isComplete = false,
+                        contentNote = null,
                         onNavigateToChat = onNavigateToChat,
+                        onScrollDepthChanged = { viewModel.updateScrollDepth(it) },
                     )
                 }
 
@@ -102,7 +115,9 @@ fun SummaryScreen(
                         buckets = state.buckets,
                         areaName = state.areaName,
                         isComplete = false,
+                        contentNote = state.contentNote,
                         onNavigateToChat = onNavigateToChat,
+                        onScrollDepthChanged = { viewModel.updateScrollDepth(it) },
                     )
                 }
 
@@ -111,7 +126,9 @@ fun SummaryScreen(
                         buckets = state.buckets,
                         areaName = state.areaName,
                         isComplete = true,
+                        contentNote = state.contentNote,
                         onNavigateToChat = onNavigateToChat,
+                        onScrollDepthChanged = { viewModel.updateScrollDepth(it) },
                     )
                 }
 
@@ -126,7 +143,7 @@ fun SummaryScreen(
                         Text(
                             text = state.message,
                             style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 3,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -146,12 +163,34 @@ private fun BucketList(
     buckets: Map<BucketType, BucketDisplayState>,
     areaName: String,
     isComplete: Boolean,
+    contentNote: String?,
     onNavigateToChat: (String) -> Unit,
+    onScrollDepthChanged: (Int) -> Unit,
 ) {
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems == 0) return@snapshotFlow 0
+            val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            ((lastVisible + 1) * 100) / totalItems
+        }.collect { depthPercent ->
+            onScrollDepthChanged(depthPercent)
+        }
+    }
+
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = MaterialTheme.spacing.md),
     ) {
+        if (contentNote != null) {
+            item(key = "content_note") {
+                ContentNoteBanner(message = contentNote)
+            }
+        }
+
         items(BucketType.entries) { bucketType ->
             val bucketState = buckets[bucketType] ?: BucketDisplayState(bucketType = bucketType)
             BucketCard(state = bucketState)
@@ -179,4 +218,17 @@ private fun BucketList(
             Spacer(Modifier.height(MaterialTheme.spacing.touchTarget))
         }
     }
+}
+
+@Composable
+private fun ContentNoteBanner(message: String) {
+    Text(
+        text = message,
+        style = MaterialTheme.typography.bodyMedium,
+        color = Color(0xFF6B5E54),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFF5EDE3))
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+    )
 }

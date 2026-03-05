@@ -6,15 +6,19 @@ import com.areadiscovery.domain.model.POI
 sealed class SummaryUiState {
     data object Loading : SummaryUiState()
 
+    data object LocationResolving : SummaryUiState()
+
     data class Streaming(
         val buckets: Map<BucketType, BucketDisplayState>,
         val areaName: String,
+        val contentNote: String? = null,
     ) : SummaryUiState()
 
     data class Complete(
         val buckets: Map<BucketType, BucketDisplayState>,
         val pois: List<POI>,
         val areaName: String,
+        val contentNote: String? = null,
     ) : SummaryUiState()
 
     data class Error(

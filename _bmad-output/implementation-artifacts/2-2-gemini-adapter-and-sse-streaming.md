@@ -1,6 +1,6 @@
 # Story 2.2: Gemini Adapter & SSE Streaming
 
-Status: review
+Status: done
 
 ## Story
 

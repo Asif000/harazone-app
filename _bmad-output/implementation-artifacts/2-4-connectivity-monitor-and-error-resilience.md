@@ -1,6 +1,6 @@
 # Story 2.4: Connectivity Monitor & Error Resilience
 
-Status: review
+Status: done
 
 ## Story
 

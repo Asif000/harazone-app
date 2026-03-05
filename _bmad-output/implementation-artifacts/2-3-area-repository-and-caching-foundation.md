@@ -1,6 +1,6 @@
 # Story 2.3: Area Repository & Caching Foundation
 
-Status: review
+Status: done
 
 ## Story
 

@@ -218,6 +218,81 @@ class SummaryStateMapperTest {
         assertIs<SummaryUiState.Loading>(result)
     }
 
+    // --- ContentAvailabilityNote handling ---
+
+    @Test
+    fun `ContentAvailabilityNote on Streaming sets contentNote`() {
+        val initial = SummaryUiState.Streaming(
+            buckets = mapOf(
+                BucketType.SAFETY to BucketDisplayState(
+                    bucketType = BucketType.SAFETY,
+                    bodyText = "Safe area.",
+                    isStreaming = true,
+                ),
+            ),
+            areaName = testAreaName,
+        )
+        val note = BucketUpdate.ContentAvailabilityNote("You're offline - showing last known content")
+
+        val result = mapper.processUpdate(initial, note, areaName = testAreaName)
+
+        val streaming = assertIs<SummaryUiState.Streaming>(result)
+        assertEquals("You're offline - showing last known content", streaming.contentNote)
+    }
+
+    @Test
+    fun `ContentAvailabilityNote on Complete sets contentNote`() {
+        val initial = SummaryUiState.Complete(
+            buckets = mapOf(
+                BucketType.SAFETY to BucketDisplayState(
+                    bucketType = BucketType.SAFETY,
+                    bodyText = "Safe area.",
+                    isComplete = true,
+                ),
+            ),
+            pois = emptyList(),
+            areaName = testAreaName,
+        )
+        val note = BucketUpdate.ContentAvailabilityNote("Cached content from 2 hours ago")
+
+        val result = mapper.processUpdate(initial, note, areaName = testAreaName)
+
+        val complete = assertIs<SummaryUiState.Complete>(result)
+        assertEquals("Cached content from 2 hours ago", complete.contentNote)
+    }
+
+    @Test
+    fun `ContentAvailabilityNote on Loading returns Loading unchanged`() {
+        val result = mapper.processUpdate(
+            SummaryUiState.Loading,
+            BucketUpdate.ContentAvailabilityNote("Some note"),
+            areaName = testAreaName,
+        )
+        assertIs<SummaryUiState.Loading>(result)
+    }
+
+    @Test
+    fun `contentNote carries from Streaming to Complete via PortraitComplete`() {
+        var state: SummaryUiState = SummaryUiState.Loading
+
+        state = mapper.processUpdate(state, BucketUpdate.ContentDelta(BucketType.SAFETY, "Safe."), areaName = testAreaName)
+        state = mapper.processUpdate(state, BucketUpdate.ContentAvailabilityNote("Stale content"), areaName = testAreaName)
+        val streaming = assertIs<SummaryUiState.Streaming>(state)
+        assertEquals("Stale content", streaming.contentNote)
+
+        state = mapper.processUpdate(
+            state,
+            BucketUpdate.BucketComplete(
+                BucketContent(BucketType.SAFETY, "Very safe!", "Safe.", Confidence.HIGH, emptyList()),
+            ),
+            areaName = testAreaName,
+        )
+        state = mapper.processUpdate(state, BucketUpdate.PortraitComplete(pois = emptyList()), areaName = testAreaName)
+
+        val complete = assertIs<SummaryUiState.Complete>(state)
+        assertEquals("Stale content", complete.contentNote)
+    }
+
     // --- areaName from Loading is preserved through full lifecycle ---
 
     @Test
