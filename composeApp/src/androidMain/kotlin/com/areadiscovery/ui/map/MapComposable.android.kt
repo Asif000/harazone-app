@@ -53,6 +53,7 @@ actual fun MapComposable(
 
     LaunchedEffect(latitude, longitude) {
         mapView.getMapAsync { map ->
+            if (isDestroyed[0]) return@getMapAsync
             map.moveCamera(
                 CameraUpdateFactory.newLatLngZoom(
                     LatLng(latitude, longitude),

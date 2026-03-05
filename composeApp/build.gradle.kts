@@ -119,6 +119,7 @@ kotlin {
             dependencies {
                 implementation(libs.androidx.testExt.junit)
                 implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.rules)
                 implementation(libs.androidx.test.runner)
             }
         }

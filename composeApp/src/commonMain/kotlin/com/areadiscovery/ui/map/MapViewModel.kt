@@ -43,7 +43,7 @@ class MapViewModel(
     private fun loadLocation() {
         loadJob = viewModelScope.launch {
             try {
-                val locationAndGeocode = withTimeoutOrNull(GPS_TIMEOUT_MS) {
+                val locationAndGeocode = withTimeoutOrNull(LOCATION_TIMEOUT_MS) {
                     val locResult = locationProvider.getCurrentLocation()
                     if (locResult.isFailure) return@withTimeoutOrNull locResult to null
                     val coords = locResult.getOrThrow()
@@ -107,6 +107,6 @@ class MapViewModel(
 
     companion object {
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."
-        internal const val GPS_TIMEOUT_MS = 10_000L
+        internal const val LOCATION_TIMEOUT_MS = 10_000L
     }
 }

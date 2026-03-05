@@ -223,6 +223,17 @@ Dev agent should choose option 1 for this story scope.
 - [x] **[L3]** poiMarkers not cleared in onDispose — added `poiMarkers.clear()` to onDispose
 - [x] **[L4]** Story File List stale "5 params" annotation — corrected to "4 params"
 
+### Review Round 11 (2026-03-05)
+
+**Review Outcome:** Changes Requested
+**Total Action Items:** 5 (0 High, 2 Medium, 3 Low)
+
+- [x] **[M1]** permissionLauncher.launch() called unconditionally on every Activity creation — added checkSelfPermission guard
+- [x] **[M2]** LaunchedEffect(lat, lon) camera callback has no isDestroyed guard — added isDestroyed[0] check
+- [x] **[L1]** Crashlytics unconditionally enabled in debug — now checks FLAG_DEBUGGABLE
+- [x] **[L2]** AppLaunchSmokeTest has no GrantPermissionRule — added rule + androidx.test:rules dependency
+- [x] **[L3]** GPS_TIMEOUT_MS constant name misleading — renamed to LOCATION_TIMEOUT_MS
+
 ## Dev Agent Record
 
 ### Agent Model Used
@@ -253,6 +264,7 @@ claude-opus-4-6
 - 2026-03-05: Address round 6 code review findings (9 fixes): C2 prompt coords, M2 poiVersion staleness guard, M11 CancellationToken, L1/L4/L7/L11/L13/L14. Fix-now triage: M9 (remove double GPS — dropped PrivacyPipeline, use reverseGeocode directly), M12 (retry delay 200ms/2s), L8 (lazy context), L10 (UseCase instead of Repository).
 - 2026-03-05: Address round 7 code review findings (1H, 3M, 3L): H1 analytics inside Ready guard, M1 mutableStateListOf→mutableListOf, M3 mutableIntStateOf→intArrayOf, L1 zero-POI analytics test, L3 @BeforeTest setMain. M2/L2 story doc updated.
 - 2026-03-05: Address round 8 code review findings (0H, 2M, 4L): M1 reverseGeocode timeout (wrap both GPS+geocode in withTimeoutOrNull), M2 getMapAsync destroyed-map guard (isDestroyed flag), L1 badge "99+" cap, L2 geocode failure test assertions, L3 poiMarkers.clear() in onDispose, L4 story doc "5 params"→"4 params".
+- 2026-03-05: Address round 11 code review findings (0H, 2M, 3L): M1 permission check before launch, M2 camera isDestroyed guard, L1 Crashlytics debug-only, L2 GrantPermissionRule in smoke test, L3 rename GPS_TIMEOUT_MS→LOCATION_TIMEOUT_MS.
 
 ### File List
 

@@ -161,7 +161,7 @@ class MapViewModelTest {
                 // StandardTestDispatcher doesn't run eagerly — state is still initial Loading
                 assertIs<MapUiState.Loading>(viewModel.uiState.value)
 
-                // Advance past GPS_TIMEOUT_MS (10_000L)
+                // Advance past LOCATION_TIMEOUT_MS (10_000L)
                 advanceTimeBy(10_001L)
 
                 val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
