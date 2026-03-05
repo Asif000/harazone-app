@@ -1,6 +1,5 @@
 package com.areadiscovery.ui.summary
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +14,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
@@ -29,7 +29,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -52,6 +51,7 @@ fun SummaryScreen(
     val areaName = when (val state = uiState) {
         is SummaryUiState.Streaming -> state.areaName
         is SummaryUiState.Complete -> state.areaName
+        is SummaryUiState.LocationFailed -> "Location unavailable"
         else -> "Discovering area..."
     }
 
@@ -99,7 +99,7 @@ fun SummaryScreen(
                 .padding(innerPadding),
         ) {
             when (val state = uiState) {
-                is SummaryUiState.Loading, is SummaryUiState.LocationResolving -> {
+                is SummaryUiState.Loading -> {
                     BucketList(
                         buckets = BucketType.entries.associateWith { BucketDisplayState(bucketType = it) },
                         areaName = areaName,
@@ -108,6 +108,48 @@ fun SummaryScreen(
                         onNavigateToChat = onNavigateToChat,
                         onScrollDepthChanged = { viewModel.updateScrollDepth(it) },
                     )
+                }
+
+                is SummaryUiState.LocationResolving -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        BucketList(
+                            buckets = BucketType.entries.associateWith { BucketDisplayState(bucketType = it) },
+                            areaName = areaName,
+                            isComplete = false,
+                            contentNote = null,
+                            onNavigateToChat = onNavigateToChat,
+                            onScrollDepthChanged = { viewModel.updateScrollDepth(it) },
+                        )
+                    }
+                }
+
+                is SummaryUiState.LocationFailed -> {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        ContentNoteBanner(message = state.message)
+                        Button(
+                            onClick = { viewModel.refresh() },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal = MaterialTheme.spacing.md,
+                                    vertical = MaterialTheme.spacing.sm,
+                                ),
+                        ) {
+                            Text("Retry")
+                        }
+                        BucketList(
+                            buckets = BucketType.entries.associateWith { BucketDisplayState(bucketType = it) },
+                            areaName = areaName,
+                            isComplete = false,
+                            contentNote = null,
+                            onNavigateToChat = onNavigateToChat,
+                            onScrollDepthChanged = { viewModel.updateScrollDepth(it) },
+                        )
+                    }
                 }
 
                 is SummaryUiState.Streaming -> {
@@ -220,15 +262,3 @@ private fun BucketList(
     }
 }
 
-@Composable
-private fun ContentNoteBanner(message: String) {
-    Text(
-        text = message,
-        style = MaterialTheme.typography.bodyMedium,
-        color = Color(0xFF6B5E54),
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFF5EDE3))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-    )
-}

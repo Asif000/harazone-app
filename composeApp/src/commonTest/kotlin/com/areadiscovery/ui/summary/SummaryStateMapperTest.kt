@@ -262,13 +262,28 @@ class SummaryStateMapperTest {
     }
 
     @Test
-    fun `ContentAvailabilityNote on Loading returns Loading unchanged`() {
+    fun `ContentAvailabilityNote on Loading transitions to Streaming with note`() {
         val result = mapper.processUpdate(
             SummaryUiState.Loading,
             BucketUpdate.ContentAvailabilityNote("Some note"),
             areaName = testAreaName,
         )
-        assertIs<SummaryUiState.Loading>(result)
+        val streaming = assertIs<SummaryUiState.Streaming>(result)
+        assertEquals("Some note", streaming.contentNote)
+        assertEquals(testAreaName, streaming.areaName)
+        assertTrue(streaming.buckets.isEmpty())
+    }
+
+    @Test
+    fun `ContentAvailabilityNote on LocationResolving transitions to Streaming with note`() {
+        val result = mapper.processUpdate(
+            SummaryUiState.LocationResolving,
+            BucketUpdate.ContentAvailabilityNote("Offline content"),
+            areaName = testAreaName,
+        )
+        val streaming = assertIs<SummaryUiState.Streaming>(result)
+        assertEquals("Offline content", streaming.contentNote)
+        assertEquals(testAreaName, streaming.areaName)
     }
 
     @Test

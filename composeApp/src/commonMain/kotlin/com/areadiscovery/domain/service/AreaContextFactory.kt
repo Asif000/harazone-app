@@ -16,8 +16,7 @@ open class AreaContextFactory(private val clock: AppClock) {
     }
 
     private fun resolveTimeOfDay(epochMs: Long): String {
-        // Convert epoch millis to hour of day in UTC
-        // For Phase 1a, we use UTC. Time zone support is future work.
+        // Uses UTC — kotlinx-datetime not in deps. Platform TZ support deferred to Epic 8 (adaptive intelligence).
         val totalSeconds = epochMs / 1000
         val secondsInDay = totalSeconds % 86400
         val hour = (secondsInDay / 3600).toInt()
@@ -30,7 +29,7 @@ open class AreaContextFactory(private val clock: AppClock) {
     }
 
     private fun resolveDayOfWeek(epochMs: Long): String {
-        // Unix epoch (Jan 1, 1970) was a Thursday
+        // Unix epoch (Jan 1, 1970) was a Thursday. Uses UTC (see resolveTimeOfDay comment).
         val daysSinceEpoch = epochMs / 86_400_000
         val dayIndex = ((daysSinceEpoch % 7) + 7) % 7 // Handle negative values
         return when (dayIndex.toInt()) {

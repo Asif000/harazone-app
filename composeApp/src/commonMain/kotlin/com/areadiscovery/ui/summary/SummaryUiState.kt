@@ -21,6 +21,10 @@ sealed class SummaryUiState {
         val contentNote: String? = null,
     ) : SummaryUiState()
 
+    data class LocationFailed(
+        val message: String,
+    ) : SummaryUiState()
+
     data class Error(
         val message: String,
     ) : SummaryUiState()

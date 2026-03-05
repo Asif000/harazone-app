@@ -104,7 +104,7 @@ class SummaryViewModel(
 
         return result.getOrElse { error ->
             AppLogger.e(error) { "Location resolution failed" }
-            _uiState.value = SummaryUiState.Error(LOCATION_FAILURE_MESSAGE)
+            _uiState.value = SummaryUiState.LocationFailed(LOCATION_FAILURE_MESSAGE)
             null
         }
     }

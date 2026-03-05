@@ -116,13 +116,13 @@ class SummaryViewModelTest {
     }
 
     @Test
-    fun gpsFailureShowsWarmErrorMessage() = runTest {
+    fun gpsFailureShowsLocationFailedNotError() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         initFakes()
         fakePipeline.setResult(Result.failure(RuntimeException("GPS unavailable")))
         val viewModel = createViewModel()
 
-        val state = assertIs<SummaryUiState.Error>(viewModel.uiState.value)
+        val state = assertIs<SummaryUiState.LocationFailed>(viewModel.uiState.value)
         assertEquals(SummaryViewModel.LOCATION_FAILURE_MESSAGE, state.message)
     }
 
@@ -178,6 +178,23 @@ class SummaryViewModelTest {
 
         assertEquals("Bairro Alto", fakeUseCase.lastAreaName)
         assertEquals(fakeContextFactory.create(), fakeUseCase.lastContext)
+    }
+
+    @Test
+    fun zeroScrollDepthSuppressesEvent() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        initFakes()
+        fakePipeline.setResult(Result.success("Test Area"))
+        fakeUseCase.emissions = listOf(
+            BucketUpdate.ContentDelta(BucketType.SAFETY, "Safe"),
+            BucketUpdate.PortraitComplete(pois = emptyList()),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.onScreenExit()
+
+        val scrollEvents = fakeTracker.recordedEvents.filter { it.first == "summary_scroll_depth" }
+        assertTrue(scrollEvents.isEmpty())
     }
 
     @Test

@@ -2,6 +2,8 @@ package com.areadiscovery.domain.service
 
 import com.areadiscovery.fakes.FakeLocationProvider
 import com.areadiscovery.location.GpsCoordinates
+import com.areadiscovery.location.LocationProvider
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -79,7 +81,7 @@ class PrivacyPipelineTest {
 
     @Test
     fun resolveAreaName_returns_fallback_area_name_when_locality_missing() = runTest {
-        // AC6: fallback extracts best available area name (e.g., adminArea if locality is null)
+        // AC1: fallback extracts best available area name (e.g., adminArea if locality is null)
         val fakeProvider = FakeLocationProvider(
             locationResult = Result.success(GpsCoordinates(38.5, -8.0)),
             geocodeResult = Result.success("Alentejo")  // adminArea only (rural area)
@@ -93,8 +95,27 @@ class PrivacyPipelineTest {
     }
 
     @Test
-    fun resolveAreaName_returns_partial_area_name_without_sublLocality() = runTest {
-        // AC6: fallback when subLocality is null but locality + adminArea exist
+    fun resolveAreaName_returns_failure_on_timeout() = runTest {
+        val neverCompletingProvider = object : LocationProvider {
+            override suspend fun getCurrentLocation(): Result<GpsCoordinates> {
+                CompletableDeferred<Unit>().await() // suspends forever
+                error("unreachable")
+            }
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                error("should not be called")
+            }
+        }
+        val pipeline = PrivacyPipeline(neverCompletingProvider)
+
+        val result = pipeline.resolveAreaName()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()?.message?.contains("timed out") == true)
+    }
+
+    @Test
+    fun resolveAreaName_returns_partial_area_name_without_subLocality() = runTest {
+        // AC1: fallback when subLocality is null but locality + adminArea exist
         val fakeProvider = FakeLocationProvider(
             locationResult = Result.success(GpsCoordinates(38.7, -9.1)),
             geocodeResult = Result.success("Lisbon, Lisboa")  // locality + adminArea
