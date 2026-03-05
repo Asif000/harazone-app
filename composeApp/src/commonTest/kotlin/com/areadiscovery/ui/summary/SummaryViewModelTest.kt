@@ -198,6 +198,31 @@ class SummaryViewModelTest {
     }
 
     @Test
+    fun refreshResetsScrollDepth() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        initFakes()
+        fakePipeline.setResult(Result.success("Area A"))
+        fakeUseCase.emissions = listOf(
+            BucketUpdate.ContentDelta(BucketType.SAFETY, "Safe"),
+            BucketUpdate.PortraitComplete(pois = emptyList()),
+        )
+        val viewModel = createViewModel()
+
+        viewModel.updateScrollDepth(80)
+
+        fakePipeline.setResult(Result.success("Area B"))
+        fakeUseCase.emissions = listOf(
+            BucketUpdate.ContentDelta(BucketType.SAFETY, "Safe"),
+            BucketUpdate.PortraitComplete(pois = emptyList()),
+        )
+        viewModel.refresh()
+        viewModel.onScreenExit()
+
+        val scrollEvents = fakeTracker.recordedEvents.filter { it.first == "summary_scroll_depth" }
+        assertTrue(scrollEvents.isEmpty())
+    }
+
+    @Test
     fun scrollDepthTrackedOnScreenExit() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         initFakes()

@@ -23,10 +23,6 @@ class PrivacyPipelineTest {
 
         assertTrue(result.isSuccess)
         assertEquals("Alfama, Lisbon", result.getOrThrow())
-        // Verify specific coordinate values don't leak into the area name
-        val areaName = result.getOrThrow()
-        assertTrue("38.7139" !in areaName, "Area name should not contain latitude: $areaName")
-        assertTrue("-9.1394" !in areaName, "Area name should not contain longitude: $areaName")
     }
 
     @Test
