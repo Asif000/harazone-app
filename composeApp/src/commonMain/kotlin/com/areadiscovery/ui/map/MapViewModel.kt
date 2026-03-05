@@ -79,11 +79,11 @@ class MapViewModel(
                             val current = _uiState.value
                             if (current is MapUiState.Ready) {
                                 _uiState.value = current.copy(pois = pois)
+                                analyticsTracker.trackEvent(
+                                    "map_opened",
+                                    mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
+                                )
                             }
-                            analyticsTracker.trackEvent(
-                                "map_opened",
-                                mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
-                            )
                         }
                     }
             } catch (e: CancellationException) {

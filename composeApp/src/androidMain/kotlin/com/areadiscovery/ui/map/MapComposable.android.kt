@@ -7,8 +7,6 @@ import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -33,8 +31,8 @@ actual fun MapComposable(
 ) {
     val context = LocalContext.current
 
-    val poiMarkers = remember { mutableStateListOf<Marker>() }
-    val poiVersion = remember { mutableIntStateOf(0) }
+    val poiMarkers = remember { mutableListOf<Marker>() }
+    val poiVersion = remember { intArrayOf(0) }
 
     val mapView = remember {
         /* Initialize MapLibre singleton — return value unused (side-effect only) */
@@ -63,10 +61,10 @@ actual fun MapComposable(
     // TODO: Replace default pin markers with custom icons per POI type using
     //  org.maplibre.gl:android-plugin-annotation-v9 SymbolManager (deferred to next cycle)
     LaunchedEffect(pois) {
-        val version = ++poiVersion.intValue
+        val version = ++poiVersion[0]
         mapView.getMapAsync { map ->
             // Discard stale callback if pois changed while getMapAsync was queued
-            if (poiVersion.intValue != version) return@getMapAsync
+            if (poiVersion[0] != version) return@getMapAsync
             // Remove only POI markers (preserves any non-POI markers added by future stories)
             poiMarkers.forEach { map.removeMarker(it) }
             poiMarkers.clear()
