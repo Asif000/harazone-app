@@ -23,7 +23,7 @@ class SummaryStateMapper {
         areaName: String,
     ): SummaryUiState {
         val buckets = when (currentState) {
-            is SummaryUiState.Loading, is SummaryUiState.LocationResolving, is SummaryUiState.LocationFailed -> emptyMap()
+            is SummaryUiState.Loading, is SummaryUiState.LocationResolving -> emptyMap()
             is SummaryUiState.Streaming -> currentState.buckets
             else -> return currentState
         }

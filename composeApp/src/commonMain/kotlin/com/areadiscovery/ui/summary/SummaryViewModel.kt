@@ -36,6 +36,7 @@ class SummaryViewModel(
     fun refresh() {
         _uiState.value = SummaryUiState.Loading
         resolvedAreaName = null
+        maxScrollDepthPercent = 0
         loadPortrait()
     }
 

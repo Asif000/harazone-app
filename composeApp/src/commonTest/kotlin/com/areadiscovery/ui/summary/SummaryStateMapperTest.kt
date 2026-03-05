@@ -287,6 +287,18 @@ class SummaryStateMapperTest {
     }
 
     @Test
+    fun `ContentAvailabilityNote on LocationFailed returns unchanged`() {
+        val initial = SummaryUiState.LocationFailed("Can't find your location")
+        val result = mapper.processUpdate(
+            initial,
+            BucketUpdate.ContentAvailabilityNote("Some note"),
+            areaName = testAreaName,
+        )
+        val locationFailed = assertIs<SummaryUiState.LocationFailed>(result)
+        assertEquals("Can't find your location", locationFailed.message)
+    }
+
+    @Test
     fun `contentNote carries from Streaming to Complete via PortraitComplete`() {
         var state: SummaryUiState = SummaryUiState.Loading
 

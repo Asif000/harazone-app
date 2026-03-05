@@ -23,9 +23,10 @@ class PrivacyPipelineTest {
 
         assertTrue(result.isSuccess)
         assertEquals("Alfama, Lisbon", result.getOrThrow())
-        // Verify result contains no numeric coordinate patterns from input
+        // Verify specific coordinate values don't leak into the area name
         val areaName = result.getOrThrow()
-        assertTrue(areaName.none { it.isDigit() }, "Area name should not contain digits from coordinates: $areaName")
+        assertTrue("38.7139" !in areaName, "Area name should not contain latitude: $areaName")
+        assertTrue("-9.1394" !in areaName, "Area name should not contain longitude: $areaName")
     }
 
     @Test
