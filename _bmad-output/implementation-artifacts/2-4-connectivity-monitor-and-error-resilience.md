@@ -37,14 +37,14 @@ so that I always see something useful regardless of connectivity.
   - [x] 2.3 Implement `observe()` using `ConnectivityManager.registerNetworkCallback()` with `callbackFlow { }` — emit `Online` when `onAvailable`, emit `Offline` when `onLost`/`onUnavailable`
   - [x] 2.4 Emit initial state immediately: query `connectivityManager.activeNetwork` / `getNetworkCapabilities()` on subscribe, emit `Online`/`Offline` before registering callback
   - [x] 2.5 Cancel callback on `awaitClose { connectivityManager.unregisterNetworkCallback(callback) }`
-  - [x] 2.6 Use `shareIn(scope, SharingStarted.WhileSubscribed(5000), replay = 1)` so state survives brief unsubscription
+  - [ ] 2.6 Use `shareIn(scope, SharingStarted.WhileSubscribed(5000), replay = 1)` so state survives brief unsubscription — DEFERRED: not needed until Story 2.5; current usage is single `.first()` reads only
 
 - [x] Task 3: Create iOS `ConnectivityMonitor` actual (AC: #3)
   - [x] 3.1 Create `iosMain/kotlin/com/areadiscovery/util/ConnectivityMonitor.ios.kt`
   - [x] 3.2 `actual class ConnectivityMonitor()` — no constructor args needed on iOS
   - [x] 3.3 Implement `observe()` using `callbackFlow { }` with `NWPathMonitor()` — emit `Online` when `path.status == .satisfied`, else `Offline`
-  - [x] 3.4 Start monitor on `DispatchQueue(label = "ConnectivityMonitor")`, cancel on `awaitClose { monitor.cancel() }`
-  - [x] 3.5 Use `shareIn(scope, SharingStarted.WhileSubscribed(5000), replay = 1)` same as Android
+  - [x] 3.4 Start monitor on dispatch queue, cancel on `awaitClose { nw_path_monitor_cancel(monitor) }` — NOTE: uses global queue due to KMP cinterop type mismatch (`dispatch_queue_create` returns `CPointer` but `nw_path_monitor_set_queue` expects `NSObject?`); NWPathMonitor manages its own thread safety regardless of queue type
+  - [ ] 3.5 Use `shareIn(scope, SharingStarted.WhileSubscribed(5000), replay = 1)` same as Android — DEFERRED: same as 2.6
 
 - [x] Task 4: Create `RetryHelper` (AC: #4)
   - [x] 4.1 Create `commonMain/kotlin/com/areadiscovery/util/RetryHelper.kt`
@@ -610,10 +610,12 @@ Claude Opus 4.6
 - 7 `RetryHelper` tests: success first attempt, success after retry, all exhausted, delay capping, CancellationException propagation, single attempt success/failure
 - 5 repository resilience tests: offline+cache, offline+no-cache, AI-failure+partial-cache, AI-failure+no-cache, online-normal regression guard
 - All 3 build gates pass: `assembleDebug`, `allTests`, `lint`
+- NOTE for Story 2.5: `SummaryStateMapper` ignores `ContentAvailabilityNote` (returns currentState). `SummaryUiState.Streaming`/`Complete` have no `availabilityNote: String?` field — Story 2.5 will need a state model change, not just a mapper change
 
 ### Change Log
 
 - 2026-03-04: Add connectivity monitor and error resilience (Story 2.4)
+- 2026-03-04: Address code review findings for Story 2.4 (3H, 3M, 3L)
 
 ### File List
 
@@ -627,6 +629,7 @@ Claude Opus 4.6
 - composeApp/src/commonTest/kotlin/com/areadiscovery/util/RetryHelperTest.kt
 
 **Modified files:**
+- _bmad-output/implementation-artifacts/sprint-status.yaml
 - composeApp/src/commonMain/kotlin/com/areadiscovery/domain/model/BucketUpdate.kt
 - composeApp/src/commonMain/kotlin/com/areadiscovery/data/repository/AreaRepositoryImpl.kt
 - composeApp/src/commonMain/kotlin/com/areadiscovery/data/remote/GeminiAreaIntelligenceProvider.kt

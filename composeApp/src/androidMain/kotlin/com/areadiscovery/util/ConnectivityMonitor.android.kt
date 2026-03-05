@@ -19,13 +19,20 @@ actual class ConnectivityMonitor(private val context: Context) {
         trySend(currentState(cm))
 
         val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { trySend(ConnectivityState.Online) }
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                trySend(
+                    if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                    ) ConnectivityState.Online else ConnectivityState.Offline
+                )
+            }
             override fun onLost(network: Network) { trySend(ConnectivityState.Offline) }
             override fun onUnavailable() { trySend(ConnectivityState.Offline) }
         }
 
         val request = NetworkRequest.Builder()
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
             .build()
         cm.registerNetworkCallback(request, callback)
 
@@ -35,7 +42,8 @@ actual class ConnectivityMonitor(private val context: Context) {
     private fun currentState(cm: ConnectivityManager): ConnectivityState {
         val network = cm.activeNetwork ?: return ConnectivityState.Offline
         val caps = cm.getNetworkCapabilities(network) ?: return ConnectivityState.Offline
-        return if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
+        return if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)) {
             ConnectivityState.Online
         } else {
             ConnectivityState.Offline

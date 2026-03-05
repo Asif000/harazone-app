@@ -78,49 +78,48 @@ internal class GeminiAreaIntelligenceProvider(
 
         var hasEmitted = false
 
-        val result = withRetry(maxAttempts = MAX_RETRY_ATTEMPTS) {
-            try {
-                val streamingParser = responseParser.createStreamingParser()
+        val result = withRetry(
+            maxAttempts = MAX_RETRY_ATTEMPTS,
+            isRetryable = { e -> !hasEmitted && e is Exception && isRetryableError(e) }
+        ) {
+            val streamingParser = responseParser.createStreamingParser()
 
-                httpClient.sse(
-                    urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
-                    request = {
-                        method = HttpMethod.Post
-                        parameter("alt", "sse")
-                        parameter("key", apiKey)
-                        contentType(ContentType.Application.Json)
-                        setBody(requestBody)
-                    }
-                ) {
-                    incoming.collect { event ->
-                        val data = event.data ?: return@collect
-                        val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
+            httpClient.sse(
+                urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
+                request = {
+                    method = HttpMethod.Post
+                    parameter("alt", "sse")
+                    parameter("key", apiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(requestBody)
+                }
+            ) {
+                incoming.collect { event ->
+                    val data = event.data ?: return@collect
+                    val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
 
-                        for (update in streamingParser.processChunk(text)) {
-                            hasEmitted = true
-                            emit(update)
-                        }
+                    for (update in streamingParser.processChunk(text)) {
+                        hasEmitted = true
+                        emit(update)
                     }
                 }
-
-                for (update in streamingParser.finish()) {
-                    hasEmitted = true
-                    emit(update)
-                }
-
-                AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete" }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                // Never retry if partial data already emitted or error is non-retryable
-                if (hasEmitted || !isRetryableError(e)) throw mapToDomainErrorException(e)
-                throw e // retryable — let withRetry catch and retry
             }
+
+            for (update in streamingParser.finish()) {
+                hasEmitted = true
+                emit(update)
+            }
+
+            AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete" }
         }
 
         if (result.isFailure) {
-            val error = result.exceptionOrNull() ?: Exception("Unknown error")
-            throw if (error is DomainErrorException) error else mapToDomainErrorException(error as Exception)
+            val error = result.exceptionOrNull()
+            throw when (error) {
+                is DomainErrorException -> error
+                is Exception -> mapToDomainErrorException(error)
+                else -> mapToDomainErrorException(RuntimeException("Unexpected error", error))
+            }
         }
     }
 

@@ -56,8 +56,8 @@ class RetryHelperTest {
         }
         assertEquals(Result.success("done"), result)
         assertEquals(3, attempts)
-        // Virtual time should reflect capped delays: 5000 + 6000 = 11000
-        // (attempt 2 delay = min(5000, 6000) = 5000, attempt 3 delay = min(10000, 6000) = 6000)
+        // attempt 2 delay = min(5000, 6000) = 5000, attempt 3 delay = min(10000, 6000) = 6000
+        assertEquals(11000L, testScheduler.currentTime)
     }
 
     @Test
@@ -83,5 +83,28 @@ class RetryHelperTest {
         }
         assertTrue(result.isFailure)
         assertEquals(error, result.exceptionOrNull())
+    }
+
+    @Test
+    fun nonRetryableErrorFailsImmediately() = runTest {
+        var attempts = 0
+        val error = IllegalArgumentException("bad input")
+        val result = withRetry(
+            maxAttempts = 3,
+            initialDelayMs = 1000,
+            isRetryable = { it !is IllegalArgumentException }
+        ) {
+            attempts++
+            throw error
+        }
+        assertTrue(result.isFailure)
+        assertEquals(error, result.exceptionOrNull())
+        assertEquals(1, attempts, "Non-retryable error should not trigger retries")
+    }
+
+    @Test
+    fun zeroMaxAttemptsReturnsFailure() = runTest {
+        val result = withRetry(maxAttempts = 0) { "should not run" }
+        assertTrue(result.isFailure)
     }
 }

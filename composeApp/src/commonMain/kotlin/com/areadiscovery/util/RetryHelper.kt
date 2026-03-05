@@ -7,6 +7,7 @@ suspend fun <T> withRetry(
     maxAttempts: Int = 3,
     initialDelayMs: Long = 1000,
     maxDelayMs: Long = 10000,
+    isRetryable: (Throwable) -> Boolean = { true },
     block: suspend () -> T
 ): Result<T> {
     var lastError: Throwable? = null
@@ -24,6 +25,9 @@ suspend fun <T> withRetry(
         } catch (e: Throwable) {
             lastError = e
             AppLogger.d { "RetryHelper: attempt ${attempt + 1} failed — ${e.message}" }
+            if (!isRetryable(e)) {
+                return Result.failure(e)
+            }
         }
     }
 
