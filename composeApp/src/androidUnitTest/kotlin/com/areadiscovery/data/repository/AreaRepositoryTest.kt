@@ -255,4 +255,48 @@ class AreaRepositoryTest {
             .executeAsList()
         assertEquals(0, oldCached.size, "Expired buckets should be cleaned up")
     }
+
+    @Test
+    fun cacheHitWithExtraUnknownBucketTypeStillHits() = testScope.runTest {
+        // Pre-populate all 6 known buckets (valid)
+        BucketType.entries.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = "Test Area",
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Highlight $type",
+                content = "Content $type",
+                confidence = "HIGH",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() + 100_000L,
+                created_at = fakeClock.nowMs()
+            )
+        }
+        // Add an extra unknown bucket type (e.g., from a newer app version)
+        database.area_bucket_cacheQueries.insertOrReplace(
+            area_name = "Test Area",
+            bucket_type = "FUTURE_BUCKET",
+            language = "en",
+            highlight = "h",
+            content = "c",
+            confidence = "HIGH",
+            sources_json = "[]",
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs()
+        )
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            // Should get 6 known BucketComplete (unknown skipped) + PortraitComplete
+            repeat(BucketType.entries.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+            }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+
+        // Should be a cache hit — AI provider NOT called
+        assertEquals(0, fakeProvider.callCount, "Cache hit should work even with extra unknown bucket types")
+    }
 }
