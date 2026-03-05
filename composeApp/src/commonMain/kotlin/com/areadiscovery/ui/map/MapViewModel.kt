@@ -9,6 +9,7 @@ import com.areadiscovery.domain.service.PrivacyPipeline
 import com.areadiscovery.location.LocationProvider
 import com.areadiscovery.util.AnalyticsTracker
 import com.areadiscovery.util.AppLogger
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,17 +30,20 @@ class MapViewModel(
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
+    private var loadJob: Job? = null
+
     init {
         loadLocation()
     }
 
     fun retry() {
+        loadJob?.cancel()
         _uiState.value = MapUiState.Loading
         loadLocation()
     }
 
     private fun loadLocation() {
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             try {
                 val locationDeferred = async { locationProvider.getCurrentLocation() }
                 val areaNameDeferred = async { privacyPipeline.resolveAreaName() }

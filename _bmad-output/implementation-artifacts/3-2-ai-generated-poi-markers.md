@@ -230,7 +230,7 @@ claude-opus-4-6
 - Task 2: Added `pois: List<POI>` parameter to `MapComposable` expect/actual. Android actual renders markers via `LaunchedEffect(pois)` + `getMapAsync` + `addMarker()`. iOS stub accepts parameter but ignores it. MapView accessibility set to `NO_HIDE_DESCENDANTS` (V1 — POI accessibility deferred to Story 3.4 list view). Custom icons deferred via TODO comment.
 - Task 3: Badge via `mapPoiCount` param passed from `App.kt` through `AppNavigation` to avoid duplicate ViewModel instances. `BadgedBox` wraps only the Map tab icon. Single `MapViewModel` created in Activity scope (`App.kt`), shared with `MapScreen` via parameter.
 - Task 4: Updated `FakeAreaRepository` with configurable `updates` list + `callCount`. Added 4 new tests: `poisAreEmptyWhenRepositoryEmitsNoUpdates`, `poisPopulatedOnPortraitComplete`, `analyticsMapOpenedFiredWithCorrectParams`, `noPoisLoadedIfLocationFails`. All 5 existing tests updated to use 5-param constructor and still pass (9 total tests).
-- V1 limitations documented: default pin icons (no custom per-type icons — AC2 partial), TalkBack via list view (Story 3.4 — AC4 partial), POI cache-hit returns empty POIs.
+- V1 limitations documented: default pin icons (no custom per-type icons — AC2 partial), TalkBack via list view (Story 3.4 — AC4 partial), POIs only shown on cold cache miss; both full-cache-hit AND stale-while-revalidate paths return empty POIs (full POI caching deferred to Epic 3/7).
 
 ### Change Log
 
@@ -238,6 +238,7 @@ claude-opus-4-6
 - 2026-03-05: Address round 1 code review findings (1C, 3M, 3L): C1 fix duplicate ViewModel (App.kt→AppNavigation→MapScreen param pass-through), M1 AC2 partial noted, M3 createViewModel() uses interface types, L1 test renamed
 - 2026-03-05: Address round 2 code review findings (1M, 2L): M1 stale markers fix (remove early return on empty pois), L2 assert map_opened fires exactly once, L1/M4/L3 already fixed in round 1
 - 2026-03-05: Address round 3 code review findings (1C, 2M, 3L): C1 fix eager ViewModel creation — removed koinViewModel from App.kt, MapViewModel now lazy (created only when MapScreen navigated to), badge via callback (onPoiCountChanged). M6 test areaContextFactoryCalledExactlyOnce added. L6 locationCallCount assertion added. 10 tests.
+- 2026-03-05: Address round 4 code review findings (1M): M7 fix retry() race — cancel in-flight loadJob before relaunching (matches SummaryViewModel pattern). M8 V1 limitation note updated to clarify stale-while-revalidate also returns empty POIs. L9/L10 out of scope (AreaRepositoryImpl/use-case layer).
 
 ### File List
 
