@@ -1,7 +1,6 @@
 package com.areadiscovery.ui.map
 
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -9,14 +8,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
 @Composable
-fun MapPlaceholderScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "Map",
-            style = MaterialTheme.typography.headlineSmall,
-        )
+actual fun MapComposable(
+    modifier: Modifier,
+    latitude: Double,
+    longitude: Double,
+    zoomLevel: Double,
+) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Text("Map not yet available on iOS", style = MaterialTheme.typography.bodyMedium)
     }
 }

@@ -57,17 +57,17 @@ development_status:
 #   to iOSApp.swift. IosAnalyticsTracker is currently a no-op logging via Kermit.
 
   # Epic 2: Live Area Portrait & AI Integration (Phase 1a)
-  epic-2: in-progress
+  epic-2: done
   2-1-location-service-and-privacy-pipeline: done
   2-2-gemini-adapter-and-sse-streaming: done
   2-3-area-repository-and-caching-foundation: done
   2-4-connectivity-monitor-and-error-resilience: done
-  2-5-live-summary-screen-integration: review
+  2-5-live-summary-screen-integration: done
   epic-2-retrospective: optional
 
   # Epic 3: Interactive Map & POI Discovery (Phase 1a)
-  epic-3: backlog
-  3-1-maplibre-integration-and-base-map: backlog
+  epic-3: in-progress
+  3-1-maplibre-integration-and-base-map: review
   3-2-ai-generated-poi-markers: backlog
   3-3-poi-detail-card-and-bottom-sheet: backlog
   3-4-poi-accessible-list-view: backlog

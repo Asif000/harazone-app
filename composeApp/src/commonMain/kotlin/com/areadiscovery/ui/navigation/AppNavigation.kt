@@ -6,7 +6,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.areadiscovery.ui.chat.ChatPlaceholderScreen
-import com.areadiscovery.ui.map.MapPlaceholderScreen
+import com.areadiscovery.ui.map.MapScreen
 import com.areadiscovery.ui.saved.SavedPlaceholderScreen
 import com.areadiscovery.ui.summary.SummaryScreen
 
@@ -35,7 +35,7 @@ fun AppNavigation(
             )
         }
         composable<MapRoute> {
-            MapPlaceholderScreen()
+            MapScreen()
         }
         composable<ChatRoute> {
             ChatPlaceholderScreen()
