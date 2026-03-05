@@ -16,8 +16,8 @@ import com.areadiscovery.ui.theme.AreaDiscoveryTheme
 import org.koin.compose.KoinApplication
 
 @Composable
-fun App() {
-    KoinApplication(application = { modules(appModule()) }) {
+fun App(platformConfig: org.koin.dsl.KoinAppDeclaration = {}) {
+    KoinApplication(application = { platformConfig(); modules(appModule()) }) {
         AreaDiscoveryTheme {
             val navController = rememberNavController()
             var mapPoiCount by remember { mutableIntStateOf(0) }

@@ -1,5 +1,5 @@
 [versions]
-agp = "8.11.2"
+agp = "8.13.2"
 android-compileSdk = "36"
 android-minSdk = "26"
 android-targetSdk = "36"
@@ -95,6 +95,8 @@ firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 
 # Testing
 turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
+androidx-test-core = { module = "androidx.test:core", version = "1.6.1" }
+androidx-test-runner = { module = "androidx.test:runner", version = "1.6.2" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -1,4 +1,10 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) load(file.inputStream())
+}
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -18,7 +24,7 @@ buildkonfig {
         buildConfigField(
             com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
             "GEMINI_API_KEY",
-            project.findProperty("GEMINI_API_KEY")?.toString() ?: ""
+            localProperties.getProperty("GEMINI_API_KEY") ?: project.findProperty("GEMINI_API_KEY")?.toString() ?: ""
         )
     }
 }
@@ -109,6 +115,13 @@ kotlin {
                 implementation(libs.sqldelight.sqlite.driver)
             }
         }
+        val androidInstrumentedTest by getting {
+            dependencies {
+                implementation(libs.androidx.testExt.junit)
+                implementation(libs.androidx.test.core)
+                implementation(libs.androidx.test.runner)
+            }
+        }
     }
 }
 
@@ -122,6 +135,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
         versionName = "1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     packaging {
         resources {
