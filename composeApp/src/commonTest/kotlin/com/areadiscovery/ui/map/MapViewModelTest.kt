@@ -56,7 +56,7 @@ class MapViewModelTest {
     )
 
     @Test
-    fun initialStateIsLoading() = runTest {
+    fun initialStateIsLoading() = runTest(testDispatcher) {
 
         val suspendingLocation = ResettableFakeLocationProvider()
         val viewModel = createViewModel(locationProvider = suspendingLocation)
@@ -65,7 +65,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun locationSuccessTransitionsToReady() = runTest {
+    fun locationSuccessTransitionsToReady() = runTest(testDispatcher) {
 
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -81,7 +81,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun locationFailureTransitionsToLocationFailed() = runTest {
+    fun locationFailureTransitionsToLocationFailed() = runTest(testDispatcher) {
 
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -94,7 +94,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun geocodeFailureTransitionsToLocationFailed() = runTest {
+    fun geocodeFailureTransitionsToLocationFailed() = runTest(testDispatcher) {
 
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -107,7 +107,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun retryResetsToLoadingAndReloads() = runTest {
+    fun retryResetsToLoadingAndReloads() = runTest(testDispatcher) {
 
         val resettableLocation = ResettableFakeLocationProvider()
         val viewModel = createViewModel(
@@ -137,29 +137,30 @@ class MapViewModelTest {
         assertEquals("Alfama, Lisbon", state.areaName)
         assertEquals(38.7139, state.latitude)
         assertEquals(-9.1394, state.longitude)
+        assertEquals(emptyList(), state.pois)
     }
 
     @Test
     fun gpsTimeoutTransitionsToLocationFailed() {
-        // Separate scheduler for this test — StandardTestDispatcher controls time manually
-        val timeoutScheduler = TestCoroutineScheduler()
-        val timeoutDispatcher = StandardTestDispatcher(timeoutScheduler)
+        // StandardTestDispatcher controls time manually (unlike UnconfinedTestDispatcher)
+        val timeoutDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.resetMain()
         Dispatchers.setMain(timeoutDispatcher)
 
         try {
-            val neverCompletingLocation = ResettableFakeLocationProvider()
-            val viewModel = createViewModel(locationProvider = neverCompletingLocation)
+            runTest(timeoutDispatcher) {
+                val neverCompletingLocation = ResettableFakeLocationProvider()
+                val viewModel = createViewModel(locationProvider = neverCompletingLocation)
 
-            // StandardTestDispatcher doesn't run eagerly — state is still initial Loading
-            assertIs<MapUiState.Loading>(viewModel.uiState.value)
+                // StandardTestDispatcher doesn't run eagerly — state is still initial Loading
+                assertIs<MapUiState.Loading>(viewModel.uiState.value)
 
-            // Advance past GPS_TIMEOUT_MS (10_000L)
-            timeoutScheduler.advanceTimeBy(10_001L)
-            timeoutScheduler.advanceUntilIdle()
+                // Advance past GPS_TIMEOUT_MS (10_000L)
+                advanceTimeBy(10_001L)
 
-            val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
-            assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
+                val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
+                assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
+            }
         } finally {
             Dispatchers.resetMain()
             Dispatchers.setMain(testDispatcher)
@@ -169,7 +170,7 @@ class MapViewModelTest {
     // --- Story 3.2 tests ---
 
     @Test
-    fun poisAreEmptyWhenRepositoryEmitsNoUpdates() = runTest {
+    fun poisAreEmptyWhenRepositoryEmitsNoUpdates() = runTest(testDispatcher) {
 
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -184,7 +185,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun poisPopulatedOnPortraitComplete() = runTest {
+    fun poisPopulatedOnPortraitComplete() = runTest(testDispatcher) {
 
         val mockPOIs = listOf(
             POI("Statue of Liberty", "landmark", "Famous statue", Confidence.HIGH, 40.6892, -74.0445),
@@ -205,7 +206,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun analyticsMapOpenedFiredWithCorrectParams() = runTest {
+    fun analyticsMapOpenedFiredWithCorrectParams() = runTest(testDispatcher) {
 
         val mockPOIs = listOf(
             POI("Statue of Liberty", "landmark", "Famous statue", Confidence.HIGH, 40.6892, -74.0445),
@@ -231,7 +232,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun analyticsMapOpenedFiresWithZeroPois() = runTest {
+    fun analyticsMapOpenedFiresWithZeroPois() = runTest(testDispatcher) {
         val analyticsTracker = FakeAnalyticsTracker()
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -253,7 +254,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun areaContextFactoryCalledExactlyOnce() = runTest {
+    fun areaContextFactoryCalledExactlyOnce() = runTest(testDispatcher) {
 
         val contextFactory = FakeAreaContextFactory()
         val viewModel = createViewModel(
@@ -269,7 +270,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun contextFactoryNotCalledOnLocationFailure() = runTest {
+    fun contextFactoryNotCalledOnLocationFailure() = runTest(testDispatcher) {
 
         val contextFactory = FakeAreaContextFactory()
         val areaRepository = FakeAreaRepository()

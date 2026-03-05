@@ -22,11 +22,11 @@ so that I can discover hidden gems and notable places I wouldn't have found on m
 ## Tasks / Subtasks
 
 - [x] Task 1: Extend `MapViewModel` to fetch and expose POIs (AC: 1, 3, 6)
-  - [x] 1.1: Add constructor dependencies to `MapViewModel`: `GetAreaPortraitUseCase`, `AreaContextFactory`, `AnalyticsTracker` (in addition to existing `LocationProvider`). Note: PrivacyPipeline was removed during review — MapViewModel calls `locationProvider.reverseGeocode()` directly to avoid double GPS (M9 fix).
+  - [x] 1.1: Add constructor dependencies to `MapViewModel`: `GetAreaPortraitUseCase`, `AreaContextFactory`, `AnalyticsTracker` (in addition to existing `LocationProvider`). MapViewModel calls `locationProvider.reverseGeocode()` directly (no PrivacyPipeline — removed during review to avoid double GPS, M9 fix).
   - [x] 1.2: After `MapUiState.Ready` is emitted (location resolved), call `areaRepository.getAreaPortrait(areaName, areaContextFactory.create())` in the same `viewModelScope.launch` block
   - [x] 1.3: Collect the portrait flow and listen for `BucketUpdate.PortraitComplete(pois)` — when received, update state: `_uiState.value = (current as? MapUiState.Ready)?.copy(pois = pois) ?: current`; ignore all other `BucketUpdate` types (buckets are SummaryScreen's concern)
   - [x] 1.4: After POIs are resolved (on receiving `PortraitComplete`, even if `pois.isEmpty()`), fire analytics: `analyticsTracker.trackEvent("map_opened", mapOf("area_name" to areaName, "poi_count" to pois.size.toString()))`
-  - [x] 1.5: Update `UiModule.kt` Koin registration: `viewModel { MapViewModel(get(), get(), get(), get()) }` — order: `LocationProvider`, `GetAreaPortraitUseCase`, `AreaContextFactory`, `AnalyticsTracker` (4 params after M9/L10 review fixes)
+  - [x] 1.5: Update `UiModule.kt` Koin registration: `viewModel { MapViewModel(get(), get(), get(), get()) }` — 4 params: `LocationProvider`, `GetAreaPortraitUseCase`, `AreaContextFactory`, `AnalyticsTracker`
   - [x] 1.6: **V1 Limitation Note** — `AreaRepositoryImpl` returns `PortraitComplete(pois = emptyList())` in cache hit paths (all 6 buckets cached). POIs are populated only on AI cache miss. This is acceptable V1 behaviour: on first launch, the AI call returns POIs; on subsequent loads, the cache serves the buckets but not POIs. Full POI caching is deferred to Epic 3/7.
 
 - [x] Task 2: Update `MapComposable` `expect/actual` to accept and render POIs (AC: 1, 2, 4)
@@ -149,7 +149,7 @@ MapLibre's `MapView` is a classic Android View. Individual marker `contentDescri
 2. **Full accessibility:** Implement a custom `AccessibilityDelegate` on `MapView` that exposes virtual accessibility nodes per marker — defer to Story 3.4 or a dedicated accessibility pass.
 Dev agent should choose option 1 for this story scope.
 
-**Badge in `App.kt`:** The `koinViewModel<MapViewModel>()` approach described above was rejected during implementation due to ViewModel scope issues. **Actual implementation:** Uses a callback pattern (`onPoiCountChanged`) — `MapScreen` reports POI count changes upward via callback to `App.kt`, which passes the count down to `BottomNavBar`. This avoids creating duplicate ViewModel instances across navigation scopes.
+**Badge in `App.kt`:** Uses a callback pattern (`onPoiCountChanged`) — `MapScreen` reports POI count changes upward via callback to `App.kt`, which passes the count down to `BottomNavBar`. This avoids creating duplicate ViewModel instances across navigation scopes.
 
 **`retry()` and POI fetch:** When `retry()` is called, the ViewModel resets to `Loading` and calls `loadLocation()` again, which will re-fetch the portrait and POIs from scratch (or cache). No special handling needed — the existing retry flow will re-trigger the `getAreaPortrait()` call.
 

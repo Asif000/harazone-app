@@ -10,7 +10,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.areadiscovery.domain.model.POI
 import org.maplibre.android.MapLibre
 import org.maplibre.android.annotations.Marker
@@ -93,12 +96,23 @@ actual fun MapComposable(
         }
     }
 
-    DisposableEffect(Unit) {
-        mapView.onStart()
-        mapView.onResume()
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_START -> mapView.onStart()
+                Lifecycle.Event.ON_RESUME -> mapView.onResume()
+                Lifecycle.Event.ON_PAUSE -> mapView.onPause()
+                Lifecycle.Event.ON_STOP -> mapView.onStop()
+                Lifecycle.Event.ON_DESTROY -> mapView.onDestroy()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         context.registerComponentCallbacks(lowMemoryCallback)
         onDispose {
             context.unregisterComponentCallbacks(lowMemoryCallback)
+            lifecycleOwner.lifecycle.removeObserver(observer)
             mapView.onPause()
             mapView.onStop()
             mapView.onDestroy()
