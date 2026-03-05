@@ -239,6 +239,7 @@ claude-opus-4-6
 - 2026-03-05: Address round 2 code review findings (1M, 2L): M1 stale markers fix (remove early return on empty pois), L2 assert map_opened fires exactly once, L1/M4/L3 already fixed in round 1
 - 2026-03-05: Address round 3 code review findings (1C, 2M, 3L): C1 fix eager ViewModel creation — removed koinViewModel from App.kt, MapViewModel now lazy (created only when MapScreen navigated to), badge via callback (onPoiCountChanged). M6 test areaContextFactoryCalledExactlyOnce added. L6 locationCallCount assertion added. 10 tests.
 - 2026-03-05: Address round 4 code review findings (1M): M7 fix retry() race — cancel in-flight loadJob before relaunching (matches SummaryViewModel pattern). M8 V1 limitation note updated to clarify stale-while-revalidate also returns empty POIs. L9/L10 out of scope (AreaRepositoryImpl/use-case layer).
+- 2026-03-05: Address round 5 code review findings (1M): C1 already fixed in round 3 (reviewer on stale code). M10 fix GPS timeout — wrap locationProvider.getCurrentLocation() with withTimeoutOrNull(10s) matching PrivacyPipeline. M9 (double GPS) is pre-existing from Story 3.1, not a 3.2 regression.
 
 ### File List
 

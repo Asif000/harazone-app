@@ -11,6 +11,7 @@ import com.areadiscovery.util.AnalyticsTracker
 import com.areadiscovery.util.AppLogger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -45,7 +46,11 @@ class MapViewModel(
     private fun loadLocation() {
         loadJob = viewModelScope.launch {
             try {
-                val locationDeferred = async { locationProvider.getCurrentLocation() }
+                val locationDeferred = async {
+                    withTimeoutOrNull(GPS_TIMEOUT_MS) {
+                        locationProvider.getCurrentLocation()
+                    } ?: Result.failure(Exception("GPS timeout"))
+                }
                 val areaNameDeferred = async { privacyPipeline.resolveAreaName() }
 
                 val locationResult = locationDeferred.await()
@@ -100,5 +105,6 @@ class MapViewModel(
 
     companion object {
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."
+        internal const val GPS_TIMEOUT_MS = 10_000L
     }
 }
