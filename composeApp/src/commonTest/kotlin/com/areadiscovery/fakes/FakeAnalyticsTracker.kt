@@ -6,6 +6,10 @@ import kotlin.test.assertTrue
 class FakeAnalyticsTracker : AnalyticsTracker {
     val recordedEvents = mutableListOf<Pair<String, Map<String, String>>>()
 
+    fun reset() {
+        recordedEvents.clear()
+    }
+
     override fun trackEvent(name: String, params: Map<String, String>) {
         recordedEvents += name to params
     }

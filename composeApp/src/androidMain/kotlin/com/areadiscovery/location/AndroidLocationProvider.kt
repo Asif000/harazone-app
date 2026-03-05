@@ -5,6 +5,7 @@ import android.location.Geocoder
 import android.os.Build
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.android.gms.tasks.CancellationTokenSource
 import com.areadiscovery.util.AppLogger
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +21,9 @@ class AndroidLocationProvider(private val context: Context) : LocationProvider {
     override suspend fun getCurrentLocation(): Result<GpsCoordinates> =
         suspendCancellableCoroutine { cont ->
             try {
-                fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
+                val cts = CancellationTokenSource()
+                cont.invokeOnCancellation { cts.cancel() }
+                fusedClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, cts.token)
                     .addOnSuccessListener { location ->
                         if (location != null) {
                             cont.resume(Result.success(GpsCoordinates(location.latitude, location.longitude)))
@@ -44,7 +47,7 @@ class AndroidLocationProvider(private val context: Context) : LocationProvider {
                 return Result.failure(Exception("Geocoder service unavailable on this device"))
             }
             val geocoder = Geocoder(context)
-            val areaName = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 suspendCancellableCoroutine { cont ->
                     geocoder.getFromLocation(latitude, longitude, 1) { addresses ->
                         cont.resume(extractAreaName(addresses))
@@ -57,20 +60,21 @@ class AndroidLocationProvider(private val context: Context) : LocationProvider {
                     extractAreaName(addresses ?: emptyList())
                 }
             }
-            Result.success(areaName)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             Result.failure(e)
         }
 
-    private fun extractAreaName(addresses: List<android.location.Address>): String {
+    private fun extractAreaName(addresses: List<android.location.Address>): Result<String> {
         val address = addresses.firstOrNull()
-            ?: return "Unknown area"
-        return listOfNotNull(
+            ?: return Result.failure(Exception("Geocoding returned no addresses"))
+        val name = listOfNotNull(
             address.subLocality,
             address.locality,
             address.adminArea
-        ).joinToString(", ").ifBlank { "Unknown area" }
+        ).joinToString(", ")
+        return if (name.isNotBlank()) Result.success(name)
+        else Result.failure(Exception("Geocoding returned address with no locality data"))
     }
 }

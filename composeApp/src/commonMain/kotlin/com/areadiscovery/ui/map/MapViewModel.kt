@@ -3,14 +3,12 @@ package com.areadiscovery.ui.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.areadiscovery.domain.model.BucketUpdate
-import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.service.AreaContextFactory
-import com.areadiscovery.domain.service.PrivacyPipeline
+import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
 import com.areadiscovery.location.LocationProvider
 import com.areadiscovery.util.AnalyticsTracker
 import com.areadiscovery.util.AppLogger
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,8 +20,7 @@ import kotlin.coroutines.cancellation.CancellationException
 
 class MapViewModel(
     private val locationProvider: LocationProvider,
-    private val privacyPipeline: PrivacyPipeline,
-    private val areaRepository: AreaRepository,
+    private val getAreaPortrait: GetAreaPortraitUseCase,
     private val areaContextFactory: AreaContextFactory,
     private val analyticsTracker: AnalyticsTracker,
 ) : ViewModel() {
@@ -46,23 +43,18 @@ class MapViewModel(
     private fun loadLocation() {
         loadJob = viewModelScope.launch {
             try {
-                val locationDeferred = async {
-                    withTimeoutOrNull(GPS_TIMEOUT_MS) {
-                        locationProvider.getCurrentLocation()
-                    } ?: Result.failure(Exception("GPS timeout"))
-                }
-                val areaNameDeferred = async { privacyPipeline.resolveAreaName() }
-
-                val locationResult = locationDeferred.await()
+                val locationResult = withTimeoutOrNull(GPS_TIMEOUT_MS) {
+                    locationProvider.getCurrentLocation()
+                } ?: Result.failure(Exception("GPS timeout"))
 
                 if (locationResult.isFailure) {
-                    areaNameDeferred.cancel()
                     AppLogger.e(locationResult.exceptionOrNull()) { "Map: location unavailable" }
                     _uiState.value = MapUiState.LocationFailed(LOCATION_FAILURE_MESSAGE)
                     return@launch
                 }
 
-                val areaNameResult = areaNameDeferred.await()
+                val coords = locationResult.getOrThrow()
+                val areaNameResult = locationProvider.reverseGeocode(coords.latitude, coords.longitude)
 
                 if (areaNameResult.isFailure) {
                     AppLogger.e(areaNameResult.exceptionOrNull()) { "Map: area name resolution failed" }
@@ -70,7 +62,6 @@ class MapViewModel(
                     return@launch
                 }
 
-                val coords = locationResult.getOrThrow()
                 val areaName = areaNameResult.getOrThrow()
 
                 _uiState.value = MapUiState.Ready(
@@ -79,7 +70,8 @@ class MapViewModel(
                     longitude = coords.longitude,
                 )
 
-                areaRepository.getAreaPortrait(areaName, areaContextFactory.create())
+                val context = areaContextFactory.create()
+                getAreaPortrait(areaName, context)
                     .catch { e -> AppLogger.e(e) { "Map: portrait fetch failed" } }
                     .collect { update ->
                         if (update is BucketUpdate.PortraitComplete) {

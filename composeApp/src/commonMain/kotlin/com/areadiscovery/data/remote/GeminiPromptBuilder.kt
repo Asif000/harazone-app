@@ -31,7 +31,7 @@ After the last bucket, output this delimiter:
 ---POIS---
 
 Then output a JSON array of notable points of interest:
-[{"name":"POI name","type":"category","description":"brief description","confidence":"HIGH|MEDIUM|LOW","latitude":null,"longitude":null}]
+[{"name":"POI name","type":"category","description":"brief description","confidence":"HIGH|MEDIUM|LOW","latitude":51.5074,"longitude":-0.1278}]
 
 IMPORTANT:
 - Output ONLY the JSON objects and delimiters, no other text
@@ -40,6 +40,7 @@ IMPORTANT:
 - Provide honest confidence levels based on data availability
 - Include real, verifiable sources where possible
 - NEVER include the strings "---BUCKET---" or "---POIS---" inside JSON field values
+- For each POI, provide decimal GPS coordinates to 4 decimal places. Coordinates are required for map marker placement. Only include a POI if you can provide coordinates with reasonable confidence
         """.trimIndent()
     }
 }

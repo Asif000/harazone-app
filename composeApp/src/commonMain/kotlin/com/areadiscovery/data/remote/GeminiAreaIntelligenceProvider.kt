@@ -80,6 +80,8 @@ internal class GeminiAreaIntelligenceProvider(
 
         val result = withRetry(
             maxAttempts = MAX_RETRY_ATTEMPTS,
+            initialDelayMs = 200,
+            maxDelayMs = 2000,
             isRetryable = { e -> !hasEmitted && e is Exception && isRetryableError(e) }
         ) {
             val streamingParser = responseParser.createStreamingParser()

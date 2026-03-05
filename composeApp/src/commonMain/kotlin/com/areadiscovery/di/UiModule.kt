@@ -11,5 +11,5 @@ val uiModule = module {
     factory { SummaryStateMapper() }
     factory { AreaContextFactory(get()) }
     viewModel { SummaryViewModel(get(), get(), get(), get(), get()) }
-    viewModel { MapViewModel(get(), get(), get(), get(), get()) }
+    viewModel { MapViewModel(get(), get(), get(), get()) }
 }

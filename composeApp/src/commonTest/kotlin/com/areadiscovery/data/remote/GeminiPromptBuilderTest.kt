@@ -61,4 +61,27 @@ class GeminiPromptBuilderTest {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
         assertTrue(prompt.contains("---POIS---"))
     }
+
+    @Test
+    fun buildAreaPortraitPrompt_poiTemplateHasRealCoordinates() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        // Verify the template shows real coordinates, not null placeholders (C2 fix)
+        assertTrue(
+            prompt.contains("\"latitude\":51.5074") || prompt.contains("\"latitude\": 51.5074"),
+            "POI template must show example coordinates, not null",
+        )
+        assertTrue(
+            !prompt.contains("\"latitude\":null") && !prompt.contains("\"latitude\": null"),
+            "POI template must NOT contain null latitude",
+        )
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_instructsGpsCoordinates() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(
+            prompt.contains("decimal GPS coordinates"),
+            "Prompt must instruct Gemini to provide GPS coordinates for POIs",
+        )
+    }
 }

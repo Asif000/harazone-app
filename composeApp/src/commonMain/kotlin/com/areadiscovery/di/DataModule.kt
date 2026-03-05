@@ -46,5 +46,5 @@ val dataModule = module {
             connectivityObserver = { get<ConnectivityMonitor>().observe() }
         )
     }
-    factory { GetAreaPortraitUseCase(get()) }
+    single { GetAreaPortraitUseCase(get()) }
 }

@@ -7,16 +7,19 @@ import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import com.areadiscovery.domain.model.POI
 import org.maplibre.android.MapLibre
+import org.maplibre.android.annotations.Marker
+import org.maplibre.android.annotations.MarkerOptions
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
-import org.maplibre.android.annotations.MarkerOptions
 
 private const val MAP_STYLE_URL = "https://demotiles.maplibre.org/style.json"
 
@@ -30,8 +33,12 @@ actual fun MapComposable(
 ) {
     val context = LocalContext.current
 
+    val poiMarkers = remember { mutableStateListOf<Marker>() }
+    val poiVersion = remember { mutableIntStateOf(0) }
+
     val mapView = remember {
-        MapLibre.getInstance(context) // init MapLibre singleton before creating MapView
+        /* Initialize MapLibre singleton — return value unused (side-effect only) */
+        MapLibre.getInstance(context)
         MapView(context).apply {
             onCreate(Bundle())
             getMapAsync { map ->
@@ -56,15 +63,21 @@ actual fun MapComposable(
     // TODO: Replace default pin markers with custom icons per POI type using
     //  org.maplibre.gl:android-plugin-annotation-v9 SymbolManager (deferred to next cycle)
     LaunchedEffect(pois) {
+        val version = ++poiVersion.intValue
         mapView.getMapAsync { map ->
-            map.markers.forEach { map.removeMarker(it) }
+            // Discard stale callback if pois changed while getMapAsync was queued
+            if (poiVersion.intValue != version) return@getMapAsync
+            // Remove only POI markers (preserves any non-POI markers added by future stories)
+            poiMarkers.forEach { map.removeMarker(it) }
+            poiMarkers.clear()
             pois.filter { it.latitude != null && it.longitude != null }.forEach { poi ->
-                map.addMarker(
+                val marker = map.addMarker(
                     MarkerOptions()
                         .position(LatLng(poi.latitude!!, poi.longitude!!))
                         .title(poi.name)
                         .snippet(poi.type)
                 )
+                poiMarkers.add(marker)
             }
         }
     }
