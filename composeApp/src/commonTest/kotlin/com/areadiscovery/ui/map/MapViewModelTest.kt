@@ -14,7 +14,10 @@ import com.areadiscovery.location.GpsCoordinates
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -27,9 +30,12 @@ import kotlin.test.assertIs
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapViewModelTest {
 
+    private val testScheduler = TestCoroutineScheduler()
+    private val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+
     @BeforeTest
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        Dispatchers.setMain(testDispatcher)
     }
 
     @AfterTest
@@ -133,6 +139,33 @@ class MapViewModelTest {
         assertEquals(-9.1394, state.longitude)
     }
 
+    @Test
+    fun gpsTimeoutTransitionsToLocationFailed() {
+        // Separate scheduler for this test — StandardTestDispatcher controls time manually
+        val timeoutScheduler = TestCoroutineScheduler()
+        val timeoutDispatcher = StandardTestDispatcher(timeoutScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(timeoutDispatcher)
+
+        try {
+            val neverCompletingLocation = ResettableFakeLocationProvider()
+            val viewModel = createViewModel(locationProvider = neverCompletingLocation)
+
+            // StandardTestDispatcher doesn't run eagerly — state is still initial Loading
+            assertIs<MapUiState.Loading>(viewModel.uiState.value)
+
+            // Advance past GPS_TIMEOUT_MS (10_000L)
+            timeoutScheduler.advanceTimeBy(10_001L)
+            timeoutScheduler.advanceUntilIdle()
+
+            val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
+            assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
+    }
+
     // --- Story 3.2 tests ---
 
     @Test
@@ -211,7 +244,8 @@ class MapViewModelTest {
             analyticsTracker = analyticsTracker,
         )
 
-        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(emptyList(), state.pois)
         analyticsTracker.assertEventTracked(
             "map_opened",
             mapOf("area_name" to "Manhattan, New York", "poi_count" to "0"),

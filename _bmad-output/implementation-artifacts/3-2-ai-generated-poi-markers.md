@@ -78,13 +78,7 @@ so that I can discover hidden gems and notable places I wouldn't have found on m
       }
       ```
     - All other tabs remain unchanged (no badge wrapping)
-  - [x] 3.2: Update `App.kt` to obtain `MapViewModel` via `koinViewModel<MapViewModel>()` and collect `uiState`:
-    ```kotlin
-    val mapViewModel: MapViewModel = koinViewModel()
-    val mapUiState by mapViewModel.uiState.collectAsStateWithLifecycle()
-    val mapPoiCount = (mapUiState as? MapUiState.Ready)?.pois?.size ?: 0
-    ```
-    Then pass `mapPoiCount` to `BottomNavBar(navController, mapPoiCount = mapPoiCount)`
+  - [x] 3.2: Wire POI count from `MapScreen` to `BottomNavBar` via `onPoiCountChanged` callback pattern (avoids duplicate ViewModel scoping). `App.kt` holds the count state, `MapScreen` reports changes upward, `BottomNavBar` receives it as a parameter.
 
 - [x] Task 4: `MapViewModelTest` updates (AC: 1, 3, 6)
   - [x] 4.1: Update `FakeAreaRepository` to be configurable for POI tests:
@@ -96,7 +90,7 @@ so that I can discover hidden gems and notable places I wouldn't have found on m
             updates.asFlow()
     }
     ```
-  - [x] 4.2: Update `MapViewModelTest` helper `createViewModel()` to pass all 5 constructor params: `FakeLocationProvider`, `FakePrivacyPipeline`, `FakeAreaRepository`, `FakeAreaContextFactory`, `FakeAnalyticsTracker`
+  - [x] 4.2: Update `MapViewModelTest` helper `createViewModel()` to pass all 4 constructor params: `FakeLocationProvider`, `FakeAreaRepository` (wrapped in `GetAreaPortraitUseCase`), `FakeAreaContextFactory`, `FakeAnalyticsTracker`
   - [x] 4.3: Test: `poisAreEmptyBeforePortraitComplete` — `FakeAreaRepository` returns no updates → `MapUiState.Ready.pois` is `emptyList()`
   - [x] 4.4: Test: `poisPopulatedOnPortraitComplete` — `FakeAreaRepository` emits `PortraitComplete(mockPOIs)` → `MapUiState.Ready.pois == mockPOIs`
   - [x] 4.5: Test: `analyticsMapOpenedFiredWithCorrectParams` — verify `FakeAnalyticsTracker.events` contains `"map_opened"` event with `"area_name"` = resolved area name and `"poi_count"` = POI count string
