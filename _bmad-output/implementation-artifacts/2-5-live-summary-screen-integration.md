@@ -1,6 +1,6 @@
 # Story 2.5: Live Summary Screen Integration
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -198,12 +198,35 @@ Claude Opus 4.6
 - Task 6: 10s GPS timeout implemented in PrivacyPipeline.resolveAreaName() via withTimeoutOrNull. ViewModel shows LOCATION_FAILURE_MESSAGE on timeout/failure.
 - Task 7: Full test rewrite with FakePrivacyPipeline, FakeAreaContextFactory, TestGetAreaPortraitUseCase. 9 ViewModel tests, 15 StateMapper tests, 20 AreaContextFactory tests — all pass.
 
+### Senior Developer Review (AI)
+**Reviewer:** Asifchauhan (Claude Sonnet 4.6) — 2026-03-04
+**Outcome:** ✅ APPROVED — 5 review rounds, all HIGH/MEDIUM issues resolved
+
+**Round summary:**
+- R1 (2H, 4M, 6L): GPS failure used Error state; ContentAvailabilityNote dropped in early states; UTC timezone undocumented; GPS timeout untested; LocationResolving visually identical to Loading; ContentNoteBanner inline not separate file
+- R2 (0H, 4M, 6L): LocationFailed in ContentAvailabilityNote handler wrong; ContentNoteBanner theme colors; LinearProgressIndicator not orange pulse; retry button scrollable
+- R3 (0H, 1M, 5L): Privacy test used flawed digit assertion; handleContentDelta inconsistent for LocationFailed; maxScrollDepthPercent not reset on refresh; missing LocationFailed mapper test
+- R4 (0H, 0M, 3L): depth_percent String accepted (Firebase convention); redundant coordinate assertions cleaned up; refreshResetsScrollDepth test added
+- R5 (0H, 0M, 0L): Clean pass — APPROVED
+
+**Known accepted items (non-blocking):**
+- `depth_percent` tracked as String per Firebase Analytics convention
+- `LinearProgressIndicator` used for LocationResolving instead of spec's "orange pulse" — cosmetic deviation
+- LocationFailed renders skeleton BucketList below message — design choice
+
+**Post-approval review (Round 6 — Story 3.1 code review caught Story 2.5 issues):**
+- R6 (1H, 4M, 4L): H1 contentNote dropped on ContentDelta; M3 PullToRefreshBox flicker; M4 no Error state test; L1 hardcoded dp; L3 missing ContentDelta-after-note test
+- All actionable items resolved (see Change Log)
+
 ### Change Log
 - 2026-03-04: Implement Story 2.5 — Live Summary Screen Integration
+- 2026-03-04: Code review — 5 rounds, 2H + 4M + 6L found and resolved (see Senior Developer Review above)
+- 2026-03-04: Post-approval fixes (1H, 2M, 1L): H1 contentNote preserved in handleContentDelta, M3 isRefreshing includes LocationResolving, M4 streaming exception→Error test added, L1 ContentNoteBanner uses theme spacing, L3 ContentDelta-after-note test added
 
 ### File List
 #### New Files
 - `composeApp/src/commonMain/kotlin/com/areadiscovery/domain/service/AreaContextFactory.kt`
+- `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/summary/ContentNoteBanner.kt`
 - `composeApp/src/commonTest/kotlin/com/areadiscovery/fakes/FakePrivacyPipeline.kt`
 - `composeApp/src/commonTest/kotlin/com/areadiscovery/fakes/FakeAreaContextFactory.kt`
 - `composeApp/src/commonTest/kotlin/com/areadiscovery/fakes/FakeAreaRepository.kt`
@@ -219,4 +242,5 @@ Claude Opus 4.6
 - `composeApp/src/commonMain/kotlin/com/areadiscovery/domain/usecase/GetAreaPortraitUseCase.kt` — Made open for testability
 - `composeApp/src/commonTest/kotlin/com/areadiscovery/ui/summary/SummaryViewModelTest.kt` — Full rewrite with new fakes
 - `composeApp/src/commonTest/kotlin/com/areadiscovery/ui/summary/SummaryStateMapperTest.kt` — Added ContentAvailabilityNote tests
+- `composeApp/src/commonTest/kotlin/com/areadiscovery/domain/service/PrivacyPipelineTest.kt` — Timeout and privacy enforcement tests
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — Status updates

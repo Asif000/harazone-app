@@ -41,7 +41,8 @@ class SummaryStateMapper {
         )
 
         val newBuckets = buckets + (delta.bucketType to updated)
-        return SummaryUiState.Streaming(buckets = newBuckets, areaName = resolvedAreaName)
+        val existingNote = (currentState as? SummaryUiState.Streaming)?.contentNote
+        return SummaryUiState.Streaming(buckets = newBuckets, areaName = resolvedAreaName, contentNote = existingNote)
     }
 
     private fun handleBucketComplete(

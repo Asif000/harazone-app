@@ -320,6 +320,24 @@ class SummaryStateMapperTest {
         assertEquals("Stale content", complete.contentNote)
     }
 
+    @Test
+    fun `ContentDelta after ContentAvailabilityNote preserves contentNote`() {
+        var state: SummaryUiState = SummaryUiState.Loading
+
+        state = mapper.processUpdate(state, BucketUpdate.ContentAvailabilityNote("Offline — showing cached data"), areaName = testAreaName)
+        val streamingWithNote = assertIs<SummaryUiState.Streaming>(state)
+        assertEquals("Offline — showing cached data", streamingWithNote.contentNote)
+
+        state = mapper.processUpdate(state, BucketUpdate.ContentDelta(BucketType.SAFETY, "Safe area."), areaName = testAreaName)
+        val streamingAfterDelta = assertIs<SummaryUiState.Streaming>(state)
+        assertEquals("Offline — showing cached data", streamingAfterDelta.contentNote)
+        assertEquals("Safe area.", streamingAfterDelta.buckets[BucketType.SAFETY]!!.bodyText)
+
+        state = mapper.processUpdate(state, BucketUpdate.ContentDelta(BucketType.CHARACTER, "Vibrant."), areaName = testAreaName)
+        val streamingAfterSecondDelta = assertIs<SummaryUiState.Streaming>(state)
+        assertEquals("Offline — showing cached data", streamingAfterSecondDelta.contentNote)
+    }
+
     // --- areaName from Loading is preserved through full lifecycle ---
 
     @Test

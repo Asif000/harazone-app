@@ -89,7 +89,7 @@ fun SummaryScreen(
             )
         },
     ) { innerPadding ->
-        val isRefreshing = uiState is SummaryUiState.Loading
+        val isRefreshing = uiState is SummaryUiState.Loading || uiState is SummaryUiState.LocationResolving
 
         PullToRefreshBox(
             isRefreshing = isRefreshing,

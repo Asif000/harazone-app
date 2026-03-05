@@ -223,6 +223,19 @@ class SummaryViewModelTest {
     }
 
     @Test
+    fun portraitStreamingExceptionTransitionsToError() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        initFakes()
+        fakePipeline.setResult(Result.success("Downtown SF"))
+        fakeUseCase.shouldThrow = true
+        fakeUseCase.errorMessage = "Network timeout"
+        val viewModel = createViewModel()
+
+        val state = assertIs<SummaryUiState.Error>(viewModel.uiState.value)
+        assertEquals("Network timeout", state.message)
+    }
+
+    @Test
     fun scrollDepthTrackedOnScreenExit() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         initFakes()

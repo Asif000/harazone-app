@@ -7,7 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.areadiscovery.ui.theme.spacing
 
 // UX spec: warm beige bg (#F5EDE3) + warm gray text (#6B5E54)
 // These match our theme's surface and onSurfaceVariant tokens (see Color.kt)
@@ -20,6 +20,6 @@ fun ContentNoteBanner(message: String) {
         modifier = Modifier
             .fillMaxWidth()
             .background(MaterialTheme.colorScheme.surface)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
     )
 }
