@@ -34,12 +34,6 @@ actual fun MapComposable(
             onCreate(Bundle())
             getMapAsync { map ->
                 map.setStyle(MAP_STYLE_URL)
-                map.moveCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(latitude, longitude),
-                        zoomLevel,
-                    ),
-                )
             }
         }
     }

@@ -36,13 +36,15 @@ class MapViewModel(
                 val areaNameDeferred = async { privacyPipeline.resolveAreaName() }
 
                 val locationResult = locationDeferred.await()
-                val areaNameResult = areaNameDeferred.await()
 
                 if (locationResult.isFailure) {
+                    areaNameDeferred.cancel()
                     AppLogger.e(locationResult.exceptionOrNull()) { "Map: location unavailable" }
                     _uiState.value = MapUiState.LocationFailed(LOCATION_FAILURE_MESSAGE)
                     return@launch
                 }
+
+                val areaNameResult = areaNameDeferred.await()
 
                 if (areaNameResult.isFailure) {
                     AppLogger.e(areaNameResult.exceptionOrNull()) { "Map: area name resolution failed" }

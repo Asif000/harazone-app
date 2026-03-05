@@ -68,13 +68,13 @@ fun MapScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                            .padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
                     ) {
                         Text(
                             text = state.areaName,
                             style = MaterialTheme.typography.headlineSmall,
                         )
-                        Spacer(Modifier.height(4.dp))
+                        Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         Text(
                             text = "Explore this area",
                             style = MaterialTheme.typography.bodyMedium,

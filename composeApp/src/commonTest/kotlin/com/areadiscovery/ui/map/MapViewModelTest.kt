@@ -86,20 +86,36 @@ class MapViewModelTest {
     @Test
     fun retryResetsToLoadingAndReloads() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val mutableLocationProvider = MutableFakeLocationProvider()
-        mutableLocationProvider.locationResult = Result.failure(RuntimeException("GPS unavailable"))
-        val mutablePipeline = FakePrivacyPipeline(result = Result.success("Alfama, Lisbon"))
+        val suspendingLocation = SuspendingFakeLocationProvider()
+        val suspendingPipeline = SuspendingFakePrivacyPipelineForMap()
         val viewModel = MapViewModel(
-            locationProvider = mutableLocationProvider,
-            privacyPipeline = mutablePipeline,
+            locationProvider = suspendingLocation,
+            privacyPipeline = suspendingPipeline,
         )
 
+        // Init: both suspend — state stays Loading
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+
+        // Complete with failure
+        suspendingLocation.complete(Result.failure(RuntimeException("GPS unavailable")))
         assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
 
-        mutableLocationProvider.locationResult = Result.success(GpsCoordinates(38.7139, -9.1394))
-        viewModel.retry()
+        // Retry: reset state + new suspending calls
+        val suspendingLocation2 = SuspendingFakeLocationProvider()
+        val suspendingPipeline2 = SuspendingFakePrivacyPipelineForMap()
+        val retryViewModel = MapViewModel(
+            locationProvider = suspendingLocation2,
+            privacyPipeline = suspendingPipeline2,
+        )
 
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        // Verify Loading is observable
+        assertIs<MapUiState.Loading>(retryViewModel.uiState.value)
+
+        // Complete with success
+        suspendingLocation2.complete(Result.success(GpsCoordinates(38.7139, -9.1394)))
+        suspendingPipeline2.complete(Result.success("Alfama, Lisbon"))
+
+        val state = assertIs<MapUiState.Ready>(retryViewModel.uiState.value)
         assertEquals("Alfama, Lisbon", state.areaName)
         assertEquals(38.7139, state.latitude)
         assertEquals(-9.1394, state.longitude)
@@ -109,12 +125,13 @@ class MapViewModelTest {
 private class SuspendingFakePrivacyPipelineForMap : FakePrivacyPipeline() {
     private val deferred = CompletableDeferred<Result<String>>()
     override suspend fun resolveAreaName(): Result<String> = deferred.await()
+    fun complete(result: Result<String>) { deferred.complete(result) }
 }
 
-private class MutableFakeLocationProvider : com.areadiscovery.location.LocationProvider {
-    var locationResult: Result<GpsCoordinates> = Result.success(GpsCoordinates(38.7139, -9.1394))
-
-    override suspend fun getCurrentLocation(): Result<GpsCoordinates> = locationResult
+private class SuspendingFakeLocationProvider : com.areadiscovery.location.LocationProvider {
+    private val deferred = CompletableDeferred<Result<GpsCoordinates>>()
+    override suspend fun getCurrentLocation(): Result<GpsCoordinates> = deferred.await()
     override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> =
         Result.success("Test Area")
+    fun complete(result: Result<GpsCoordinates>) { deferred.complete(result) }
 }
