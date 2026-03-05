@@ -237,6 +237,7 @@ claude-opus-4-6
 - 2026-03-04: Story 3.2 implementation complete — all 4 tasks, 9 passing tests
 - 2026-03-05: Address round 1 code review findings (1C, 3M, 3L): C1 fix duplicate ViewModel (App.kt→AppNavigation→MapScreen param pass-through), M1 AC2 partial noted, M3 createViewModel() uses interface types, L1 test renamed
 - 2026-03-05: Address round 2 code review findings (1M, 2L): M1 stale markers fix (remove early return on empty pois), L2 assert map_opened fires exactly once, L1/M4/L3 already fixed in round 1
+- 2026-03-05: Address round 3 code review findings (1C, 2M, 3L): C1 fix eager ViewModel creation — removed koinViewModel from App.kt, MapViewModel now lazy (created only when MapScreen navigated to), badge via callback (onPoiCountChanged). M6 test areaContextFactoryCalledExactlyOnce added. L6 locationCallCount assertion added. 10 tests.
 
 ### File List
 

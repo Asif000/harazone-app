@@ -31,7 +31,7 @@ actual fun MapComposable(
     val context = LocalContext.current
 
     val mapView = remember {
-        MapLibre.getInstance(context)
+        MapLibre.getInstance(context) // init MapLibre singleton before creating MapView
         MapView(context).apply {
             onCreate(Bundle())
             getMapAsync { map ->

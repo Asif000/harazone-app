@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +30,14 @@ import org.koin.compose.viewmodel.koinViewModel
 @Composable
 fun MapScreen(
     viewModel: MapViewModel = koinViewModel(),
+    onPoiCountChanged: (Int) -> Unit = {},
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    val poiCount = (uiState as? MapUiState.Ready)?.pois?.size ?: 0
+    LaunchedEffect(poiCount) {
+        onPoiCountChanged(poiCount)
+    }
 
     when (val state = uiState) {
         is MapUiState.Loading -> {

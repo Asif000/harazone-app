@@ -194,18 +194,36 @@ class MapViewModelTest {
     }
 
     @Test
+    fun areaContextFactoryCalledExactlyOnce() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val contextFactory = FakeAreaContextFactory()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+            ),
+            privacyPipeline = FakePrivacyPipeline(result = Result.success("Manhattan, New York")),
+            areaContextFactory = contextFactory,
+        )
+
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, contextFactory.callCount)
+    }
+
+    @Test
     fun noPoisLoadedIfLocationFails() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val areaRepository = FakeAreaRepository()
+        val locationProvider = FakeLocationProvider(
+            locationResult = Result.failure(RuntimeException("GPS unavailable")),
+        )
         val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.failure(RuntimeException("GPS unavailable")),
-            ),
+            locationProvider = locationProvider,
             areaRepository = areaRepository,
         )
 
         assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
         assertEquals(0, areaRepository.callCount)
+        assertEquals(1, locationProvider.locationCallCount)
     }
 }
 
