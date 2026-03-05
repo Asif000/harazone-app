@@ -5,8 +5,8 @@ import android.content.res.Configuration
 import android.os.Bundle
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -25,8 +25,6 @@ actual fun MapComposable(
     zoomLevel: Double,
 ) {
     val context = LocalContext.current
-    val currentLatitude = rememberUpdatedState(latitude)
-    val currentLongitude = rememberUpdatedState(longitude)
 
     val mapView = remember {
         MapLibre.getInstance(context)
@@ -38,19 +36,20 @@ actual fun MapComposable(
         }
     }
 
+    LaunchedEffect(latitude, longitude) {
+        mapView.getMapAsync { map ->
+            map.moveCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                    LatLng(latitude, longitude),
+                    zoomLevel,
+                ),
+            )
+        }
+    }
+
     AndroidView(
         factory = { mapView },
         modifier = modifier,
-        update = { view ->
-            view.getMapAsync { map ->
-                map.moveCamera(
-                    CameraUpdateFactory.newLatLngZoom(
-                        LatLng(currentLatitude.value, currentLongitude.value),
-                        zoomLevel,
-                    ),
-                )
-            }
-        },
     )
 
     val lowMemoryCallback = remember {

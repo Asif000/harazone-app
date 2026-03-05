@@ -205,6 +205,7 @@ None — clean implementation with no debug issues.
 - 2026-03-04: Implemented Story 3.1 — MapLibre integration with expect/actual composable wrapper, MapViewModel with parallel location resolution, MapScreen with BottomSheetScaffold, and 5 unit tests.
 - 2026-03-04: Address code review R1 findings (0H, 2M, 2L): M1 setStyle moved to factory one-shot, M2 sprint-status.yaml added to File List, L1 removed unused DEFAULT_ZOOM, L2 added onLowMemory lifecycle callback, L4 theme spacing in MapScreen.
 - 2026-03-04: Address code review R2 findings (0H, 2M, 1L): M1 cancel sibling deferred on early location failure, M2 retry test now asserts Loading state via suspending fakes, L1 removed stale closure in remember block, L2 theme spacing in Ready sheet content.
+- 2026-03-04: Address code review R3 findings (1C, 1M): C1 retry test now calls viewModel.retry() on same instance using resettable fakes, M1 moveCamera via LaunchedEffect(lat, lon) — no longer resets on sheet animation.
 
 ### File List
 

@@ -34,7 +34,7 @@ class MapViewModelTest {
     @Test
     fun initialStateIsLoading() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val suspendingPipeline = SuspendingFakePrivacyPipelineForMap()
+        val suspendingPipeline = ResettableFakePrivacyPipeline()
         fakeLocationProvider = FakeLocationProvider()
         val viewModel = MapViewModel(
             locationProvider = fakeLocationProvider,
@@ -86,52 +86,53 @@ class MapViewModelTest {
     @Test
     fun retryResetsToLoadingAndReloads() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        val suspendingLocation = SuspendingFakeLocationProvider()
-        val suspendingPipeline = SuspendingFakePrivacyPipelineForMap()
+        val resettableLocation = ResettableFakeLocationProvider()
+        val resettablePipeline = ResettableFakePrivacyPipeline()
         val viewModel = MapViewModel(
-            locationProvider = suspendingLocation,
-            privacyPipeline = suspendingPipeline,
+            locationProvider = resettableLocation,
+            privacyPipeline = resettablePipeline,
         )
 
         // Init: both suspend — state stays Loading
         assertIs<MapUiState.Loading>(viewModel.uiState.value)
 
-        // Complete with failure
-        suspendingLocation.complete(Result.failure(RuntimeException("GPS unavailable")))
+        // Complete init with failure
+        resettableLocation.complete(Result.failure(RuntimeException("GPS unavailable")))
         assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
 
-        // Retry: reset state + new suspending calls
-        val suspendingLocation2 = SuspendingFakeLocationProvider()
-        val suspendingPipeline2 = SuspendingFakePrivacyPipelineForMap()
-        val retryViewModel = MapViewModel(
-            locationProvider = suspendingLocation2,
-            privacyPipeline = suspendingPipeline2,
-        )
+        // Reset fakes for retry call
+        resettableLocation.reset()
+        resettablePipeline.reset()
 
-        // Verify Loading is observable
-        assertIs<MapUiState.Loading>(retryViewModel.uiState.value)
+        // Call retry() on the SAME ViewModel
+        viewModel.retry()
 
-        // Complete with success
-        suspendingLocation2.complete(Result.success(GpsCoordinates(38.7139, -9.1394)))
-        suspendingPipeline2.complete(Result.success("Alfama, Lisbon"))
+        // Verify Loading is set by retry() before coroutines resolve
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
 
-        val state = assertIs<MapUiState.Ready>(retryViewModel.uiState.value)
+        // Complete retry with success
+        resettableLocation.complete(Result.success(GpsCoordinates(38.7139, -9.1394)))
+        resettablePipeline.complete(Result.success("Alfama, Lisbon"))
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Alfama, Lisbon", state.areaName)
         assertEquals(38.7139, state.latitude)
         assertEquals(-9.1394, state.longitude)
     }
 }
 
-private class SuspendingFakePrivacyPipelineForMap : FakePrivacyPipeline() {
-    private val deferred = CompletableDeferred<Result<String>>()
+private class ResettableFakePrivacyPipeline : FakePrivacyPipeline() {
+    private var deferred = CompletableDeferred<Result<String>>()
     override suspend fun resolveAreaName(): Result<String> = deferred.await()
     fun complete(result: Result<String>) { deferred.complete(result) }
+    fun reset() { deferred = CompletableDeferred() }
 }
 
-private class SuspendingFakeLocationProvider : com.areadiscovery.location.LocationProvider {
-    private val deferred = CompletableDeferred<Result<GpsCoordinates>>()
+private class ResettableFakeLocationProvider : com.areadiscovery.location.LocationProvider {
+    private var deferred = CompletableDeferred<Result<GpsCoordinates>>()
     override suspend fun getCurrentLocation(): Result<GpsCoordinates> = deferred.await()
     override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> =
         Result.success("Test Area")
     fun complete(result: Result<GpsCoordinates>) { deferred.complete(result) }
+    fun reset() { deferred = CompletableDeferred() }
 }
