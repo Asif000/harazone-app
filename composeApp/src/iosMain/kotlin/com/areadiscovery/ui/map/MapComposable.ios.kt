@@ -6,6 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.areadiscovery.domain.model.POI
 
 @Composable
 actual fun MapComposable(
@@ -13,6 +14,7 @@ actual fun MapComposable(
     latitude: Double,
     longitude: Double,
     zoomLevel: Double,
+    pois: List<POI>,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Text("Map not yet available on iOS", style = MaterialTheme.typography.bodyMedium)

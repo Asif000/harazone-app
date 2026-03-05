@@ -5,6 +5,8 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
@@ -30,7 +32,7 @@ private data class BottomNavItem<T : Any>(
 )
 
 @Composable
-fun BottomNavBar(navController: NavController) {
+fun BottomNavBar(navController: NavController, mapPoiCount: Int = 0) {
     val items = remember {
         listOf(
             BottomNavItem("Summary", Icons.Filled.Explore, SummaryRoute, SummaryRoute::class),
@@ -49,6 +51,7 @@ fun BottomNavBar(navController: NavController) {
     ) {
         items.forEach { item ->
             val selected = currentDestination?.hasRoute(item.routeClass) == true
+            val isMapItem = item.routeClass == MapRoute::class
             NavigationBarItem(
                 selected = selected,
                 onClick = {
@@ -64,10 +67,15 @@ fun BottomNavBar(navController: NavController) {
                     )
                 },
                 icon = {
-                    Icon(
-                        imageVector = item.icon,
-                        contentDescription = null,
-                    )
+                    if (isMapItem) {
+                        BadgedBox(badge = {
+                            if (mapPoiCount > 0) Badge { Text(mapPoiCount.toString()) }
+                        }) {
+                            Icon(imageVector = item.icon, contentDescription = null)
+                        }
+                    } else {
+                        Icon(imageVector = item.icon, contentDescription = null)
+                    }
                 },
                 label = { Text(item.label) },
                 colors = NavigationBarItemDefaults.colors(

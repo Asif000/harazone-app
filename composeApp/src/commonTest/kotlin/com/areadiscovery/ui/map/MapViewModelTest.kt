@@ -1,5 +1,11 @@
 package com.areadiscovery.ui.map
 
+import com.areadiscovery.domain.model.BucketUpdate
+import com.areadiscovery.domain.model.Confidence
+import com.areadiscovery.domain.model.POI
+import com.areadiscovery.fakes.FakeAnalyticsTracker
+import com.areadiscovery.fakes.FakeAreaContextFactory
+import com.areadiscovery.fakes.FakeAreaRepository
 import com.areadiscovery.fakes.FakeLocationProvider
 import com.areadiscovery.fakes.FakePrivacyPipeline
 import com.areadiscovery.location.GpsCoordinates
@@ -18,28 +24,30 @@ import kotlin.test.assertIs
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapViewModelTest {
 
-    private lateinit var fakeLocationProvider: FakeLocationProvider
-    private lateinit var fakePipeline: FakePrivacyPipeline
-
     @AfterTest
     fun tearDown() {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel() = MapViewModel(
-        locationProvider = fakeLocationProvider,
-        privacyPipeline = fakePipeline,
+    private fun createViewModel(
+        locationProvider: com.areadiscovery.location.LocationProvider = FakeLocationProvider(),
+        privacyPipeline: com.areadiscovery.domain.service.PrivacyPipeline = FakePrivacyPipeline(),
+        areaRepository: com.areadiscovery.domain.repository.AreaRepository = FakeAreaRepository(),
+        areaContextFactory: com.areadiscovery.domain.service.AreaContextFactory = FakeAreaContextFactory(),
+        analyticsTracker: com.areadiscovery.util.AnalyticsTracker = FakeAnalyticsTracker(),
+    ) = MapViewModel(
+        locationProvider = locationProvider,
+        privacyPipeline = privacyPipeline,
+        areaRepository = areaRepository,
+        areaContextFactory = areaContextFactory,
+        analyticsTracker = analyticsTracker,
     )
 
     @Test
     fun initialStateIsLoading() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val suspendingPipeline = ResettableFakePrivacyPipeline()
-        fakeLocationProvider = FakeLocationProvider()
-        val viewModel = MapViewModel(
-            locationProvider = fakeLocationProvider,
-            privacyPipeline = suspendingPipeline,
-        )
+        val viewModel = createViewModel(privacyPipeline = suspendingPipeline)
 
         assertIs<MapUiState.Loading>(viewModel.uiState.value)
     }
@@ -47,11 +55,12 @@ class MapViewModelTest {
     @Test
     fun locationSuccessTransitionsToReady() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        fakeLocationProvider = FakeLocationProvider(
-            locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+            ),
+            privacyPipeline = FakePrivacyPipeline(result = Result.success("Manhattan, New York")),
         )
-        fakePipeline = FakePrivacyPipeline(result = Result.success("Manhattan, New York"))
-        val viewModel = createViewModel()
 
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Manhattan, New York", state.areaName)
@@ -62,11 +71,11 @@ class MapViewModelTest {
     @Test
     fun locationFailureTransitionsToLocationFailed() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        fakeLocationProvider = FakeLocationProvider(
-            locationResult = Result.failure(RuntimeException("GPS unavailable")),
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.failure(RuntimeException("GPS unavailable")),
+            ),
         )
-        fakePipeline = FakePrivacyPipeline()
-        val viewModel = createViewModel()
 
         val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
         assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
@@ -75,9 +84,9 @@ class MapViewModelTest {
     @Test
     fun privacyPipelineFailureTransitionsToLocationFailed() = runTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
-        fakeLocationProvider = FakeLocationProvider()
-        fakePipeline = FakePrivacyPipeline(result = Result.failure(RuntimeException("Geocoding failed")))
-        val viewModel = createViewModel()
+        val viewModel = createViewModel(
+            privacyPipeline = FakePrivacyPipeline(result = Result.failure(RuntimeException("Geocoding failed"))),
+        )
 
         val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
         assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
@@ -88,7 +97,7 @@ class MapViewModelTest {
         Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
         val resettableLocation = ResettableFakeLocationProvider()
         val resettablePipeline = ResettableFakePrivacyPipeline()
-        val viewModel = MapViewModel(
+        val viewModel = createViewModel(
             locationProvider = resettableLocation,
             privacyPipeline = resettablePipeline,
         )
@@ -118,6 +127,84 @@ class MapViewModelTest {
         assertEquals("Alfama, Lisbon", state.areaName)
         assertEquals(38.7139, state.latitude)
         assertEquals(-9.1394, state.longitude)
+    }
+
+    // --- Story 3.2 tests ---
+
+    @Test
+    fun poisAreEmptyWhenRepositoryEmitsNoUpdates() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+            ),
+            privacyPipeline = FakePrivacyPipeline(result = Result.success("Manhattan, New York")),
+            areaRepository = FakeAreaRepository(updates = emptyList()),
+        )
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(emptyList(), state.pois)
+    }
+
+    @Test
+    fun poisPopulatedOnPortraitComplete() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val mockPOIs = listOf(
+            POI("Statue of Liberty", "landmark", "Famous statue", Confidence.HIGH, 40.6892, -74.0445),
+            POI("Central Park", "nature", "Large park", Confidence.HIGH, 40.7829, -73.9654),
+        )
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+            ),
+            privacyPipeline = FakePrivacyPipeline(result = Result.success("Manhattan, New York")),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(mockPOIs))
+            ),
+        )
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(mockPOIs, state.pois)
+    }
+
+    @Test
+    fun analyticsMapOpenedFiredWithCorrectParams() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val mockPOIs = listOf(
+            POI("Statue of Liberty", "landmark", "Famous statue", Confidence.HIGH, 40.6892, -74.0445),
+        )
+        val analyticsTracker = FakeAnalyticsTracker()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+            ),
+            privacyPipeline = FakePrivacyPipeline(result = Result.success("Manhattan, New York")),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(mockPOIs))
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        analyticsTracker.assertEventTracked(
+            "map_opened",
+            mapOf("area_name" to "Manhattan, New York", "poi_count" to "1"),
+        )
+    }
+
+    @Test
+    fun noPoisLoadedIfLocationFails() = runTest {
+        Dispatchers.setMain(UnconfinedTestDispatcher(testScheduler))
+        val areaRepository = FakeAreaRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.failure(RuntimeException("GPS unavailable")),
+            ),
+            areaRepository = areaRepository,
+        )
+
+        assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
+        assertEquals(0, areaRepository.callCount)
     }
 }
 

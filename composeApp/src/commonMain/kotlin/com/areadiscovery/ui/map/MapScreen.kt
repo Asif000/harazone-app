@@ -90,6 +90,7 @@ fun MapScreen(
                     latitude = state.latitude,
                     longitude = state.longitude,
                     zoomLevel = 14.0,
+                    pois = state.pois,
                 )
             }
         }
