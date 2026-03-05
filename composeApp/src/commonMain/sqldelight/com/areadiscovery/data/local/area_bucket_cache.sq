@@ -33,7 +33,7 @@ INSERT OR REPLACE INTO area_bucket_cache(
 
 deleteExpiredBuckets:
 DELETE FROM area_bucket_cache
-WHERE expires_at < :current_time;
+WHERE expires_at <= :current_time;
 
 deleteByArea:
 DELETE FROM area_bucket_cache

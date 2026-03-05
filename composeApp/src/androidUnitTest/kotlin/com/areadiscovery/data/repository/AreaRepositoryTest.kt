@@ -8,6 +8,7 @@ import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.fakes.FakeAreaIntelligenceProvider
 import com.areadiscovery.fakes.FakeClock
+import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlin.test.AfterTest
@@ -40,7 +41,8 @@ class AreaRepositoryTest {
         database = AreaDiscoveryDatabase(driver)
         fakeProvider = FakeAreaIntelligenceProvider()
         fakeClock = FakeClock(nowMs = 1_000_000_000L)
-        repository = AreaRepositoryImpl(fakeProvider, database, testScope, fakeClock)
+        val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        repository = AreaRepositoryImpl(fakeProvider, database, testScope, fakeClock, testDispatcher)
     }
 
     @AfterTest
@@ -298,5 +300,62 @@ class AreaRepositoryTest {
 
         // Should be a cache hit — AI provider NOT called
         assertEquals(0, fakeProvider.callCount, "Cache hit should work even with extra unknown bucket types")
+    }
+
+    @Test
+    fun mixedStaleAndValidEmitsBothAndTriggersRefresh() = testScope.runTest {
+        val dynamicTypes = listOf(BucketType.SAFETY, BucketType.WHATS_HAPPENING, BucketType.COST)
+        val staticTypes = listOf(BucketType.HISTORY, BucketType.CHARACTER, BucketType.NEARBY)
+
+        // 3 stale (dynamic TTL expired)
+        dynamicTypes.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = "Test Area",
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Stale $type",
+                content = "Stale content $type",
+                confidence = "MEDIUM",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() - 1L,
+                created_at = fakeClock.nowMs() - 100_000L
+            )
+        }
+        // 3 valid (static TTL still fresh)
+        staticTypes.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = "Test Area",
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Valid $type",
+                content = "Valid content $type",
+                confidence = "HIGH",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() + 100_000L,
+                created_at = fakeClock.nowMs()
+            )
+        }
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            // (a) Stale emitted first
+            repeat(dynamicTypes.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+                assertTrue(item.content.highlight.startsWith("Stale"), "Stale buckets should come first")
+            }
+            // (b) Then valid
+            repeat(staticTypes.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+                assertTrue(item.content.highlight.startsWith("Valid"), "Valid buckets should follow stale")
+            }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+
+        // (c) Background refresh triggered
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, fakeProvider.callCount, "Background refresh should be triggered for mixed stale/valid")
     }
 }

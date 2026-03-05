@@ -13,6 +13,7 @@ import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.util.AppClock
 import com.areadiscovery.util.AppLogger
 import com.areadiscovery.util.SystemClock
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -29,7 +30,8 @@ class AreaRepositoryImpl(
     private val aiProvider: AreaIntelligenceProvider,
     private val database: AreaDiscoveryDatabase,
     private val scope: CoroutineScope,
-    private val clock: AppClock = SystemClock()
+    private val clock: AppClock = SystemClock(),
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AreaRepository {
 
     companion object {
@@ -58,41 +60,30 @@ class AreaRepositoryImpl(
         // Clean up expired cache entries after reading current area's data
         database.area_bucket_cacheQueries.deleteExpiredBuckets(now)
 
-        val validBuckets = cached.filter { it.expires_at > now }
-        val staleBuckets = cached.filter { it.expires_at <= now }
+        // L2: Parse once, reuse — avoids duplicate type lookups
+        val validParsed = cached.filter { it.expires_at > now }.mapNotNull { it.toBucketContent() }
+        val staleParsed = cached.filter { it.expires_at <= now }.mapNotNull { it.toBucketContent() }
 
-        // M2: Count only rows that map to known types for cache hit check
-        val knownValidCount = validBuckets.count { row ->
-            BucketType.entries.any { it.name == row.bucket_type }
-        }
-
-        if (knownValidCount == BucketType.entries.size) {
+        if (validParsed.size == BucketType.entries.size) {
             // Full cache hit — emit all from cache
-            validBuckets.forEach { row ->
-                row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
-            }
+            validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
             emit(BucketUpdate.PortraitComplete(pois = emptyList()))
             return@flow
         }
 
-        if (staleBuckets.isNotEmpty()) {
+        if (staleParsed.isNotEmpty()) {
             // Stale-while-revalidate: emit cached content immediately, refresh in background.
-            // Errors in the background refresh are silently logged (L3: intentional —
+            // Errors in the background refresh are silently logged — intentional:
             // the caller already has stale content to display; propagating a refresh
-            // failure would disrupt the UI for no user benefit).
-            staleBuckets.forEach { row ->
-                row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
-            }
-            validBuckets.forEach { row ->
-                row.toBucketContent()?.let { emit(BucketUpdate.BucketComplete(it)) }
-            }
-            // M3: Use withContext(IO) for DB writes in background refresh
+            // failure would disrupt the UI for no user benefit.
+            staleParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
+            validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
             scope.launch {
                 aiProvider.streamAreaPortrait(areaName, context)
                     .catch { e -> AppLogger.e(e) { "Background refresh failed for area: $areaName" } }
                     .collect { update ->
                         if (update is BucketUpdate.BucketComplete) {
-                            withContext(Dispatchers.IO) {
+                            withContext(ioDispatcher) {
                                 writeToCache(update.content, areaName, language)
                             }
                         }
@@ -103,15 +94,15 @@ class AreaRepositoryImpl(
         }
 
         // Cache miss — stream from AI, write each bucket as it completes.
-        // Unlike stale-revalidate, errors here propagate to the caller (L3: intentional —
-        // there is no cached content to fall back on).
+        // Unlike stale-revalidate, errors here propagate to the caller —
+        // there is no cached content to fall back on.
         aiProvider.streamAreaPortrait(areaName, context).collect { update ->
             emit(update)
             if (update is BucketUpdate.BucketComplete) {
                 writeToCache(update.content, areaName, language)
             }
         }
-    }.flowOn(Dispatchers.IO) // DB reads/writes off Main thread
+    }.flowOn(ioDispatcher)
 
     private fun writeToCache(bucket: BucketContent, areaName: String, language: String) {
         val now = clock.nowMs()
@@ -140,7 +131,6 @@ class AreaRepositoryImpl(
             AppLogger.d { "Skipping unknown confidence in cache: $confidence" }
             return null
         }
-        // M1: Protect against corrupted sources_json
         val parsedSources = try {
             json.decodeFromString<List<Source>>(sources_json)
         } catch (e: Exception) {
