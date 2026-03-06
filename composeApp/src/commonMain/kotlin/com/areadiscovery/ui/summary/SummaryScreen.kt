@@ -37,12 +37,17 @@ import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.ui.components.BucketCard
 import com.areadiscovery.ui.components.InlineChatPrompt
 import com.areadiscovery.ui.theme.spacing
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SummaryScreen(
     onNavigateToChat: (String) -> Unit,
+    onNavigateToSearch: () -> Unit = {},
     viewModel: SummaryViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -77,6 +82,15 @@ fun SummaryScreen(
                             color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.8f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onNavigateToSearch) {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = "Search areas",
+                            tint = MaterialTheme.colorScheme.onPrimary,
                         )
                     }
                 },
@@ -140,6 +154,14 @@ fun SummaryScreen(
                                 ),
                         ) {
                             Text("Retry")
+                        }
+                        Button(
+                            onClick = onNavigateToSearch,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = MaterialTheme.spacing.md),
+                        ) {
+                            Text("Search an area")
                         }
                         BucketList(
                             buckets = BucketType.entries.associateWith { BucketDisplayState(bucketType = it) },

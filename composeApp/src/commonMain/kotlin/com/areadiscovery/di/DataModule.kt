@@ -13,6 +13,7 @@ import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.service.PrivacyPipeline
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
+import com.areadiscovery.domain.usecase.SearchAreaUseCase
 import com.areadiscovery.util.AppClock
 import com.areadiscovery.util.ConnectivityMonitor
 import com.areadiscovery.util.SystemClock
@@ -47,4 +48,5 @@ val dataModule = module {
         )
     }
     single { GetAreaPortraitUseCase(get()) }
+    single { SearchAreaUseCase(get()) }
 }

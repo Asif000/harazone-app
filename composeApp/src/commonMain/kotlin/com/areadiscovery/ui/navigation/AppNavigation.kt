@@ -8,6 +8,7 @@ import androidx.navigation.compose.composable
 import com.areadiscovery.ui.chat.ChatPlaceholderScreen
 import com.areadiscovery.ui.map.MapScreen
 import com.areadiscovery.ui.saved.SavedPlaceholderScreen
+import com.areadiscovery.ui.search.SearchScreen
 import com.areadiscovery.ui.summary.SummaryScreen
 
 @Composable
@@ -34,7 +35,11 @@ fun AppNavigation(
                         restoreState = true
                     }
                 },
+                onNavigateToSearch = { navController.navigate(SearchRoute) },
             )
+        }
+        composable<SearchRoute> {
+            SearchScreen(onNavigateBack = { navController.popBackStack() })
         }
         composable<MapRoute> {
             MapScreen(

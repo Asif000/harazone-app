@@ -13,3 +13,6 @@ data object ChatRoute
 
 @Serializable
 data object SavedRoute
+
+@Serializable
+data object SearchRoute

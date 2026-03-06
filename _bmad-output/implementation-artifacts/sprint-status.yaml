@@ -66,11 +66,11 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Interactive Map & POI Discovery (Phase 1a)
-  epic-3: in-progress
+  epic-3: done
   3-1-maplibre-integration-and-base-map: done
   3-2-ai-generated-poi-markers: done
   3-3-poi-detail-card-and-bottom-sheet: done
-  3-4-poi-accessible-list-view: review
+  3-4-poi-accessible-list-view: done
   epic-3-retrospective: optional
 
   # Epic 4: AI Chat — Ask About Your Area (Phase 1a + 1b)
@@ -81,8 +81,8 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: Manual Search & Onboarding (Phase 1b)
-  epic-5: backlog
-  5-1-manual-area-search: backlog
+  epic-5: in-progress
+  5-1-manual-area-search: review
   5-2-location-permission-flow-and-value-first-onboarding: backlog
   epic-5-retrospective: optional
 
