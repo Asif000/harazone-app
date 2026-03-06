@@ -149,8 +149,13 @@ android {
         }
     }
     buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            resValue("string", "app_name", "AreaDiscovery DEV")
+        }
         getByName("release") {
             isMinifyEnabled = false
+            resValue("string", "app_name", "AreaDiscovery")
         }
     }
     compileOptions {
