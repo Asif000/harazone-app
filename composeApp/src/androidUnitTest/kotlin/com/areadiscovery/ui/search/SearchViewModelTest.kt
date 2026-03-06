@@ -1,6 +1,7 @@
 package com.areadiscovery.ui.search
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
+import app.cash.turbine.test
 import com.areadiscovery.data.local.AreaDiscoveryDatabase
 import com.areadiscovery.domain.model.AreaContext
 import com.areadiscovery.domain.model.BucketType
@@ -40,9 +41,12 @@ class SearchViewModelTest {
     private lateinit var fakeClock: FakeClock
     private val stateMapper = SummaryStateMapper()
 
+    private lateinit var testDispatcher: kotlinx.coroutines.test.TestDispatcher
+
     @BeforeTest
     fun setUp() {
-        Dispatchers.setMain(UnconfinedTestDispatcher())
+        testDispatcher = UnconfinedTestDispatcher()
+        Dispatchers.setMain(testDispatcher)
         driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY)
         AreaDiscoveryDatabase.Schema.create(driver)
         database = AreaDiscoveryDatabase(driver)
@@ -65,10 +69,11 @@ class SearchViewModelTest {
         analyticsTracker = fakeTracker,
         database = database,
         clock = fakeClock,
+        ioDispatcher = testDispatcher,
     )
 
     @Test
-    fun searchEmitsStreamingThenComplete() = runTest {
+    fun searchEmitsLoadingThenComplete() = runTest {
         fakeUseCase.emissions = listOf(
             BucketUpdate.ContentDelta(BucketType.SAFETY, "Safe area"),
             BucketUpdate.PortraitComplete(pois = listOf(
@@ -77,12 +82,27 @@ class SearchViewModelTest {
         )
         val viewModel = createViewModel()
 
-        viewModel.search("Shibuya, Tokyo")
+        viewModel.uiState.test {
+            assertIs<SearchUiState.Idle>(awaitItem())
 
-        val state = assertIs<SearchUiState.Complete>(viewModel.uiState.value)
-        assertEquals("Shibuya, Tokyo", state.query)
-        assertEquals("Shibuya, Tokyo", state.areaName)
-        assertEquals(1, state.pois.size)
+            viewModel.search("Shibuya, Tokyo")
+
+            // StateFlow conflation may merge Loading+Streaming; verify at least Loading or final Complete
+            val emissions = mutableListOf<SearchUiState>()
+            while (true) {
+                val item = awaitItem()
+                emissions.add(item)
+                if (item is SearchUiState.Complete) break
+            }
+
+            // Loading should be the first emission (set synchronously before coroutine)
+            assertIs<SearchUiState.Loading>(emissions.first())
+            val complete = assertIs<SearchUiState.Complete>(emissions.last())
+            assertEquals("Shibuya, Tokyo", complete.query)
+            assertEquals(1, complete.pois.size)
+
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

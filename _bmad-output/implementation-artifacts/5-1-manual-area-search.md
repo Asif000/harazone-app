@@ -592,7 +592,7 @@ Claude Opus 4.6
 
 - Task 1: Created `search_history.sq` table definition + `3.sqm` migration. Schema version auto-increments to 3.
 - Task 2: Created `SearchAreaUseCase` mirroring `GetAreaPortraitUseCase` pattern.
-- Task 3: Created `SearchUiState` sealed class with Idle/Streaming/Complete/Error states + `DEFAULT_CATEGORY_CHIPS`.
+- Task 3: Created `SearchUiState` sealed class with Idle/Loading/Streaming/Complete/Error states + `DEFAULT_CATEGORY_CHIPS`. **Deviation from spec:** Added `Loading` state (spec said "No Loading state") — needed for immediate visual feedback when search is submitted before first AI streaming chunk arrives. Without it, UI appeared unresponsive for several seconds.
 - Task 4: Created `SearchViewModel` — reuses `SummaryStateMapper` internally for streaming state transitions, maps to `SearchUiState` via extension. Persists search history, fires analytics on complete.
 - Task 5: Created `SearchScreen` with TopAppBar search field (autofocus), FlowRow chips for recent searches and categories, portrait streaming via BucketCard reuse, error retry. Skipped `BackHandler` (Android-only) per Dev Notes — back arrow only.
 - Task 6: Added `SearchRoute`, wired into `AppNavigation` with `popBackStack`. Added `onNavigateToSearch` param to `SummaryScreen`, search icon in MediumTopAppBar actions, "Search an area" button in LocationFailed state.
@@ -602,6 +602,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-05: Implemented Story 5.1 — Manual Area Search (all 8 tasks)
+- 2026-03-05: Address code review findings (3M, 4L): race condition fix (loadJob tracking), duplicate analytics guard, DB ops on IO dispatcher, unused import, internal visibility for DEFAULT_CATEGORY_CHIPS, Loading state deviation documented
 
 ### File List
 

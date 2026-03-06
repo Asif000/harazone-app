@@ -4,7 +4,7 @@ import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.ui.summary.BucketDisplayState
 
-val DEFAULT_CATEGORY_CHIPS = listOf("Popular cities", "Nearby areas", "Trending")
+internal val DEFAULT_CATEGORY_CHIPS = listOf("Popular cities", "Nearby areas", "Trending")
 
 sealed class SearchUiState {
     data class Loading(

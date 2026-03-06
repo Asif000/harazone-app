@@ -10,11 +10,14 @@ import com.areadiscovery.ui.summary.SummaryUiState
 import com.areadiscovery.util.AnalyticsTracker
 import com.areadiscovery.util.AppClock
 import com.areadiscovery.util.AppLogger
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 
 class SearchViewModel(
@@ -24,12 +27,14 @@ class SearchViewModel(
     private val analyticsTracker: AnalyticsTracker,
     private val database: AreaDiscoveryDatabase,
     private val clock: AppClock,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle())
     val uiState: StateFlow<SearchUiState> = _uiState.asStateFlow()
 
     private var searchJob: Job? = null
+    private var loadJob: Job? = null
 
     init {
         loadRecentSearches()
@@ -39,6 +44,7 @@ class SearchViewModel(
         val trimmedQuery = query.trim()
         if (trimmedQuery.isBlank()) return
 
+        loadJob?.cancel()
         searchJob?.cancel()
         _uiState.value = SearchUiState.Loading(query = trimmedQuery)
         searchJob = viewModelScope.launch {
@@ -46,13 +52,15 @@ class SearchViewModel(
 
             val context = areaContextFactory.create()
             var summaryState: SummaryUiState = SummaryUiState.Loading
+            var analyticsTracked = false
 
             try {
                 searchAreaUseCase(trimmedQuery, context).collect { update ->
                     summaryState = stateMapper.processUpdate(summaryState, update, trimmedQuery)
                     _uiState.value = summaryState.toSearchUiState(trimmedQuery)
 
-                    if (summaryState is SummaryUiState.Complete) {
+                    if (!analyticsTracked && summaryState is SummaryUiState.Complete) {
+                        analyticsTracked = true
                         analyticsTracker.trackEvent(
                             "summary_viewed",
                             mapOf("source" to "search", "area_name" to trimmedQuery),
@@ -78,17 +86,22 @@ class SearchViewModel(
     }
 
     private fun loadRecentSearches() {
-        viewModelScope.launch {
-            val recent = database.search_historyQueries.getRecentSearches().executeAsList()
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            val recent = withContext(ioDispatcher) {
+                database.search_historyQueries.getRecentSearches().executeAsList()
+            }
             _uiState.value = SearchUiState.Idle(recentSearches = recent)
         }
     }
 
     private suspend fun persistSearch(query: String) {
-        database.search_historyQueries.upsertSearch(
-            query = query,
-            searched_at = clock.nowMs(),
-        )
+        withContext(ioDispatcher) {
+            database.search_historyQueries.upsertSearch(
+                query = query,
+                searched_at = clock.nowMs(),
+            )
+        }
     }
 
     private fun SummaryUiState.toSearchUiState(query: String): SearchUiState = when (this) {
