@@ -72,6 +72,7 @@ class AreaRepositoryImpl(
 
         if (validParsed.size == BucketType.entries.size) {
             // Full cache hit — emit all from cache
+            AppLogger.d { "Cache HIT for '$areaName' — ${validParsed.size} buckets" }
             validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
             emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
             return@flow
@@ -120,6 +121,7 @@ class AreaRepositoryImpl(
         }
 
         // Cache miss — stream from AI with error fallback
+        AppLogger.d { "Cache MISS for '$areaName' — valid=${validParsed.size}, stale=${staleParsed.size}, needed=${BucketType.entries.size}" }
         try {
             aiProvider.streamAreaPortrait(areaName, context).collect { update ->
                 emit(update)

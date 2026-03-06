@@ -64,9 +64,11 @@ class SummaryViewModel(
         collectionJob?.cancel()
         collectionJob = viewModelScope.launch {
             _uiState.value = SummaryUiState.LocationResolving
+            val startMs = System.currentTimeMillis()
 
             val areaName = resolveLocation()
             if (areaName == null) return@launch
+            AppLogger.d { "Summary: location resolved in ${System.currentTimeMillis() - startMs}ms" }
 
             resolvedAreaName = areaName
             val context = areaContextFactory.create()
@@ -81,6 +83,7 @@ class SummaryViewModel(
                         )
                         _uiState.value = newState
                         if (newState is SummaryUiState.Complete) {
+                            AppLogger.d { "Summary: complete in ${System.currentTimeMillis() - startMs}ms" }
                             analyticsTracker.trackEvent(
                                 "summary_viewed",
                                 mapOf(

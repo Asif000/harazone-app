@@ -11,7 +11,7 @@ class SummaryStateMapper {
     ): SummaryUiState {
         return when (update) {
             is BucketUpdate.ContentDelta -> handleContentDelta(currentState, update, areaName)
-            is BucketUpdate.BucketComplete -> handleBucketComplete(currentState, update)
+            is BucketUpdate.BucketComplete -> handleBucketComplete(currentState, update, areaName)
             is BucketUpdate.PortraitComplete -> handlePortraitComplete(currentState, update)
             is BucketUpdate.ContentAvailabilityNote -> handleContentAvailabilityNote(currentState, update, areaName)
         }
@@ -48,8 +48,14 @@ class SummaryStateMapper {
     private fun handleBucketComplete(
         currentState: SummaryUiState,
         complete: BucketUpdate.BucketComplete,
+        areaName: String,
     ): SummaryUiState {
-        val streaming = currentState as? SummaryUiState.Streaming ?: return currentState
+        val streaming = when (currentState) {
+            is SummaryUiState.Streaming -> currentState
+            is SummaryUiState.Loading, is SummaryUiState.LocationResolving ->
+                SummaryUiState.Streaming(buckets = emptyMap(), areaName = areaName)
+            else -> return currentState
+        }
         val content = complete.content
         val bucketType = content.type
 
