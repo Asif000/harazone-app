@@ -34,7 +34,7 @@ fun POIListView(
 ) {
     if (pois.isEmpty()) {
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = modifier,
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -46,11 +46,12 @@ fun POIListView(
     } else {
         LazyColumn(modifier = modifier) {
             item { Spacer(Modifier.height(MaterialTheme.spacing.sm)) }
-            items(pois, key = { it.name }) { poi ->
+            items(pois, key = { "${it.name}_${it.type}" }) { poi ->
+                val capitalizedType = poi.type.replaceFirstChar { it.uppercaseChar() }
                 val description = buildString {
                     append(poi.name)
                     append(", ")
-                    append(poi.type.replaceFirstChar { it.uppercaseChar() })
+                    append(capitalizedType)
                     append(", ")
                     append(poi.description.take(100))
                     append(", Confidence: ")
@@ -63,10 +64,10 @@ fun POIListView(
                             horizontal = MaterialTheme.spacing.md,
                             vertical = MaterialTheme.spacing.xs,
                         )
+                        .clickable { onPoiClick(poi) }
                         .semantics(mergeDescendants = true) {
                             contentDescription = description
-                        }
-                        .clickable { onPoiClick(poi) },
+                        },
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
@@ -81,7 +82,7 @@ fun POIListView(
                         )
                         Spacer(Modifier.height(MaterialTheme.spacing.xs))
                         Text(
-                            text = poi.type.replaceFirstChar { it.uppercaseChar() },
+                            text = capitalizedType,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

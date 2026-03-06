@@ -275,7 +275,7 @@ No issues encountered during implementation.
 ### Completion Notes List
 
 - Task 1: Added `showListView: Boolean = false` to `MapUiState.Ready` and `toggleListView()` to `MapViewModel`. Default value ensures zero impact on existing code/tests. No DI changes needed.
-- Task 2: Created `POIListView.kt` composable in `commonMain` — pure Compose, no platform imports. Includes empty state message, `LazyColumn` with `Card` items, `ConfidenceTierBadge` reuse, TalkBack-friendly `semantics(mergeDescendants = true)` with combined content description. Previews omitted (KMP commonMain — `@Preview` is Android-only).
+- Task 2: Created `POIListView.kt` composable in `commonMain` — pure Compose, no platform imports. Includes empty state message, `LazyColumn` with `Card` items, `ConfidenceTierBadge` reuse, TalkBack-friendly `semantics(mergeDescendants = true)` with combined content description. Previews in `androidMain/POIListViewPreviews.kt` (3-item + empty state).
 - Task 3: Updated `MapScreen.kt` with `SingleChoiceSegmentedButtonRow` toggle overlay (Map/List) at top-center, conditional rendering of `MapComposable` vs `POIListView` in scaffold content. Toggle preserves `selectedPoi` across view mode switches. All new imports added.
 - Task 4: Added 4 new ViewModel tests — `toggleListViewActivatesListView`, `toggleListViewTwiceRestoresMapView`, `toggleListViewNoOpBeforeReadyState`, `toggleListViewPreservesSelectedPoi`. All 20 existing tests continue to pass (showListView defaults to false).
 - NFR21 note: The accessible list view IS the primary solution for screen reader users. Per-marker TalkBack with `AccessibilityDelegate` remains a separate enhancement (deferred from Story 3.2).
@@ -285,6 +285,7 @@ No issues encountered during implementation.
 | Action | Path |
 |--------|------|
 | CREATE | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/POIListView.kt` |
+| CREATE | `composeApp/src/androidMain/kotlin/com/areadiscovery/ui/map/POIListViewPreviews.kt` |
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapUiState.kt` |
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapViewModel.kt` |
 | MODIFY | `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt` |
@@ -295,3 +296,4 @@ No issues encountered during implementation.
 ### Change Log
 
 - 2026-03-05: Implemented Story 3.4 — POI accessible list view with Map/List toggle, TalkBack semantics, empty state, and 4 new ViewModel tests.
+- 2026-03-05: Address code review findings (3M, 2L) — fix empty state modifier, add @Preview files, safer LazyColumn key, extract capitalizedType, fix clickable/semantics ordering.
