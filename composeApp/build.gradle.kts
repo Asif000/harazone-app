@@ -151,7 +151,7 @@ android {
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".debug"
-            resValue("string", "app_name", "AreaDiscovery DEV")
+            resValue("string", "app_name", "AreaDiscovery DEBUG")
         }
         getByName("release") {
             isMinifyEnabled = false
