@@ -70,7 +70,7 @@ development_status:
   3-1-maplibre-integration-and-base-map: done
   3-2-ai-generated-poi-markers: done
   3-3-poi-detail-card-and-bottom-sheet: done
-  3-4-poi-accessible-list-view: backlog
+  3-4-poi-accessible-list-view: review
   epic-3-retrospective: optional
 
   # Epic 4: AI Chat — Ask About Your Area (Phase 1a + 1b)

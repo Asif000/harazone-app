@@ -25,7 +25,9 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapViewModelTest {
@@ -363,6 +365,43 @@ class MapViewModelTest {
         assertEquals(0, areaRepository.callCount)
         assertEquals(0, contextFactory.callCount)
         assertEquals(1, locationProvider.locationCallCount)
+    }
+    // --- Story 3.4 tests ---
+
+    @Test
+    fun toggleListViewActivatesListView() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.toggleListView()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.showListView)
+    }
+
+    @Test
+    fun toggleListViewTwiceRestoresMapView() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.toggleListView()
+        viewModel.toggleListView()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.showListView)
+    }
+
+    @Test
+    fun toggleListViewNoOpBeforeReadyState() = runTest(testDispatcher) {
+        val suspendingLocation = ResettableFakeLocationProvider()
+        val viewModel = createViewModel(locationProvider = suspendingLocation)
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+        viewModel.toggleListView()
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+    }
+
+    @Test
+    fun toggleListViewPreservesSelectedPoi() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.selectPoi(samplePoi)
+        viewModel.toggleListView()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.showListView)
+        assertEquals(samplePoi, state.selectedPoi)
     }
 }
 

@@ -50,6 +50,11 @@ class MapViewModel(
         }
     }
 
+    fun toggleListView() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(showListView = !current.showListView)
+    }
+
     fun retry() {
         loadJob?.cancel()
         _uiState.value = MapUiState.Loading

@@ -8,12 +8,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -165,16 +169,47 @@ fun MapScreen(
                         }
                     },
                 ) { paddingValues ->
-                    MapComposable(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues),
-                        latitude = state.latitude,
-                        longitude = state.longitude,
-                        zoomLevel = 14.0,
-                        pois = state.pois,
-                        onPoiSelected = { poi -> viewModel.selectPoi(poi) },
-                    )
+                    if (state.showListView) {
+                        POIListView(
+                            pois = state.pois,
+                            onPoiClick = { poi -> viewModel.selectPoi(poi) },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(paddingValues),
+                        )
+                    } else {
+                        MapComposable(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(paddingValues),
+                            latitude = state.latitude,
+                            longitude = state.longitude,
+                            zoomLevel = 14.0,
+                            pois = state.pois,
+                            onPoiSelected = { poi -> viewModel.selectPoi(poi) },
+                        )
+                    }
+                }
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = MaterialTheme.spacing.sm)
+                        .wrapContentWidth(),
+                ) {
+                    SegmentedButton(
+                        selected = !state.showListView,
+                        onClick = { if (state.showListView) viewModel.toggleListView() },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) {
+                        Text("Map")
+                    }
+                    SegmentedButton(
+                        selected = state.showListView,
+                        onClick = { if (!state.showListView) viewModel.toggleListView() },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) {
+                        Text("List")
+                    }
                 }
                 SnackbarHost(
                     hostState = snackbarHostState,
