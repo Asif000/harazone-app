@@ -33,12 +33,14 @@ import com.areadiscovery.ui.theme.spacing
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
+private val SHEET_PEEK_HEIGHT = 88.dp
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     viewModel: MapViewModel = koinViewModel(),
     onPoiCountChanged: (Int) -> Unit = {},
-    onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Unit = { _, _, _ -> },
+    onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Boolean = { _, _, _ -> false },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -98,7 +100,7 @@ fun MapScreen(
             Box(Modifier.fillMaxSize()) {
                 BottomSheetScaffold(
                     scaffoldState = scaffoldState,
-                    sheetPeekHeight = 88.dp,
+                    sheetPeekHeight = SHEET_PEEK_HEIGHT,
                     sheetContent = {
                         if (state.selectedPoi != null) {
                             POIDetailCard(
@@ -117,7 +119,12 @@ fun MapScreen(
                                     val lat = state.selectedPoi.latitude
                                     val lon = state.selectedPoi.longitude
                                     if (lat != null && lon != null) {
-                                        onNavigateToMaps(lat, lon, state.selectedPoi.name)
+                                        val handled = onNavigateToMaps(lat, lon, state.selectedPoi.name)
+                                        if (!handled) {
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar("No maps app available")
+                                            }
+                                        }
                                     } else {
                                         coroutineScope.launch {
                                             snackbarHostState.showSnackbar("Location not available for this place")
@@ -171,7 +178,9 @@ fun MapScreen(
                 }
                 SnackbarHost(
                     hostState = snackbarHostState,
-                    modifier = Modifier.align(Alignment.BottomCenter),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = SHEET_PEEK_HEIGHT),
                 )
             }
         }

@@ -21,8 +21,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.areadiscovery.domain.model.Confidence
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.ui.theme.AreaDiscoveryTheme
 import com.areadiscovery.ui.theme.spacing
+import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun POIDetailCard(
@@ -94,5 +97,25 @@ fun POIDetailCard(
             Spacer(Modifier.height(MaterialTheme.spacing.sm))
             ConfidenceTierBadge(confidence = poi.confidence)
         }
+    }
+}
+
+@Preview
+@Composable
+private fun POIDetailCardPreview() {
+    AreaDiscoveryTheme {
+        POIDetailCard(
+            poi = POI(
+                name = "Torre de Belem",
+                type = "landmark",
+                description = "A 16th-century fortified tower on the banks of the Tagus River, a UNESCO World Heritage Site.",
+                confidence = Confidence.HIGH,
+                latitude = 38.6916,
+                longitude = -9.2160,
+            ),
+            onSaveClick = {},
+            onShareClick = {},
+            onNavigateClick = {},
+        )
     }
 }

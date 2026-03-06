@@ -51,7 +51,13 @@ class MainActivity : ComponentActivity() {
                     platformConfig = { androidContext(this@MainActivity) },
                     onNavigateToMaps = { lat, lon, name ->
                         val uri = Uri.parse("geo:$lat,$lon?q=${Uri.encode(name)}")
-                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+                        val intent = Intent(Intent.ACTION_VIEW, uri)
+                        if (intent.resolveActivity(packageManager) != null) {
+                            startActivity(intent)
+                            true
+                        } else {
+                            false
+                        }
                     },
                 )
             }

@@ -18,7 +18,7 @@ import org.koin.compose.KoinApplication
 @Composable
 fun App(
     platformConfig: org.koin.dsl.KoinAppDeclaration = {},
-    onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Unit = { _, _, _ -> },
+    onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Boolean = { _, _, _ -> false },
 ) {
     KoinApplication(application = { platformConfig(); modules(appModule()) }) {
         AreaDiscoveryTheme {

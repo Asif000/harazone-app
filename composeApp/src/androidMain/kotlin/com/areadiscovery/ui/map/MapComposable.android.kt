@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -35,6 +36,7 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
 ) {
     val context = LocalContext.current
+    val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
 
     val poiMarkers = remember { mutableListOf<Marker>() }
     val poiMarkerMap = remember { mutableMapOf<Marker, POI>() }
@@ -73,11 +75,12 @@ actual fun MapComposable(
                         map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoomLevel))
                         // Set click listeners once — map is fully ready here
                         map.setOnMarkerClickListener { marker ->
-                            onPoiSelected(poiMarkerMap[marker])
+                            currentOnPoiSelected.value(poiMarkerMap[marker])
                             true // consume click, prevent default info window
                         }
+                        // Consumes event — future listeners added via addOnMapClickListener won't fire
                         map.addOnMapClickListener {
-                            onPoiSelected(null) // deselect on blank tap
+                            currentOnPoiSelected.value(null) // deselect on blank tap
                             true
                         }
                         // Flush any POI markers that arrived before style loaded
