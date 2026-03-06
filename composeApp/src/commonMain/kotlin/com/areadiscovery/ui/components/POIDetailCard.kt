@@ -20,12 +20,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.areadiscovery.domain.model.Confidence
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.ui.theme.AreaDiscoveryTheme
 import com.areadiscovery.ui.theme.spacing
-import androidx.compose.ui.tooling.preview.Preview
 
 @Composable
 fun POIDetailCard(
