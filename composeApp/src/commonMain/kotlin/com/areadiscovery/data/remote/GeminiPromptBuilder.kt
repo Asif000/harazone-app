@@ -24,7 +24,7 @@ The 6 bucket types IN ORDER are:
 2. CHARACTER - Neighborhood vibe, demographics, culture
 3. WHATS_HAPPENING - Current events, activities, what's going on now
 4. COST - Cost of living, prices, affordability
-5. HISTORY - Historical significance, notable events
+5. HISTORY - Historical significance, notable events. For content, write a timeline of 5-10 key moments, each as a separate sentence starting with a 4-digit year (e.g. "1718: Founded as a French colony. 1803: Acquired by the United States. 1962: Major development began."). More dates = better. Do NOT use phrases like "early 20th century" — always use exact years
 6. NEARBY - Notable nearby places, attractions, services
 
 After the last bucket, output this delimiter:

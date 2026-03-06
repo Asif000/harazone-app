@@ -36,6 +36,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.ui.components.BucketCard
 import com.areadiscovery.ui.components.InlineChatPrompt
+import com.areadiscovery.ui.components.RightNowCard
+import com.areadiscovery.ui.components.TimelineCard
 import com.areadiscovery.ui.theme.spacing
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
@@ -244,6 +246,13 @@ private fun BucketList(
         }
     }
 
+    val historyState = buckets[BucketType.HISTORY]
+        ?: BucketDisplayState(bucketType = BucketType.HISTORY)
+    val whatsHappeningState = buckets[BucketType.WHATS_HAPPENING]
+        ?: BucketDisplayState(bucketType = BucketType.WHATS_HAPPENING)
+    // Finding #8: Only show hero section label when at least one bucket has content
+    val hasAnyContent = buckets.values.any { it.isComplete || it.isStreaming }
+
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
@@ -252,6 +261,37 @@ private fun BucketList(
         if (contentNote != null) {
             item(key = "content_note") {
                 ContentNoteBanner(message = contentNote)
+            }
+        }
+
+        // Finding #10: Fixed order — RightNowCard then TimelineCard.
+        // AnimatedVisibility inside each card handles show/hide without layout shift
+        // because both items always occupy a slot; when invisible they take zero height.
+        item(key = "right_now_card") {
+            RightNowCard(whatsHappeningState = whatsHappeningState)
+            if (whatsHappeningState.isComplete && whatsHappeningState.highlightText.isNotBlank()) {
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
+            }
+        }
+
+        item(key = "timeline_card") {
+            TimelineCard(historyState = historyState)
+            if (historyState.isComplete) {
+                Spacer(Modifier.height(MaterialTheme.spacing.md))
+            }
+        }
+
+        if (hasAnyContent) {
+            item(key = "more_about_label") {
+                Text(
+                    text = "More about this place",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(
+                        top = MaterialTheme.spacing.sm,
+                        bottom = MaterialTheme.spacing.xs,
+                    ),
+                )
             }
         }
 
