@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.areadiscovery.BuildKonfig
 import com.areadiscovery.domain.model.POI
 import org.maplibre.android.MapLibre
 import org.maplibre.android.annotations.Marker
@@ -22,7 +23,7 @@ import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.maps.MapView
 
-private const val MAP_STYLE_URL = "https://demotiles.maplibre.org/style.json"
+private val MAP_STYLE_URL = "https://api.maptiler.com/maps/streets-v2/style.json?key=${BuildKonfig.MAPTILER_API_KEY}"
 
 @Composable
 actual fun MapComposable(
@@ -38,28 +39,55 @@ actual fun MapComposable(
     val poiVersion = remember { intArrayOf(0) }
     val isDestroyed = remember { booleanArrayOf(false) }
 
+    val styleLoaded = remember { booleanArrayOf(false) }
+    val styleLoading = remember { booleanArrayOf(false) }
+    val pendingPois = remember { mutableListOf<POI>() }
+
     val mapView = remember {
         /* Initialize MapLibre singleton — return value unused (side-effect only) */
         MapLibre.getInstance(context)
         MapView(context).apply {
             onCreate(Bundle())
-            getMapAsync { map ->
-                map.setStyle(MAP_STYLE_URL)
-            }
             // POI accessibility is served by Story 3.4's list view (POIListView)
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         }
     }
 
     LaunchedEffect(latitude, longitude) {
+        // Guard: skip camera move until GPS resolves (avoid null island)
+        if (latitude == 0.0 && longitude == 0.0) return@LaunchedEffect
         mapView.getMapAsync { map ->
             if (isDestroyed[0]) return@getMapAsync
-            map.moveCamera(
-                CameraUpdateFactory.newLatLngZoom(
-                    LatLng(latitude, longitude),
-                    zoomLevel,
-                ),
-            )
+            if (styleLoaded[0]) {
+                // Fast path: style already loaded (e.g. location update after initial render)
+                map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoomLevel))
+            } else if (!styleLoading[0]) {
+                // Authoritative path: set style then move camera inside loaded callback.
+                // Guard: only call setStyle once — skip if already loading.
+                styleLoading[0] = true
+                map.setStyle(MAP_STYLE_URL) { _ ->
+                    if (!isDestroyed[0]) {
+                        styleLoaded[0] = true
+                        map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoomLevel))
+                        // Flush any POI markers that arrived before style loaded
+                        if (pendingPois.isNotEmpty()) {
+                            val poisToAdd = pendingPois.toList()
+                            pendingPois.clear()
+                            poisToAdd.filter { it.latitude != null && it.longitude != null }.forEach { poi ->
+                                val marker = map.addMarker(
+                                    MarkerOptions()
+                                        .position(LatLng(poi.latitude!!, poi.longitude!!))
+                                        .title(poi.name)
+                                        .snippet(poi.type)
+                                )
+                                poiMarkers.add(marker)
+                            }
+                        }
+                    }
+                }
+            }
+            // If style is loading (map.style != null but !styleLoaded), the setStyle callback
+            // will move the camera to the latest lat/lng when it fires.
         }
     }
 
@@ -67,6 +95,12 @@ actual fun MapComposable(
     //  org.maplibre.gl:android-plugin-annotation-v9 SymbolManager (deferred to next cycle)
     LaunchedEffect(pois) {
         val version = ++poiVersion[0]
+        if (!styleLoaded[0]) {
+            // Style not ready — queue POIs for the setStyle callback to flush
+            pendingPois.clear()
+            pendingPois.addAll(pois)
+            return@LaunchedEffect
+        }
         mapView.getMapAsync { map ->
             // Discard callback if map was destroyed or pois changed while getMapAsync was queued
             if (isDestroyed[0] || poiVersion[0] != version) return@getMapAsync

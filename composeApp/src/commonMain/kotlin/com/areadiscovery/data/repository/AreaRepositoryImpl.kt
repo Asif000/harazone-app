@@ -8,6 +8,7 @@ import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.Confidence
 import com.areadiscovery.domain.model.ConnectivityState
+import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Source
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.repository.AreaRepository
@@ -63,6 +64,7 @@ class AreaRepositoryImpl(
 
         // Clean up expired cache entries after reading current area's data
         database.area_bucket_cacheQueries.deleteExpiredBuckets(now)
+        database.area_poi_cacheQueries.deleteExpiredPois(now)
 
         // L2: Parse once, reuse — avoids duplicate type lookups
         val validParsed = cached.filter { it.expires_at > now }.mapNotNull { it.toBucketContent() }
@@ -71,7 +73,7 @@ class AreaRepositoryImpl(
         if (validParsed.size == BucketType.entries.size) {
             // Full cache hit — emit all from cache
             validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
-            emit(BucketUpdate.PortraitComplete(pois = emptyList()))
+            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
             return@flow
         }
 
@@ -86,7 +88,7 @@ class AreaRepositoryImpl(
             } else {
                 emit(BucketUpdate.ContentAvailabilityNote("No content available offline for this area"))
             }
-            emit(BucketUpdate.PortraitComplete(pois = emptyList()))
+            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
             return@flow
         }
 
@@ -106,9 +108,14 @@ class AreaRepositoryImpl(
                                 writeToCache(update.content, areaName, language)
                             }
                         }
+                        if (update is BucketUpdate.PortraitComplete && update.pois.isNotEmpty()) {
+                            withContext(ioDispatcher) {
+                                writePoisToCache(update.pois, areaName, language)
+                            }
+                        }
                     }
             }
-            emit(BucketUpdate.PortraitComplete(pois = emptyList()))
+            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
             return@flow
         }
 
@@ -118,6 +125,9 @@ class AreaRepositoryImpl(
                 emit(update)
                 if (update is BucketUpdate.BucketComplete) {
                     writeToCache(update.content, areaName, language)
+                }
+                if (update is BucketUpdate.PortraitComplete && update.pois.isNotEmpty()) {
+                    writePoisToCache(update.pois, areaName, language)
                 }
             }
         } catch (e: CancellationException) {
@@ -134,9 +144,32 @@ class AreaRepositoryImpl(
             } else {
                 emit(BucketUpdate.ContentAvailabilityNote("Could not load area content — please try again"))
             }
-            emit(BucketUpdate.PortraitComplete(pois = emptyList()))
+            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
         }
     }.flowOn(ioDispatcher)
+
+    private fun writePoisToCache(pois: List<POI>, areaName: String, language: String) {
+        val now = clock.nowMs()
+        database.area_poi_cacheQueries.insertOrReplacePois(
+            area_name = areaName,
+            language = language,
+            pois_json = json.encodeToString(pois),
+            expires_at = now + CACHE_TTL_SEMI_STATIC_MS,
+            created_at = now,
+        )
+    }
+
+    private fun loadPoisFromCache(areaName: String, language: String, now: Long): List<POI> {
+        val cached = database.area_poi_cacheQueries.getPois(areaName, language).executeAsOneOrNull()
+        if (cached == null || cached.expires_at <= now) return emptyList()
+        return try {
+            json.decodeFromString(cached.pois_json)
+        } catch (e: Exception) {
+            AppLogger.e(e) { "Failed to parse cached POIs for $areaName, deleting corrupted entry" }
+            database.area_poi_cacheQueries.deletePoisByArea(areaName)
+            emptyList()
+        }
+    }
 
     private fun writeToCache(bucket: BucketContent, areaName: String, language: String) {
         val now = clock.nowMs()

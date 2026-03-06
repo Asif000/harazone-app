@@ -26,6 +26,11 @@ buildkonfig {
             "GEMINI_API_KEY",
             localProperties.getProperty("GEMINI_API_KEY") ?: project.findProperty("GEMINI_API_KEY")?.toString() ?: ""
         )
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "MAPTILER_API_KEY",
+            localProperties.getProperty("MAPTILER_API_KEY") ?: project.findProperty("MAPTILER_API_KEY")?.toString() ?: ""
+        )
     }
 }
 

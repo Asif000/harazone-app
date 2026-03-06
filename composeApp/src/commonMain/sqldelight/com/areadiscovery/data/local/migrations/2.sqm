@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS area_poi_cache (
+    area_name TEXT NOT NULL,
+    language TEXT NOT NULL,
+    pois_json TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (area_name, language)
+);
+CREATE INDEX IF NOT EXISTS idx_area_poi_cache_expires_at ON area_poi_cache(expires_at);

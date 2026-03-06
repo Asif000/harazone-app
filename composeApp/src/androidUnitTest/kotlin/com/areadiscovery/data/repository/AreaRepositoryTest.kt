@@ -6,12 +6,15 @@ import com.areadiscovery.data.local.AreaDiscoveryDatabase
 import com.areadiscovery.domain.model.AreaContext
 import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.domain.model.BucketUpdate
+import com.areadiscovery.domain.model.Confidence
 import com.areadiscovery.domain.model.ConnectivityState
 import com.areadiscovery.domain.model.DomainError
 import com.areadiscovery.domain.model.DomainErrorException
+import com.areadiscovery.domain.model.POI
 import com.areadiscovery.fakes.FakeAreaIntelligenceProvider
 import com.areadiscovery.fakes.FakeClock
 import com.areadiscovery.fakes.FakeConnectivityMonitor
+import com.areadiscovery.fakes.defaultBucketEmissions
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -478,6 +481,164 @@ class AreaRepositoryTest {
             assertEquals("Could not load area content — please try again", note.message)
             val portrait = awaitItem()
             assertIs<BucketUpdate.PortraitComplete>(portrait)
+            awaitComplete()
+        }
+    }
+
+    // --- POI cache tests ---
+
+    private val mockPois = listOf(
+        POI("Cafe Roma", "cafe", "Good coffee", Confidence.HIGH, 40.7128, -74.0060),
+        POI("Central Park", "park", "Large urban park", Confidence.MEDIUM, 40.7829, -73.9654),
+    )
+
+    private fun populateAllBucketsValid(areaName: String = "Test Area") {
+        BucketType.entries.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = areaName,
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Highlight $type",
+                content = "Content $type",
+                confidence = "HIGH",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() + 100_000L,
+                created_at = fakeClock.nowMs()
+            )
+        }
+    }
+
+    private fun populateAllBucketsStale(areaName: String = "Test Area") {
+        BucketType.entries.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = areaName,
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Stale $type",
+                content = "Stale content $type",
+                confidence = "MEDIUM",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() - 1L,
+                created_at = fakeClock.nowMs() - 100_000L
+            )
+        }
+    }
+
+    private fun populatePoiCache(areaName: String = "Test Area", expiresAt: Long? = null) {
+        val json = kotlinx.serialization.json.Json.encodeToString(mockPois)
+        database.area_poi_cacheQueries.insertOrReplacePois(
+            area_name = areaName,
+            language = "en",
+            pois_json = json,
+            expires_at = expiresAt ?: (fakeClock.nowMs() + 100_000L),
+            created_at = fakeClock.nowMs()
+        )
+    }
+
+    @Test
+    fun poisPersistedToCacheOnAiStreamPortraitComplete() = testScope.runTest {
+        // Setup: AI emits buckets + PortraitComplete with POIs
+        val emissionsWithPois = defaultBucketEmissions().map {
+            if (it is BucketUpdate.PortraitComplete) BucketUpdate.PortraitComplete(pois = mockPois)
+            else it
+        }
+        fakeProvider.emissions = emissionsWithPois
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) { awaitItem() }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(mockPois, portrait.pois)
+            awaitComplete()
+        }
+
+        // Verify POIs were persisted to cache
+        val cached = database.area_poi_cacheQueries.getPois("Test Area", "en").executeAsOneOrNull()
+        assertTrue(cached != null, "POI cache entry should exist")
+        val decoded = kotlinx.serialization.json.Json.decodeFromString<List<POI>>(cached!!.pois_json)
+        assertEquals(mockPois, decoded)
+    }
+
+    @Test
+    fun poisRestoredOnFullCacheHit() = testScope.runTest {
+        populateAllBucketsValid()
+        populatePoiCache()
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) { awaitItem() }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(mockPois, portrait.pois)
+            awaitComplete()
+        }
+
+        assertEquals(0, fakeProvider.callCount, "AI provider should not be called for cache hit")
+    }
+
+    @Test
+    fun poisRestoredOnStaleWhileRevalidatePath() = testScope.runTest {
+        populateAllBucketsStale()
+        populatePoiCache()
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) { awaitItem() }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(mockPois, portrait.pois)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun emptyPoisReturnedWhenPoiCacheExpired() = testScope.runTest {
+        populateAllBucketsValid()
+        populatePoiCache(expiresAt = fakeClock.nowMs() - 1L)
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) { awaitItem() }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(emptyList(), portrait.pois)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun poisRestoredOnErrorFallbackPath() = testScope.runTest {
+        fakeConnectivity.setState(ConnectivityState.Online)
+
+        // Insert partial valid buckets (not all 6 — triggers AI call path)
+        val partialTypes = listOf(BucketType.HISTORY, BucketType.CHARACTER, BucketType.SAFETY)
+        partialTypes.forEach { type ->
+            database.area_bucket_cacheQueries.insertOrReplace(
+                area_name = "Test Area",
+                bucket_type = type.name,
+                language = "en",
+                highlight = "Cached $type",
+                content = "Cached content $type",
+                confidence = "HIGH",
+                sources_json = "[]",
+                expires_at = fakeClock.nowMs() + 100_000L,
+                created_at = fakeClock.nowMs()
+            )
+        }
+        populatePoiCache()
+
+        // AI provider throws
+        fakeProvider.responseFlow = flow {
+            throw DomainErrorException(DomainError.NetworkError("Connection failed"))
+        }
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(partialTypes.size) {
+                val item = awaitItem()
+                assertIs<BucketUpdate.BucketComplete>(item)
+            }
+            val note = awaitItem()
+            assertIs<BucketUpdate.ContentAvailabilityNote>(note)
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(mockPois, portrait.pois, "POIs should be served from cache despite AI failure")
             awaitComplete()
         }
     }
