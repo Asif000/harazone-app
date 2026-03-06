@@ -15,6 +15,7 @@ fun AppNavigation(
     navController: NavHostController,
     modifier: Modifier = Modifier,
     onMapPoiCountChanged: (Int) -> Unit,
+    onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Unit = { _, _, _ -> },
 ) {
     NavHost(
         navController = navController,
@@ -36,7 +37,10 @@ fun AppNavigation(
             )
         }
         composable<MapRoute> {
-            MapScreen(onPoiCountChanged = onMapPoiCountChanged)
+            MapScreen(
+                onPoiCountChanged = onMapPoiCountChanged,
+                onNavigateToMaps = onNavigateToMaps,
+            )
         }
         composable<ChatRoute> {
             ChatPlaceholderScreen()

@@ -15,6 +15,7 @@ actual fun MapComposable(
     longitude: Double,
     zoomLevel: Double,
     pois: List<POI>,
+    onPoiSelected: (POI?) -> Unit,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Text("Map not yet available on iOS", style = MaterialTheme.typography.bodyMedium)

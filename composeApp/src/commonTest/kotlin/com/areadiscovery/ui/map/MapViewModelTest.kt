@@ -259,6 +259,76 @@ class MapViewModelTest {
         )
     }
 
+    // --- Story 3.3 tests ---
+
+    private val samplePoi = POI(
+        "Statue of Liberty", "landmark", "Famous statue",
+        Confidence.HIGH, 40.6892, -74.0445,
+    )
+
+    private fun createReadyViewModel(
+        analyticsTracker: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+    ): Pair<MapViewModel, FakeAnalyticsTracker> {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
+            ),
+            analyticsTracker = analyticsTracker,
+        )
+        return viewModel to analyticsTracker
+    }
+
+    @Test
+    fun selectPoiUpdatesSelectedPoiInReadyState() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.selectPoi(samplePoi)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(samplePoi, state.selectedPoi)
+    }
+
+    @Test
+    fun selectPoiFiresPoiTappedAnalytics() = runTest(testDispatcher) {
+        val tracker = FakeAnalyticsTracker()
+        val (viewModel, _) = createReadyViewModel(analyticsTracker = tracker)
+        viewModel.selectPoi(samplePoi)
+        tracker.assertEventTracked(
+            "poi_tapped",
+            mapOf(
+                "area_name" to "Manhattan, New York",
+                "poi_name" to "Statue of Liberty",
+                "poi_type" to "landmark",
+            ),
+        )
+    }
+
+    @Test
+    fun selectPoiNullClearsSelectionWithoutAnalytics() = runTest(testDispatcher) {
+        val tracker = FakeAnalyticsTracker()
+        val (viewModel, _) = createReadyViewModel(analyticsTracker = tracker)
+        viewModel.selectPoi(samplePoi)
+        val poiTappedCount = tracker.recordedEvents.count { it.first == "poi_tapped" }
+        assertEquals(1, poiTappedCount)
+
+        viewModel.selectPoi(null)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(null, state.selectedPoi)
+        // poi_tapped should not have been fired again
+        assertEquals(poiTappedCount, tracker.recordedEvents.count { it.first == "poi_tapped" })
+    }
+
+    @Test
+    fun selectPoiNoOpBeforeReadyState() = runTest(testDispatcher) {
+        val suspendingLocation = ResettableFakeLocationProvider()
+        val viewModel = createViewModel(locationProvider = suspendingLocation)
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+        viewModel.selectPoi(samplePoi)
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+    }
+
     @Test
     fun areaContextFactoryCalledExactlyOnce() = runTest(testDispatcher) {
 

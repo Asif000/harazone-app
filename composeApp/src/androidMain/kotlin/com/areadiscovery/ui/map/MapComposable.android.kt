@@ -32,10 +32,12 @@ actual fun MapComposable(
     longitude: Double,
     zoomLevel: Double,
     pois: List<POI>,
+    onPoiSelected: (POI?) -> Unit,
 ) {
     val context = LocalContext.current
 
     val poiMarkers = remember { mutableListOf<Marker>() }
+    val poiMarkerMap = remember { mutableMapOf<Marker, POI>() }
     val poiVersion = remember { intArrayOf(0) }
     val isDestroyed = remember { booleanArrayOf(false) }
 
@@ -69,6 +71,15 @@ actual fun MapComposable(
                     if (!isDestroyed[0]) {
                         styleLoaded[0] = true
                         map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoomLevel))
+                        // Set click listeners once — map is fully ready here
+                        map.setOnMarkerClickListener { marker ->
+                            onPoiSelected(poiMarkerMap[marker])
+                            true // consume click, prevent default info window
+                        }
+                        map.addOnMapClickListener {
+                            onPoiSelected(null) // deselect on blank tap
+                            true
+                        }
                         // Flush any POI markers that arrived before style loaded
                         if (pendingPois.isNotEmpty()) {
                             val poisToAdd = pendingPois.toList()
@@ -81,6 +92,7 @@ actual fun MapComposable(
                                         .snippet(poi.type)
                                 )
                                 poiMarkers.add(marker)
+                                poiMarkerMap[marker] = poi
                             }
                         }
                     }
@@ -107,6 +119,7 @@ actual fun MapComposable(
             // Remove only POI markers (preserves any non-POI markers added by future stories)
             poiMarkers.forEach { map.removeMarker(it) }
             poiMarkers.clear()
+            poiMarkerMap.clear()
             pois.filter { it.latitude != null && it.longitude != null }.forEach { poi ->
                 val marker = map.addMarker(
                     MarkerOptions()
@@ -115,6 +128,7 @@ actual fun MapComposable(
                         .snippet(poi.type)
                 )
                 poiMarkers.add(marker)
+                poiMarkerMap[marker] = poi
             }
         }
     }
@@ -149,6 +163,7 @@ actual fun MapComposable(
         onDispose {
             isDestroyed[0] = true
             poiMarkers.clear()
+            poiMarkerMap.clear()
             context.unregisterComponentCallbacks(lowMemoryCallback)
             lifecycleOwner.lifecycle.removeObserver(observer)
             mapView.onPause()

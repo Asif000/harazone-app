@@ -1,8 +1,10 @@
 package com.areadiscovery
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -45,7 +47,13 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             if (permissionResolved) {
-                App(platformConfig = { androidContext(this@MainActivity) })
+                App(
+                    platformConfig = { androidContext(this@MainActivity) },
+                    onNavigateToMaps = { lat, lon, name ->
+                        val uri = Uri.parse("geo:$lat,$lon?q=${Uri.encode(name)}")
+                        startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    },
+                )
             }
         }
     }
@@ -61,5 +69,5 @@ class MainActivity : ComponentActivity() {
 @Preview
 @Composable
 fun AppAndroidPreview() {
-    App {}
+    App(platformConfig = {})
 }

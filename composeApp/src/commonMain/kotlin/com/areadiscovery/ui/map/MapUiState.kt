@@ -9,6 +9,7 @@ sealed class MapUiState {
         val latitude: Double,
         val longitude: Double,
         val pois: List<POI> = emptyList(),
+        val selectedPoi: POI? = null,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

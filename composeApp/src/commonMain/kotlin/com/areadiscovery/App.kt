@@ -16,7 +16,10 @@ import com.areadiscovery.ui.theme.AreaDiscoveryTheme
 import org.koin.compose.KoinApplication
 
 @Composable
-fun App(platformConfig: org.koin.dsl.KoinAppDeclaration = {}) {
+fun App(
+    platformConfig: org.koin.dsl.KoinAppDeclaration = {},
+    onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Unit = { _, _, _ -> },
+) {
     KoinApplication(application = { platformConfig(); modules(appModule()) }) {
         AreaDiscoveryTheme {
             val navController = rememberNavController()
@@ -28,6 +31,7 @@ fun App(platformConfig: org.koin.dsl.KoinAppDeclaration = {}) {
                     navController = navController,
                     modifier = Modifier.padding(innerPadding),
                     onMapPoiCountChanged = { mapPoiCount = it },
+                    onNavigateToMaps = onNavigateToMaps,
                 )
             }
         }

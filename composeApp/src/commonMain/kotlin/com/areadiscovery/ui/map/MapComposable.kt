@@ -11,4 +11,5 @@ expect fun MapComposable(
     longitude: Double,
     zoomLevel: Double,
     pois: List<POI>,
+    onPoiSelected: (POI?) -> Unit,
 )

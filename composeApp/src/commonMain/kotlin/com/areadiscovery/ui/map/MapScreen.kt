@@ -13,17 +13,24 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.areadiscovery.ui.components.POIDetailCard
 import com.areadiscovery.ui.summary.ContentNoteBanner
 import com.areadiscovery.ui.theme.spacing
+import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,6 +38,7 @@ import org.koin.compose.viewmodel.koinViewModel
 fun MapScreen(
     viewModel: MapViewModel = koinViewModel(),
     onPoiCountChanged: (Int) -> Unit = {},
+    onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Unit = { _, _, _ -> },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -67,37 +75,103 @@ fun MapScreen(
 
         is MapUiState.Ready -> {
             val scaffoldState = rememberBottomSheetScaffoldState()
+            val snackbarHostState = remember { SnackbarHostState() }
+            val coroutineScope = rememberCoroutineScope()
 
-            BottomSheetScaffold(
-                scaffoldState = scaffoldState,
-                sheetPeekHeight = 88.dp,
-                sheetContent = {
-                    Column(
+            // Auto-expand/collapse sheet based on POI selection
+            LaunchedEffect(state.selectedPoi) {
+                if (state.selectedPoi != null) {
+                    scaffoldState.bottomSheetState.expand()
+                } else {
+                    scaffoldState.bottomSheetState.partialExpand()
+                }
+            }
+
+            // Clear selection when user drags sheet down
+            val sheetValue = scaffoldState.bottomSheetState.currentValue
+            LaunchedEffect(sheetValue) {
+                if (sheetValue == SheetValue.PartiallyExpanded && state.selectedPoi != null) {
+                    viewModel.selectPoi(null)
+                }
+            }
+
+            Box(Modifier.fillMaxSize()) {
+                BottomSheetScaffold(
+                    scaffoldState = scaffoldState,
+                    sheetPeekHeight = 88.dp,
+                    sheetContent = {
+                        if (state.selectedPoi != null) {
+                            POIDetailCard(
+                                poi = state.selectedPoi,
+                                onSaveClick = {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Bookmarks coming soon")
+                                    }
+                                },
+                                onShareClick = {
+                                    coroutineScope.launch {
+                                        snackbarHostState.showSnackbar("Sharing coming soon")
+                                    }
+                                },
+                                onNavigateClick = {
+                                    val lat = state.selectedPoi.latitude
+                                    val lon = state.selectedPoi.longitude
+                                    if (lat != null && lon != null) {
+                                        onNavigateToMaps(lat, lon, state.selectedPoi.name)
+                                    } else {
+                                        coroutineScope.launch {
+                                            snackbarHostState.showSnackbar("Location not available for this place")
+                                        }
+                                    }
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = MaterialTheme.spacing.md,
+                                        vertical = MaterialTheme.spacing.sm,
+                                    ),
+                            )
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        horizontal = MaterialTheme.spacing.md,
+                                        vertical = MaterialTheme.spacing.sm,
+                                    ),
+                            ) {
+                                Text(
+                                    text = state.areaName,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                )
+                                Spacer(Modifier.height(MaterialTheme.spacing.xs))
+                                Text(
+                                    text = if (state.pois.isNotEmpty()) {
+                                        "${state.pois.size} places to explore"
+                                    } else {
+                                        "Explore this area"
+                                    },
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    },
+                ) { paddingValues ->
+                    MapComposable(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
-                    ) {
-                        Text(
-                            text = state.areaName,
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
-                        Spacer(Modifier.height(MaterialTheme.spacing.xs))
-                        Text(
-                            text = "Explore this area",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-            ) { paddingValues ->
-                MapComposable(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues),
-                    latitude = state.latitude,
-                    longitude = state.longitude,
-                    zoomLevel = 14.0,
-                    pois = state.pois,
+                            .fillMaxSize()
+                            .padding(paddingValues),
+                        latitude = state.latitude,
+                        longitude = state.longitude,
+                        zoomLevel = 14.0,
+                        pois = state.pois,
+                        onPoiSelected = { poi -> viewModel.selectPoi(poi) },
+                    )
+                }
+                SnackbarHost(
+                    hostState = snackbarHostState,
+                    modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
         }

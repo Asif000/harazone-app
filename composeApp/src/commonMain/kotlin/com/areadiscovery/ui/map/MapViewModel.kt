@@ -3,6 +3,7 @@ package com.areadiscovery.ui.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.areadiscovery.domain.model.BucketUpdate
+import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.service.AreaContextFactory
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
 import com.areadiscovery.location.LocationProvider
@@ -32,6 +33,21 @@ class MapViewModel(
 
     init {
         loadLocation()
+    }
+
+    fun selectPoi(poi: POI?) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(selectedPoi = poi)
+        if (poi != null) {
+            analyticsTracker.trackEvent(
+                "poi_tapped",
+                mapOf(
+                    "area_name" to current.areaName,
+                    "poi_name" to poi.name,
+                    "poi_type" to poi.type,
+                )
+            )
+        }
     }
 
     fun retry() {
