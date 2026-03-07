@@ -8,7 +8,7 @@ techniques_used: ['Cross-Pollination', 'Sensory Exploration', 'Chaos Engineering
 ideas_generated: ['Breathing Orbits', 'Reactive Radius', 'Living Canvas Background', 'Breathing Text Not Labels', 'Map Integration', 'Galaxy-Map Fusion', 'Split Horizon Orbs', 'Full-Screen Map with Category Rail', 'Rich POI Cards', 'Contextual Lens', 'Area Search with Weather/Time', 'Map Pan Auto-Populate', 'Material Symbols Pin Icons', 'Smart AI Search Bar', 'Glow Zones', 'Expandable POI Card', 'Save with Pin Badge']
 context_file: ''
 session_continued: true
-continuation_date: '2026-03-06'
+continuation_date: '2026-03-07'
 ---
 
 # Brainstorming Session Results
@@ -108,8 +108,166 @@ continuation_date: '2026-03-06'
 - `prototype-poi-card-v1.html` — POI card design exploration
 - `prototype-full-flow-v1.html` — rejected (layout broken)
 
-## Next Steps
+---
 
-1. **UX Spec** — Formalize v3 layout into UX design doc
-2. **Quick Spec** — Break into implementable features
-3. **Implement** — Build in Compose Multiplatform with MapLibre
+## Session 3: Dynamic Vibes & Product Pivot (2026-03-07)
+
+### Core Vision Shift
+
+> **Vibes are the starting point. AI is the depth. Itinerary is the outcome.**
+
+The app is not a map with filters — it's an **AI-powered discovery & planning tool**. The user loop:
+
+```
+Vibes -> Browse -> Chat -> Discover -> Save -> Vibes update -> Browse deeper -> Chat more -> Itinerary forms
+```
+
+### Design Principles (added)
+
+5. **Vibes are alive** — they change with age, mood, day, season, context — just like the person using the app
+6. **Chat-first depth** — AI chat is the brain; vibes are the browse brain; together they're the full experience
+7. **No announcement** — features explain themselves in context; no onboarding modals or tutorials
+8. **Privacy-first** — all personalization data on-device; nothing leaves the phone
+
+### Product Phasing
+
+| Phase | Name | Scope | Effort |
+|-------|------|-------|--------|
+| **A** | Smarter Vibes | Dynamic vibe model, engagement reorder, ghost vibes, smart saves | ~2 weeks |
+| **B** | AI Chat | Conversational discovery on the map, context-aware, pins from chat | ~3-4 weeks |
+| **C** | Itinerary | Auto-organize saves into routed day plans, export, share | ~3 weeks |
+| **D** | Vibe Evolution | User-created vibes, vibe learning over time, vibe sharing | ~2-3 weeks |
+
+### Phase A Detailed Decisions
+
+**Deliverables:**
+- Dynamic vibe data model (Room DB, not hardcoded enum)
+- Engagement-based rail reordering (30-day rolling window)
+- Ghost vibes (AI-suggested new vibes from behavior patterns)
+- Smart save annotations (AI-generated contextual notes)
+- Manage Vibes screen (reorder, rename, delete)
+
+**Decision Log:**
+
+| # | Question | Decision |
+|---|----------|----------|
+| 1 | Max vibes on rail | Top 6-8 by engagement, "+N" overflow indicator for the rest |
+| 2 | Delete default vibes | No — engagement reorder + overflow handles it naturally |
+| 3 | Ghost vibe frequency | One at a time, strongest first. Next appears after Keep/Dismiss, 5-10 sec delay |
+| 4 | Ghost vibe position | Above overflow divider. Glow + NEW badge + sparkles (Approach B) |
+| 5 | Vibe management | Dedicated "Manage Vibes" screen (no long-press gesture in Phase A) |
+| 6 | Smart save offline | Save instantly, silently backfill AI note via WorkManager |
+| 7 | Engagement decay | 30-day rolling window (simple SQL, no decay coefficients) |
+| 8 | Ghost threshold | 5+ interactions with unmapped POI types, minimum 2 saves |
+| 9 | Smart save note length | ~30 words, middot-separated tips (best time, cost, insider tip, nearby pairing) |
+| 10 | Analytics | Defer to Phase B (no backend in Phase A) |
+
+**Engine Architecture (all on-device):**
+
+```
+1. USER ACTS (tap, save, browse, expand card)
+2. INTERACTION LOG records it (Room insert)
+3. ENGAGEMENT AGGREGATOR updates scores (SQL, 30-day window)
+4. RAIL REORDER on app open (sort by score = taps*1 + saves*3 + time*0.5)
+5. GHOST DETECTOR on app open, max 1 per session
+   - Query unmapped POI type clusters (>= 5 interactions, >= 2 saves)
+   - ONE Gemini call to name/emoji/color the vibe
+6. SMART SAVE on save action
+   - ONE Gemini call for ~30 word contextual tips
+   - Offline: save immediately, backfill note via WorkManager
+```
+
+**Gemini cost:** ~3-5 calls per day per user. Rail reorder = zero AI.
+
+**New DB tables:** vibe_table, vibe_engagement_table, interaction_log_table, save_annotation_table
+
+**Ghost Vibe UX:**
+- Visual: Glow aura + sparkles + "NEW" badge (Approach B)
+- Position: Above overflow divider, below established vibes
+- On Keep: badge dissolves, sparkles fade, orb solidifies — "graduates" to real vibe
+- On Dismiss: fades out, pattern not suggested again
+- First ghost gets slightly more aggressive pulse to establish the pattern
+
+**Key Insight — External Data:**
+- No third-party integrations (no Spotify, no Instagram, no OAuth)
+- On-app behavior is the primary data source
+- Manual import (paste Google Maps link, text list) as easy bridge
+- "We don't harvest your social media — we learn from how you explore" = privacy differentiator
+
+### Prototypes (this session)
+
+- `prototype-phase-a-dynamic-vibes.html` — 5 interactive scenarios: default rail, reordered rail, ghost vibe appearance, smart save annotation, saves list with AI notes
+
+### Competitive Positioning
+
+> "Your AI travel companion that lives on the map."
+
+| Competitor | Does | Doesn't |
+|-----------|------|---------|
+| Google Maps | Find specific places | Discover, plan, personalize |
+| TripAdvisor | Reviews, top 10 lists | AI, map-first, personalization |
+| Wanderlog/TripIt | Organize itineraries | Discovery, AI, map exploration |
+| **HaraZone** | Explore + Discover + Plan in one conversational flow on a map | — |
+
+Nobody does all three jobs: Speed (find what I want), Discovery (find what I didn't know I wanted), Identity (express who I am).
+
+### Gemini Prompt v2 — Diagnosis & Proposed Fixes
+
+**Problem:** Results are underwhelming even in busy places (Orlando, Doral). Generic, obvious places. Food dominates. Historical depth missing. Feels like Google Maps, not a discovery tool.
+
+**Current prompt file:** `GeminiPromptBuilder.kt`
+
+**Root causes identified:**
+
+| # | Problem | Impact |
+|---|---------|--------|
+| 1 | No uniqueness filter | Returns popular/common places, not special ones |
+| 2 | Bland persona ("expert assistant") | Generic tone, safe results |
+| 3 | No food gate | Restaurants flood every vibe — Gemini defaults to food because it has the most data |
+| 4 | Sources array | Gemini hallucinates URLs, wasted tokens |
+| 5 | vibeInsights per POI | 3 sub-fields per POI rarely displayed, wasted tokens |
+| 6 | confidence field | Always HIGH or useless |
+| 7 | No "dig deeper" instruction | For less obvious areas (Doral), Gemini gives up and returns generic results |
+| 8 | No chain exclusion | Starbucks, Walmart, malls can appear |
+
+**Approach: Keep single call, make it BETTER not smaller.**
+
+One heavy call per area is fine — it populates all vibes and the user switches between them instantly from cache. The fix is reallocating tokens from waste into quality.
+
+**Proposed changes:**
+
+1. **Passionate local persona** — "You are a passionate local who has lived here 20 years. You love showing visitors things they'd NEVER find on Google Maps."
+2. **Uniqueness filter** — "Only include places genuinely unique to this area, not chains or generic businesses"
+3. **Food gate** — "Only include food places if: (a) local institution 10+ years, (b) culturally significant to area identity, or (c) truly one-of-a-kind"
+4. **Chain exclusion** — explicit list: no Starbucks, McDonald's, Walmart, Target, generic malls
+5. **why_special required** — every POI must have a compelling reason to visit; if you can't explain why, don't include it
+6. **Dig deeper instruction** — "For areas with less obvious attractions: local parks with history, community landmarks, street art, architectural details, cultural centers, neighborhood stories"
+7. **Drop sources array** — save ~200 tokens of hallucinated URLs
+8. **Drop confidence field** — never useful
+9. **Drop vibeInsights object** — 3 sub-fields per POI rarely used
+10. **Slim JSON keys** — shorter field names save ~30% output tokens per POI
+11. **Historical depth** — "Include at least 2-3 POIs with historical or cultural stories per area"
+
+**Proposed slim POI schema:**
+```json
+{"n":"HOPE Gallery","t":"arts","v":"character","w":"Iconic street art spanning 3 stories, ever-changing murals by local and international artists","h":"10a-6p","s":"open","r":4.5,"lat":38.71,"lng":-9.13}
+```
+Fields: n=name, t=type, v=vibe, w=why_special, h=hours, s=status, r=rating, lat/lng=coordinates
+
+**Net effect:** Similar token count, dramatically better quality. Waste tokens (URLs, redundant fields, generic results) reallocated to value (uniqueness, stories, why_special).
+
+**Testing plan:** Validate prompt across multiple city types:
+- Busy tourist city (Orlando)
+- Suburban area (Doral)
+- Major city (Austin)
+- Small town (test depth of "dig deeper" instruction)
+
+**Status:** Needs its own quick spec for implementation.
+
+### Next Steps
+
+1. **Gemini Prompt v2 Quick Spec** — Rewrite prompt, slim schema, test across cities
+2. **UX Spec (Phase A)** — Formalize dynamic vibes, ghost vibes, smart saves into UX design doc
+3. **Quick Spec (Phase A)** — Break Phase A into implementable features
+4. **Implement** — Build in Compose Multiplatform
+5. **Phase B planning** — AI Chat brainstorm after Phase A ships
