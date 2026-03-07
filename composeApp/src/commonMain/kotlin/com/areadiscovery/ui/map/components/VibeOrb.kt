@@ -2,14 +2,14 @@ package com.areadiscovery.ui.map.components
 
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -20,17 +20,22 @@ import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.areadiscovery.domain.model.Vibe
@@ -50,13 +55,11 @@ fun Vibe.toImageVector(): ImageVector = when (this) {
 fun VibeOrb(
     vibe: Vibe,
     isActive: Boolean,
+    isFilterActive: Boolean,
     poiCount: Int,
+    sizeDp: Dp,
     onClick: () -> Unit,
 ) {
-    val scale by animateFloatAsState(
-        targetValue = if (isActive) 1.1f else 0.9f,
-        label = "orb_scale",
-    )
     val reduceMotion = rememberReduceMotion()
     val breathingAlpha = if (isActive && !reduceMotion) {
         val transition = rememberInfiniteTransition(label = "breathing")
@@ -68,45 +71,69 @@ fun VibeOrb(
         )
         alpha
     } else {
-        if (isActive) 1.0f else 0.9f
+        1.0f
     }
-    val bgAlpha = if (isActive) 0.9f else 0.4f
-    val vibeColor = vibe.toColor()
 
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(48.dp)
-            .scale(scale)
-            .background(
-                color = vibeColor.copy(alpha = bgAlpha * breathingAlpha),
-                shape = CircleShape,
-            )
+    val vibeColor = vibe.toColor()
+    val isDimmed = isFilterActive && !isActive
+
+    val labelColor = when {
+        isActive -> Color.White
+        isDimmed -> Color.White.copy(alpha = 0.35f)
+        else -> vibeColor
+    }
+    val labelWeight = if (isActive) FontWeight.Bold else FontWeight.Normal
+
+    // Two-level alpha system: Modifier.alpha(0.45f) dims the entire Column (circle + label)
+    // for the dimmed state. graphicsLayer { alpha = breathingAlpha } pulses only the circle
+    // Box for the active breathing effect. These are intentionally separate — do not merge.
+    val columnModifier = if (isDimmed) {
+        Modifier.alpha(0.45f)
+    } else {
+        Modifier
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = columnModifier
+            .minimumInteractiveComponentSize()
             .clickable(onClick = onClick)
             .semantics { contentDescription = "${vibe.displayName}, $poiCount places" },
     ) {
-        Icon(
-            imageVector = vibe.toImageVector(),
-            contentDescription = vibe.displayName,
-            tint = Color.White,
-            modifier = Modifier.size(20.dp),
-        )
-        if (poiCount > 0) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 4.dp, y = (-4).dp)
-                    .size(18.dp)
-                    .background(vibeColor, CircleShape),
-            ) {
-                Text(
-                    text = "$poiCount",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
-                    fontSize = 9.sp,
-                )
+        val circleModifier = Modifier
+            .size(sizeDp)
+            .background(
+                brush = Brush.radialGradient(
+                    listOf(lerp(vibeColor, Color.White, 0.4f), vibeColor),
+                ),
+                shape = CircleShape,
+            )
+            .let {
+                if (isActive) {
+                    it.border(2.dp, Color.White, CircleShape)
+                        .graphicsLayer { alpha = breathingAlpha }
+                } else {
+                    it
+                }
             }
+
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = circleModifier,
+        ) {
+            Icon(
+                imageVector = vibe.toImageVector(),
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
+            )
         }
+
+        Text(
+            text = vibe.displayName,
+            fontSize = 10.sp,
+            color = labelColor,
+            fontWeight = labelWeight,
+        )
     }
 }

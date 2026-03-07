@@ -94,6 +94,15 @@ Items deferred during code review — to be picked up in relevant future stories
 
 ---
 
+## Vibe Rail Redesign + Toggle Relocation — Deferred
+
+| Severity | Item | File | Deferred To |
+|----------|------|------|-------------|
+| MEDIUM | Icon size (20dp) is hardcoded in VibeOrb regardless of dynamic circle size (32–48dp) — gradient less visible at 32dp circles. Consider scaling icon proportionally with circle size (e.g. `(sizeDp.value * 0.5f).dp`). | `VibeOrb.kt` | Phase A polish |
+| LOW | `Vibe.orbIconName` and `Vibe.accentColorHex` are dead/duplicated fields on the Vibe enum — `orbIconName` is unmapped in UI (overridden by `toImageVector()`), `accentColorHex` is duplicated by `toColor()`. Clean up when migrating to dynamic vibes (Phase A Room DB). | `Vibe.kt` | Phase A dynamic vibes story |
+
+---
+
 ## Resolved Items (for reference)
 
 - ~~POI caching across sessions~~ — Fixed in commit 437ed06 (area_poi_cache table, migration 2)

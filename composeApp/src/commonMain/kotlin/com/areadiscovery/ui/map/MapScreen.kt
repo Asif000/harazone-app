@@ -47,6 +47,7 @@ import com.areadiscovery.ui.components.ContentNoteBanner
 import com.areadiscovery.ui.map.components.AISearchBar
 import com.areadiscovery.ui.map.components.ExpandablePoiCard
 import com.areadiscovery.ui.map.components.FabMenu
+import com.areadiscovery.ui.map.components.MapListToggle
 import com.areadiscovery.ui.map.components.FabScrim
 import com.areadiscovery.ui.map.components.SearchOverlay
 import com.areadiscovery.ui.map.components.TopContextBar
@@ -276,12 +277,7 @@ private fun ReadyContent(
         val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         FabMenu(
             isExpanded = state.isFabExpanded,
-            showListView = state.showListView,
             onToggle = { viewModel.toggleFab() },
-            onListMapToggle = {
-                viewModel.toggleFab()
-                viewModel.toggleListView()
-            },
             onSavedPlaces = {
                 viewModel.toggleFab()
                 coroutineScope.launch {
@@ -325,12 +321,27 @@ private fun ReadyContent(
             }
         }
 
+        // Map/List toggle
+        AnimatedVisibility(
+            visible = !state.isSearchOverlayOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = navBarPadding + 16.dp, end = 80.dp),
+        ) {
+            MapListToggle(
+                showListView = state.showListView,
+                onToggle = { viewModel.toggleListView() },
+            )
+        }
+
         // AI search bar
         AISearchBar(
             onTap = { viewModel.openSearchOverlay() },
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 80.dp),
+                .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp),
         )
 
         // Search overlay
