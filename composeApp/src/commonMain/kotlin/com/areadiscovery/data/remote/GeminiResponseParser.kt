@@ -38,7 +38,7 @@ internal data class BucketJson(
     val type: String,
     val highlight: String,
     val content: String,
-    val confidence: String,
+    val confidence: String = "MEDIUM",
     val sources: List<SourceJson> = emptyList()
 )
 
@@ -50,19 +50,15 @@ internal data class SourceJson(
 
 @Serializable
 internal data class PoiJson(
-    @SerialName("poi") val poi: String = "",
-    val name: String = "",
-    val type: String,
-    val description: String = "",
-    val confidence: String = "MEDIUM",
-    val latitude: Double? = null,
-    val longitude: Double? = null,
-    val vibe: String = "",
-    val insight: String = "",
-    val hours: String? = null,
-    val liveStatus: String? = null,
-    val rating: Float? = null,
-    val vibeInsights: Map<String, String> = emptyMap(),
+    @SerialName("n") val n: String = "",
+    @SerialName("t") val t: String = "",
+    @SerialName("v") val v: String = "",
+    @SerialName("w") val w: String = "",
+    @SerialName("h") val h: String? = null,
+    @SerialName("s") val s: String? = null,
+    @SerialName("r") val r: Float? = null,
+    val lat: Double? = null,
+    val lng: Double? = null,
 )
 
 internal class GeminiResponseParser {
@@ -149,18 +145,18 @@ internal class GeminiResponseParser {
             val poisJson = json.decodeFromString<List<PoiJson>>(jsonString)
             poisJson.map { poiJson ->
                 POI(
-                    name = poiJson.poi.ifBlank { poiJson.name },
-                    type = poiJson.type,
-                    description = poiJson.description,
-                    confidence = parseConfidence(poiJson.confidence),
-                    latitude = poiJson.latitude,
-                    longitude = poiJson.longitude,
-                    vibe = poiJson.vibe,
-                    insight = poiJson.insight,
-                    hours = poiJson.hours,
-                    liveStatus = poiJson.liveStatus,
-                    rating = poiJson.rating,
-                    vibeInsights = poiJson.vibeInsights,
+                    name = poiJson.n,
+                    type = poiJson.t,
+                    description = "",
+                    confidence = Confidence.MEDIUM,
+                    latitude = poiJson.lat,
+                    longitude = poiJson.lng,
+                    vibe = poiJson.v,
+                    insight = poiJson.w,
+                    hours = poiJson.h,
+                    liveStatus = poiJson.s,
+                    rating = poiJson.r,
+                    vibeInsights = emptyMap(),
                 )
             }
         } catch (e: Exception) {

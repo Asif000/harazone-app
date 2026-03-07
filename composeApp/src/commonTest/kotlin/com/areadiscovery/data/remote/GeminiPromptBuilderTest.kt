@@ -2,6 +2,7 @@ package com.areadiscovery.data.remote
 
 import com.areadiscovery.domain.model.AreaContext
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class GeminiPromptBuilderTest {
@@ -67,11 +68,11 @@ class GeminiPromptBuilderTest {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
         // Verify the template shows real coordinates, not null placeholders (C2 fix)
         assertTrue(
-            prompt.contains("\"latitude\":38.71") || prompt.contains("\"latitude\": 38.71"),
+            prompt.contains("\"lat\":38.71") || prompt.contains("\"lat\": 38.71"),
             "POI template must show example coordinates, not null",
         )
         assertTrue(
-            !prompt.contains("\"latitude\":null") && !prompt.contains("\"latitude\": null"),
+            !prompt.contains("\"lat\":null") && !prompt.contains("\"lat\": null"),
             "POI template must NOT contain null latitude",
         )
     }
@@ -83,5 +84,58 @@ class GeminiPromptBuilderTest {
             prompt.contains("decimal GPS coordinates"),
             "Prompt must instruct Gemini to provide GPS coordinates for POIs",
         )
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_includesPassionateLocalPersona() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(prompt.contains("passionate local"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_includesUniquenessRule() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(prompt.contains("UNIQUENESS RULE") || prompt.contains("genuine story") || prompt.contains("genuinely unique"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_doesNotHardcodeChainBrandNames() {
+        // Exclusion is principle-based, not brand-list-based — Starbucks/McDonald's must NOT appear in prompt
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertFalse(prompt.contains("Starbucks"))
+        assertFalse(prompt.contains("McDonald"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_includesFoodGate() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(prompt.contains("FOOD GATE"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_includesWhySpecialInstruction() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(prompt.contains("WHY SPECIAL") || prompt.contains("why_special") || prompt.contains("\"w\""))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_includesDigDeeperInstruction() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(prompt.contains("DIG DEEPER") || prompt.contains("less obvious"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_poiTemplateUsesSlimKeys() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(prompt.contains("\"n\":") && prompt.contains("\"w\":") && prompt.contains("\"lat\":"))
+        assertFalse(prompt.contains("\"poi\":"))
+        assertFalse(prompt.contains("\"insight\":"))
+        assertFalse(prompt.contains("\"latitude\":"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_doesNotIncludeSourcesInBucketTemplate() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertFalse(prompt.contains("\"sources\""))
     }
 }
