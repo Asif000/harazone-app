@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,7 @@ import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -140,6 +142,11 @@ fun ExpandablePoiCard(
             Spacer(Modifier.height(12.dp))
 
             // Action chips
+            val chipColors = AssistChipDefaults.assistChipColors(
+                labelColor = Color.White.copy(alpha = 0.9f),
+                leadingIconContentColor = Color.White.copy(alpha = 0.9f),
+            )
+            val chipBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -154,6 +161,8 @@ fun ExpandablePoiCard(
                             modifier = Modifier.size(18.dp),
                         )
                     },
+                    colors = chipColors,
+                    border = chipBorder,
                 )
                 AssistChip(
                     onClick = onShareClick,
@@ -161,6 +170,8 @@ fun ExpandablePoiCard(
                     leadingIcon = {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
+                    colors = chipColors,
+                    border = chipBorder,
                 )
                 if (poi.latitude != null && poi.longitude != null) {
                     AssistChip(
@@ -169,6 +180,8 @@ fun ExpandablePoiCard(
                         leadingIcon = {
                             Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp))
                         },
+                        colors = chipColors,
+                        border = chipBorder,
                     )
                 }
                 AssistChip(
@@ -177,6 +190,8 @@ fun ExpandablePoiCard(
                     leadingIcon = {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
+                    colors = chipColors,
+                    border = chipBorder,
                 )
             }
 
@@ -234,7 +249,10 @@ fun ExpandablePoiCard(
             }
 
             TextButton(onClick = { expanded = !expanded }) {
-                Text(if (expanded) "Less" else "More details")
+                Text(
+                    if (expanded) "Less" else "More details",
+                    color = vibeColor,
+                )
             }
         }
     }
