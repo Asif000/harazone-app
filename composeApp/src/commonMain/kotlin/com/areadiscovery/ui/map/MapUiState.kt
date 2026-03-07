@@ -13,7 +13,7 @@ sealed class MapUiState {
         val pois: List<POI> = emptyList(),
         val selectedPoi: POI? = null,
         val showListView: Boolean = false,
-        val activeVibe: Vibe = Vibe.DEFAULT,
+        val activeVibe: Vibe? = null,
         val vibePoiCounts: Map<Vibe, Int> = emptyMap(),
         val weather: WeatherState? = null,
         val visitTag: String = "First visit",
@@ -25,6 +25,7 @@ sealed class MapUiState {
         val isFabExpanded: Boolean = false,
         val mapRenderFailed: Boolean = false,
         val showSearchThisArea: Boolean = false,
+        val isSearchingArea: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

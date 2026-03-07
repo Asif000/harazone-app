@@ -16,7 +16,7 @@ actual fun MapComposable(
     longitude: Double,
     zoomLevel: Double,
     pois: List<POI>,
-    activeVibe: Vibe,
+    activeVibe: Vibe?,
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,

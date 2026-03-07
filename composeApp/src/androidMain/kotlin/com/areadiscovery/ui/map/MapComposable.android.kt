@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
@@ -27,10 +28,10 @@ import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.ui.theme.toColor
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
+import org.maplibre.android.geometry.LatLngBounds
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
@@ -41,8 +42,6 @@ import org.maplibre.android.style.expressions.Expression
 import org.maplibre.android.style.layers.CircleLayer
 import org.maplibre.android.style.layers.PropertyFactory
 import org.maplibre.android.style.sources.GeoJsonSource
-import com.google.gson.JsonObject
-import com.google.gson.JsonArray
 import org.maplibre.geojson.Feature
 import org.maplibre.geojson.FeatureCollection
 import org.maplibre.geojson.Point
@@ -56,7 +55,7 @@ actual fun MapComposable(
     longitude: Double,
     zoomLevel: Double,
     pois: List<POI>,
-    activeVibe: Vibe,
+    activeVibe: Vibe?,
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
@@ -99,7 +98,7 @@ actual fun MapComposable(
             if (isDestroyed[0]) return@getMapAsync
             mapRef[0] = map
             if (styleLoaded.value) {
-                map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoomLevel))
+                map.moveCamera(CameraUpdateFactory.newLatLng(LatLng(latitude, longitude)))
             } else if (!styleLoading[0]) {
                 styleLoading[0] = true
 
@@ -168,37 +167,40 @@ actual fun MapComposable(
         }
         glowSourceIds.clear()
 
-        val vibeColor = activeVibe.toColor()
-        val vibeColorArgb = vibeColor.toArgb()
-
-        // Filter POIs by active vibe; if no POIs have vibes assigned, show all
-        val hasAnyVibes = pois.any { it.vibe.isNotBlank() }
-        val filteredPois = if (hasAnyVibes) {
-            pois.filter { it.vibe.equals(activeVibe.name, ignoreCase = true) }
+        // Filter POIs by active vibe; null = show all
+        val filteredPois = if (activeVibe != null) {
+            pois.filter { it.vibe.contains(activeVibe.name, ignoreCase = true) }
         } else {
             pois
-        }
-            .filter { it.latitude != null && it.longitude != null }
+        }.filter { it.latitude != null && it.longitude != null }
 
-        // Generate icon bitmap
-        val iconKey = "vibe_icon_${activeVibe.name}"
-        if (style.getImage(iconKey) == null) {
-            val size = 48
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = vibeColorArgb
-                this.style = Paint.Style.FILL
+        // Ensure icon bitmap exists for a given vibe + POI type combo
+        fun ensureIcon(vibe: Vibe, poiType: String): String {
+            val typeKey = poiType.lowercase().trim()
+            val iconKey = "poi_${vibe.name}_$typeKey"
+            if (style.getImage(iconKey) == null) {
+                val vibeColorArgb = vibe.toColor().toArgb()
+                val emoji = poiTypeEmoji(typeKey)
+                val size = 64
+                val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bitmap)
+                // Vibe-colored circle background
+                val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = vibeColorArgb
+                    this.style = Paint.Style.FILL
+                }
+                canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
+                // Emoji icon centered
+                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textSize = size * 0.5f
+                    textAlign = Paint.Align.CENTER
+                    typeface = Typeface.DEFAULT
+                }
+                val textY = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+                canvas.drawText(emoji, size / 2f, textY, textPaint)
+                style.addImage(iconKey, bitmap)
             }
-            canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
-
-            // White inner circle for contrast
-            val innerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = android.graphics.Color.WHITE
-                this.style = Paint.Style.FILL
-            }
-            canvas.drawCircle(size / 2f, size / 2f, size / 4f, innerPaint)
-            style.addImage(iconKey, bitmap)
+            return iconKey
         }
 
         // Add symbols with stagger (runs inside LaunchedEffect — auto-cancelled on restart)
@@ -206,6 +208,11 @@ actual fun MapComposable(
         for ((i, poi) in filteredPois.withIndex()) {
             if (isDestroyed[0]) return@LaunchedEffect
             delay(50L * i)
+
+            val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
+                ?: Vibe.DEFAULT
+            val vibe = activeVibe ?: poiVibe
+            val iconKey = ensureIcon(vibe, poi.type)
 
             val symbol = sm.create(
                 SymbolOptions()
@@ -215,7 +222,9 @@ actual fun MapComposable(
                     .withTextField(poi.name)
                     .withTextSize(10f)
                     .withTextColor("#FAFAFA")
-                    .withTextOffset(arrayOf(0f, 1.5f))
+                    .withTextOffset(arrayOf(0f, 1.8f))
+                    .withTextHaloColor("rgba(0,0,0,0.7)")
+                    .withTextHaloWidth(1.5f)
             )
             symbolsRef.add(symbol)
             symbolPoiMap[symbol.id] = poi
@@ -237,8 +246,26 @@ actual fun MapComposable(
 
         pinAnimatorsRef.addAll(pinAnimators)
 
-        // Add glow zones
+        // Fit camera to show all pins
         if (filteredPois.size >= 2) {
+            val boundsBuilder = LatLngBounds.Builder()
+            for (poi in filteredPois) {
+                boundsBuilder.include(LatLng(poi.latitude!!, poi.longitude!!))
+            }
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 100),
+                600,
+            )
+        } else if (filteredPois.size == 1) {
+            val poi = filteredPois[0]
+            map.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(LatLng(poi.latitude!!, poi.longitude!!), 15.0),
+                600,
+            )
+        }
+
+        // Add glow zones (only when a specific vibe is selected)
+        if (activeVibe != null && filteredPois.size >= 2) {
             val clusters = clusterPois(filteredPois)
             val vibeHex = activeVibe.accentColorHex
 
@@ -335,6 +362,27 @@ actual fun MapComposable(
             mapView.onDestroy()
         }
     }
+}
+
+/** Maps POI type strings from Gemini to emoji for map pin icons. */
+private fun poiTypeEmoji(type: String): String = when {
+    type.contains("food") || type.contains("restaurant") || type.contains("cafe") || type.contains("bakery") -> "🍽️"
+    type.contains("bar") || type.contains("pub") || type.contains("nightlife") || type.contains("entertainment") -> "🎭"
+    type.contains("park") || type.contains("garden") || type.contains("nature") -> "🌳"
+    type.contains("historic") || type.contains("heritage") || type.contains("monument") || type.contains("memorial") -> "🏛️"
+    type.contains("shop") || type.contains("market") || type.contains("mall") || type.contains("store") -> "🛍️"
+    type.contains("art") || type.contains("gallery") || type.contains("museum") -> "🎨"
+    type.contains("transit") || type.contains("station") || type.contains("transport") -> "🚇"
+    type.contains("beach") || type.contains("coast") || type.contains("waterfront") -> "🏖️"
+    type.contains("temple") || type.contains("church") || type.contains("mosque") || type.contains("religious") -> "🕌"
+    type.contains("hotel") || type.contains("hostel") || type.contains("accommodation") -> "🏨"
+    type.contains("landmark") || type.contains("attraction") || type.contains("viewpoint") -> "📍"
+    type.contains("district") || type.contains("neighborhood") || type.contains("area") -> "🏘️"
+    type.contains("sport") || type.contains("stadium") || type.contains("gym") -> "⚽"
+    type.contains("library") || type.contains("education") || type.contains("university") -> "📚"
+    type.contains("hospital") || type.contains("clinic") || type.contains("health") -> "🏥"
+    type.contains("safety") || type.contains("police") -> "🛡️"
+    else -> "📌"
 }
 
 /** Clusters POIs within 0.005 degree proximity. Returns list of (centroid, pois). */

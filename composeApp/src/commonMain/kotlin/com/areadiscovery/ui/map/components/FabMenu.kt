@@ -24,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -41,7 +43,9 @@ import com.areadiscovery.ui.theme.MapSurfaceDark
 @Composable
 fun FabMenu(
     isExpanded: Boolean,
+    showListView: Boolean,
     onToggle: () -> Unit,
+    onListMapToggle: () -> Unit,
     onSavedPlaces: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
@@ -60,6 +64,11 @@ fun FabMenu(
                 horizontalAlignment = Alignment.End,
                 modifier = Modifier.padding(bottom = 8.dp),
             ) {
+                FabMenuItem(
+                    label = if (showListView) "Map View" else "List View",
+                    icon = if (showListView) Icons.Default.Map else Icons.AutoMirrored.Default.List,
+                    onClick = onListMapToggle,
+                )
                 FabMenuItem(
                     label = "Saved Places",
                     icon = Icons.Default.Bookmark,

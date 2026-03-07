@@ -11,7 +11,7 @@ import com.areadiscovery.domain.model.Vibe
 @Composable
 fun VibeRail(
     vibes: Array<Vibe> = Vibe.entries.toTypedArray(),
-    activeVibe: Vibe,
+    activeVibe: Vibe?,
     vibePoiCounts: Map<Vibe, Int>,
     onVibeSelected: (Vibe) -> Unit,
     modifier: Modifier = Modifier,

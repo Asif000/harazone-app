@@ -189,6 +189,38 @@ private fun ReadyContent(
             }
         }
 
+        // Loading indicator for "Search this area"
+        AnimatedVisibility(
+            visible = state.isSearchingArea,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 56.dp),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MapFloatingUiDark.copy(alpha = 0.90f),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(14.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "Loading area\u2026",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color.White,
+                    )
+                }
+            }
+        }
+
         // Vibe rail (right side, bottom-aligned above FAB)
         VibeRail(
             activeVibe = state.activeVibe,
@@ -242,7 +274,12 @@ private fun ReadyContent(
         val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         FabMenu(
             isExpanded = state.isFabExpanded,
+            showListView = state.showListView,
             onToggle = { viewModel.toggleFab() },
+            onListMapToggle = {
+                viewModel.toggleFab()
+                viewModel.toggleListView()
+            },
             onSavedPlaces = {
                 viewModel.toggleFab()
                 coroutineScope.launch {

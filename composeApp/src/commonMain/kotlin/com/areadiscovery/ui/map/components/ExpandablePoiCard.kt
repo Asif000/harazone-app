@@ -58,7 +58,7 @@ import com.areadiscovery.ui.theme.toColor
 @Composable
 fun ExpandablePoiCard(
     poi: POI,
-    activeVibe: Vibe,
+    activeVibe: Vibe?,
     onDismiss: () -> Unit,
     onDirectionsClick: (Double, Double, String) -> Unit,
     onAskAiClick: (String) -> Unit,
@@ -68,7 +68,8 @@ fun ExpandablePoiCard(
 ) {
     var expanded by remember { mutableStateOf(false) }
     var saved by remember { mutableStateOf(false) }
-    val vibeColor = activeVibe.toColor()
+    val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
+    val vibeColor = (activeVibe ?: poiVibe ?: Vibe.DEFAULT).toColor()
 
     Column(
         modifier = modifier

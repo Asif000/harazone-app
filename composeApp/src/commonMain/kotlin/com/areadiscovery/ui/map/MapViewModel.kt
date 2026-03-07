@@ -79,8 +79,9 @@ class MapViewModel(
 
     fun switchVibe(vibe: Vibe) {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(activeVibe = vibe)
-        analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to vibe.name))
+        val newVibe = if (current.activeVibe == vibe) null else vibe
+        _uiState.value = current.copy(activeVibe = newVibe)
+        analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.name ?: "all")))
     }
 
     fun openSearchOverlay() {
@@ -171,16 +172,11 @@ class MapViewModel(
                                 val pois = update.pois
                                 val state = _uiState.value as? MapUiState.Ready ?: return@collect
                                 val counts = computeVibePoiCounts(pois)
-                                val newActiveVibe = if ((counts[state.activeVibe] ?: 0) == 0) {
-                                    Vibe.entries.maxByOrNull { counts[it] ?: 0 } ?: Vibe.DEFAULT
-                                } else {
-                                    state.activeVibe
-                                }
                                 _uiState.value = state.copy(
                                     pois = pois,
                                     areaName = query,
                                     vibePoiCounts = counts,
-                                    activeVibe = newActiveVibe,
+                                    activeVibe = null,
                                     isSearchOverlayOpen = false,
                                     isAiResponding = false,
                                 )
@@ -237,8 +233,16 @@ class MapViewModel(
     fun onSearchThisAreaTapped() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cameraIdleJob?.cancel()
-        _uiState.value = current.copy(showSearchThisArea = false)
         val areaName = pendingAreaName.ifBlank { return }
+        val lat = pendingLat
+        val lng = pendingLng
+        _uiState.value = current.copy(
+            showSearchThisArea = false,
+            isSearchingArea = true,
+            vibePoiCounts = emptyMap(),
+            pois = emptyList(),
+            activeVibe = null,
+        )
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             try {
@@ -246,6 +250,8 @@ class MapViewModel(
                 getAreaPortrait(areaName, context)
                     .catch { e ->
                         AppLogger.e(e) { "Search this area: portrait fetch failed" }
+                        val s = _uiState.value as? MapUiState.Ready ?: return@catch
+                        _uiState.value = s.copy(isSearchingArea = false)
                         _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
                     }
                     .collect { update ->
@@ -253,16 +259,14 @@ class MapViewModel(
                             val pois = update.pois
                             val state = _uiState.value as? MapUiState.Ready ?: return@collect
                             val counts = computeVibePoiCounts(pois)
-                            val newActiveVibe = if ((counts[state.activeVibe] ?: 0) == 0) {
-                                Vibe.entries.maxByOrNull { counts[it] ?: 0 } ?: Vibe.DEFAULT
-                            } else {
-                                state.activeVibe
-                            }
                             _uiState.value = state.copy(
                                 areaName = areaName,
+                                latitude = lat,
+                                longitude = lng,
                                 pois = pois,
                                 vibePoiCounts = counts,
-                                activeVibe = newActiveVibe,
+                                activeVibe = null,
+                                isSearchingArea = false,
                             )
                         }
                     }
@@ -270,6 +274,8 @@ class MapViewModel(
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Search this area: unexpected error" }
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
             }
         }
@@ -319,6 +325,7 @@ class MapViewModel(
                     areaName = areaName,
                     latitude = coords.latitude,
                     longitude = coords.longitude,
+                    isSearchingArea = true,
                 )
 
                 // Fetch weather in parallel
@@ -344,6 +351,8 @@ class MapViewModel(
                                 _uiState.value = current.copy(
                                     pois = pois,
                                     vibePoiCounts = counts,
+                                    activeVibe = null,
+                                    isSearchingArea = false,
                                 )
                                 analyticsTracker.trackEvent(
                                     "map_opened",
@@ -364,7 +373,7 @@ class MapViewModel(
     private fun computeVibePoiCounts(pois: List<POI>): Map<Vibe, Int> {
         val hasAnyVibes = pois.any { it.vibe.isNotBlank() }
         return if (hasAnyVibes) {
-            Vibe.entries.associateWith { v -> pois.count { it.vibe.equals(v.name, ignoreCase = true) } }
+            Vibe.entries.associateWith { v -> pois.count { it.vibe.contains(v.name, ignoreCase = true) } }
         } else {
             // No vibes assigned — show total count on every vibe
             Vibe.entries.associateWith { pois.size }

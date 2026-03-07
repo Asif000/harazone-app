@@ -41,12 +41,16 @@ import com.areadiscovery.ui.theme.toColor
 @Composable
 fun POIListView(
     pois: List<POI>,
-    activeVibe: Vibe,
+    activeVibe: Vibe?,
     onVibeSelected: (Vibe) -> Unit,
     onPoiClick: (POI) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val filteredPois = pois.filter { it.vibe.equals(activeVibe.name, ignoreCase = true) }
+    val filteredPois = if (activeVibe != null) {
+        pois.filter { it.vibe.contains(activeVibe.name, ignoreCase = true) }
+    } else {
+        pois
+    }
 
     Column(modifier = modifier) {
         // Vibe chip strip
@@ -73,7 +77,8 @@ fun POIListView(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No places found for ${activeVibe.displayName}",
+                    text = if (activeVibe != null) "No places found for ${activeVibe.displayName}"
+                           else "No places found for this area",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -17,7 +17,7 @@ private fun POIListViewPreview() {
                 POI("Central Park", "nature", "Large urban park", Confidence.MEDIUM, 40.7829, -73.9654, vibe = "character"),
                 POI("Joe's Pizza", "food", "Classic New York slice", Confidence.LOW, 40.7306, -73.9866, vibe = "cost"),
             ),
-            activeVibe = Vibe.CHARACTER,
+            activeVibe = null,
             onVibeSelected = {},
             onPoiClick = {},
         )
@@ -30,7 +30,7 @@ private fun POIListViewEmptyPreview() {
     AreaDiscoveryTheme {
         POIListView(
             pois = emptyList(),
-            activeVibe = Vibe.CHARACTER,
+            activeVibe = null,
             onVibeSelected = {},
             onPoiClick = {},
         )

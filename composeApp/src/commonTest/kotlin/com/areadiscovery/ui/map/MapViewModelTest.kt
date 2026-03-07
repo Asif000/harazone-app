@@ -288,11 +288,135 @@ class MapViewModelTest {
     // --- v3 tests ---
 
     @Test
+    fun loadLocation_resetsActiveVibeOnPortraitComplete() = runTest(testDispatcher) {
+        val deferredPois = CompletableDeferred<List<POI>>()
+        val delayedRepo = object : AreaRepository {
+            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
+                return kotlinx.coroutines.flow.flow {
+                    val pois = deferredPois.await()
+                    emit(BucketUpdate.PortraitComplete(pois))
+                }
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = delayedRepo,
+        )
+        // Ready state with no pois yet
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNull(state1.activeVibe)
+        assertEquals(emptyList(), state1.pois)
+
+        // User taps a vibe before POIs arrive
+        viewModel.switchVibe(Vibe.CHARACTER)
+        assertEquals(Vibe.CHARACTER, (viewModel.uiState.value as MapUiState.Ready).activeVibe)
+
+        // Portrait completes — should reset activeVibe to null
+        val pois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "CHARACTER"),
+            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "COST"),
+        )
+        deferredPois.complete(pois)
+        testScheduler.advanceUntilIdle()
+
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNull(state2.activeVibe, "activeVibe should reset to null after initial portrait load")
+        assertEquals(2, state2.pois.size)
+    }
+
+    @Test
+    fun initialLoad_showsAllPoisWithNullActiveVibe() = runTest(testDispatcher) {
+        val vibedPois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "CHARACTER"),
+            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "COST"),
+            POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2, vibe = "HISTORY"),
+        )
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(vibedPois))
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNull(state.activeVibe)
+        assertEquals(3, state.pois.size)
+        assertEquals(1, state.vibePoiCounts[Vibe.CHARACTER])
+        assertEquals(1, state.vibePoiCounts[Vibe.COST])
+        assertEquals(1, state.vibePoiCounts[Vibe.HISTORY])
+        assertEquals(0, state.vibePoiCounts[Vibe.SAFETY])
+    }
+
+    @Test
+    fun computeVibePoiCounts_handlesMultiVibePois() = runTest(testDispatcher) {
+        val multiVibePois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "character,whats_on"),
+            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "character,history"),
+            POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2, vibe = "history"),
+        )
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(multiVibePois))
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(2, state.vibePoiCounts[Vibe.CHARACTER])
+        assertEquals(2, state.vibePoiCounts[Vibe.HISTORY])
+        assertEquals(1, state.vibePoiCounts[Vibe.WHATS_ON])
+        assertEquals(0, state.vibePoiCounts[Vibe.SAFETY])
+    }
+
+    @Test
+    fun switchVibe_filtersMultiVibePois() = runTest(testDispatcher) {
+        val multiVibePois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "character,whats_on"),
+            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "history"),
+        )
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(multiVibePois))
+            ),
+        )
+        // Default: all visible
+        assertNull((viewModel.uiState.value as MapUiState.Ready).activeVibe)
+        assertEquals(2, (viewModel.uiState.value as MapUiState.Ready).pois.size)
+
+        // Filter to CHARACTER — should include Place A (has "character,whats_on")
+        viewModel.switchVibe(Vibe.CHARACTER)
+        assertEquals(Vibe.CHARACTER, (viewModel.uiState.value as MapUiState.Ready).activeVibe)
+        // POIs list stays the same — filtering happens in MapComposable/POIListView
+        assertEquals(2, (viewModel.uiState.value as MapUiState.Ready).pois.size)
+    }
+
+    @Test
     fun switchVibe_updatesActiveVibe() = runTest(testDispatcher) {
         val (viewModel, _) = createReadyViewModel()
+        assertNull((viewModel.uiState.value as MapUiState.Ready).activeVibe)
         viewModel.switchVibe(Vibe.HISTORY)
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(Vibe.HISTORY, state.activeVibe)
+    }
+
+    @Test
+    fun switchVibe_togglesOffWhenTappedAgain() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.switchVibe(Vibe.HISTORY)
+        assertEquals(Vibe.HISTORY, (viewModel.uiState.value as MapUiState.Ready).activeVibe)
+        viewModel.switchVibe(Vibe.HISTORY)
+        assertNull((viewModel.uiState.value as MapUiState.Ready).activeVibe)
     }
 
     @Test
@@ -444,19 +568,86 @@ class MapViewModelTest {
         )
         val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Alfama, Lisbon", state1.areaName)
+        assertEquals(newPois, state1.pois)
+        assertNull(state1.activeVibe)
+        // Counts should be populated (no vibes → total count on each vibe)
+        assertEquals(1, state1.vibePoiCounts[Vibe.CHARACTER])
 
         // Pan to new area — button appears
         viewModel.onCameraIdle(10.0, 20.0)
         testScheduler.advanceUntilIdle()
         assertTrue((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
 
-        // Tap button — fetches portrait, hides button
+        // Tap button — fetches portrait, hides button, updates coords
         viewModel.onSearchThisAreaTapped()
         testScheduler.advanceUntilIdle()
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Bairro Alto, Lisbon", state2.areaName)
         assertEquals(newPois, state2.pois)
         assertFalse(state2.showSearchThisArea)
+        assertFalse(state2.isSearchingArea)
+        assertEquals(10.0, state2.latitude, 0.001)
+        assertEquals(20.0, state2.longitude, 0.001)
+    }
+
+    @Test
+    fun onSearchThisAreaTapped_clearsOldCountsAndPoisDuringLoading() = runTest(testDispatcher) {
+        val deferredPois = CompletableDeferred<List<POI>>()
+        val callIndex = intArrayOf(0)
+        val delayedOnSecondCallRepo = object : AreaRepository {
+            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
+                callIndex[0]++
+                return if (callIndex[0] <= 1) {
+                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(listOf(
+                        POI("Old Place", "food", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "CHARACTER"),
+                    )))
+                } else {
+                    kotlinx.coroutines.flow.flow {
+                        val pois = deferredPois.await()
+                        emit(BucketUpdate.PortraitComplete(pois))
+                    }
+                }
+            }
+        }
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var geocodeIndex = 0
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(38.7139, -9.1394))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                geocodeIndex++
+                return if (geocodeIndex <= 1) Result.success("Alfama, Lisbon")
+                else Result.success("Bairro Alto, Lisbon")
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = delayedOnSecondCallRepo,
+        )
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, state1.pois.size)
+        assertTrue(state1.vibePoiCounts.values.any { it > 0 })
+
+        // Pan + tap search
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        viewModel.onSearchThisAreaTapped()
+
+        // During loading: old counts and pois should be cleared
+        val loading = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(loading.isSearchingArea)
+        assertEquals(emptyList(), loading.pois)
+        assertEquals(emptyMap(), loading.vibePoiCounts)
+        assertNull(loading.activeVibe)
+
+        // Complete the search
+        deferredPois.complete(listOf(
+            POI("New Place", "park", "desc", Confidence.HIGH, 2.0, 3.0, vibe = "NEARBY"),
+        ))
+        testScheduler.advanceUntilIdle()
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, state2.pois.size)
+        assertEquals("New Place", state2.pois[0].name)
+        assertFalse(state2.isSearchingArea)
     }
 
     @Test
@@ -544,6 +735,7 @@ class MapViewModelTest {
         testScheduler.advanceUntilIdle()
         assertEquals(1, collectedErrors.size)
         assertEquals("Couldn't load area info. Try panning again.", collectedErrors[0])
+        assertFalse((viewModel.uiState.value as MapUiState.Ready).isSearchingArea)
         collectJob.cancel()
     }
 
