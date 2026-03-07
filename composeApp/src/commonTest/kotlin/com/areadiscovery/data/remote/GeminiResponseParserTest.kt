@@ -51,7 +51,7 @@ not valid json either"""
 
         const val V3_POIS_RESPONSE = """{"type":"SAFETY","highlight":"Safe area","content":"Low crime."}
 ---POIS---
-[{"n":"Time Out Market","t":"food","v":"character","w":"Curated food hall with 24 local restaurants in a converted 1892 iron market hall","h":"Sun-Wed 10am-12am, Thu-Sat 10am-2am","s":"open","r":4.5,"lat":38.71,"lng":-9.13},{"n":"Old Church","t":"historic","v":"history","w":"Built in 1200, oldest surviving structure in the district","h":"10a-5p","s":"open","r":4.2,"lat":38.72,"lng":-9.14}]"""
+[{"n":"Time Out Market","t":"food","v":"character","w":"Curated food hall with 24 local restaurants in a converted 1892 iron market hall","h":"Sun-Wed 10am-12am, Thu-Sat 10am-2am","s":"open","r":4.5,"lat":38.7100,"lng":-9.1300},{"n":"Old Church","t":"historic","v":"history","w":"Built in 1200, oldest surviving structure in the district","h":"10a-5p","s":"open","r":4.2,"lat":38.7200,"lng":-9.1400}]"""
     }
 
     @Test
@@ -326,6 +326,16 @@ not valid json either"""
         val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
         assertEquals(Confidence.MEDIUM, portrait.pois[0].confidence)
         assertEquals(Confidence.MEDIUM, portrait.pois[1].confidence)
+    }
+
+    @Test
+    fun parseFullResponse_filtersOutBlankNamePois() {
+        val input = """{"type":"SAFETY","highlight":"Safe","content":"Low crime."}
+---POIS---
+[{"n":"","t":"park","v":"nearby","w":"Some place","lat":38.7100,"lng":-9.1300},{"n":"Real Place","t":"historic","v":"history","w":"Genuinely special","lat":38.7200,"lng":-9.1400}]"""
+        val portrait = parser.parseFullResponse(input).getOrThrow().last() as BucketUpdate.PortraitComplete
+        assertEquals(1, portrait.pois.size)
+        assertEquals("Real Place", portrait.pois[0].name)
     }
 
     @Test
