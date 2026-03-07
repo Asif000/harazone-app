@@ -34,6 +34,14 @@ Items deferred during code review — to be picked up in relevant future stories
 
 ---
 
+## SummaryStateMapper — Missing Bucket Handling
+
+| Severity | Item | File | Deferred To |
+|----------|------|------|-------------|
+| MEDIUM | PortraitComplete only marks received buckets as complete — missing buckets stay as loading skeletons forever. Fix: fill all 6 BucketType entries in finalBuckets map, marking missing ones as `isComplete=true` with empty content | `SummaryStateMapper.kt` | Summary screen redesign |
+
+---
+
 ## Hero Redesign (Timeline & Right Now Cards)
 
 | Severity | Item | File | Deferred To |
@@ -41,6 +49,48 @@ Items deferred during code review — to be picked up in relevant future stories
 | LOW | Hero cards have no click-to-scroll interaction to jump to full bucket content below | `TimelineCard.kt`, `RightNowCard.kt` | Future UX polish |
 | LOW | No tablet/landscape adaptive layout for TimelineCard LazyRow | `TimelineCard.kt` | Phase 2+ responsive layout |
 | LOW | liveRegion on RightNowCard may re-announce on unrelated recomposition — monitor | `RightNowCard.kt` | Manual testing / UX polish |
+
+---
+
+## V3 Full-Screen Map — Review Findings
+
+| Severity | Item | File | Deferred To |
+|----------|------|------|-------------|
+| MEDIUM | `clusterPois` uses Manhattan distance in degrees — inconsistent glow zone radius at different latitudes (0.005° = ~550m equator, ~275m at 60°N). Replace with Haversine-based distance. | `MapComposable.android.kt` | Future UX polish |
+| MEDIUM | AI search `conversationHistory` always empty — follow-up chips produce standalone answers with no context from prior questions. Need to store chat turns in state and pass to `streamChatResponse`. | `MapViewModel.kt` | AI search enhancement |
+| MEDIUM | Add +/- zoom control buttons as Compose overlays on the map. MapLibre 11.x removed built-in zoom controls. Need `onZoomIn`/`onZoomOut` callbacks through expect/actual MapComposable. | `MapComposable.kt`, `MapScreen.kt` | UX polish |
+| MEDIUM | Auto-refresh area portrait when user pans/zooms to a new area. Detect camera idle, reverse-geocode new center, debounce, re-fetch portrait if area name changed. | `MapComposable.kt`, `MapViewModel.kt` | New feature / story |
+
+---
+
+## Brainstorming — Explore Later
+
+| Priority | Item | Description | Source |
+|----------|------|-------------|--------|
+| MEDIUM | Contextual AI tip on app open | Slim banner below top bar, AI-generated from user context (time, weather, location, first visit vs returning, day of week, saved places). One tip per open, auto-dismiss 5-8s or swipe. Tap → deep-link to mentioned place. Fallback: pre-computed time-of-day tips. Reduce frequency if user consistently dismisses. | Brainstorming session 2026-03-06 party mode |
+| LOW | Offline AI: pre-generated answer packs | When online, have Gemini generate & cache 10-15 common Q&A pairs per area (safety, food, nightlife, budget, etc.) in Room DB. Serve instantly offline — no on-device LLM needed. Future: Gemini Nano as fallback for free-form questions when available on more devices. On-device full LLM (Gemma 2B, Phi-3) not recommended due to app size (+1-2 GB), RAM, battery, and quality trade-offs. | Brainstorming session 2026-03-06 |
+
+---
+
+## Localisation Phase B — UI Strings, RTL Layout & Map Labels (Future Epic)
+
+| Priority | Item | Description | Source |
+|----------|------|-------------|--------|
+| MEDIUM | `moko-resources` i18n library | Add `dev.icerock.moko:resources` to KMP. Extract all hardcoded UI strings into `commonMain/MR/base/strings.xml`. Create locale files for `ar`, `es`, `pt`. Replaces any hardcoded string literals in Composables. | Planning 2026-03-06 |
+| MEDIUM | Arabic RTL layout audit | Audit all Composables for RTL breakage: swap `start/end` padding for `absolute` variants, verify `Row` ordering flips correctly with `LocalLayoutDirection.current`. MapScreen vibe rail (right side) and top context bar need special attention. | Planning 2026-03-06 |
+| MEDIUM | MapLibre RTL Text Plugin | Add `com.mapbox.mapboxsdk:mapbox-android-plugin-localization-v9` (MapLibre fork). Required for Arabic text in map tile labels to render correctly (RTL shaping). | Planning 2026-03-06 |
+| LOW | Locale-aware date/time formatting | Time-of-day and date displays should respect locale (Arabic-Indic numerals, locale-specific month names). Use `kotlinx-datetime` with locale-aware formatters. | Planning 2026-03-06 |
+| LOW | App Store / Play Store listings | Translate store description, screenshots, and keywords for Arabic (ar), Spanish (es), Portuguese (pt-BR + pt-PT). Parallel track — not a code change. | Planning 2026-03-06 |
+
+**Recommended timing:** After V3 stabilises. Phase B is a full epic (~3-4 stories). Phase A (AI locale injection) ships first as a quick spec — covers ~80% of user-facing content with minimal effort.
+
+---
+
+## Gemini Nano — On-Device Offline Fallback (Future)
+
+| Priority | Item | Description | Source |
+|----------|------|-------------|--------|
+| LOW | Gemini Nano offline fallback for new areas | Use Android AICore / MediaPipe LLM Inference API to run Gemini Nano on-device when network unavailable. Architecture is already ready: add a `NanoAreaIntelligenceProvider` in `androidMain` implementing `AreaIntelligenceProvider`, wire via Koin platform module. A `FallbackAreaIntelligenceProvider` wrapper tries cloud first, falls back to Nano. **Key constraints**: ~2K token context → need stripped-down prompts (1-2 sentences per vibe, not full portrait); Pixel 8+ and select Samsung S24/S25 only — need graceful path for unsupported devices (3 states: cloud → Nano → no AI). **Recommended sequencing**: ship portrait caching first (covers 90% of offline case for revisits); then add Nano for genuinely new areas offline on supported devices. Show "Offline — limited detail" banner when Nano is used. | Discussion 2026-03-06 |
 
 ---
 

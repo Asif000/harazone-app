@@ -2,7 +2,9 @@
 title: 'Summary Screen Hero Redesign: Timeline & Right Now Cards'
 slug: 'summary-hero-redesign-timeline-right-now'
 created: '2026-03-06'
-status: 'implementation-complete'
+status: 'superseded'
+superseded_by: 'tech-spec-v3-fullscreen-map'
+superseded_note: 'V3 retires SummaryScreen entirely — full-screen map becomes sole primary surface. Work done here (TimelineCard, RightNowCard) will be deleted as part of V3.'
 stepsCompleted: [1, 2, 3, 4]
 tech_stack: ['Kotlin Multiplatform', 'Compose Multiplatform', 'Material3', 'Coroutines/Flow']
 files_to_modify:

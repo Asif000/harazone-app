@@ -67,7 +67,7 @@ class GeminiPromptBuilderTest {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
         // Verify the template shows real coordinates, not null placeholders (C2 fix)
         assertTrue(
-            prompt.contains("\"latitude\":51.5074") || prompt.contains("\"latitude\": 51.5074"),
+            prompt.contains("\"latitude\":38.71") || prompt.contains("\"latitude\": 38.71"),
             "POI template must show example coordinates, not null",
         )
         assertTrue(

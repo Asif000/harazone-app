@@ -1,0 +1,2136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Full Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0" />
+<style>
+  :root {
+    --safety: #E8A735;
+    --character: #2BBCB3;
+    --history: #C4935A;
+    --nearby: #5B9BD5;
+    --cost: #5CAD6F;
+    --whats: #9B6ED8;
+    --active-color: var(--character);
+    --bg-dark: #0A0A0A;
+    --text-primary: #FAFAFA;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    position: relative;
+  }
+  body[data-accent="safety"] { --active-color: var(--safety); }
+  body[data-accent="character"] { --active-color: var(--character); }
+  body[data-accent="history"] { --active-color: var(--history); }
+  body[data-accent="nearby"] { --active-color: var(--nearby); }
+  body[data-accent="cost"] { --active-color: var(--cost); }
+  body[data-accent="whats"] { --active-color: var(--whats); }
+
+  /* === FULL SCREEN MAP === */
+  .map-container {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .map-container.active-glow {
+    box-shadow: inset 0 0 40px color-mix(in srgb, var(--active-color) 6%, transparent);
+  }
+  .map-surface {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 30% 35%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 65%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    position: relative;
+    cursor: grab;
+  }
+  .map-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 16%, rgba(255,255,255,0.05) 16.3%, rgba(255,255,255,0.05) 16.7%, transparent 17%),
+      linear-gradient(90deg, transparent 38%, rgba(255,255,255,0.04) 38.2%, rgba(255,255,255,0.04) 38.6%, transparent 39%),
+      linear-gradient(90deg, transparent 62%, rgba(255,255,255,0.05) 62.2%, rgba(255,255,255,0.05) 62.6%, transparent 63%),
+      linear-gradient(90deg, transparent 84%, rgba(255,255,255,0.04) 84.2%, rgba(255,255,255,0.04) 84.6%, transparent 85%),
+      linear-gradient(0deg, transparent 20%, rgba(255,255,255,0.05) 20.2%, rgba(255,255,255,0.05) 20.6%, transparent 21%),
+      linear-gradient(0deg, transparent 45%, rgba(255,255,255,0.04) 45.2%, rgba(255,255,255,0.04) 45.6%, transparent 46%),
+      linear-gradient(0deg, transparent 68%, rgba(255,255,255,0.05) 68.2%, rgba(255,255,255,0.05) 68.6%, transparent 69%),
+      linear-gradient(0deg, transparent 88%, rgba(255,255,255,0.04) 88.2%, rgba(255,255,255,0.04) 88.6%, transparent 89%);
+  }
+  .map-surface.dragging { cursor: grabbing; }
+  .map-surface.zoom-in { animation: zoom-in-effect 0.6s ease forwards; }
+  .map-surface.zoom-out { animation: zoom-out-effect 0.6s ease forwards; }
+  @keyframes zoom-in-effect { 0% { transform: scale(0.92); opacity: 0.6; } 100% { transform: scale(1); opacity: 1; } }
+  @keyframes zoom-out-effect { 0% { transform: scale(1.08); opacity: 0.6; } 100% { transform: scale(1); opacity: 1; } }
+
+  /* === TOP BAR (city + tag + weather + time) === */
+  .top-bar {
+    position: absolute;
+    top: 48px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(10,10,10,0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 12px;
+    padding: 8px 14px;
+    white-space: nowrap;
+  }
+  .top-bar .tb-loc {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    flex-shrink: 0;
+  }
+  .top-bar .tb-tag {
+    font-size: 8px;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.05);
+    padding: 1px 5px;
+    border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .top-bar .tb-sep {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+  }
+  .top-bar .tb-weather {
+    font-size: 10px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .top-bar .tb-temp { font-weight: 700; color: var(--text-primary); }
+  .top-bar .tb-time {
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  /* === MAP HINT === */
+  .map-hint {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 3;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .map-hint.hidden { opacity: 0; }
+  .map-hint span {
+    font-size: 12px;
+    color: var(--text-dim);
+    background: rgba(10,10,10,0.6);
+    padding: 8px 16px;
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+  }
+
+  /* Zoom badge & scale bar */
+  .zoom-badge {
+    position: absolute;
+    top: 88px;
+    left: 12px;
+    font-size: 9px;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    background: rgba(10,10,10,0.6);
+    padding: 3px 8px;
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .zoom-badge.visible { opacity: 1; }
+  .scale-bar {
+    position: absolute;
+    top: 106px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .scale-bar.visible { opacity: 1; }
+  .scale-bar .bar { height: 2px; background: rgba(255,255,255,0.25); border-radius: 1px; transition: width 0.6s ease; }
+  .scale-bar .bar-label { font-size: 8px; color: var(--text-dim); white-space: nowrap; }
+
+  /* === GLOW ZONES === */
+  .glow-zone {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+    filter: blur(14px);
+  }
+  .glow-zone.visible { opacity: 1; }
+  .glow-zone.pulse {
+    animation: glow-breathe 5s ease-in-out infinite;
+  }
+  @keyframes glow-breathe {
+    0%, 100% { opacity: 0.85; transform: translate(-50%, -50%) scale(1); }
+    50% { opacity: 1; transform: translate(-50%, -50%) scale(1.04); }
+  }
+
+  /* === ZOOM CONTROLS (left side) === */
+  .zoom-controls {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .zoom-btn {
+    width: 36px; height: 36px;
+    border: none;
+    background: rgba(10,10,10,0.65);
+    backdrop-filter: blur(10px);
+    color: var(--text-primary);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .zoom-btn:first-child { border-radius: 10px 10px 0 0; }
+  .zoom-btn:last-child { border-radius: 0 0 10px 10px; }
+  .zoom-btn:active {
+    background: rgba(255,255,255,0.12);
+  }
+  .zoom-btn .material-symbols-outlined {
+    font-size: 20px;
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 20;
+  }
+
+  /* Drag hint */
+  .map-drag-hint {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 6;
+    font-size: 9px;
+    color: var(--text-dim);
+    background: rgba(10,10,10,0.6);
+    backdrop-filter: blur(4px);
+    padding: 4px 10px;
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .map-drag-hint.visible { opacity: 1; }
+
+  /* === CATEGORY RAIL (right side, vertical, above FAB) === */
+  .cat-rail {
+    position: absolute;
+    right: 8px;
+    bottom: 90px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+  .cat-orb {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    position: relative;
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 18%, rgba(255,255,255,0.06)),
+      color-mix(in srgb, var(--orb-color) 6%, rgba(10,10,10,0.85)));
+    border: 1.5px solid color-mix(in srgb, var(--orb-color) 18%, transparent);
+    backdrop-filter: blur(6px);
+  }
+  .cat-orb::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--orb-color) 10%, transparent), transparent 70%);
+    opacity: 0.25;
+    animation: orb-breathe 4.5s ease-in-out infinite;
+    transition: all 0.3s ease;
+  }
+  @keyframes orb-breathe {
+    0%, 100% { opacity: 0.2; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(1.05); }
+  }
+  .cat-orb:active { transform: scale(0.88); }
+
+  /* Result count badge */
+  .cat-orb .orb-count {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--orb-color) 70%, #000);
+    border: 1.5px solid rgba(10,10,10,0.8);
+    font-size: 8px;
+    font-weight: 800;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    z-index: 2;
+    transition: all 0.3s ease;
+  }
+  .cat-orb.selected .orb-count {
+    background: var(--orb-color);
+    transform: scale(1.1);
+  }
+  .cat-rail.has-selection .cat-orb:not(.selected) .orb-count {
+    opacity: 0.4;
+  }
+
+  /* Selected orb */
+  .cat-orb.selected {
+    border-color: var(--orb-color);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--orb-color) 35%, transparent);
+    transform: scale(1.1);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 28%, rgba(255,255,255,0.1)),
+      color-mix(in srgb, var(--orb-color) 12%, rgba(10,10,10,0.75)));
+  }
+  .cat-orb.selected::after {
+    opacity: 0.7;
+    inset: -7px;
+  }
+
+  /* Orb name label — appears on select */
+  .cat-orb .orb-label {
+    position: absolute;
+    right: calc(100% + 8px);
+    top: 50%;
+    transform: translateY(-50%) translateX(4px);
+    background: rgba(10,10,10,0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--orb-color) 20%, transparent);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-dim);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.25s ease;
+  }
+  .cat-orb.selected .orb-label {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--orb-color) 35%, transparent);
+  }
+
+  /* Dim unselected when one is selected */
+  .cat-rail.has-selection .cat-orb:not(.selected) {
+    opacity: 0.4;
+    transform: scale(0.85);
+  }
+  .cat-rail.has-selection .cat-orb:not(.selected)::after { opacity: 0.05; }
+
+  /* === FAB (bottom right, below rail) === */
+  .fab-wrap {
+    position: absolute;
+    bottom: 28px;
+    right: 8px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    width: 42px;
+    gap: 10px;
+  }
+  .fab-btn {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--active-color) 80%, #fff), var(--active-color));
+    border: none;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+      0 4px 14px color-mix(in srgb, var(--active-color) 30%, transparent),
+      0 0 20px color-mix(in srgb, var(--active-color) 10%, transparent);
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    z-index: 2;
+  }
+  .fab-btn:active { transform: scale(0.9); }
+  .fab-btn.open { transform: rotate(45deg); background: rgba(255,255,255,0.12); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .fab-btn::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 18%, transparent);
+    animation: fab-glow 3s ease-in-out infinite;
+  }
+  .fab-btn.open::after { animation: none; opacity: 0; }
+  @keyframes fab-glow {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.12); opacity: 0; }
+  }
+  .fab-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transform: scale(0.5) translateY(16px);
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+  }
+  .fab-option.show { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
+  .fab-option:nth-child(1) { transition-delay: 0.04s; }
+  .fab-option:nth-child(2) { transition-delay: 0.08s; }
+  .fab-option:nth-child(3) { transition-delay: 0.12s; }
+  .fab-label {
+    background: rgba(20,14,20,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .fab-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(20,14,20,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .fab-option:active .fab-icon {
+    background: color-mix(in srgb, var(--active-color) 18%, rgba(20,14,20,0.92));
+    border-color: color-mix(in srgb, var(--active-color) 35%, transparent);
+  }
+  .fab-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .fab-scrim.show { opacity: 1; pointer-events: auto; }
+
+  /* === BOTTOM SEARCH BAR === */
+  .bottom-bar {
+    position: absolute;
+    bottom: 28px;
+    left: 12px;
+    right: 58px;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(10,10,10,0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 10px 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .bottom-bar:active { background: rgba(10,10,10,0.85); border-color: rgba(255,255,255,0.12); }
+  .bottom-bar .bb-icon { font-size: 14px; opacity: 0.4; }
+  .bottom-bar .bb-text { font-size: 13px; color: var(--text-dim); flex: 1; }
+
+  /* === POI PINS === */
+  .poi {
+    position: absolute;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 4;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .poi.visible { opacity: 1; transform: scale(1); }
+  .poi .pin-dot {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 40% 35%,
+      color-mix(in srgb, var(--active-color) 25%, rgba(20,16,20,0.95)),
+      color-mix(in srgb, var(--active-color) 10%, rgba(10,10,10,0.95)));
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 30%, transparent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--active-color) 25%, transparent);
+    transition: all 0.3s ease;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    line-height: 1;
+  }
+  .poi .pin-icon {
+    font-size: 14px;
+    color: color-mix(in srgb, var(--active-color) 85%, #fff);
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .poi.active .pin-icon {
+    color: var(--active-color);
+    font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .poi .pin-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 15%, transparent);
+    transition: all 0.3s ease;
+  }
+  .poi.active .pin-dot {
+    width: 30px; height: 30px;
+    border-color: var(--active-color);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--active-color) 45%, transparent);
+    background: radial-gradient(circle at 40% 35%,
+      color-mix(in srgb, var(--active-color) 35%, rgba(20,16,20,0.9)),
+      color-mix(in srgb, var(--active-color) 15%, rgba(10,10,10,0.9)));
+  }
+  .poi.active .pin-dot::after { inset: -6px; border-width: 2px; border-color: color-mix(in srgb, var(--active-color) 35%, transparent); }
+  .poi .pin-ring {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--active-color);
+    pointer-events: none;
+    animation: pin-ring-out 1.2s ease-out 0.4s 1;
+  }
+  @keyframes pin-ring-out { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(3); opacity: 0; } }
+
+  /* Pin label — always visible */
+  .poi .pin-tip {
+    position: absolute;
+    left: 50%;
+    background: rgba(10,10,10,0.82);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--active-color) 18%, transparent);
+    border-radius: 7px;
+    padding: 2px 7px;
+    white-space: nowrap;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    pointer-events: none;
+    z-index: 10;
+    transition: all 0.3s ease;
+  }
+  .poi .pin-tip.below { top: calc(100% + 5px); transform: translateX(-50%); }
+  .poi .pin-tip.above { bottom: calc(100% + 5px); transform: translateX(-50%); }
+  .poi .pin-tip.right { left: calc(100% + 5px); top: 50%; transform: translateY(-50%); }
+  .poi .pin-tip.left { right: calc(100% + 5px); left: auto; top: 50%; transform: translateY(-50%); }
+  .poi.active .pin-tip {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--active-color) 35%, transparent);
+  }
+
+  /* === POI CARD === */
+  .poi-card-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .poi-card-overlay.visible { opacity: 1; pointer-events: auto; }
+  .poi-card-scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.4); }
+  .poi-card {
+    position: relative;
+    width: 300px;
+    max-height: 55%;
+    background: rgba(22,16,22,0.97);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    overflow: hidden;
+    transform: translateY(12px) scale(0.92);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 24px color-mix(in srgb, var(--active-color) 8%, transparent);
+    overflow-y: auto;
+  }
+  .poi-card-overlay.visible .poi-card { transform: translateY(0) scale(1); }
+
+  /* Expanded state */
+  .poi-card.expanded {
+    max-height: 80%;
+  }
+
+  /* Expand handle */
+  .card-handle {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    padding: 8px 0 2px;
+    cursor: pointer;
+  }
+  .card-handle-bar {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.2);
+    transition: all 0.2s ease;
+  }
+  .poi-card.expanded .card-handle-bar {
+    background: var(--active-color);
+    width: 44px;
+  }
+
+  /* Expanded content */
+  .card-expanded-content {
+    display: none;
+    padding: 0 14px 14px;
+  }
+  .poi-card.expanded .card-expanded-content { display: block; }
+  .card-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 10px 0;
+  }
+  .card-desc {
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+  .card-section-title {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  .card-all-insights {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .card-vibe-insight {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+  .card-vibe-insight .vibe-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .card-vibe-insight .vibe-name {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+  }
+  .card-vibe-insight .vibe-text {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .card-hours {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+  .card-hours .material-symbols-outlined {
+    font-size: 16px;
+    color: var(--text-dim);
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .card-hours .hours-status {
+    color: #5CAD6F;
+    font-weight: 700;
+  }
+  .card-tip {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.03);
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.4;
+  }
+  .card-tip .tip-ico { flex-shrink: 0; }
+
+  /* Card photo area */
+  .card-photos { width: 100%; height: 110px; position: relative; overflow: hidden; }
+  .card-photo {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; opacity: 0.35;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+  }
+  .card-photo.p1 { background: linear-gradient(135deg, #4a332a, #7a5a3a, #5a3a2a); }
+  .card-photo.p2 { background: linear-gradient(135deg, #2a3a4a, #3a5a6a, #2a4a5a); transform: translateX(100%); }
+  .card-photo.p3 { background: linear-gradient(135deg, #3a4a2a, #5a6a3a, #4a5a2a); transform: translateX(200%); }
+  .card-photo::before { content: ''; position: absolute; inset: 0; background: radial-gradient(circle at 30% 60%, rgba(255,200,100,0.12), transparent 40%); }
+  .card-photo-grad { position: absolute; bottom: 0; left: 0; right: 0; height: 35px; background: linear-gradient(to top, rgba(22,16,22,0.97), transparent); z-index: 2; }
+  .card-photo-dots { position: absolute; bottom: 7px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; z-index: 3; }
+  .card-pdot { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.3); transition: all 0.3s ease; }
+  .card-pdot.on { width: 14px; border-radius: 3px; background: var(--active-color); }
+
+  /* Card body */
+  .card-body { padding: 10px 14px 14px; }
+  .card-name-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 3px; }
+  .card-name { font-size: 15px; font-weight: 800; letter-spacing: -0.2px; }
+  .card-rating { display: flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; color: #FFD700; }
+  .card-rating .star { font-size: 11px; animation: star-sparkle 2s ease-in-out infinite; }
+  @keyframes star-sparkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.15); } }
+  .card-meta { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--text-secondary); margin-bottom: 8px; }
+  .card-meta .msep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-dim); }
+  .card-live { display: flex; align-items: center; gap: 8px; padding: 7px 9px; background: rgba(255,255,255,0.04); border-radius: 9px; margin-bottom: 8px; }
+  .live-left { display: flex; align-items: center; gap: 5px; flex: 1; }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; position: relative; }
+  .live-dot.green { background: #4ADE80; box-shadow: 0 0 6px rgba(74,222,128,0.5); color: rgba(74,222,128,0.3); }
+  .live-dot.orange { background: #FB923C; box-shadow: 0 0 6px rgba(251,146,60,0.5); color: rgba(251,146,60,0.3); }
+  .live-dot::after { content: ''; position: absolute; inset: -3px; border-radius: 50%; border: 1px solid currentColor; animation: ldot-ping 2s ease-out infinite; }
+  @keyframes ldot-ping { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(2.2); opacity: 0; } }
+  .live-label { font-size: 10px; font-weight: 600; }
+  .live-label.green { color: #4ADE80; }
+  .live-label.orange { color: #FB923C; }
+  .live-right { font-size: 9px; color: var(--text-secondary); text-align: right; line-height: 1.3; }
+  .card-buzz { display: flex; gap: 2px; margin-bottom: 8px; }
+  .buzz-seg { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.06); }
+  .buzz-seg.on { background: var(--active-color); box-shadow: 0 0 4px color-mix(in srgb, var(--active-color) 25%, transparent); }
+  .buzz-seg.hot { animation: bpulse 1.5s ease-in-out infinite; }
+  @keyframes bpulse { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
+  .card-insight { display: flex; align-items: flex-start; gap: 6px; padding: 7px 9px; background: color-mix(in srgb, var(--active-color) 7%, transparent); border: 1px solid color-mix(in srgb, var(--active-color) 12%, transparent); border-radius: 9px; margin-bottom: 8px; }
+  .insight-ico { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+  .insight-txt { font-size: 10px; line-height: 1.4; color: var(--text-secondary); }
+  .insight-txt strong { color: var(--text-primary); font-weight: 700; }
+  .card-actions { display: flex; gap: 5px; }
+  .act-chip { flex: 1; display: flex; align-items: center; justify-content: center; gap: 3px; padding: 7px 4px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); font-size: 10px; font-weight: 600; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease; }
+  .act-chip:active { transform: scale(0.95); background: color-mix(in srgb, var(--active-color) 12%, transparent); border-color: color-mix(in srgb, var(--active-color) 25%, transparent); color: var(--text-primary); }
+  .act-chip .aci { font-size: 12px; }
+
+  /* Expand row */
+  .card-expand-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 0 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .card-expand-row:active { opacity: 0.6; }
+  .expand-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: color 0.2s ease;
+  }
+  .expand-icon {
+    color: var(--text-dim);
+    transition: all 0.3s ease;
+  }
+  .poi-card.expanded .expand-icon {
+    transform: rotate(180deg);
+    color: var(--active-color);
+  }
+  .poi-card.expanded .expand-label {
+    color: var(--active-color);
+  }
+
+  /* === SEARCH OVERLAY === */
+  .search-overlay {
+    position: absolute; inset: 0; z-index: 100;
+    background: rgba(10,10,10,0.97); backdrop-filter: blur(20px);
+    display: flex; flex-direction: column;
+    opacity: 0; pointer-events: none; transform: translateY(8px);
+    transition: all 0.3s ease;
+  }
+  .search-overlay.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
+  .search-bar { padding: 50px 14px 10px; display: flex; align-items: center; gap: 8px; }
+  .search-input-wrap { flex: 1; display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 10px 12px; }
+  .search-input-wrap .si-icon { font-size: 14px; opacity: 0.4; }
+  .search-input { flex: 1; background: none; border: none; outline: none; color: var(--text-primary); font-size: 15px; font-weight: 600; font-family: inherit; }
+  .search-input::placeholder { color: var(--text-dim); font-weight: 400; }
+  .search-cancel { font-size: 13px; color: var(--active-color); font-weight: 600; cursor: pointer; padding: 8px 4px; }
+  .search-section { padding: 14px 18px 6px; font-size: 9px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--text-dim); }
+  .search-results { flex: 1; overflow-y: auto; padding-bottom: 40px; }
+  .search-item { display: flex; align-items: center; gap: 12px; padding: 12px 18px; cursor: pointer; transition: background 0.15s ease; }
+  .search-item:active { background: rgba(255,255,255,0.04); }
+  .search-item .si-emoji { width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+  .search-item .si-info { flex: 1; }
+  .search-item .si-name { font-size: 14px; font-weight: 700; margin-bottom: 1px; }
+  .search-item .si-detail { font-size: 10px; color: var(--text-secondary); }
+  .search-item .si-meta { text-align: right; }
+  .search-item .si-weather { font-size: 10px; color: var(--text-secondary); }
+  .search-item .si-time { font-size: 9px; color: var(--text-dim); }
+
+  /* === AI RESPONSE === */
+  .ai-response {
+    display: none;
+    margin: 4px 14px 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid color-mix(in srgb, var(--active-color) 20%, transparent);
+    border-radius: 14px;
+    padding: 14px;
+    animation: ai-fade-in 0.4s ease;
+  }
+  .ai-response.visible { display: block; }
+  @keyframes ai-fade-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  .ai-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .ai-spark {
+    font-size: 16px;
+    color: var(--active-color);
+    font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .ai-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: var(--active-color);
+    text-transform: uppercase;
+  }
+  .ai-body {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+  .ai-body strong { color: var(--text-primary); font-weight: 700; }
+  .ai-typing::after {
+    content: '▍';
+    animation: blink 0.8s step-end infinite;
+    color: var(--active-color);
+    margin-left: 1px;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .ai-followups {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .ai-followup {
+    font-size: 11px;
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .ai-followup:active {
+    background: color-mix(in srgb, var(--active-color) 12%, transparent);
+    border-color: color-mix(in srgb, var(--active-color) 25%, transparent);
+  }
+
+  /* Search input AI mode indicator */
+  .search-input-wrap.ai-mode {
+    border-color: color-mix(in srgb, var(--active-color) 30%, transparent);
+    background: color-mix(in srgb, var(--active-color) 5%, rgba(255,255,255,0.06));
+  }
+  .search-input-wrap .ai-indicator {
+    display: none;
+    font-size: 14px;
+    color: var(--active-color);
+    font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .search-input-wrap.ai-mode .ai-indicator { display: block; }
+  .search-input-wrap.ai-mode .si-icon { display: none; }
+
+  /* === MODE TOGGLE === */
+  .mode-toggle {
+    position: absolute;
+    top: 48px;
+    right: 12px;
+    z-index: 35;
+    display: flex;
+    background: rgba(10,10,10,0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .mode-btn {
+    width: 36px; height: 32px;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+  .mode-btn .material-symbols-outlined {
+    font-size: 18px;
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .mode-btn.active {
+    background: color-mix(in srgb, var(--active-color) 15%, transparent);
+    color: var(--active-color);
+  }
+  .mode-btn.active .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+
+  /* === LIST MODE === */
+  .list-container {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: none;
+    flex-direction: column;
+    background: var(--bg-dark);
+  }
+  .list-container.active { display: flex; }
+
+  .list-top-bar {
+    padding: 48px 14px 0;
+    background: var(--bg-dark);
+  }
+  .list-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 0;
+  }
+  .list-header .lh-loc {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.3px;
+  }
+  .list-header .lh-meta {
+    font-size: 10px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  /* Vibe chips horizontal scroll */
+  .vibe-chips {
+    display: flex;
+    gap: 6px;
+    padding: 8px 0 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .vibe-chips::-webkit-scrollbar { display: none; }
+  .vibe-chip {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+  }
+  .vibe-chip .vc-icon { font-size: 14px; }
+  .vibe-chip .vc-count {
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 8px;
+  }
+  .vibe-chip.active {
+    background: color-mix(in srgb, var(--vc-color) 15%, transparent);
+    border-color: color-mix(in srgb, var(--vc-color) 35%, transparent);
+    color: var(--text-primary);
+  }
+  .vibe-chip.active .vc-count {
+    background: color-mix(in srgb, var(--vc-color) 40%, transparent);
+    color: #fff;
+  }
+
+  /* POI list */
+  .poi-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 14px 80px;
+  }
+  .poi-list::-webkit-scrollbar { width: 2px; }
+  .poi-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 1px; }
+
+  .list-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .list-card:active {
+    background: color-mix(in srgb, var(--active-color) 6%, transparent);
+    border-color: color-mix(in srgb, var(--active-color) 15%, transparent);
+  }
+  .lc-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .lc-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, var(--active-color) 10%, rgba(20,16,20,0.95));
+    border: 1px solid color-mix(in srgb, var(--active-color) 20%, transparent);
+  }
+  .lc-icon .material-symbols-outlined {
+    font-size: 18px;
+    color: var(--active-color);
+    font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 20;
+  }
+  .lc-info { flex: 1; }
+  .lc-name { font-size: 14px; font-weight: 800; letter-spacing: -0.2px; margin-bottom: 1px; }
+  .lc-meta { font-size: 10px; color: var(--text-secondary); display: flex; align-items: center; gap: 5px; }
+  .lc-meta .msep { width: 3px; height: 3px; border-radius: 50%; background: var(--text-dim); }
+  .lc-rating { font-size: 12px; font-weight: 700; color: #FFD700; flex-shrink: 0; }
+
+  .lc-live {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .lc-live-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+  }
+  .lc-live-dot.green { background: #5CAD6F; box-shadow: 0 0 6px rgba(92,173,111,0.5); }
+  .lc-live-dot.yellow { background: #E8A735; box-shadow: 0 0 6px rgba(232,167,53,0.5); }
+  .lc-live-dot.red { background: #D94F4F; box-shadow: 0 0 6px rgba(217,79,79,0.5); }
+  .lc-live-label { font-size: 10px; font-weight: 700; }
+  .lc-live-label.green { color: #5CAD6F; }
+  .lc-live-label.yellow { color: #E8A735; }
+  .lc-live-label.red { color: #D94F4F; }
+  .lc-live-detail { font-size: 9px; color: var(--text-dim); margin-left: auto; }
+
+  .lc-insight {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--active-color) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--active-color) 10%, transparent);
+    margin-bottom: 8px;
+  }
+  .lc-insight-ico { font-size: 11px; flex-shrink: 0; }
+  .lc-insight-txt { font-size: 11px; color: var(--text-secondary); line-height: 1.4; }
+
+  .lc-actions {
+    display: flex;
+    gap: 5px;
+  }
+  .lc-actions .act-chip { flex: 1; }
+
+  .list-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+</style>
+</head>
+<body data-accent="character">
+
+<!-- Full-screen Map -->
+<div class="map-container" id="mapContainer">
+  <div class="map-surface" id="mapSurface"></div>
+
+  <!-- Top bar -->
+  <div class="top-bar" id="topBar">
+    <span class="tb-loc" id="tbLoc">Doral, FL</span>
+    <span class="tb-tag" id="tbTag">First visit</span>
+    <span class="tb-sep"></span>
+    <span class="tb-weather" id="tbWeather">☀️ <span class="tb-temp">78°F</span></span>
+    <span class="tb-time" id="tbTime">7:12 PM EST</span>
+  </div>
+
+  <!-- Zoom Controls -->
+  <div class="zoom-controls">
+    <button class="zoom-btn" onclick="zoomMap('in')"><span class="material-symbols-outlined">add</span></button>
+    <button class="zoom-btn" onclick="zoomMap('out')"><span class="material-symbols-outlined">remove</span></button>
+  </div>
+
+  <div class="map-hint" id="mapHint"><span>Tap a category to explore</span></div>
+  <div class="map-drag-hint" id="dragHint">Drag to explore · pins update live</div>
+  <div class="zoom-badge" id="zoomBadge">NEIGHBORHOOD</div>
+  <div class="scale-bar" id="scaleBar">
+    <div class="bar" id="scaleBarLine" style="width: 40px"></div>
+    <span class="bar-label" id="scaleBarLabel">0.5 mi</span>
+  </div>
+
+  <!-- POI Card Overlay -->
+  <div class="poi-card-overlay" id="poiCardOverlay">
+    <div class="poi-card-scrim" onclick="closePoiCard()"></div>
+    <div class="poi-card" id="poiCard">
+      <div class="card-handle" id="cardHandle"><div class="card-handle-bar"></div></div>
+      <div class="card-photos" id="cardPhotos"></div>
+      <div class="card-body" id="cardBody"></div>
+      <div class="card-expanded-content" id="cardExpanded"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Mode Toggle (sits above both map and list) -->
+<div class="mode-toggle" id="modeToggle">
+  <button class="mode-btn active" id="mapModeBtn" onclick="switchMode('map')"><span class="material-symbols-outlined">map</span></button>
+  <button class="mode-btn" id="listModeBtn" onclick="switchMode('list')"><span class="material-symbols-outlined">view_list</span></button>
+</div>
+
+<!-- List Mode -->
+<div class="list-container" id="listContainer">
+  <div class="list-top-bar">
+    <div class="list-header">
+      <span class="lh-loc">Doral, FL</span>
+      <div class="lh-meta">
+        <span>☀️ 78°F</span>
+        <span>·</span>
+        <span>7:12 PM EST</span>
+      </div>
+    </div>
+    <div class="vibe-chips" id="vibeChips"></div>
+  </div>
+  <div class="poi-list" id="poiList"></div>
+</div>
+
+<!-- Category Rail (right side, vertical) -->
+<div class="cat-rail" id="catRail"></div>
+
+<!-- Bottom Search Bar -->
+<div class="bottom-bar" onclick="openSearch()">
+  <span class="bb-icon">🔍</span>
+  <span class="bb-text">Search or ask anything...</span>
+</div>
+
+<!-- FAB -->
+<div class="fab-scrim" id="fabScrim" onclick="toggleFab()"></div>
+<div class="fab-wrap">
+  <button class="fab-btn" id="fabBtn" onclick="toggleFab()">+</button>
+  <div class="fab-option" data-action="saved">
+    <span class="fab-label">Saved Places</span>
+    <div class="fab-icon">🔖</div>
+  </div>
+  <div class="fab-option" data-action="settings">
+    <span class="fab-label">Settings</span>
+    <div class="fab-icon">⚙️</div>
+  </div>
+</div>
+
+<!-- Search Overlay -->
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <span class="si-icon">🔍</span>
+      <span class="material-symbols-outlined ai-indicator">auto_awesome</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search areas or ask a question..." autocomplete="off">
+    </div>
+    <span class="search-cancel" onclick="closeSearch()">Cancel</span>
+  </div>
+  <!-- AI Response Card -->
+  <div class="ai-response" id="aiResponse">
+    <div class="ai-header">
+      <span class="material-symbols-outlined ai-spark">auto_awesome</span>
+      <span class="ai-label">AI</span>
+    </div>
+    <div class="ai-body" id="aiBody"></div>
+    <div class="ai-followups" id="aiFollowups"></div>
+  </div>
+
+  <div class="search-results" id="searchResults">
+    <div class="search-section">NEARBY AREAS</div>
+    <div class="search-item" onclick="switchArea('wynwood')">
+      <div class="si-emoji">🎨</div>
+      <div class="si-info"><div class="si-name">Wynwood</div><div class="si-detail">Arts District · 20 min east</div></div>
+      <div class="si-meta"><div class="si-weather">☀️ 79°F</div><div class="si-time">7:12 PM</div></div>
+    </div>
+    <div class="search-item" onclick="switchArea('brickell')">
+      <div class="si-emoji">🏙️</div>
+      <div class="si-info"><div class="si-name">Brickell</div><div class="si-detail">Financial District · 18 min</div></div>
+      <div class="si-meta"><div class="si-weather">☀️ 80°F</div><div class="si-time">7:12 PM</div></div>
+    </div>
+    <div class="search-item" onclick="switchArea('coconut')">
+      <div class="si-emoji">🌴</div>
+      <div class="si-info"><div class="si-name">Coconut Grove</div><div class="si-detail">Waterfront · 22 min south</div></div>
+      <div class="si-meta"><div class="si-weather">☀️ 79°F</div><div class="si-time">7:12 PM</div></div>
+    </div>
+    <div class="search-section">SAVED AREAS</div>
+    <div class="search-item" onclick="switchArea('tokyo')">
+      <div class="si-emoji">🗼</div>
+      <div class="si-info"><div class="si-name">Shibuya, Tokyo</div><div class="si-detail">Last visited 3 months ago</div></div>
+      <div class="si-meta"><div class="si-weather">🌧️ 58°F</div><div class="si-time">8:12 AM+1</div></div>
+    </div>
+    <div class="search-item" onclick="switchArea('barcelona')">
+      <div class="si-emoji">🏛️</div>
+      <div class="si-info"><div class="si-name">El Born, Barcelona</div><div class="si-detail">Saved · never visited</div></div>
+      <div class="si-meta"><div class="si-weather">⛅ 62°F</div><div class="si-time">1:12 AM+1</div></div>
+    </div>
+    <div class="search-section">TRENDING</div>
+    <div class="search-item" onclick="switchArea('lisbon')">
+      <div class="si-emoji">🇵🇹</div>
+      <div class="si-info"><div class="si-name">Alfama, Lisbon</div><div class="si-detail">Historic quarter · Trending with travelers</div></div>
+      <div class="si-meta"><div class="si-weather">☁️ 59°F</div><div class="si-time">12:12 AM+1</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // === DATA (same as before) ===
+  const categories = {
+    character: {
+      title: 'Character', icon: '🎭',
+      text: "CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district.",
+      pois: [
+        { x: 32, y: 18, name: "CityPlace Doral", pinType: 'entertain', desc: "The cultural living room — live music Fridays, Venezuelan bakeries, weekend family gatherings.",
+          rating: 4.6, reviews: 2840, type: "Entertainment Complex", price: "$$",
+          buzz: 7, live: { status: 'green', label: 'Lively', detail: '~200 people\nLive music starting' },
+          photos: ['🎶','🏙️','🌮'], insights: {
+            character: { ico: '🎭', text: '<strong>Cultural heartbeat</strong> of Doral — 12 Venezuelan bakeries within walking distance' },
+            cost: { ico: '💰', text: 'Free entry. Dinner avg <strong>$14-22/person</strong>. Parking free after 6pm' },
+            whats: { ico: '⚡', text: '<strong>Live Latin jazz trio tonight</strong> 7-10pm. Free entry, grab a table early' },
+          }},
+        { x: 65, y: 35, name: "Downtown Doral", pinType: 'district', desc: "Walkable Latin dining, art galleries, boutique shops.",
+          rating: 4.4, reviews: 1950, type: "District", price: "$$",
+          buzz: 6, live: { status: 'green', label: 'Busy', detail: '~150 people\nDining rush' },
+          photos: ['🏘️','🎨','🛍️'], insights: {
+            character: { ico: '🎭', text: '<strong>Art-meets-food district</strong> — 6 galleries + 20 restaurants in 3 blocks' },
+            cost: { ico: '💰', text: 'Lunch specials <strong>$10-16</strong>. Best deal: Sergio\'s combo $11.99' },
+            whats: { ico: '⚡', text: '<strong>Food truck rally tonight</strong> 7pm. 15+ trucks, live DJ' },
+          }},
+        { x: 20, y: 52, name: "Central Park", pinType: 'park', desc: "Outdoor yoga, food trucks Thursdays, playgrounds packed.",
+          rating: 4.7, reviews: 3100, type: "Park", price: "Free",
+          buzz: 5, live: { status: 'green', label: 'Active', detail: '~80 people\nJoggers & families' },
+          photos: ['🌳','🧘','🎪'], insights: {
+            character: { ico: '🎭', text: '<strong>Community gathering spot</strong> — yoga, food trucks, evening soccer matches' },
+            cost: { ico: '💰', text: '<strong>Completely free.</strong> Yoga Saturdays free, food trucks avg $8-12' },
+          }},
+        { x: 75, y: 20, name: "Costa del Sol", pinType: 'food', desc: "Venezuelan arepas — line out the door at lunch.",
+          rating: 4.8, reviews: 1420, type: "Venezuelan Restaurant", price: "$",
+          buzz: 8, live: { status: 'orange', label: '15 min wait', detail: '~40 people\nLunch rush' },
+          photos: ['🫓','🇻🇪','🍽️'], insights: {
+            character: { ico: '🎭', text: '<strong>Local institution</strong> — 3rd generation family recipe' },
+            cost: { ico: '💰', text: '<strong>$8-12/person.</strong> Best value lunch in Doral' },
+          }},
+        { x: 48, y: 65, name: "La Estancia", pinType: 'food', desc: "Argentine steakhouse, live tango Saturday nights.",
+          rating: 4.5, reviews: 890, type: "Argentine Steakhouse", price: "$$$",
+          buzz: 6, live: { status: 'green', label: 'Open', detail: 'Reservations\navailable' },
+          photos: ['🥩','💃','🍷'], insights: {
+            character: { ico: '🎭', text: '<strong>Tango Saturdays</strong> — live band, authentic Buenos Aires vibe' },
+            cost: { ico: '💰', text: 'Parrillada for two <strong>$58</strong>. Worth it.' },
+          }},
+        { x: 82, y: 55, name: "Bulla Gastrobar", pinType: 'food', desc: "Spanish tapas, Miami twist. Sunday brunch is iconic.",
+          rating: 4.3, reviews: 2200, type: "Spanish Tapas", price: "$$",
+          buzz: 9, live: { status: 'green', label: 'Buzzing', detail: '~120 people\nPatio packed' },
+          photos: ['🍤','🥘','🍹'], insights: {
+            character: { ico: '🎭', text: '<strong>The social scene</strong> — where Doral sees and is seen' },
+            cost: { ico: '💰', text: 'Tapas <strong>$12-18</strong>. Sangria pitcher $28' },
+          }}
+      ]
+    },
+    history: {
+      title: 'History', icon: '🏛️', text: "From farmland to city in decades — remarkable transformation.",
+      pois: [
+        { x: 38, y: 28, name: "Doral Golf Resort", pinType: 'historic', desc: "Blue Monster put Doral on the map in 1962.", rating: 4.2, reviews: 5600, type: "Historic Resort", price: "$$$$", buzz: 4, live: { status: 'green', label: 'Open', detail: 'Tours available' }, photos: ['⛳','🏨','🏆'], insights: { history: { ico: '🏛️', text: 'Est. <strong>1962</strong> — swampland to world-class resort' } }},
+        { x: 22, y: 55, name: "Farmland Marker", pinType: 'historic', desc: "Sugarcane stretched endlessly here — just 40 years ago.", rating: 4.0, reviews: 120, type: "Historic Marker", price: "Free", buzz: 1, live: { status: 'green', label: 'Open', detail: '24/7 access' }, photos: ['🌾','📜','🗺️'], insights: { history: { ico: '🏛️', text: '<strong>1980s:</strong> Nothing but sugarcane fields' } }},
+        { x: 68, y: 42, name: "Venezuelan Heritage", pinType: 'historic', desc: "The wave that made Doral 'Doralzuela.'", rating: 4.4, reviews: 340, type: "Cultural Center", price: "Free", buzz: 3, live: { status: 'green', label: 'Open', detail: '10am-6pm' }, photos: ['🇻🇪','📸','🎭'], insights: { history: { ico: '🏛️', text: '<strong>2000s wave:</strong> Thousands fled Chávez, chose Doral' } }},
+        { x: 52, y: 70, name: "Incorporation Site", pinType: 'historic', desc: "Doral became a city in 2003.", rating: 3.9, reviews: 85, type: "Government", price: "Free", buzz: 2, live: { status: 'green', label: 'Open', detail: 'City Hall' }, photos: ['🏛️','📋','🎉'], insights: { history: { ico: '🏛️', text: '<strong>June 24, 2003:</strong> Doral incorporated' } }}
+      ]
+    },
+    whats: {
+      title: "What's On", icon: '⚡', text: "Friday buzz — live music, food trucks, salsa night.",
+      pois: [
+        { x: 35, y: 25, name: "Live Music", pinType: 'entertain', desc: "Tonight 7-10pm: Latin jazz at CityPlace.", rating: 4.6, reviews: 420, type: "Live Event", price: "Free", buzz: 8, live: { status: 'green', label: 'Starting soon', detail: '7pm tonight' }, photos: ['🎵','🎷','🌃'], insights: { whats: { ico: '⚡', text: '<strong>Latin jazz trio</strong> 7-10pm. Free entry' } }},
+        { x: 65, y: 48, name: "Food Trucks", pinType: 'food', desc: "7pm Downtown. 15+ trucks.", rating: 4.5, reviews: 680, type: "Food Event", price: "$", buzz: 7, live: { status: 'green', label: 'Setting up', detail: 'Starts 7pm' }, photos: ['🚚','🍩','🌮'], insights: { whats: { ico: '⚡', text: '<strong>15+ trucks tonight.</strong> Arrive by 7' } }},
+        { x: 25, y: 62, name: "Park Yoga", pinType: 'park', desc: "Tomorrow 8am. Free.", rating: 4.7, reviews: 290, type: "Fitness Event", price: "Free", buzz: 3, live: { status: 'green', label: 'Tomorrow', detail: 'Sat 8am' }, photos: ['🧘','🌅','🌳'], insights: { whats: { ico: '⚡', text: '<strong>Tomorrow 8am.</strong> Bring a mat' } }},
+        { x: 75, y: 28, name: "Art Walk", pinType: 'arts', desc: "Saturday 6-9pm.", rating: 4.3, reviews: 510, type: "Art Event", price: "Free", buzz: 5, live: { status: 'green', label: 'Tomorrow', detail: 'Sat 6-9pm' }, photos: ['🖼️','🍷','🎨'], insights: { whats: { ico: '⚡', text: '<strong>Art Walk 6-9pm.</strong> Wine + local artists' } }},
+        { x: 50, y: 72, name: "Salsa Night", pinType: 'entertain', desc: "Friday 9pm at Bulla.", rating: 4.8, reviews: 750, type: "Nightlife", price: "$$", buzz: 9, live: { status: 'green', label: 'Tonight!', detail: '9pm at Bulla' }, photos: ['💃','🎺','🍹'], insights: { whats: { ico: '⚡', text: '<strong>FREE salsa lessons 9pm</strong> then live band' } }}
+      ]
+    },
+    safety: {
+      title: 'Safety', icon: '🛡️', text: "One of the safest in Miami-Dade.",
+      pois: [
+        { x: 30, y: 22, name: "Police HQ", pinType: 'safety', desc: "Bike patrol at CityPlace weekends.", rating: 4.1, reviews: 180, type: "Police Station", price: "N/A", buzz: 3, live: { status: 'green', label: 'Staffed 24/7', detail: 'Bike patrol active' }, photos: ['🚔','👮','🏢'], insights: { safety: { ico: '🛡️', text: '<strong>Community-first policing.</strong> Bike patrols, school visits' } }},
+        { x: 55, y: 45, name: "NW 87th Corridor", pinType: 'safety', desc: "Safest walk in Miami-Dade after 10pm.", rating: 4.5, reviews: 95, type: "Safe Zone", price: "N/A", buzz: 2, live: { status: 'green', label: 'Well-lit', detail: '24 cameras' }, photos: ['💡','📹','🛤️'], insights: { safety: { ico: '🛡️', text: '<strong>Safest night walk in Miami-Dade.</strong> 24 HD cameras, LED lighting' } }},
+        { x: 72, y: 60, name: "Neighborhood Watch", pinType: 'safety', desc: "Crime down 23% since 2022.", rating: 4.6, reviews: 210, type: "Community Program", price: "N/A", buzz: 4, live: { status: 'green', label: 'Active', detail: 'Patrols tonight' }, photos: ['👁️','🏘️','📱'], insights: { safety: { ico: '🛡️', text: 'Crime down <strong>23% since 2022</strong>' } }},
+        { x: 80, y: 30, name: "Emergency Station", pinType: 'safety', desc: "4.2 min avg response.", rating: 4.4, reviews: 320, type: "Fire/EMS", price: "N/A", buzz: 3, live: { status: 'green', label: 'Staffed', detail: '4.2 min avg' }, photos: ['🚑','🚒','⏱️'], insights: { safety: { ico: '🛡️', text: '<strong>4.2 min average response</strong> — among fastest in Miami-Dade' } }}
+      ]
+    },
+    nearby: {
+      title: 'Nearby', icon: '📍', text: "15 min to MIA, 25 min to South Beach.",
+      pois: [
+        { x: 12, y: 20, name: "MIA Airport", pinType: 'transit', desc: "15 minutes. 170+ destinations.", rating: 3.8, reviews: 42000, type: "Airport", price: "N/A", buzz: 8, live: { status: 'green', label: 'Normal ops', detail: 'No delays' }, photos: ['✈️','🌎','🧳'], insights: { nearby: { ico: '📍', text: '<strong>15 min drive.</strong> 170+ destinations' } }},
+        { x: 85, y: 25, name: "South Beach", pinType: 'beach', desc: "25 min. Ocean Drive, nightlife.", rating: 4.4, reviews: 28000, type: "Beach District", price: "$$$", buzz: 9, live: { status: 'green', label: 'Busy', detail: 'Friday peak' }, photos: ['🏖️','🌴','🌊'], insights: { nearby: { ico: '📍', text: '<strong>25 min east.</strong> World-class nightlife' } }},
+        { x: 10, y: 72, name: "Everglades", pinType: 'park', desc: "10 min. Airboats, alligators.", rating: 4.6, reviews: 8500, type: "National Park", price: "$", buzz: 4, live: { status: 'green', label: 'Open', detail: 'Tours running' }, photos: ['🐊','🚤','🌿'], insights: { nearby: { ico: '📍', text: '<strong>10 min west.</strong> Wild Florida at your doorstep' } }},
+        { x: 88, y: 65, name: "Wynwood", pinType: 'arts', desc: "20 min. Murals, breweries.", rating: 4.5, reviews: 15000, type: "Arts District", price: "$$", buzz: 7, live: { status: 'green', label: 'Buzzing', detail: 'Openings tonight' }, photos: ['🎨','🍺','🖌️'], insights: { nearby: { ico: '📍', text: '<strong>20 min east.</strong> World-famous murals' } }},
+        { x: 50, y: 15, name: "Coral Gables", pinType: 'district', desc: "15 min south. Miracle Mile.", rating: 4.3, reviews: 9800, type: "City", price: "$$$", buzz: 5, live: { status: 'green', label: 'Open', detail: 'Shops til 9pm' }, photos: ['🏛️','🌺','🛍️'], insights: { nearby: { ico: '📍', text: '<strong>15 min south.</strong> Mediterranean vibes' } }},
+        { x: 48, y: 80, name: "Dolphin Mall", pinType: 'shopping', desc: "5 min — 240+ stores.", rating: 4.0, reviews: 18000, type: "Mall", price: "$$", buzz: 7, live: { status: 'green', label: 'Open', detail: '240+ stores' }, photos: ['🛒','🎬','👗'], insights: { nearby: { ico: '📍', text: '<strong>5 min away.</strong> 240+ stores, IMAX' } }}
+      ]
+    },
+    cost: {
+      title: 'Cost', icon: '💰', text: "Surprisingly affordable — way cheaper than Brickell.",
+      pois: [
+        { x: 30, y: 22, name: "Arepas El Cacao", pinType: 'food', desc: "$8-12/person. Best value.", rating: 4.7, reviews: 980, type: "Venezuelan", price: "$", buzz: 7, live: { status: 'orange', label: '10 min wait', detail: 'Lunch rush' }, photos: ['🫓','💵','😋'], insights: { cost: { ico: '💰', text: '<strong>$8-12/person.</strong> Best arepa value in South FL' } }},
+        { x: 58, y: 38, name: "CityPlace Happy Hour", pinType: 'entertain', desc: "$8-14 cocktails. Half of Brickell.", rating: 4.3, reviews: 1500, type: "Happy Hour", price: "$", buzz: 6, live: { status: 'green', label: 'Happy hour!', detail: '4-7pm today' }, photos: ['🍸','🌅','💰'], insights: { cost: { ico: '💰', text: 'Cocktails <strong>$8-14</strong> vs Brickell\'s $18-22' } }},
+        { x: 22, y: 58, name: "Farmers Market", pinType: 'shopping', desc: "Groceries $40-60. Half supermarket.", rating: 4.5, reviews: 620, type: "Market", price: "$", buzz: 4, live: { status: 'green', label: 'Tomorrow', detail: 'Sat 8am-2pm' }, photos: ['🥑','🍅','🧺'], insights: { cost: { ico: '💰', text: 'Weekly groceries <strong>$40-60</strong> — half of Publix' } }},
+        { x: 72, y: 55, name: "Sergio's Cuban", pinType: 'food', desc: "$10-15 lunch specials.", rating: 4.4, reviews: 3200, type: "Cuban", price: "$", buzz: 6, live: { status: 'green', label: 'Open', detail: 'Lunch special on' }, photos: ['🥪','🍛','☕'], insights: { cost: { ico: '💰', text: 'Lunch combo <strong>$11.99</strong> — sandwich, side, drink' } }},
+        { x: 45, y: 72, name: "Free Trolley", pinType: 'transit', desc: "Saves $200+/month.", rating: 4.1, reviews: 450, type: "Transit", price: "Free", buzz: 3, live: { status: 'green', label: 'Running', detail: 'Every 20 min' }, photos: ['🚋','🗺️','💚'], insights: { cost: { ico: '💰', text: '<strong>100% free.</strong> Saves $200+/month on Uber' } }},
+        { x: 82, y: 30, name: "Costco Doral", pinType: 'shopping', desc: "Highest-volume Costco in FL.", rating: 4.2, reviews: 4100, type: "Wholesale", price: "$", buzz: 8, live: { status: 'orange', label: 'Very busy', detail: 'Friday rush' }, photos: ['🛒','📦','🏪'], insights: { cost: { ico: '💰', text: '<strong>Highest-volume Costco in Florida</strong>' } }}
+      ]
+    }
+  };
+
+  const allCats = ['character', 'whats', 'history', 'cost', 'nearby', 'safety'];
+
+  // Pin type → icon mapping (10 types)
+  const pinIcons = {
+    food:       'restaurant',
+    entertain:  'nightlife',
+    park:       'park',
+    historic:   'account_balance',
+    shopping:   'shopping_bag',
+    arts:       'palette',
+    transit:    'directions_bus',
+    safety:     'shield',
+    beach:      'beach_access',
+    district:   'location_city',
+  };
+
+  const zoomLevels = {
+    character: { level: 'NEIGHBORHOOD', scale: '0.5 mi', barWidth: 40, direction: 'in' },
+    history:   { level: 'NEIGHBORHOOD', scale: '0.5 mi', barWidth: 40, direction: 'in' },
+    whats:     { level: 'NEIGHBORHOOD', scale: '0.3 mi', barWidth: 30, direction: 'in' },
+    safety:    { level: 'CITY',         scale: '1 mi',   barWidth: 55, direction: 'out' },
+    nearby:    { level: 'REGIONAL',     scale: '5 mi',   barWidth: 65, direction: 'out' },
+    cost:      { level: 'CITY',         scale: '1 mi',   barWidth: 55, direction: 'out' },
+  };
+
+  let currentCat = null;
+  let currentPin = -1;
+  let prevZoomDir = null;
+  let cardPhotoIdx = 0;
+
+  // === BUILD CATEGORY RAIL ===
+  function buildCatRail() {
+    const rail = document.getElementById('catRail');
+    allCats.forEach(cat => {
+      const orb = document.createElement('div');
+      orb.className = 'cat-orb';
+      orb.style.setProperty('--orb-color', `var(--${cat})`);
+      orb.setAttribute('data-cat', cat);
+      orb.onclick = () => selectOrb(cat);
+      const count = categories[cat].pois.length;
+      orb.innerHTML = `${categories[cat].icon}<span class="orb-count">${count}</span><span class="orb-label">${categories[cat].title}</span>`;
+      rail.appendChild(orb);
+    });
+  }
+
+  // === SELECT ORB ===
+  function selectOrb(cat) {
+    if (currentCat === cat) { deselectAll(); return; }
+    currentCat = cat;
+    currentPin = -1;
+    document.body.setAttribute('data-accent', cat);
+    document.getElementById('mapContainer').classList.add('active-glow');
+    document.getElementById('mapHint').classList.add('hidden');
+
+    const rail = document.getElementById('catRail');
+    rail.classList.add('has-selection');
+    rail.querySelectorAll('.cat-orb').forEach(o =>
+      o.classList.toggle('selected', o.getAttribute('data-cat') === cat));
+
+    applyZoom(cat);
+    createPins(cat);
+  }
+
+  function applyZoom(cat) {
+    const z = zoomLevels[cat];
+    const surf = document.getElementById('mapSurface');
+    const animClass = z.direction === 'out' ? 'zoom-out' : 'zoom-in';
+    surf.classList.remove('zoom-in', 'zoom-out');
+    void surf.offsetWidth;
+    surf.classList.add(animClass);
+    prevZoomDir = z.direction;
+    document.getElementById('zoomBadge').textContent = z.level;
+    document.getElementById('zoomBadge').classList.add('visible');
+    document.getElementById('scaleBarLine').style.width = z.barWidth + 'px';
+    document.getElementById('scaleBarLabel').textContent = z.scale;
+    document.getElementById('scaleBar').classList.add('visible');
+  }
+
+  function deselectAll() {
+    currentCat = null;
+    currentPin = -1;
+    const rail = document.getElementById('catRail');
+    rail.classList.remove('has-selection');
+    rail.querySelectorAll('.cat-orb').forEach(o => o.classList.remove('selected'));
+    document.getElementById('mapContainer').classList.remove('active-glow');
+    document.getElementById('mapHint').classList.remove('hidden');
+    document.getElementById('mapSurface').querySelectorAll('.poi, .glow-zone').forEach(p => p.remove());
+    document.getElementById('mapSurface').classList.remove('zoom-in', 'zoom-out');
+    document.getElementById('zoomBadge').classList.remove('visible');
+    document.getElementById('scaleBar').classList.remove('visible');
+    closePoiCard();
+    prevZoomDir = null;
+  }
+
+  // === GLOW ZONES ===
+  function createGlowZones(cat) {
+    const surf = document.getElementById('mapSurface');
+    surf.querySelectorAll('.glow-zone').forEach(g => g.remove());
+    const pois = categories[cat].pois;
+    if (pois.length < 1) return;
+
+    // Cluster POIs using simple proximity grouping
+    const clusters = [];
+    const used = new Set();
+    const CLUSTER_DIST = 30;
+
+    pois.forEach((poi, i) => {
+      if (used.has(i)) return;
+      const cluster = [poi];
+      used.add(i);
+      pois.forEach((other, j) => {
+        if (used.has(j)) return;
+        const dx = poi.x - other.x, dy = poi.y - other.y;
+        if (Math.sqrt(dx * dx + dy * dy) < CLUSTER_DIST) {
+          cluster.push(other);
+          used.add(j);
+        }
+      });
+      clusters.push(cluster);
+    });
+
+    // Compute intensity per cluster from size + avg buzz
+    const maxClusterSize = Math.max(...clusters.map(c => c.length));
+
+    clusters.forEach((cluster, ci) => {
+      const cx = cluster.reduce((s, p) => s + p.x, 0) / cluster.length;
+      const cy = cluster.reduce((s, p) => s + p.y, 0) / cluster.length;
+      const avgBuzz = cluster.reduce((s, p) => s + (p.buzz || 5), 0) / cluster.length;
+
+      // Intensity: 0.3 to 1.0 based on cluster size + buzz
+      const sizeWeight = cluster.length / maxClusterSize; // 0-1
+      const buzzWeight = avgBuzz / 10; // 0-1
+      const intensity = 0.3 + 0.7 * (sizeWeight * 0.5 + buzzWeight * 0.5);
+
+      // Zone size: bigger clusters = bigger zones
+      const spread = cluster.length > 1
+        ? Math.max(25, ...cluster.map(p => Math.sqrt((p.x - cx) ** 2 + (p.y - cy) ** 2))) * 2.5
+        : 20;
+      const size = Math.min(55, Math.max(18, spread + cluster.length * 5));
+
+      // Map vibe to actual RGB for direct opacity control
+      const vibeRGB = {
+        character: '43,188,179', safety: '232,167,53', history: '196,147,90',
+        nearby: '91,155,213', cost: '92,173,111', whats: '155,110,216'
+      };
+      const rgb = vibeRGB[cat] || '43,188,179';
+
+      // Opacity varies significantly: dim clusters ~0.08, hot clusters ~0.35
+      const coreAlpha = (0.08 + intensity * 0.30).toFixed(2);
+      const midAlpha = (0.04 + intensity * 0.18).toFixed(2);
+      const outerAlpha = (0.01 + intensity * 0.06).toFixed(2);
+
+      const zone = document.createElement('div');
+      zone.className = 'glow-zone';
+      zone.style.left = `${cx}%`;
+      zone.style.top = `${cy}%`;
+      zone.style.width = `${size}%`;
+      zone.style.height = `${size * 1.15}%`;
+      zone.style.transform = 'translate(-50%, -50%)';
+      zone.style.background = `radial-gradient(ellipse at center,
+        rgba(${rgb}, ${coreAlpha}) 0%,
+        rgba(${rgb}, ${midAlpha}) 35%,
+        rgba(${rgb}, ${outerAlpha}) 60%,
+        transparent 78%)`;
+
+      // Hot clusters get the breathing pulse
+      if (intensity > 0.65) {
+        zone.classList.add('pulse');
+      }
+
+      surf.appendChild(zone);
+      setTimeout(() => zone.classList.add('visible'), 150 + ci * 200);
+    });
+  }
+
+  // === MAP PINS ===
+  function createPins(cat) {
+    const surf = document.getElementById('mapSurface');
+    surf.querySelectorAll('.poi').forEach(p => p.remove());
+    surf.querySelectorAll('.glow-zone').forEach(g => g.remove());
+    closePoiCard();
+    const pois = categories[cat].pois;
+    const pinEls = [];
+    pois.forEach((poi, i) => {
+      const pin = document.createElement('div');
+      pin.className = 'poi';
+      pin.style.left = poi.x + '%';
+      pin.style.top = poi.y + '%';
+      pin.style.transform = 'translate(-50%, -50%)';
+      pin.setAttribute('data-idx', i);
+      pin.onclick = (e) => { e.stopPropagation(); tapPin(cat, i); };
+      pin.innerHTML = `<div class="pin-dot"><span class="material-symbols-outlined pin-icon">${pinIcons[poi.pinType] || 'location_on'}</span></div><div class="pin-ring"></div><div class="pin-tip below">${poi.name}</div>`;
+      surf.appendChild(pin);
+      pinEls.push({ el: pin, poi, idx: i });
+      setTimeout(() => pin.classList.add('visible'), 80 + i * 70);
+    });
+    requestAnimationFrame(() => resolveLabels(pinEls));
+    createGlowZones(cat);
+  }
+
+  function resolveLabels(pinEls) {
+    const placements = [];
+    pinEls.forEach(({ el }) => {
+      const tip = el.querySelector('.pin-tip');
+      const directions = ['below', 'above', 'right', 'left'];
+      let placed = false;
+      for (const dir of directions) {
+        tip.className = 'pin-tip ' + dir;
+        const rect = tip.getBoundingClientRect();
+        if (!placements.some(p => rectsOverlap(rect, p.rect, 4))) {
+          placements.push({ rect, el: tip });
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) placements.push({ rect: tip.getBoundingClientRect(), el: tip });
+    });
+  }
+
+  function rectsOverlap(a, b, gap) {
+    return !(a.right + gap < b.left || a.left - gap > b.right || a.bottom + gap < b.top || a.top - gap > b.bottom);
+  }
+
+  function tapPin(cat, idx) {
+    document.querySelectorAll('.poi').forEach(p => p.classList.remove('active'));
+    if (currentPin === idx) { currentPin = -1; closePoiCard(); return; }
+    currentPin = idx;
+    document.querySelector(`.poi[data-idx="${idx}"]`)?.classList.add('active');
+    showPoiCard(cat, idx);
+  }
+
+  // === POI CARD ===
+  const vibeColors = {
+    character: '#2BBCB3', history: '#C4935A', whats: '#9B6ED8',
+    safety: '#E8A735', nearby: '#5B9BD5', cost: '#5CAD6F'
+  };
+  const vibeNames = {
+    character: 'Character', history: 'History', whats: "What's On",
+    safety: 'Safety', nearby: 'Nearby', cost: 'Cost'
+  };
+
+  function showPoiCard(cat, idx) {
+    const poi = categories[cat].pois[idx];
+    const card = document.getElementById('poiCard');
+    const overlay = document.getElementById('poiCardOverlay');
+    const photosEl = document.getElementById('cardPhotos');
+    const bodyEl = document.getElementById('cardBody');
+    const expandedEl = document.getElementById('cardExpanded');
+    card.classList.remove('expanded');
+    cardPhotoIdx = 0;
+    const photoClasses = ['p1','p2','p3'];
+    photosEl.innerHTML = poi.photos.map((emoji, i) =>
+      `<div class="card-photo ${photoClasses[i]}">${emoji}</div>`
+    ).join('') + `<div class="card-photo-grad"></div><div class="card-photo-dots">${poi.photos.map((_, i) => `<div class="card-pdot${i === 0 ? ' on' : ''}"></div>`).join('')}</div>`;
+
+    const insight = (poi.insights && poi.insights[cat]) || (poi.insights && poi.insights[Object.keys(poi.insights)[0]]) || { ico: '💡', text: poi.desc };
+    const buzzSegs = Array.from({length: 10}, (_, i) => {
+      const on = i < poi.buzz, hot = on && i >= 7;
+      return `<div class="buzz-seg${on ? ' on' : ''}${hot ? ' hot' : ''}"></div>`;
+    }).join('');
+
+    bodyEl.innerHTML = `
+      <div class="card-name-row"><span class="card-name">${poi.name}</span><span class="card-rating"><span class="star">★</span> ${poi.rating}</span></div>
+      <div class="card-meta"><span>${poi.type}</span><span class="msep"></span><span>${poi.price}</span><span class="msep"></span><span>${poi.reviews.toLocaleString()} reviews</span></div>
+      <div class="card-live"><div class="live-left"><div class="live-dot ${poi.live.status}"></div><span class="live-label ${poi.live.status}">${poi.live.label}</span></div><div class="live-right">${poi.live.detail.replace('\n', '<br>')}</div></div>
+      <div class="card-buzz">${buzzSegs}</div>
+      <div class="card-insight"><span class="insight-ico">${insight.ico}</span><span class="insight-txt">${insight.text}</span></div>
+      <div class="card-actions">
+        <div class="act-chip"><span class="aci">🧭</span> Directions</div>
+        <div class="act-chip" id="saveChip" onclick="savePoi(event, '${poi.name}')"><span class="aci">🔖</span> Save</div>
+        <div class="act-chip" onclick="askAiAboutPoi('${poi.name}')"><span class="material-symbols-outlined aci" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 300,'GRAD' 0,'opsz' 20;color:var(--active-color)">auto_awesome</span> Ask AI</div>
+      </div>
+      <div class="card-expand-row" id="expandRow" onclick="toggleCardExpand(event)">
+        <span class="material-symbols-outlined expand-icon" style="font-size:16px;font-variation-settings:'FILL' 0,'wght' 300,'GRAD' 0,'opsz' 20">expand_more</span>
+        <span class="expand-label">More details</span>
+      </div>
+    `;
+
+    // Build expanded content — all-vibe insights + hours + tip
+    const allInsights = poi.insights ? Object.entries(poi.insights).map(([vibe, ins]) =>
+      `<div class="card-vibe-insight">
+        <div class="vibe-dot" style="background:${vibeColors[vibe] || '#888'}"></div>
+        <div>
+          <div class="vibe-name" style="color:${vibeColors[vibe] || '#888'}">${vibeNames[vibe] || vibe}</div>
+          <div class="vibe-text">${ins.text}</div>
+        </div>
+      </div>`
+    ).join('') : '';
+
+    expandedEl.innerHTML = `
+      <div class="card-divider"></div>
+      <div class="card-desc">${poi.desc}</div>
+      <div class="card-hours">
+        <span class="material-symbols-outlined">schedule</span>
+        <span class="hours-status">Open now</span>
+        <span>· Closes 11:00 PM</span>
+      </div>
+      <div class="card-section-title">All Vibe Insights</div>
+      <div class="card-all-insights">${allInsights || '<div class="vibe-text">No additional insights yet</div>'}</div>
+      <div class="card-section-title">Local Tip</div>
+      <div class="card-tip">
+        <span class="tip-ico">💡</span>
+        <span>Regulars say: come early on weekends for the best experience. Parking fills up after 7 PM — try the side streets.</span>
+      </div>
+    `;
+
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+    setupPhotoSwipe(photosEl, poi.photos.length);
+    setupCardSwipe();
+  }
+
+  function closePoiCard() {
+    const overlay = document.getElementById('poiCardOverlay');
+    const card = document.getElementById('poiCard');
+    if (overlay) overlay.classList.remove('visible');
+    if (card) card.classList.remove('expanded');
+  }
+
+  // Save POI — simple visual feedback
+  function savePoi(e, name) {
+    e.stopPropagation();
+    const chip = document.getElementById('saveChip');
+    chip.innerHTML = '<span class="aci" style="color:var(--active-color)">✓</span> Saved';
+    chip.style.background = 'color-mix(in srgb, var(--active-color) 12%, transparent)';
+    chip.style.borderColor = 'color-mix(in srgb, var(--active-color) 25%, transparent)';
+    chip.style.color = 'var(--text-primary)';
+    // Add bookmark badge to the active pin
+    const activePin = document.querySelector('.poi.active .pin-dot');
+    if (activePin && !activePin.querySelector('.pin-saved')) {
+      const badge = document.createElement('div');
+      badge.className = 'pin-saved';
+      badge.style.cssText = 'position:absolute;top:-4px;right:-4px;width:12px;height:12px;border-radius:50%;background:var(--active-color);display:flex;align-items:center;justify-content:center;font-size:7px;color:#fff;border:1.5px solid rgba(10,10,10,0.8);z-index:2;';
+      badge.textContent = '✓';
+      activePin.appendChild(badge);
+    }
+  }
+
+  function toggleCardExpand(e) {
+    e.stopPropagation();
+    const card = document.getElementById('poiCard');
+    const label = document.querySelector('.expand-label');
+    card.classList.toggle('expanded');
+    label.textContent = card.classList.contains('expanded') ? 'Less' : 'More details';
+  }
+
+  // Card swipe gestures (touch devices)
+  function setupCardSwipe() {
+    const card = document.getElementById('poiCard');
+    let startY = 0;
+
+    card.addEventListener('touchstart', (e) => {
+      startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    card.addEventListener('touchend', (e) => {
+      const dy = e.changedTouches[0].clientY - startY;
+      if (dy < -40 && !card.classList.contains('expanded')) {
+        card.classList.add('expanded');
+        document.querySelector('.expand-label').textContent = 'Less';
+      } else if (dy > 40 && card.classList.contains('expanded')) {
+        card.classList.remove('expanded');
+        document.querySelector('.expand-label').textContent = 'More details';
+      } else if (dy > 80 && !card.classList.contains('expanded')) {
+        closePoiCard();
+      }
+    }, { passive: true });
+  }
+
+  function setupPhotoSwipe(container, count) {
+    let startX = 0;
+    container.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+    container.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) { dx < 0 && cardPhotoIdx < count - 1 ? cardPhotoIdx++ : dx > 0 && cardPhotoIdx > 0 ? cardPhotoIdx-- : 0; updatePhotoSlide(container); }
+    }, { passive: true });
+    container.addEventListener('click', (e) => { e.stopPropagation(); cardPhotoIdx = (cardPhotoIdx + 1) % count; updatePhotoSlide(container); });
+  }
+
+  function updatePhotoSlide(container) {
+    container.querySelectorAll('.card-photo').forEach((ph, i) => { ph.style.transform = `translateX(${(i - cardPhotoIdx) * 100}%)`; ph.style.opacity = i === cardPhotoIdx ? '0.35' : '0'; });
+    container.querySelectorAll('.card-pdot').forEach((d, i) => { d.classList.toggle('on', i === cardPhotoIdx); });
+  }
+
+  // Tap empty map
+  document.getElementById('mapSurface').addEventListener('click', () => {
+    if (currentPin !== -1) { document.querySelectorAll('.poi').forEach(p => p.classList.remove('active')); currentPin = -1; closePoiCard(); }
+  });
+
+  // === FAB ===
+  let fabOpen = false;
+  function toggleFab() {
+    fabOpen = !fabOpen;
+    document.getElementById('fabBtn').classList.toggle('open', fabOpen);
+    document.getElementById('fabScrim').classList.toggle('show', fabOpen);
+    document.querySelectorAll('.fab-option').forEach(o => o.classList.toggle('show', fabOpen));
+  }
+
+  // === MODE TOGGLE (Map ↔ List) ===
+  let currentMode = 'map';
+
+  function switchMode(mode) {
+    if (mode === currentMode) return;
+    currentMode = mode;
+    document.getElementById('mapModeBtn').classList.toggle('active', mode === 'map');
+    document.getElementById('listModeBtn').classList.toggle('active', mode === 'list');
+
+    const mapContainer = document.getElementById('mapContainer');
+    const listContainer = document.getElementById('listContainer');
+    const catRail = document.getElementById('catRail');
+    const zoomControls = document.querySelector('.zoom-controls');
+    const bottomBar = document.querySelector('.bottom-bar');
+    const fabWrap = document.querySelector('.fab-wrap');
+
+    if (mode === 'list') {
+      mapContainer.style.visibility = 'hidden';
+      catRail.style.display = 'none';
+      zoomControls.style.display = 'none';
+      listContainer.classList.add('active');
+      buildListView();
+      // Keep bottom bar and fab visible
+    } else {
+      listContainer.classList.remove('active');
+      mapContainer.style.visibility = 'visible';
+      catRail.style.display = '';
+      zoomControls.style.display = '';
+    }
+  }
+
+  function buildVibeChips() {
+    const container = document.getElementById('vibeChips');
+    container.innerHTML = '';
+    allCats.forEach(cat => {
+      const chip = document.createElement('div');
+      chip.className = `vibe-chip${currentCat === cat ? ' active' : ''}`;
+      chip.style.setProperty('--vc-color', `var(--${cat})`);
+      chip.onclick = () => selectListVibe(cat);
+      const count = categories[cat].pois.length;
+      chip.innerHTML = `<span class="vc-icon">${categories[cat].icon}</span>${categories[cat].title}<span class="vc-count">${count}</span>`;
+      container.appendChild(chip);
+    });
+  }
+
+  function selectListVibe(cat) {
+    // Also update map mode state
+    if (currentCat === cat) return;
+    currentCat = cat;
+    document.body.setAttribute('data-accent', cat);
+
+    // Update chips
+    document.querySelectorAll('.vibe-chip').forEach(c =>
+      c.classList.toggle('active', c.textContent.includes(categories[cat].title)));
+    buildVibeChips();
+    renderPoiList(cat);
+
+    // Keep map rail in sync
+    const rail = document.getElementById('catRail');
+    rail.classList.add('has-selection');
+    rail.querySelectorAll('.cat-orb').forEach(o =>
+      o.classList.toggle('selected', o.getAttribute('data-cat') === cat));
+  }
+
+  function renderPoiList(cat) {
+    const list = document.getElementById('poiList');
+    if (!cat) {
+      list.innerHTML = '<div class="list-empty">Select a vibe to explore places</div>';
+      return;
+    }
+    const pois = categories[cat].pois;
+    const insight = (poi) => (poi.insights && poi.insights[cat]) || (poi.insights && poi.insights[Object.keys(poi.insights)[0]]) || { ico: '💡', text: poi.desc };
+
+    list.innerHTML = pois.map((poi, i) => {
+      const ins = insight(poi);
+      const icon = pinIcons[poi.pinType] || 'location_on';
+      return `<div class="list-card" onclick="showListPoiCard('${cat}', ${i})">
+        <div class="lc-top">
+          <div class="lc-icon"><span class="material-symbols-outlined">${icon}</span></div>
+          <div class="lc-info">
+            <div class="lc-name">${poi.name}</div>
+            <div class="lc-meta"><span>${poi.type}</span><span class="msep"></span><span>${poi.price}</span><span class="msep"></span><span>${poi.reviews.toLocaleString()} reviews</span></div>
+          </div>
+          <div class="lc-rating">★ ${poi.rating}</div>
+        </div>
+        <div class="lc-live">
+          <div class="lc-live-dot ${poi.live.status}"></div>
+          <span class="lc-live-label ${poi.live.status}">${poi.live.label}</span>
+          <span class="lc-live-detail">${poi.live.detail.split('\n')[0]}</span>
+        </div>
+        <div class="lc-insight">
+          <span class="lc-insight-ico">${ins.ico}</span>
+          <span class="lc-insight-txt">${ins.text}</span>
+        </div>
+        <div class="lc-actions">
+          <div class="act-chip"><span class="aci">🧭</span> Directions</div>
+          <div class="act-chip"><span class="aci">🔖</span> Save</div>
+          <div class="act-chip" onclick="event.stopPropagation(); askAiAboutPoi('${poi.name.replace(/'/g, "\\'")}')"><span class="material-symbols-outlined aci" style="font-size:14px;font-variation-settings:'FILL' 1,'wght' 300,'GRAD' 0,'opsz' 20;color:var(--active-color)">auto_awesome</span> Ask AI</div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function showListPoiCard(cat, idx) {
+    // Reuse the same POI card overlay
+    showPoiCard(cat, idx);
+  }
+
+  function buildListView() {
+    buildVibeChips();
+    renderPoiList(currentCat);
+  }
+
+  // === ZOOM CONTROLS ===
+  const zoomSteps = ['STREET', 'NEIGHBORHOOD', 'CITY', 'REGIONAL'];
+  let currentZoomIdx = 1; // start at NEIGHBORHOOD
+  function zoomMap(dir) {
+    const surf = document.getElementById('mapSurface');
+    if (dir === 'in' && currentZoomIdx > 0) currentZoomIdx--;
+    if (dir === 'out' && currentZoomIdx < zoomSteps.length - 1) currentZoomIdx++;
+    const animClass = dir === 'in' ? 'zoom-in' : 'zoom-out';
+    surf.classList.remove('zoom-in', 'zoom-out');
+    void surf.offsetWidth;
+    surf.classList.add(animClass);
+    const badge = document.getElementById('zoomBadge');
+    badge.textContent = zoomSteps[currentZoomIdx];
+    badge.classList.add('visible');
+    setTimeout(() => badge.classList.remove('visible'), 1500);
+  }
+
+  // === SEARCH ===
+  function openSearch() {
+    document.getElementById('searchOverlay').classList.add('open');
+    setTimeout(() => document.getElementById('searchInput').focus(), 300);
+  }
+  function closeSearch() {
+    document.getElementById('searchOverlay').classList.remove('open');
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchInput').blur();
+    document.querySelector('.search-input-wrap').classList.remove('ai-mode');
+    hideAiResponse();
+  }
+
+  const areaData = {
+    wynwood: { name: 'Wynwood, Miami', short: 'Wynwood', tag: 'Arts District', weather: '☀️ 79°F Sunny', time: '7:12 PM EST', vibe: '9 places buzzing' },
+    brickell: { name: 'Brickell, Miami', short: 'Brickell', tag: 'Financial Hub', weather: '☀️ 80°F Clear', time: '7:12 PM EST', vibe: '12 places buzzing' },
+    coconut: { name: 'Coconut Grove', short: 'Coconut Grove', tag: 'Waterfront', weather: '☀️ 79°F Breezy', time: '7:12 PM EST', vibe: '5 places buzzing' },
+    tokyo: { name: 'Shibuya, Tokyo', short: 'Shibuya', tag: 'Saved area', weather: '🌧️ 58°F Rain', time: '8:12 AM JST', vibe: '24 places buzzing' },
+    barcelona: { name: 'El Born, Barcelona', short: 'El Born', tag: 'Never visited', weather: '⛅ 62°F Overcast', time: '1:12 AM CET', vibe: '3 places buzzing' },
+    lisbon: { name: 'Alfama, Lisbon', short: 'Alfama', tag: 'Trending', weather: '☁️ 59°F Cloudy', time: '12:12 AM WET', vibe: '7 places buzzing' },
+  };
+
+  function switchArea(areaKey) {
+    const area = areaData[areaKey];
+    if (!area) return;
+    document.getElementById('tbLoc').textContent = area.short;
+    document.getElementById('tbTag').textContent = area.tag;
+    const parts = area.weather.split(' ');
+    document.getElementById('tbWeather').innerHTML = `${parts[0]} <span class="tb-temp">${parts[1]}</span>`;
+    document.getElementById('tbTime').textContent = area.time;
+    deselectAll();
+    closeSearch();
+  }
+
+  // === SMART SEARCH (areas + AI) ===
+  const questionWords = /^(what|where|how|why|when|is |are |can |should|do |does |tell|show|which|any |best|safest|cheapest|recommend)/i;
+  let aiTimeout = null;
+
+  // Simulated AI answers keyed by pattern
+  const aiAnswers = {
+    'safe': {
+      text: 'Doral is <strong>very safe</strong> overall — it ranks in the top 15% of Florida cities for low crime. <strong>CityPlace</strong> and <strong>Downtown Doral</strong> are well-lit and heavily patrolled, especially evenings. The area west of 87th Ave is quieter and residential. Avoid walking alone past midnight near NW 41st St.',
+      followups: ['What about parking safety?', 'Safest restaurants nearby?', 'Compare to Brickell safety']
+    },
+    'eat|food|restaurant|hungry|dinner|lunch': {
+      text: 'Right now your best bets in Doral: <strong>Dragonfly Izakaya</strong> (buzzing tonight, 45 min wait) for upscale Japanese, <strong>Havana 1957</strong> for classic Cuban, or <strong>Bulla Gastrobar</strong> if you want tapas with no wait. For quick bites, the Venezuelan arepas at <strong>CityPlace food hall</strong> are legendary.',
+      followups: ['What\'s open late?', 'Best for a date night?', 'Cheapest good food?']
+    },
+    'cheap|budget|cost|afford|money|free': {
+      text: 'Doral skews <strong>mid-range</strong> but there are deals: <strong>CityPlace food hall</strong> has meals under $12, <strong>Doral Central Park</strong> is free with great trails, and <strong>happy hours</strong> at Bulla Gastrobar (4-7 PM, half-price tapas) are a local favorite. Parking is free almost everywhere here.',
+      followups: ['Free things to do?', 'Happy hours right now?', 'Budget hotels nearby?']
+    },
+    'night|evening|tonight|late|bar|drink|club': {
+      text: 'Doral nightlife is <strong>chill but lively</strong>. <strong>CityPlace</strong> has live music on the plaza tonight (starts 8 PM), <strong>Dragonfly</strong> has a craft cocktail bar, and <strong>Bulla Gastrobar</strong> stays open until midnight. For clubs, you\'d head to <strong>Wynwood</strong> (20 min east) — way more intense scene.',
+      followups: ['Live music tonight?', 'Best cocktail bar?', 'How to get to Wynwood?']
+    },
+    'history|old|heritage|historic': {
+      text: 'Doral is relatively young (incorporated 2003), but the land has deep roots. <strong>Doral Hotel</strong> (now Trump National) opened in 1962 as a golf resort. The <strong>Venezuelan diaspora</strong> transformed the area in the 2000s — nicknamed "Doralzuela." <strong>CityPlace</strong> (2019) is the newest landmark.',
+      followups: ['Why is it called Doral?', 'Venezuelan influence?', 'Oldest building?']
+    },
+    'park|outdoor|walk|nature|trail': {
+      text: '<strong>Doral Central Park</strong> is the gem — 12 acres with trails, a dog park, and lake. <strong>Morgan Levy Park</strong> is great for kids with splash pads. For serious nature, <strong>Everglades</strong> is only 20 min west. Right now the weather is perfect for a walk (78°F, clear).',
+      followups: ['Dog-friendly parks?', 'Running trails?', 'Best park for kids?']
+    },
+    'default': {
+      text: 'I can help with anything about <strong>Doral</strong> — safety, food, nightlife, history, costs, or what\'s happening right now. I have context on all the places on your map. What would you like to know?',
+      followups: ['Is this area safe?', 'Where should I eat?', 'What\'s happening tonight?']
+    }
+  };
+
+  function isQuestion(text) {
+    return questionWords.test(text.trim()) || text.includes('?');
+  }
+
+  function findAiAnswer(query) {
+    const q = query.toLowerCase();
+    for (const [pattern, answer] of Object.entries(aiAnswers)) {
+      if (pattern === 'default') continue;
+      if (new RegExp(pattern, 'i').test(q)) return answer;
+    }
+    return aiAnswers['default'];
+  }
+
+  function showAiResponse(answer) {
+    const aiEl = document.getElementById('aiResponse');
+    const bodyEl = document.getElementById('aiBody');
+    const followupsEl = document.getElementById('aiFollowups');
+    const resultsEl = document.getElementById('searchResults');
+
+    resultsEl.style.display = 'none';
+    aiEl.classList.add('visible');
+
+    // Simulate typing effect
+    bodyEl.innerHTML = '';
+    bodyEl.classList.add('ai-typing');
+    followupsEl.innerHTML = '';
+
+    const words = answer.text.split(' ');
+    let i = 0;
+    const typeInterval = setInterval(() => {
+      if (i < words.length) {
+        bodyEl.innerHTML = words.slice(0, i + 1).join(' ');
+        i++;
+      } else {
+        clearInterval(typeInterval);
+        bodyEl.classList.remove('ai-typing');
+        // Show follow-ups
+        followupsEl.innerHTML = answer.followups.map(f =>
+          `<div class="ai-followup" onclick="askFollowup('${f.replace(/'/g, "\\'")}')">${f}</div>`
+        ).join('');
+      }
+    }, 30);
+  }
+
+  function hideAiResponse() {
+    document.getElementById('aiResponse').classList.remove('visible');
+    document.getElementById('searchResults').style.display = '';
+  }
+
+  function askFollowup(question) {
+    document.getElementById('searchInput').value = question;
+    const answer = findAiAnswer(question);
+    showAiResponse(answer);
+  }
+
+  function askAiAboutPoi(poiName) {
+    closePoiCard();
+    openSearch();
+    setTimeout(() => {
+      const input = document.getElementById('searchInput');
+      input.value = `Tell me about ${poiName}`;
+      const wrap = input.closest('.search-input-wrap');
+      wrap.classList.add('ai-mode');
+      const answer = {
+        text: `<strong>${poiName}</strong> is one of Doral's standout spots. Based on current data: it's <strong>lively right now</strong> with good crowd energy. Visitors love the atmosphere and it scores high on the Character vibe. Want me to compare it with nearby alternatives or help plan a visit?`,
+        followups: ['Compare with similar places', 'Best time to visit?', 'What\'s nearby?']
+      };
+      showAiResponse(answer);
+    }, 350);
+  }
+
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    const q = e.target.value;
+    const wrap = e.target.closest('.search-input-wrap');
+    clearTimeout(aiTimeout);
+
+    if (q === '') {
+      wrap.classList.remove('ai-mode');
+      hideAiResponse();
+      filterSearchResults('');
+      return;
+    }
+
+    if (isQuestion(q)) {
+      wrap.classList.add('ai-mode');
+      document.getElementById('searchResults').style.display = 'none';
+      // Debounce AI response
+      aiTimeout = setTimeout(() => {
+        const answer = findAiAnswer(q);
+        showAiResponse(answer);
+      }, 600);
+    } else {
+      wrap.classList.remove('ai-mode');
+      hideAiResponse();
+      filterSearchResults(q.toLowerCase());
+    }
+  });
+
+  function filterSearchResults(q) {
+    document.querySelectorAll('.search-item').forEach(item => {
+      const name = item.querySelector('.si-name').textContent.toLowerCase();
+      const detail = item.querySelector('.si-detail').textContent.toLowerCase();
+      item.style.display = (name.includes(q) || detail.includes(q) || q === '') ? 'flex' : 'none';
+    });
+    document.querySelectorAll('.search-section').forEach(sec => {
+      let next = sec.nextElementSibling, hasVisible = false;
+      while (next && !next.classList.contains('search-section')) { if (next.style.display !== 'none') hasVisible = true; next = next.nextElementSibling; }
+      sec.style.display = hasVisible ? '' : 'none';
+    });
+  }
+
+  // === MAP DRAG ===
+  let isDragging = false, dragStartX = 0, dragStartY = 0, mapOffsetX = 0, mapOffsetY = 0;
+  const surf = document.getElementById('mapSurface');
+  surf.addEventListener('mousedown', startDrag);
+  surf.addEventListener('touchstart', (e) => { if (e.touches.length === 1) startDrag(e.touches[0]); }, { passive: true });
+
+  function startDrag(e) { isDragging = true; dragStartX = e.clientX - mapOffsetX; dragStartY = e.clientY - mapOffsetY; surf.classList.add('dragging'); }
+
+  document.addEventListener('mousemove', (e) => { if (isDragging) dragMove(e); });
+  document.addEventListener('touchmove', (e) => { if (isDragging && e.touches.length === 1) dragMove(e.touches[0]); }, { passive: true });
+
+  function dragMove(e) {
+    mapOffsetX = Math.max(-80, Math.min(80, e.clientX - dragStartX));
+    mapOffsetY = Math.max(-60, Math.min(60, e.clientY - dragStartY));
+    surf.style.transform = `translate(${mapOffsetX}px, ${mapOffsetY}px)`;
+    if (Math.sqrt(mapOffsetX * mapOffsetX + mapOffsetY * mapOffsetY) > 15) document.getElementById('dragHint').classList.add('visible');
+  }
+
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+
+  function endDrag() {
+    if (!isDragging) return;
+    isDragging = false;
+    surf.classList.remove('dragging');
+    const dist = Math.sqrt(mapOffsetX * mapOffsetX + mapOffsetY * mapOffsetY);
+    if (dist > 30 && currentCat) simulatePanRefresh();
+    surf.style.transition = 'transform 0.4s ease';
+    surf.style.transform = 'translate(0, 0)';
+    mapOffsetX = 0; mapOffsetY = 0;
+    setTimeout(() => { surf.style.transition = ''; }, 400);
+    setTimeout(() => document.getElementById('dragHint').classList.remove('visible'), 1500);
+  }
+
+  function simulatePanRefresh() {
+    if (!currentCat) return;
+    document.querySelectorAll('.poi').forEach((p, i) => {
+      p.classList.remove('visible');
+      setTimeout(() => {
+        const jX = (Math.random() - 0.5) * 8, jY = (Math.random() - 0.5) * 8;
+        p.style.left = Math.max(5, Math.min(88, parseFloat(p.style.left) + jX)) + '%';
+        p.style.top = Math.max(10, Math.min(85, parseFloat(p.style.top) + jY)) + '%';
+        p.classList.add('visible');
+      }, 100 + i * 50);
+    });
+  }
+
+  // === INIT ===
+  buildCatRail();
+  // Auto-select most engaging category on load
+  selectOrb('character');
+</script>
+</body>
+</html>

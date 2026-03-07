@@ -2,12 +2,16 @@
 stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 lastStep: 14
 inputDocuments: ['_bmad-output/planning-artifacts/prd.md', '_bmad-output/planning-artifacts/product-brief-AreaDiscovery-2026-03-03.md']
+revisions:
+  - date: 2026-03-06
+    description: 'v3 prototype update — full-screen map experience replaces summary-first architecture. References: brainstorming-session-2026-03-06-002.md, prototype-orbital-map-v3.html'
 ---
 
 # UX Design Specification AreaDiscovery
 
 **Author:** Asifchauhan
 **Date:** 2026-03-03
+**Last Revised:** 2026-03-06 (v3 prototype — full-screen map experience)
 
 ---
 
@@ -30,7 +34,7 @@ AreaDiscovery is an AI-powered area exploration companion that proactively deliv
 ### Key Design Challenges
 
 1. **Information density vs. overwhelm** — Six buckets of area content must feel like a gift, not a wall of text. Streaming UX must reveal content progressively, inviting exploration over scrolling fatigue.
-2. **Map + summary coexistence** — Home screen must balance a streaming summary card and interactive map simultaneously on mobile — a significant spatial challenge with dynamically growing content.
+2. **Map density vs. clarity** — Full-screen map with six vibes, glow zones, pins, and overlays must feel like discovery rather than visual chaos. Pin density, glow zone intensity, and label placement require careful balance.
 3. **Graceful degradation across connectivity states** — Full connectivity, partial data, offline with cache, and offline without cache all need distinct but cohesive UX patterns. No empty screens, no error walls — always something useful.
 4. **Permission-denied as first-class experience** — Manual search for location-denied users must prove value so compellingly that users grant permission afterward, not feel like a fallback.
 5. **Multilingual content flow** — Local language terms embedded naturally within the user's preferred language without feeling like a translation feature.
@@ -41,14 +45,14 @@ AreaDiscovery is an AI-powered area exploration companion that proactively deliv
 2. **Temporal UI adaptation** — Time-of-day and day-of-week context can influence not just content but visual tone, making the same screen feel fresh every visit.
 3. **Shareable content cards** — Individual facts or bucket sections designed as beautifully formatted shareable cards drive organic growth — the content markets itself.
 
-### Key Decisions from Multi-Agent Review
+### Key Decisions from Multi-Agent Review + v3 Prototype Iteration
 
 1. **Attention choreography** — The first 10 seconds must have a deliberate emotional arc: what draws the eye first, what reveals second, what invites exploration third.
-2. **Summary-first, map-second (Phase 1a)** — Full-screen summary card is the hero experience. Map is one tap away, not competing for screen space. Eliminates the dual-async-source problem and focuses validation on whether the content creates the "whoa" moment.
+2. **Map-first, always-on-screen (v3 redesign)** — The full-screen map is the hero experience. POI discovery is immediate and visual. The old summary-first architecture is retired; the map IS the primary surface. List mode is the first-class non-map alternative, toggled via top-right icons — not a fallback.
 3. **Phase-layered UX** — Phase 1a must be complete and magical on its own. Phase 1b features layer on without breaking what already works.
-4. **Chat entry point design** — The transition from passive summary reading to active AI conversation needs explicit design — a make-or-break handoff moment.
-5. **Scannable depth** — Visual hierarchy must support both glanceable scanning (top-level) and rewarding deep reading (full six buckets). Target: 60%+ view full summary.
-6. **Dual async coordination** — Streaming AI content leads; map tiles load in background. By the time users tap "View Map," it's ready. Map button shows a static affordance (pin count or mini preview) to signal more content exists.
+4. **AI via search, not a dedicated screen** — AI conversation entry is embedded in the bottom search bar (detects questions vs location searches). No separate Chat screen — AI feels like smart search, always in context.
+5. **No chrome, maximum map** — Bottom nav removed (FAB menu replaces it). Header removed (floating centered top bar). Bottom sheet for POIs removed (expandable pop-out card). Every decision removes UI chrome to expose more map.
+6. **Vibe-filtered discovery** — The six vibe orbs on the right rail are the primary navigation. Selecting a vibe filters map pins and glow zones. Character auto-selects on load — no blank screen, immediate value.
 7. **Emotional tone flexibility** — Different user journeys have different emotional entry points (curious, anxious, skeptical, casual, chaotic). UX tone must flex accordingly.
 
 ## Core User Experience
@@ -57,14 +61,15 @@ AreaDiscovery is an AI-powered area exploration companion that proactively deliv
 
 The core experience is **proactive area knowledge delivery**. Users open AreaDiscovery and within seconds receive a holistic portrait of their surroundings — history, safety, culture, cost, current events, and nearby points of interest — without typing a query or pressing a button. The app reads the user's location and streams a six-bucket area portrait directly to the screen.
 
-The core loop: **Arrive → Open → Absorb → Explore deeper**
+The core loop: **Arrive → Open → See → Tap → Discover**
 
 - **Arrive:** User enters a new area (or opens the app in any location)
-- **Open:** App detects GPS location and begins AI area synthesis
-- **Absorb:** Six-bucket summary streams progressively onto a full-screen card
-- **Explore deeper:** User taps into the map for visual discovery or asks a follow-up question via chat
+- **Open:** App detects GPS location, full-screen map loads, Character vibe auto-selects
+- **See:** POI pins appear on the map with vibe-colored glow zones highlighting clusters; top bar shows city, visit context, weather, time at a glance
+- **Tap:** Single tap on any pin opens a rich expandable POI card (photo, rating, live status, AI insight, actions); tap a vibe orb to switch discovery lens
+- **Discover:** Search bar doubles as AI — ask a question, get a contextual answer with follow-up suggestions; List mode provides full scrollable POI list as an alternate view
 
-The interaction that must be absolutely flawless is the **first 5 seconds**: GPS lock → streaming content begins → at least one surprising fact visible. This is the "whoa, I didn't know that" moment. If this fails, nothing else matters.
+The interaction that must be absolutely flawless is the **first 5 seconds**: GPS lock → map loads → Character pins populate with glow zones visible. This is the "whoa, there's so much going on here" moment. If this fails, nothing else matters.
 
 ### Platform Strategy
 
@@ -78,16 +83,16 @@ The interaction that must be absolutely flawless is the **first 5 seconds**: GPS
 | **Key device capabilities** | GPS/location services, network state, map rendering |
 | **Target devices** | Android 8.0+ (API 26+), typical mid-range to flagship phones |
 
-**Phase 1a screen architecture:** Summary-first. Full-screen area portrait card is the hero. Map is one tap away (not split-screen). This focuses validation on content quality and eliminates the dual-async-source complexity.
+**Phase 1a screen architecture:** Map-first. The full-screen map IS the primary experience — it fills the entire viewport from launch. List mode is a first-class alternate view, toggled via map/list icons (top-right of top bar). No summary card, no separate map tab — everything happens on or above the map surface.
 
 ### Effortless Interactions
 
 | Interaction | How It Becomes Effortless |
 |-------------|--------------------------|
 | **Getting area knowledge** | Proactive — no search needed. Open the app, knowledge arrives via GPS. |
-| **Reading the summary** | Streaming delivery — content appears progressively, no loading spinner. Bucket-by-bucket reveal creates anticipation. |
-| **Exploring the map** | One tap from summary to map. POI markers pre-loaded during summary streaming. Mini preview or pin count on the map button signals content is ready. |
-| **Asking a follow-up** | Chat entry point embedded naturally at the end of the summary or via a persistent input affordance. The summary content itself seeds curiosity. |
+| **Asking AI** | Bottom search bar is always present. Type a question, AI response streams in the overlay. Follow-up chips surface immediately after the answer. |
+| **Exploring the map** | Map is the first screen — no navigation needed. Switch vibes via right-side orb rail. Pan to explore; pins auto-populate as the viewport moves. |
+| **Asking a follow-up** | Bottom search bar always visible. Tap to open search overlay; type a question and AI detects it automatically, showing a response card with typing animation and follow-up suggestions. |
 | **Understanding confidence** | Tiering is visual and inline — no extra taps. High-confidence content looks different from approximate content at a glance. |
 | **Multilingual context** | Local terms embedded naturally in the user's language. No "translate" button — bilingual context is the default output format. |
 
@@ -177,7 +182,7 @@ The interaction that must be absolutely flawless is the **first 5 seconds**: GPS
 | Product | What It Does Well | Key UX Lesson for AreaDiscovery |
 |---------|-------------------|--------------------------------|
 | **Instagram** | Visual-first, minimal chrome, content IS the interface. Stories format delivers full-screen, swipeable content units. Sharing produces beautiful standalone cards. | Our summary screen should feel like scrolling Instagram — content fills the screen, chrome disappears. Share output must be visually beautiful and self-contained. |
-| **Google Maps** | Instant location awareness on open. Bottom sheet pattern for map + content coexistence. Place cards on pin tap. Zero-state search suggestions. | Our map screen should use the bottom sheet pattern. POI cards should feel as natural as Google Maps place cards. Search should offer category chips, not a blank input. |
+| **Google Maps** | Instant location awareness on open. Place cards on pin tap. Zero-state search suggestions. Vibe-colored map layers. | Our map is always the hero screen. POI expandable cards replace the bottom sheet. AI search overlay replaces the blank search input. Glow zones replace heat maps. |
 | **Yelp** | "Near me" as default — location-first, no setup. Bite-sized review snippets surface key info quickly. | Our proactive delivery mirrors Yelp's location-first approach but goes further — we deliver without the user even searching. Bite-sized facts over wall-of-text. |
 | **TripAdvisor** | Traveler-verified trust badges on content. Curated "top things" aggregation from collective intelligence. | Our confidence tiering is the AI equivalent of TripAdvisor's trust badges. AI synthesis replaces manual review aggregation. |
 | **TikTok** | Full-screen, one-content-unit-at-a-time. Algorithmic "For You" — content finds you. First 1-2 seconds determine engagement. | Content must hook in the first line. Proactive delivery = "For You" for places. |
@@ -194,15 +199,22 @@ AreaDiscovery delivers **one rich portrait per location**, not many pieces of co
 
 Because we are a **text-first app**, typography must do what imagery does in Instagram — create visual rhythm, guide the eye, and make reading feel like pleasure. Font weight hierarchy, spacing, and color are our primary design tools.
 
-### Three-Screen Pattern Mapping
+### Two-Surface Pattern Mapping
 
-Each screen in AreaDiscovery borrows from the best-in-class app for that specific interaction type:
+AreaDiscovery v3 collapses to two primary render surfaces — everything happens on or above the map:
 
-| Screen | UX Model | Pattern |
-|--------|----------|---------|
-| **Summary** | Apple Weather | Full-screen scrollable card. Six buckets flow as one continuous read. Content is the interface — minimal chrome, typographic hierarchy drives the experience. |
-| **Map** | Google Maps | Interactive map with POI markers. Three-stop bottom sheet (collapsed: area name + teaser; half: summary; full: deep reading) for area/POI details over the map. |
-| **Chat** | ChatGPT | Conversational UI with streaming responses. Suggested follow-up prompts seeded by summary content. Simple text input. |
+| Surface | UX Model | Pattern |
+|---------|----------|---------|
+| **Map (primary)** | Google Maps + custom | Full-screen map fills viewport. Vibe orb rail (right side) filters pins. Expandable POI card (centered pop-out, not bottom sheet) for POI details. Glow zones replace heat maps. Top bar floats over map. |
+| **List (alternate)** | App-style POI list | Toggled via top-right icon. Horizontal vibe chip strip at top. Scrollable POI cards with same data as map (icon, name, type, price, rating, live status, AI insight, action chips). Same expandable card on tap. Shared data source with map. Auto-activates on map render failure with an alert banner. |
+
+**Overlays that live above both surfaces:**
+
+| Overlay | Trigger | Content |
+|---------|---------|---------|
+| **Search overlay** | Tap bottom search bar | Full-screen dark overlay. Smart input detects question vs location. AI response card with typing animation + follow-up chips. Area search results with weather/time context. |
+| **Expandable POI card** | Tap any pin or list card | Centered pop-out card. Photo carousel, rating, live status, buzz meter, AI insight. Expands to show full description, hours, all-vibe insights, local tip. "Ask AI" chip pre-fills search. One-tap save. |
+| **FAB menu** | Tap FAB (bottom-right) | Saved Places, Settings. Scrim behind. Spring animation. |
 
 ### Transferable UX Patterns
 
@@ -210,10 +222,10 @@ Each screen in AreaDiscovery borrows from the best-in-class app for that specifi
 
 | Pattern | Source | Application in AreaDiscovery |
 |---------|--------|------------------------------|
-| **Three-stop bottom sheet** | Google Maps | Map screen: POI or area details slide up in three stops (collapsed/half/full). User controls depth by dragging. |
-| **Full-screen content scroll** | Apple Weather | Summary screen: six buckets as one continuous vertical scroll. Each section flows naturally into the next. |
-| **Tab/chip navigation** | Google Maps, Instagram | Switch between Summary, Map, and Chat via bottom tabs. Simple, predictable, one-tap access. |
-| **Category chips in search** | Google Maps | Manual search zero-state shows suggested areas or category chips rather than a blank input field. |
+| **Centered expandable card** | v3 prototype (custom) | POI details pop out as centered overlay over map — expands in-place for depth. No bottom sheet, no navigation away from map. |
+| **Vibe-filtered map** | Google Maps layers (adapted) | Six vibe orbs filter pins and glow zones. Auto-select most engaging. Vertical right-side rail keeps thumbs in reach. |
+| **Overlay, not navigate** | Custom | All secondary surfaces (POI card, search overlay, FAB menu) layer over map without replacing it. |
+| **AI-smart search** | ChatGPT + Google Maps hybrid | Bottom search bar detects question vs location input. AI response card streams inline within the search overlay. |
 
 **Interaction Patterns:**
 
@@ -246,11 +258,10 @@ Each screen in AreaDiscovery borrows from the best-in-class app for that specifi
 ### Design Inspiration Strategy
 
 **Adopt directly:**
-- Apple Weather single-scroll, location-aware content model for summary screen
-- Google Maps bottom sheet (three-stop) for map + detail coexistence
-- Google Maps pin-tap → detail card for POI interactions
+- Google Maps pin-tap → expandable POI card (adapted: centered overlay vs. bottom sheet)
 - Instagram-quality share cards for organic growth
-- ChatGPT-style streaming content reveal for summary and chat
+- ChatGPT-style streaming content reveal for AI search responses
+- Google Maps location-aware on open (adapted: map is the hero, not a summary card)
 
 **Adapt for our context:**
 - TikTok's "For You" → GPS-triggered proactive portrait (location replaces algorithm)
@@ -291,9 +302,9 @@ Each screen in AreaDiscovery borrows from the best-in-class app for that specifi
 - Rounded shape system aligned with card-based content presentation
 
 **Component Strategy:**
-- **Use M3 stock:** Buttons, TextFields, BottomSheet, NavigationBar, Cards, TopAppBar, Chips
+- **Use M3 stock:** TextFields, Cards, Chips, IconButtons, Snackbar, AnimatedVisibility, HorizontalPager
 - **Customize via theme:** Colors, typography, shapes, elevation — all through design tokens
-- **Build custom:** Streaming text animation composable, confidence tier badge, bucket section header, map overlay controls, share card renderer
+- **Build custom:** VibeOrb, GlowZone, AISearchBar, ExpandablePOICard, TopContextBar, ShareCardRenderer, StreamingTextComposable, ConfidenceTierBadge
 
 **Design Token Hierarchy:**
 
@@ -310,7 +321,7 @@ Theme
 ├── Typography (display for area name, headline for buckets, body for content, label for metadata)
 ├── Shapes (rounded cards, pill chips, circular markers)
 ├── Spacing (content padding, bucket gaps, card margins)
-└── Motion (streaming reveal, bottom sheet, screen transitions)
+└── Motion (pin spring-in, glow zone fade, card pop-out, orb scale, overlay slide)
 ```
 
 ### Customization Strategy
@@ -330,8 +341,9 @@ Theme
 **Where custom components are required:**
 - **Streaming text composable** — Animated token-by-token text rendering with bucket-by-bucket reveal
 - **Confidence tier badge** — Inline indicator (icon + color) showing content reliability level
-- **Bucket section header** — Six-bucket visual header with icon, title, and expand/collapse affordance
-- **POI detail card** — Map-overlay card with quick actions (bookmark, share, navigate)
+- **VibeOrb** — Animated circular navigation element with per-vibe color, count badge, glow ring
+- **GlowZone** — Vibe-colored atmospheric radial blur behind pin clusters
+- **ExpandablePOICard** — Centered pop-out card with photo carousel, expandable depth, "Ask AI" chip
 - **Share card renderer** — Generates a beautiful standalone image/card from a selected fact or bucket
 - **Offline status indicator** — Warm, non-intrusive messaging for degraded connectivity states
 
@@ -384,88 +396,113 @@ This is AreaDiscovery's Shazam moment — the interaction users describe to frie
 ### Experience Mechanics — The First 30 Seconds
 
 **Phase 1: Location Lock (Second 0–2)**
-- App opens to full-screen summary view
-- Subtle warm orange pulse on location icon indicates GPS lock in progress
-- Area name appears at top once location resolves: "Alfama, Lisbon"
-- Skeleton bucket headers (Safety, Character, What's Happening, Cost, History, Nearby) fade in on beige card surface
+- App opens to full-screen map (dark, #0A0A0A base)
+- Top bar fades in with skeleton state: "Locating..." with subtle pulse
+- Map tiles begin loading; zoom controls and vibe rail appear immediately
+- Bottom search bar is always visible
 
-**Phase 2: Streaming Reveal (Second 2–8)**
-- First bucket begins streaming (prioritized by most surprising content)
-- Text materializes word-by-word on beige card background
-- Active bucket header glows with orange accent
-- Remaining buckets stream in sequence
-- User can scroll ahead — already-streamed content is readable immediately
-- White background provides breathing room between bucket sections
+**Phase 2: Map + Vibe Activation (Second 2–5)**
+- GPS resolves: top bar populates — "Doral, FL · First visit · ☀️ 78°F · 7:12 PM EST"
+- Character vibe orb auto-selects on right rail (most engaging vibe, decided by engagement history or default)
+- Character-colored (teal `#2BBCB3`) glow zones bloom softly behind pin clusters
+- POI pins appear with pop-in spring animation, each with a Material Symbols icon and always-visible label
+- Hot clusters pulse/breathe via glow zone animation
+- Result count badge appears on Character orb
 
-**Phase 3: Summary Complete (Second 8)**
-- Subtle completion indicator (all six bucket icons filled)
-- "View Map (7 places)" button appears at bottom with a single gentle pulse
-- Chat input fades in: "Ask about Alfama..."
-- Share icon available on each bucket section
+**Phase 3: Discovery State (Second 5+)**
+- Map is fully interactive — pan, zoom, tap pins
+- Vibe rail shows all 6 orbs; tapping any orb switches the active vibe, recolors pins and glow zones, updates result counts
+- Bottom search bar placeholder: "Search or ask anything..."
+- This is the "whoa, there's so much going on here" moment — no waiting required
 
-**Phase 4: Exploration (Second 8–30+)**
-- User reads, scrolls, absorbs — the "whoa" moment has landed
-- Three clear next actions always visible: Map button, Chat input, Share on any fact
-- No dead ends — every piece of content leads somewhere deeper
+**Phase 4: Deep Exploration (Second 10–30+)**
+- User taps a pin → expandable POI card pops out centered on screen with photo carousel, rating, live status, buzz meter, AI insight, action chips
+- "More details" expands card to show full description, hours, all-vibe insights (colored dots), local tip
+- "Ask AI" chip on the card opens search pre-filled with POI context
+- Panning the map auto-populates new pins for the visible viewport
+- Switching to List mode (top-right toggle) shows the same POIs as scrollable cards
+- No dead ends — every element has a clear next interaction
 
 ## Visual Design Foundation
 
 ### Color System
 
-**Primary Palette: Orange, Beige, and White**
+**Primary Palette: Dark Mode with Per-Vibe Accents**
 
-Warm, exploratory, and inviting. Orange conveys energy and discovery; beige grounds with earthiness and trust; white provides breathing room for text-heavy content.
+The v3 experience is dark-first: a near-black map surface (`#0A0A0A`) with the active vibe's color providing all accent, emphasis, and glow. This maximizes map contrast, makes POI pins pop, and gives each vibe a distinct visual identity. The color system is dynamic — as the user switches vibes, the entire accent system shifts.
 
-**Light Mode:**
+**Base Palette (always present):**
 
 | Role | Color | Hex | Usage |
 |------|-------|-----|-------|
-| Primary | Warm Orange | `#E8722A` | Interactive elements, active bucket headers, CTAs, location pulse |
-| Primary Variant | Deep Orange | `#C45A1C` | Pressed states, active navigation, links |
-| Surface | Warm Beige | `#F5EDE3` | Card backgrounds, content areas, bucket sections |
-| Background | White | `#FFFFFF` | Screen base, breathing space between cards |
-| On-Primary | White | `#FFFFFF` | Text/icons on orange backgrounds |
-| On-Surface | Dark Charcoal | `#2D2926` | Primary text on beige (contrast ratio > 7:1) |
-| On-Surface Variant | Warm Gray | `#6B5E54` | Secondary text, metadata, timestamps |
-| Confidence High | Muted Green | `#4A8C5C` | Verified/high-confidence indicator |
-| Confidence Medium | Muted Amber | `#C49A3C` | Approximate content indicator |
-| Confidence Low | Muted Red | `#B85C4A` | Low-confidence / AI-uncertain indicator |
-| Error | Red | `#BA1A1A` | Error states |
+| Background / Map base | Near-black | `#0A0A0A` | App background, map surface base |
+| Surface (cards/overlays) | Dark surface | `rgba(22,16,22,0.97)` | POI cards, search overlay, FAB labels |
+| Floating UI (bars/controls) | Frosted dark | `rgba(10,10,10,0.65–0.75)` + `blur(10–12px)` | Top bar, zoom controls, bottom search bar, vibe orbs |
+| Border | Subtle white | `rgba(255,255,255,0.06–0.12)` | Card borders, control borders |
+| Text Primary | Near-white | `#FAFAFA` | Primary labels, POI names, card titles |
+| Text Secondary | Dim white | `rgba(255,255,255,0.6)` | Metadata, weather, secondary info |
+| Text Tertiary | Faint white | `rgba(255,255,255,0.35)` | Placeholder text, disabled states |
 
-**Dark Mode (Phase 1b implementation — defined here, shipped later):**
+**Per-Vibe Accent Colors (active-color system):**
 
-| Role | Color | Hex |
+The active vibe's color flows through every accent: orb glow, pin borders, glow zones, card highlights, AI spark icon, follow-up chip borders. When the user switches vibes, `--active-color` updates and the whole UI reacts.
+
+| Vibe | Color | Hex | Personality |
+|------|-------|-----|-------------|
+| **Character** | Teal | `#2BBCB3` | Curiosity, culture, discovery (auto-selected default) |
+| **History** | Warm Brown | `#C4935A` | Depth, heritage, time |
+| **What's On** | Purple | `#9B6ED8` | Energy, events, nightlife |
+| **Safety** | Amber | `#E8A735` | Attention, awareness |
+| **Nearby** | Blue | `#5B9BD5` | Navigation, proximity |
+| **Cost** | Green | `#5CAD6F` | Value, practicality |
+
+**Confidence Indicators (retained from original spec):**
+
+| Tier | Color | Hex |
 |------|-------|-----|
-| Background | Deep Brown | `#1A1412` |
-| Surface | Warm Dark Brown | `#2D2520` |
-| Primary | Muted Orange | `#E89A5E` |
-| On-Surface | Warm Off-White | `#EDE0D4` |
-| On-Surface Variant | Warm Tan | `#A89888` |
-
-Dark mode deferred to Phase 1b due to MapLibre dark tile style dependency and additional QA effort. Light mode is the brand identity for launch.
+| High | Muted Green | `#4A8C5C` |
+| Medium | Muted Amber | `#C49A3C` |
+| Low | Muted Red | `#B85C4A` |
 
 **Color application rules:**
-- Orange is for interaction and emphasis only — never large background fills (prevents visual fatigue)
-- Beige is the reading surface — all long-form content sits on beige cards
-- White is breathing space — separates cards, provides contrast
-- Beige cards on white require subtle elevation (1dp shadow) for visual separation — cards must feel like distinct objects, not colored regions
-- Confidence colors are subtle inline accents, never dominant
-- Confidence tiers implemented as M3 `AssistChip` components for speed
+- The active vibe color is the sole accent — no competing orange/beige palette on the map surface
+- Glow zones use `color-mix(in srgb, active-color X%, transparent)` for atmospheric depth
+- Pin circles: dark fill with active-color border + subtle box-shadow glow
+- Active orb: brighter fill, ring glow, 1.1x scale; inactive orbs: 0.85x scale, 40% opacity
+- Cards use near-opaque dark surface with active-color subtle border tint
+- Never use vibe colors for large background fills — accent + glow only
+- Confidence colors remain independent of vibe color (safety-critical, always triple-encoded: icon + color + text)
+- List mode uses same active-color system — vibe chip strip mirrors the orb rail selection
 
-### Bucket Visual Identity
+### Vibe Visual Identity
 
-Each of the six knowledge buckets has a distinctive icon, creating a visual brand language that appears across summary headers, map filters, share cards, and marketing materials.
+Each of the six vibes has a distinctive icon and color, creating a visual brand language across the orb rail, map pins, glow zones, list mode chips, POI card vibe-insight dots, and share cards.
 
-| Bucket | Icon | M3 Material Symbol | Color Treatment |
-|--------|------|-------------------|----------------|
-| **Safety** | Shield | `Shield` | Orange accent on header |
-| **Character** | Palette | `Palette` | Orange accent on header |
-| **What's Happening** | Calendar | `CalendarMonth` | Orange accent on header |
-| **Cost** | Coins | `Payments` | Orange accent on header |
-| **History** | Clock | `History` | Orange accent on header |
-| **Nearby** | Compass | `Explore` | Orange accent on header |
+| Vibe | Orb Icon | M3 Material Symbol | Accent Color | Hex |
+|------|----------|-------------------|--------------|-----|
+| **Character** | Palette | `palette` | Teal | `#2BBCB3` |
+| **History** | History | `history` | Warm Brown | `#C4935A` |
+| **What's On** | Event | `event` | Purple | `#9B6ED8` |
+| **Safety** | Shield | `shield` | Amber | `#E8A735` |
+| **Nearby** | Compass | `explore` | Blue | `#5B9BD5` |
+| **Cost** | Payments | `payments` | Green | `#5CAD6F` |
 
-All icons sourced from M3 Material Symbols — no custom icon design needed. Icons enable instant visual scanning: users recognize buckets by shape before reading the header text.
+**POI Pin Icons (10 types, Material Symbols):**
+
+| Pin Type | M3 Symbol | Vibes it appears under |
+|----------|-----------|----------------------|
+| Food | `restaurant` | Character, Nearby |
+| Entertainment / Nightlife | `nightlife` | What's On, Character |
+| Park / Nature | `park` | Nearby, Character |
+| Historic | `account_balance` | History |
+| Shopping | `shopping_bag` | Cost, Character |
+| Arts / Culture | `palette` | Character, History |
+| Transit | `directions_transit` | Nearby |
+| Safety | `local_police` | Safety |
+| Beach | `beach_access` | Nearby, Character |
+| District / Area | `location_city` | Character, History |
+
+All icons sourced from M3 Material Symbols (`font-variation-settings: 'FILL' 0, 'wght' 300`). At pin size (14sp), these read crisply on dark map surfaces. Filled variant (`'FILL' 1`) used for active/selected state.
 
 ### Typography System
 
@@ -506,8 +543,8 @@ All icons sourced from M3 Material Symbols — no custom icon design needed. Ico
 **Layout principles:**
 1. **Single column, full-width** — No multi-column layouts. Content flows top-to-bottom on mobile.
 2. **Generous vertical spacing** — 24dp between bucket sections. Text-heavy content needs room to breathe.
-3. **Edge-to-edge beige cards** — Summary cards stretch full width on white background. Rounded top corners (16dp radius). 1dp elevation shadow for visual separation from white background.
-4. **Bottom-anchored actions** — Map button and chat input fixed to bottom, always accessible during scroll.
+3. **Full-viewport map** — Map fills the entire screen with no margins. All UI is overlay-based. Search bar and FAB are bottom-anchored; top bar and vibe rail float at their respective positions.
+4. **Bottom-anchored persistent UI** — Search bar and FAB always accessible regardless of map interaction state.
 5. **Content-first margins** — 16dp horizontal padding ensures content never touches screen edges.
 
 ### Accessibility Considerations
@@ -519,40 +556,35 @@ All icons sourced from M3 Material Symbols — no custom icon design needed. Ico
 | **Font sizing** | Body text at 16sp minimum. Respects system font scaling. |
 | **Color independence** | Confidence tiers use icon + color + text label — never color alone. |
 | **Dark mode** | Full dark mode palette defined, implementation Phase 1b. |
-| **Screen reader** | All bucket headers, POI markers, and interactive elements have content descriptions. Map POIs available as accessible list view alternative. |
-| **Reduced motion** | When system reduced motion is enabled, streaming replaced with section-by-section fade-in (200ms per section). Progressive but not animation-dependent — avoids wall-of-text overwhelm while respecting the accessibility setting. |
+| **Screen reader** | All vibe orbs, POI pins, and interactive elements have content descriptions. List mode is the primary accessible alternative to map interaction — same data, linear scroll. |
+| **Reduced motion** | When system reduced motion is enabled: pin spring-in replaced with fade-in (200ms), glow zone pulse disabled, card pop-out scale replaced with fade. All animations are progressive enhancements, not functional requirements. |
 
 ## Design Direction Decision
 
 ### Design Directions Explored
 
-Six layout directions were explored via interactive HTML mockups (`ux-design-directions.html`), each showing the Alfama, Lisbon area portrait with the orange/beige/white palette:
+Eight layout directions were explored across two brainstorming sessions and five interactive HTML prototypes (v0 through v3):
 
 | Direction | Name | Model | Verdict |
 |-----------|------|-------|---------|
-| A | Card Stack | Beige cards stacked on white | Good separation but card chrome breaks reading flow |
-| **B** | **Continuous Scroll** | **Apple Weather flow** | **CHOSEN — best reading experience, natural streaming** |
-| C | Tabbed Buckets | One bucket at a time | Breaks "story unfolding" feel; better for reference later |
-| D | Hero Fact + List | "Did you know?" hook + list | Strong hook but requires taps to read; two-level nav |
-| E | Map-Forward Split | Google Maps + bottom sheet | Better as Phase 1b map screen, not primary summary |
-| F | Story Mode | Instagram Stories swipe | Immersive but can't scan all buckets; 6 swipes for full portrait |
+| A | Strip Variants (v0) | Pill tab strip + map below | Good — approved by user. Foundation for v1. |
+| B | Continuous Scroll | Apple Weather flow | Retired — the text-summary-first approach was superseded by visual-first map. |
+| C | Galaxy Map (v1) | Galaxy orbs above map | Orbs above map felt disconnected — user asked to merge with map surface. |
+| D | Edge Orbiting (v1b) | Orbs floating at map edges | Approach B (edge) chosen over circular orbit. |
+| E | Split Horizon (v2) | Two rows of orbs (size-weighted by engagement) | Strong but orb rows compete with map. FAB + right rail was cleaner. |
+| **F** | **Full-Screen Map with Vibe Rail (v3)** | **Map fills viewport, vertical rail right** | **CHOSEN — maximum visual impact, minimum chrome** |
+| G | List Mode | Scrollable POI cards | First-class alternate view within v3, not a standalone direction. |
+| H | Story Mode | Instagram Stories swipe | Immersive but can't scan all vibes; rejected. |
 
 ### Chosen Direction
 
-**Direction B: Continuous Scroll (Apple Weather Model)**
+**Direction F: Full-Screen Map with Vibe Rail (v3)**
 
-The summary screen is one continuous vertical scroll with subtle section dividers between buckets. Content flows naturally from Safety → Character → What's Happening → Cost → History → Nearby as a single reading experience. No cards, no tabs, no swipes — just a beautifully typeset story that streams in progressively.
+The map fills the entire viewport. All UI elements float over it as dark frosted glass overlays. The vibe rail (6 orbs, right side, vertical) is the primary navigation. The bottom search bar doubles as AI chat. No summary card, no bottom sheet, no bottom nav.
 
-**Key elements of Direction B:**
-- **Collapsing orange gradient header** — Full gradient with area name, visit context ("First visit"), and temporal context chip ("Morning — cafés, markets, quiet streets") on load. Collapses to slim area-name bar on scroll via M3 `MediumTopAppBar` with `enterAlwaysScrollBehavior`. Maximizes content space for streaming.
-- **Continuous bucket sections** separated by subtle 1px beige dividers, not card boundaries
-- **Highlight-first streaming order** — Each bucket streams the highlight fact first (the hook in a beige callout with orange left border), then supporting context. "Whoa" lands immediately, depth follows.
-- **Inline chat prompt at scroll end** — After the last bucket (Nearby), a contextual prompt appears: "Want to know more about Alfama?" with text input. Typing navigates to Chat screen with question pre-filled and auto-sent. Catches users at peak curiosity.
-- **Bottom navigation bar** with Summary, Map, Chat, and Saved tabs (orange active state)
+### Key Layout Elements (v3)
 
-### Bucket Anatomy
-
-Each bucket within the continuous scroll follows this visual structure:
+The v3 map surface layout replaces the summary scroll. See the Design Direction section above for element specs and anatomy diagrams.
 
 ```
 [Bucket Icon] [Bucket Title]                    ← headlineSmall, 20sp SemiBold
@@ -566,39 +598,40 @@ More detail if available...                      ← Streams THIRD (optional)
 ─────────────────── divider ───────────────────  ← 1px beige, 24dp vertical gap
 ```
 
-**Highlight fact criteria (AI-structured):**
-- **Surprising** — contradicts common assumptions ("laundry is cultural pride, not poverty")
-- **Actionable** — something the user can do now ("fado festival this weekend")
-- **Safety-critical** — things the user needs to know ("pickpocket-prone at night near X")
-- Maximum one highlight per bucket. No forced highlights — if nothing is genuinely surprising, omit the callout.
-
-**AI structured output per bucket:**
+**AI structured output per POI (v3):**
 ```json
 {
-  "bucket": "Safety",
-  "highlight": "Pickpocketing increases near tourist clusters...",
-  "content": "Alfama is generally safe during daytime...",
+  "poi": "Time Out Market",
+  "type": "food",
+  "vibe": "character",
+  "insight": "Curated food hall with 24 restaurants, rooftop river views",
+  "hours": "Sun-Wed 10am-12am, Thu-Sat 10am-2am",
+  "liveStatus": "busy",
   "confidence": "high",
-  "sources": ["..."]
+  "vibeInsights": {
+    "character": "A gathering hub for locals and travelers alike",
+    "history": "Converted from a 1892 iron market hall",
+    "cost": "Mid-range, $10-25 per dish"
+  }
 }
 ```
 
 ### Design Rationale
 
-| Factor | Why Direction B Wins |
-|--------|---------------------|
-| **Streaming UX** | Continuous scroll is the most natural surface for token-by-token streaming. No card boundaries interrupt the reveal. |
-| **Reading experience** | Long-form text reads best on a continuous surface. Apple Weather proves this at scale. |
-| **"Story unfolding" feel** | A single flowing narrative serves the emotional design principle better than discrete cards. |
-| **Scannable depth** | Bucket headers with icons create scanning anchors. Highlight callouts draw the eye. Users can skim headers or read deeply. |
-| **Content is the interface** | Minimal chrome. Typography and spacing do the structural work. |
-| **Highlight-first streaming** | Users see the "whoa" fact before the explanation. Hook lands immediately, depth follows. |
-| **Curiosity-to-conversation** | Inline chat prompt at scroll end catches users at peak curiosity within the same content flow. |
-| **Simplest implementation** | One `LazyColumn` with section headers. No card layout logic, no tab state, no swipe handlers. Fastest for Phase 1a. |
+| Factor | Why v3 Wins |
+|--------|-------------|
+| **Maximum visual impact** | Map fills viewport — no chrome eating screen space. First impression is immersive. |
+| **Spatial, not textual** | Users see WHERE things are. Place and discovery are inherently spatial. |
+| **Immediate value** | Auto-selecting Character + glow zones means something is visible before user acts. |
+| **Zero chrome navigation** | FAB menu replaces bottom nav. Vibe rail replaces tab strip. More map, fewer widgets. |
+| **AI in context** | Search bar AI feels like asking the map a question — no navigating to a "Chat" screen. |
+| **Glow zones > heat maps** | Works with sparse data. Vibe-colored. Atmospheric. Beautiful on dark map. |
+| **No detail page** | Expandable card keeps user on the map. Breaking flow to a detail page kills discovery momentum. |
+| **List as equal** | Accessibility-first: list mode is a first-class view. Auto-activates on map failure. |
 
 ### Implementation Approach
 
-**Summary screen composable structure:**
+**v3 screen composable structure:**
 
 ```
 Scaffold(topBar = MediumTopAppBar with enterAlwaysScrollBehavior)
@@ -619,17 +652,41 @@ Scaffold(topBar = MediumTopAppBar with enterAlwaysScrollBehavior)
     ├── Bucket: History
     ├── BucketDivider
     ├── Bucket: Nearby
-    ├── InlineChatPrompt ("Want to know more about Alfama?")
-    └── Spacer (bottom nav clearance)
-BottomNavigationBar (Summary | Map | Chat | Saved)
+    └── Spacer (bottom search bar clearance)
+// See v3 composable structure above for actual implementation
 ```
 
-**Summary screen is a pure read-only surface.** The inline chat prompt is a navigation trigger — typing navigates to the Chat screen with the question pre-filled. No inline chat state on the summary screen.
+**The map screen has no separate navigation stack.** Everything — POI card, search overlay, FAB menu — layers over the map without replacing it. The user never leaves the map surface.
 
-**Borrowed elements from other directions:**
-- Direction D's "Did you know?" concept → applied as highlight fact callouts within the continuous scroll
-- Direction E's bottom sheet → reserved for the Map screen POI details (Phase 1a secondary screen)
-- Direction F's story progress → potential future enhancement for bucket-by-bucket sharing
+**Composable hierarchy:**
+```
+Box (fillMaxSize) {
+    MapLibreView (zIndex 0)
+    GlowZoneLayer (zIndex 1, drawn per active vibe cluster)
+    PinLayer (zIndex 2, per-vibe pins with labels)
+    TopContextBar (zIndex 10, floating, top-center)
+    ZoomControls (zIndex 10, floating, left-center)
+    VibeRail (zIndex 30, floating, right side)
+    FabScrim (zIndex 40, conditional)
+    FabMenu (zIndex 50, bottom-right)
+    BottomSearchBar (zIndex 30, bottom, left of FAB)
+    PoiCardOverlay (zIndex 20, centered, conditional)
+    SearchOverlay (zIndex 100, fullscreen, conditional)
+    AlertBanner (zIndex 15, top, conditional - map failure)
+}
+```
+
+**List mode composable structure:**
+```
+Column {
+    VibeChipStrip (horizontal, active-color selected state)
+    LazyColumn {
+        PoiListCard (per POI - icon, name, type, price, rating, live, insight, action chips)
+        // Same PoiCardOverlay on tap as map mode
+    }
+}
+// Wrapped in same Box as map, shown/hidden via toggle state
+```
 
 ## User Journey Flows
 
@@ -642,42 +699,41 @@ The primary user flow that defines the entire product experience. Every design d
 ```mermaid
 flowchart TD
     A[App Open] --> B{GPS Permission?}
-    B -->|Granted| C[GPS Lock Animation\norange pulse on location icon]
-    B -->|Denied| J[→ Jamie Flow\nPermission Denied Journey]
+    B -->|Granted| C[Full-screen map loads\nTop bar: Locating...]
+    B -->|Denied| J[Search overlay opens\nJamie Flow]
     C --> D{Location Resolved?}
-    D -->|Yes| E[Display Area Name\n'Alfama, Lisbon']
-    D -->|Timeout 10s| F[Show Manual Search\n'Search an area to explore']
-    E --> G[Begin AI Streaming Request\nPass: area name, time, day, visit count]
-    G --> H[Stream Bucket 1: Highlight First\nthen supporting context]
-    H --> I[Stream Bucket 2-6\neach: highlight → context]
-    I --> K[Summary Complete\nAll 6 bucket icons filled]
-    K --> L[Show Inline Chat Prompt\n'Want to know more about Alfama?']
-    K --> M[Map Button Active\n'View Map - 7 places']
+    D -->|Yes| E[Top bar populates\n'Alfama, Lisbon · First visit · sunny 72F · 3:14 PM']
+    D -->|Timeout 10s| F[Bottom search bar pulses\nSearch overlay opens]
+    E --> G[Character vibe auto-selects\nPOI request: area + vibe + viewport]
+    G --> H[Pins appear with spring animation\nGlow zones bloom behind clusters]
+    H --> I[User sees map with pins and glows\nResult count badge on Character orb]
 
-    L --> N{User Action?}
-    M --> N
-    N -->|Types question| O[Navigate to Chat Screen\nquestion pre-filled, auto-sent]
-    N -->|Taps Map| P[Navigate to Map Screen\nPOIs loaded during streaming]
-    N -->|Scrolls back up| Q[Re-read Summary\ncontent fully cached locally]
-    N -->|Taps Share on a fact| R[Generate Share Card\nformatted fact + area + branding]
-    N -->|Taps Bookmark| S[Save Area to Bookmarks\none-tap, confirmation toast]
+    I --> N{User Action?}
+    N -->|Taps pin| O[PoiCard pops out centered\nPhoto, rating, live, buzz, insight, actions]
+    N -->|Taps vibe orb| P[Switch active vibe\nPins recolor, glows recolor, count updates]
+    N -->|Taps search bar| Q[Search overlay opens\nType area = new area search\nType question = AI response card]
+    N -->|Taps map/list toggle| R[List mode: vibe chips + scrollable POI cards\nSame data, same expandable card on tap]
+    N -->|Pans map| S[Viewport-aware pin refresh\nNew pins populate as map moves]
+    N -->|Taps FAB| T[FAB menu opens\nSaved Places / Settings]
 
-    O --> T[Chat: Streaming AI Response\nwith source attribution]
-    T --> U[Suggested Follow-up Questions\nseeded by conversation context]
+    O --> U{Card Action?}
+    U -->|More details| V[Card expands\nFull description, hours, all-vibe insights, local tip]
+    U -->|Ask AI| W[Search overlay opens\nPre-filled with POI context]
+    U -->|Save| X[One-tap save\nCheck mark feedback + bookmark badge on pin]
+    U -->|Directions| Y[Opens external maps intent]
 
-    P --> V[Map with POI Markers\norange pins on MapLibre]
-    V --> W{Tap a POI?}
-    W -->|Yes| X[Bottom Sheet: POI Detail Card\nname, summary, actions]
-    W -->|No| Y[Pan/Zoom to Explore\nnearby area names visible]
+    Q --> Z{Input Type?}
+    Z -->|Location name| AA[New area loads\nTop bar updates, pins reload]
+    Z -->|Question| BB[AI response card with typing animation\nTappable follow-up suggestions]
 ```
 
 **Key flow decisions:**
-- GPS timeout (10s) falls back to manual search — never a dead end
-- Streaming begins before full summary is ready — user sees content within 2 seconds
-- Highlight facts stream first within each bucket — "whoa" lands immediately
-- Map button shows POI count as a static affordance during streaming
-- Summary screen is read-only; chat prompt navigates to a separate screen
-- All content cached locally on view — revisiting the summary is instant
+- GPS timeout (10s) opens search overlay — never a dead end, never a blank screen
+- Character vibe auto-selects on load — immediate value, no blank map
+- Glow zones appear simultaneously with pins — visual richness from second 2
+- No navigation away from map — POI card, search overlay, list mode all layer over it
+- Panning auto-populates new pins — discovery expands naturally with map movement
+- List mode is always one tap away — accessibility-first alternate view, same data
 
 ### Journey 2: Permission Denied — Jamie's Onboarding (Phase 1b)
 
@@ -691,13 +747,13 @@ flowchart TD
     B -->|Denied| C[No Nag · No Wall\nGraceful pivot to manual search]
     B -->|Granted| D[→ Asif Flow\nFirst Arrival Journey]
 
-    C --> E[Search Screen\n'Search any area to explore'\nCategory chips: Popular · Nearby Cities · Trending]
+    C --> E[Map loads with search overlay open\nBottom search bar pulsing\nSuggested areas: Popular · Nearby Cities · Trending]
     E --> F[User Types Area Name\ne.g. 'Shibuya, Tokyo']
-    F --> G[Full Area Portrait Loads\nidentical experience to GPS-triggered]
-    G --> H[User Reads Summary\nsame streaming, same quality]
+    F --> G[Full Map Experience Loads for That Area\nidentical to GPS-triggered: pins, glow zones, vibe rail]
+    G --> H[User Explores Map\nsame quality, same interactions]
     H --> I{Engaged?}
-    I -->|Explores chat/map| J[Full Feature Access\neverything works except proactive delivery]
-    I -->|Closes app| K[Next Open: Search Screen Again\nno nagging, no re-prompt]
+    I -->|Taps pins/searches/uses list| J[Full Feature Access\neverything works except proactive GPS delivery]
+    I -->|Closes app| K[Next Open: Map with search bar ready\nno nagging, no re-prompt]
 
     J --> L{Value Demonstrated?}
     L -->|User goes to Settings| M[Enable Location Permission\nuser-initiated, not app-prompted]
@@ -709,8 +765,8 @@ flowchart TD
 
 **Key flow decisions:**
 - Zero nagging after denial — no re-prompts, no permission walls, no degraded UI
-- Manual search is a first-class experience — identical summary quality, full chat/map access
-- Category chips in search zero-state reduce friction (Popular, Nearby Cities, Trending)
+- Search-first is a first-class experience — identical map quality, full AI search/list access
+- Suggested area chips in search zero-state reduce friction (Popular, Nearby Cities, Trending)
 - If user later enables location in system settings, app detects and transitions gracefully
 - Manual-only users are fully supported — search-first is a valid permanent mode
 
@@ -769,19 +825,19 @@ flowchart TD
 
 | Pattern | Description | Used In |
 |---------|-------------|---------|
-| **Streaming Summary** | AI content streams bucket-by-bucket, highlight-first. Same composable regardless of trigger (GPS, search, cache). | All journeys |
-| **Graceful Fallback Chain** | GPS fails → manual search. Online fails → cache. Cache misses → nearby cache. Nearby misses → warm message + queue. Always something useful. | Asif (GPS timeout), Jamie (permission denied), Priya (offline) |
-| **Navigation Trigger** | Inline prompts (chat prompt, map button) navigate to separate screens with context pre-loaded. Source screen stays pure. | Summary → Chat, Summary → Map |
-| **One-Tap Action** | Bookmark, share, and feedback are single-tap with confirmation toast. No dialogs, no confirmation screens. | All journeys |
-| **Warm Degradation Messaging** | Offline/error states use conversational language ("No data here yet" not "Error: No connection"). Warm gray text, beige background. Never red error screens. | Priya (offline), Asif (GPS timeout) |
-| **Bottom Sheet Detail** | Map POI details, area details on map screen use three-stop bottom sheet (collapsed/half/full). | Map screen across all journeys |
+| **Map-first delivery** | GPS resolves → Character vibe auto-selects → pins + glow zones appear. Map is the primary surface from second 0. | All GPS-enabled journeys |
+| **Graceful Fallback Chain** | GPS fails → search overlay opens. Online fails → cached pins shown. Cache misses → nearby area suggestions. Always something on screen. | Asif (GPS timeout), Jamie (permission denied), Priya (offline) |
+| **Overlay, not navigation** | POI card, search overlay, FAB menu all layer over the map. No screen transitions, no back stack between features. Map is always underneath. | All journeys |
+| **One-Tap Action** | Save, share, and dismiss are single-tap with feedback (chip state change, pin badge, Snackbar). No dialogs. | All journeys |
+| **Warm Degradation Messaging** | Offline/error states use conversational language. Alert banner on map failure. Warm dark surface, near-white text. Never red error screens. | Priya (offline), Asif (GPS timeout), map failure fallback |
+| **Expandable POI Card** | Single tap on any pin or list card opens the expandable card. Consistent behavior across map and list modes. | Map + list across all journeys |
 
 ### Flow Optimization Principles
 
 1. **Zero steps to first value** — GPS-enabled users see content without any interaction. The app does the work.
 2. **Maximum one tap to any feature** — From the summary, map is one tap, chat is one tap (or inline prompt), bookmark is one tap, share is one tap.
 3. **No dead ends** — Every state has a next action. Offline has a queue. Permission denied has search. Sparse data has "AI acknowledges limited knowledge." Error has cached content.
-4. **Context carries forward** — Chat screen knows what area the user was reading about. Map screen knows which POIs were in the summary. Bookmarks link back to the full portrait.
+4. **Context carries forward** — Search AI answers are always area-aware. POI "Ask AI" chip pre-fills with POI context. Saved places link back to that area's map.
 5. **Feedback is silent** — Bookmarks, thumbs up/down, and shares show a brief toast, not a dialog. The user's reading flow is never interrupted.
 
 ## Component Strategy
@@ -792,31 +848,34 @@ flowchart TD
 
 | M3 Component | AreaDiscovery Usage | Customization |
 |---|---|---|
-| `MediumTopAppBar` | Collapsing header with area name | Orange gradient, `enterAlwaysScrollBehavior` |
-| `LazyColumn` | Summary screen continuous scroll | Connected to collapsing header scroll state |
-| `NavigationBar` | Bottom nav: Summary / Map / Chat / Saved | Orange active indicator |
-| `BottomSheetScaffold` | Map screen POI detail sheet | Three-stop (collapsed/half/full) |
-| `AssistChip` | Confidence tier badges (green/amber/red) | Custom icon + color per tier |
-| `TextField` / `OutlinedTextField` | Chat input, manual search input | Beige surface, orange cursor |
-| `IconButton` | Share, bookmark, navigate actions | 48dp touch target, orange active |
-| `HorizontalDivider` | Bucket section dividers | 1px, beige `#F5EDE3` |
-| `Text` | All typography roles | Inter font, custom type scale |
-| `FilterChip` | Category chips in search zero-state | Orange selected state |
-| `Snackbar` | Confirmation toasts (bookmark, share, queue) | Charcoal background, warm tone |
-| `CircularProgressIndicator` | GPS lock animation | Orange tint |
-| `ModalBottomSheet` | Additional context overlays | Beige surface |
-| `SearchBar` | Manual area search | M3 SearchBar with category chips |
-| `Card` | POI detail card container, share card base | Beige surface, 1dp elevation |
+| `Box` | Root container: map + all floating overlays | `fillMaxSize`, no padding |
+| `LazyColumn` | List mode POI list; search results | Dark surface, active-color chip selection |
+| `AssistChip` / `FilterChip` | Vibe chips in list mode; search suggestions | Per-vibe active-color selected state |
+| `TextField` | Search overlay input | Dark surface, active-color cursor + border |
+| `IconButton` | Save, share, navigate, zoom +/-, toggle | 48dp touch target, active-color on press |
+| `Text` | All typography roles | Inter font, dark-mode type scale |
+| `Snackbar` | Confirmation toasts (save, share, queue) | Dark background, warm tone |
+| `CircularProgressIndicator` | GPS lock animation in top bar | Active-color (Character teal on load) |
+| `Card` | Share card base, list POI cards | Dark surface `rgba(22,16,22,0.97)` |
+| `AnimatedVisibility` | Search overlay, FAB menu, POI card | Spring + fade transitions |
+| `HorizontalPager` | Photo carousel in POI card | Dot indicator, swipe to navigate |
 
-All M3 components are themed through the project's custom `MaterialTheme` — no per-component color overrides needed. The orange/beige/white palette and Inter typography propagate automatically.
+**Removed from v3 (vs. original spec):**
+- `MediumTopAppBar` — replaced by custom floating `TopContextBar`
+- `NavigationBar` — removed; FAB menu replaces bottom nav
+- `BottomSheetScaffold` — removed; expandable centered card replaces POI bottom sheet
+- `ModalBottomSheet` — removed; no more sheet-based navigation
+- `SearchBar` (M3) — replaced by custom bottom search bar + search overlay
+
+All M3 components are themed through the project's custom `MaterialTheme`. The dark surface + per-vibe accent color system flows through composition via a `LocalVibeColor` CompositionLocal.
 
 ### Custom Components
 
 #### 1. StreamingTextComposable
 
-**Purpose:** Renders AI-generated text token-by-token, creating the signature "story unfolding" animation that defines the brand experience.
+**Purpose:** Renders AI-generated text token-by-token. Used in the search overlay AI response card and POI card AI insight field.
 
-**Usage:** Summary screen bucket content, chat responses, POI descriptions.
+**Usage:** Search overlay AI response, POI expanded description, AI insight chip text.
 
 **Anatomy:**
 ```
@@ -842,11 +901,11 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 
 **Implementation:** Kotlin `Flow<String>` drives a `mutableStateOf<String>` that appends tokens. `AnimatedVisibility` with fade for reduced motion fallback.
 
-#### 2. BucketSectionHeader
+#### 2. VibeOrb
 
-**Purpose:** Visual anchor for each of the six knowledge buckets. Enables scanning by icon shape before reading text.
+**Purpose:** Visual navigation element for each of the six vibes. Tapping filters map/list to that vibe's POIs. Shows result count badge. Animates glow breathing.
 
-**Usage:** Summary screen — one per bucket, six total.
+**Usage:** Vibe rail — six orbs stacked vertically on the right side, above FAB.
 
 **Anatomy:**
 ```
@@ -869,40 +928,40 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 
 **Implementation:** `Row` with `Icon` (M3 Material Symbol) + `Text` (headlineSmall) + optional `AnimatedVisibility` pulsing dot.
 
-#### 3. HighlightFactCallout
+#### 3. GlowZone
 
-**Purpose:** Visually distinguishes the "whoa" fact — the single most surprising, actionable, or safety-critical insight in each bucket.
+**Purpose:** Soft colored radial blobs rendered behind POI pin clusters. Intensity scales with cluster density and buzz level. Hot clusters pulse/breathe. Replaces traditional heat maps — works well with sparse data and looks atmospheric on dark map.
 
-**Usage:** Summary screen — zero or one per bucket. Streams first within each bucket.
+**Usage:** Map surface — one per cluster of same-vibe pins, rendered at zIndex 1 below pins.
 
 **Anatomy:**
 ```
-┌──────────────────────────────────────────────┐
-│ ▌ The hanging laundry in Alfama isn't        │
-│ ▌ poverty — it's a centuries-old cultural    │
-│ ▌ tradition that residents fiercely protect. │
-└──────────────────────────────────────────────┘
- 3dp orange left border │ beige #F5EDE3 bg │ 12dp internal padding
- bodyLarge 16sp Regular │ charcoal #2D2926
+Circular radial gradient, active-color at center fading to transparent
+  - Size: proportional to cluster density (min 80dp, max 200dp diameter)
+  - Opacity: 0.15–0.35 based on buzz level
+  - Filter: blur(14px) — soft, atmospheric
+  - Position: centered on pin cluster centroid
+  - Hot clusters: pulse animation (scale 1.0→1.04, opacity 0.85→1.0, 5s loop)
 ```
 
 **States:**
 
 | State | Behavior |
 |---|---|
-| Streaming | Text streams token-by-token inside the callout. Orange border visible immediately. |
-| Complete | Full highlight text displayed. Static. |
-| Absent | No callout rendered. Bucket goes straight to supporting context. |
+| Inactive vibe | Hidden (opacity 0, transition 0.8s) |
+| Active vibe, no cluster | No zone rendered |
+| Active vibe, cluster | Zone fades in (opacity 0.8s), size and opacity from cluster density |
+| Hot cluster | Pulse animation loops continuously |
 
-**Accessibility:** `semantics { heading() }` — screen readers identify as a key callout. Role: complementary landmark.
+**Accessibility:** `contentDescription = null` (decorative). TalkBack ignores. Map pin labels provide all meaningful content.
 
-**Implementation:** `Surface` (beige) with `Modifier.drawBehind` for the orange left border (3dp). Contains `StreamingTextComposable`.
+**Implementation:** Custom `Canvas` overlay composable. Positions computed from pin lat/lng cluster data. Uses `drawCircle` with radial `Brush`. Pulse via `infiniteTransition + animateFloat`. Color sourced from `LocalVibeColor.current`.
 
-#### 4. InlineChatPrompt
+#### 4. AISearchBar
 
-**Purpose:** Catches users at peak curiosity (end of summary scroll) and bridges to the Chat screen. Navigation trigger, not inline chat.
+**Purpose:** Bottom search bar that doubles as AI chat entry. Detects whether user input is a location search or a natural language question. Location input → loads that area's map. Question input → shows AI response card with typing animation and follow-up chips inside the search overlay. Always visible — the persistent AI entry point.
 
-**Usage:** Summary screen — appears after the last bucket (Nearby).
+**Usage:** Bottom of map surface (and list surface), always visible.
 
 **Anatomy:**
 ```
@@ -917,22 +976,23 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 
 | State | Behavior |
 |---|---|
-| Hidden | Not visible until summary streaming completes. |
-| Visible | Fades in after last bucket finishes streaming. |
-| Focused | User taps input → navigates to Chat screen immediately with focus on chat input. |
-| Typed | User types text → navigates to Chat screen with question pre-filled and auto-sent. |
+| Idle | Collapsed bar showing placeholder "Search or ask anything..." |
+| Active (location) | Overlay open; input border neutral; results show area suggestions with weather/time |
+| Active (question) | Overlay open; input border shifts to active-color; AI indicator icon replaces search icon; AI response card streams below input |
+| AI streaming | `StreamingTextComposable` renders response token-by-token; cursor blinks; follow-up chips appear after completion |
+| Closed | Overlay dismisses via Cancel tap or system back; search bar returns to idle |
 
-**Interaction:** `onFocusChanged` triggers navigation to Chat screen. If text entered before focus navigation, text carries as pre-filled query. No local text state management.
+**Interaction:** Tap bar → opens overlay. Input detection: if text contains `?` or question words (what, where, how, why, is, can) → AI mode. Otherwise → location search mode. AI mode: streams response, shows tappable follow-up chips.
 
-**Accessibility:** `contentDescription = "Ask a question about $areaName"`. Keyboard focus triggers same navigation.
+**Accessibility:** `contentDescription = "Search areas or ask a question"`. Keyboard focus opens overlay. AI response has `LiveRegion.Polite`.
 
-**Implementation:** `OutlinedTextField` (read-only visually) with `onFocusChanged` callback that calls `navController.navigate("chat?query=$text")`. Prompt text above is a `Text` composable.
+**Implementation:** Custom `SearchOverlay` composable. Dark fullscreen (`rgba(10,10,10,0.97)` + blur). `TextField` with `onValueChange` driving mode detection. AI response uses `StreamingTextComposable`. Follow-up chips are `FilterChip` components.
 
 #### 5. ConfidenceTierBadge
 
 **Purpose:** Inline indicator showing AI content reliability level. Builds trust through transparency.
 
-**Usage:** Summary screen — one per bucket. Map POI detail cards.
+**Usage:** Expandable POI card — one per card. Search overlay AI response. Share card bottom-right corner.
 
 **Anatomy:**
 ```
@@ -956,7 +1016,7 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 
 **Purpose:** Generates a beautiful standalone image from a selected fact or bucket for social sharing. Drives organic growth.
 
-**Usage:** Triggered by share action on any bucket or highlight fact.
+**Usage:** Triggered by Share action chip on expandable POI card.
 
 **Anatomy:**
 ```
@@ -971,7 +1031,7 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 │  📍 Alfama, Lisbon               │  ← area name
 │  🛡️ Safety · Verified            │  ← bucket + confidence
 └──────────────────────────────────┘
-  beige background, orange accents
+  dark background (#0A0A0A), active-vibe accent color
 ```
 
 **States:**
@@ -986,11 +1046,11 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 
 **Implementation:** Off-screen `Canvas` composable renders the card layout to a `Bitmap`. Uses `ShareCompat.IntentBuilder` for the share action. No external library needed.
 
-#### 7. POIDetailCard
+#### 7. ExpandablePOICard
 
-**Purpose:** Shows point-of-interest details when a map marker is tapped. Lives inside the bottom sheet on the Map screen.
+**Purpose:** Shows point-of-interest details when a pin or list card is tapped. Centered pop-out over the map (not a bottom sheet). Expands in-place to reveal full description, hours, all-vibe insights, and local tip. "Ask AI" chip opens search overlay pre-filled with POI context. One-tap save with pin badge feedback.
 
-**Usage:** Map screen — appears in bottom sheet when a POI marker is tapped.
+**Usage:** Map surface and list mode — centered overlay, triggered by pin tap or list card tap.
 
 **Anatomy:**
 ```
@@ -1017,13 +1077,13 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 
 **Accessibility:** All actions have content descriptions. Touch targets 48dp. Card content readable in sequence by TalkBack.
 
-**Implementation:** M3 `Card` (beige surface, 1dp elevation) inside `BottomSheetScaffold` content. Action row uses `IconButton` with 48dp targets.
+**Implementation:** Custom `Box` overlay at zIndex 20. Card is `Surface` (`rgba(22,16,22,0.97)` + `blur(20px)`) with 18dp corner radius, centered in viewport. Spring animation: `scale(0.92)→scale(1)` + `translateY(12px)→translateY(0)`. `HorizontalPager` for photos. Action row uses `FilterChip` components. Expand/collapse via `animateContentSize()`.
 
 #### 8. OfflineStatusIndicator (Phase 1b)
 
 **Purpose:** Persistent, warm inline banner for degraded connectivity states. Non-intrusive — sits at top of content, doesn't block reading.
 
-**Usage:** Summary screen, map screen — appears when connectivity is degraded.
+**Usage:** Map and list surfaces — appears as a top banner when connectivity is degraded or map render fails.
 
 **Anatomy:**
 ```
@@ -1051,7 +1111,7 @@ All M3 components are themed through the project's custom `MaterialTheme` — no
 ### Component Implementation Strategy
 
 **Foundation Layer (M3 stock, themed):**
-All standard UI building blocks — navigation, inputs, containers, feedback — come from Material 3 and inherit the orange/beige/white theme through `MaterialTheme` composition. Zero custom styling per component instance.
+All standard UI building blocks — inputs, containers, feedback, animations — come from Material 3 and inherit the dark theme through `MaterialTheme` composition. Vibe accent color flows via `LocalVibeColor` CompositionLocal. Zero custom styling per component instance.
 
 **Custom Layer (built for AreaDiscovery):**
 Eight custom composables address the specific gaps between M3's component library and AreaDiscovery's unique experience requirements. Each custom component:
@@ -1061,22 +1121,33 @@ Eight custom composables address the specific gaps between M3's component librar
 - Has accessibility built-in from day one (content descriptions, touch targets, color independence, screen reader support)
 - Follows Compose best practices (single responsibility, minimal recomposition scope)
 
-**Component Dependency Map:**
+**Component Dependency Map (v3):**
 ```
-StreamingTextComposable
-├── used by: HighlightFactCallout
-├── used by: BucketSectionHeader (drives streaming state)
-├── used by: POIDetailCard (description field)
-└── used by: Chat screen messages
+VibeOrb
+├── used by: VibeRail (6 orbs)
+└── drives: active vibe state -> LocalVibeColor -> all accent colors
 
-ConfidenceTierBadge
-├── used by: Summary screen (per bucket)
-├── used by: POIDetailCard
-└── used by: ShareCardRenderer
+GlowZone
+├── driven by: active vibe + cluster data from API
+└── rendered below: PinLayer on map surface
+
+AISearchBar
+├── opens: SearchOverlay
+└── SearchOverlay contains: StreamingTextComposable (AI response)
+
+ExpandablePOICard
+├── triggered by: pin tap (map) or card tap (list)
+├── contains: HorizontalPager (photos), StreamingTextComposable (insight)
+├── contains: ConfidenceTierBadge
+└── "Ask AI" chip opens: AISearchBar SearchOverlay pre-filled
 
 ShareCardRenderer
 ├── uses: ConfidenceTierBadge (static render)
-└── triggered by: IconButton on buckets and POIDetailCard
+└── triggered by: Share action chip on ExpandablePOICard
+
+ConfidenceTierBadge
+├── used by: ExpandablePOICard
+└── used by: ShareCardRenderer
 ```
 
 ### Implementation Roadmap
@@ -1085,13 +1156,15 @@ ShareCardRenderer
 
 | Component | Needed For | Complexity | Dependencies |
 |---|---|---|---|
-| StreamingTextComposable | Summary streaming — the entire brand moment | Medium | AI response Flow |
-| BucketSectionHeader | Summary screen structure and scanning | Low | M3 Icon, Text |
-| HighlightFactCallout | "Whoa" moment delivery per bucket | Low | StreamingTextComposable |
-| InlineChatPrompt | Summary → Chat navigation bridge | Low | NavController |
-| ConfidenceTierBadge | Trust establishment on all content | Low | M3 AssistChip |
+| MapLibreView | Full-screen map surface | High | MapLibre SDK, dark tile style |
+| VibeOrb + VibeRail | Vibe navigation — auto-select + switch | Medium | LocalVibeColor, count badge |
+| GlowZone | Visual atmosphere — cluster density visualization | Medium | Canvas, cluster data from API |
+| TopContextBar | Area name + visit tag + weather + time | Low | Location + weather API |
+| AISearchBar + SearchOverlay | Area search + AI question answering | High | AI streaming, StreamingTextComposable |
+| ExpandablePOICard | POI detail — the key discovery interaction | High | HorizontalPager, ConfidenceTierBadge |
+| StreamingTextComposable | AI response card, POI insight | Medium | AI response Flow |
+| ConfidenceTierBadge | Trust on POI cards | Low | M3 AssistChip |
 | ShareCardRenderer | Organic growth via social sharing | Medium | Canvas, ShareCompat |
-| POIDetailCard | Map screen POI details and actions | Medium | Card, ConfidenceTierBadge |
 
 **Phase 1b — Supporting Components:**
 
@@ -1117,16 +1190,17 @@ AreaDiscovery is content-first with minimal interactive chrome. The button hiera
 
 | Level | M3 Component | Visual | Usage |
 |---|---|---|---|
-| **Primary** | `FilledButton` | Orange `#E8722A` bg, white text | One per screen max. "View Map (7 places)" on summary. "Send" in chat. |
-| **Secondary** | `OutlinedButton` | Orange outline, orange text on white/beige | "Search an Area" on manual search. "Try Again" on error recovery. |
-| **Tertiary** | `TextButton` | Orange text, no background | Inline actions: "See sources", "Show more". |
-| **Icon Action** | `IconButton` | 48dp touch target, orange on tap | Share, bookmark, navigate. Always with tooltip/content description. |
+| **Primary action chip** | Custom chip | Active-color bg tint, active-color border | "Save", "Ask AI" on POI card — the dominant CTA pattern |
+| **Secondary action chip** | Custom chip | Dark surface, subtle white border | "Share", "Directions" on POI card |
+| **Tertiary** | `TextButton` | Active-color text, no background | Cancel in search overlay. "Less" / "More details" on card. |
+| **Icon Action** | `IconButton` | 48dp touch target, active-color on tap | Map/List toggle, zoom buttons, FAB |
 
 **Button rules:**
-- Never more than one primary button visible at a time
-- Icon actions are the dominant interaction pattern (share, bookmark, navigate) — always 48dp minimum
+- Action chips (not `FilledButton`) are the primary CTA pattern on the map surface — they fit horizontally in POI card action rows
+- Icon actions are the dominant navigation pattern — always 48dp minimum
 - No "Cancel/OK" dialog patterns — use Snackbar with undo for reversible actions
 - Disabled state: 38% opacity, never remove the button entirely (avoid layout shift)
+- Active-color drives all interactive states — no hardcoded orange fallback
 
 ### Feedback Patterns
 
@@ -1160,52 +1234,56 @@ AreaDiscovery's "stream, never load" principle means traditional loading spinner
 
 | State | Pattern | Visual |
 |---|---|---|
-| **GPS resolving** | Pulsing orange dot on location icon | Subtle animation, no blocking overlay |
-| **AI streaming** | Token-by-token text reveal | Content IS the loading state. Skeleton bucket headers appear immediately. |
+| **GPS resolving** | Top bar skeleton "Locating..." with pulse | Subtle animation on top bar text, no blocking overlay |
+| **Pins loading** | Pins spring-in one by one as API responds | 0→scale(1) spring animation per pin; glow zones fade in |
+| **AI response streaming** | Token-by-token text reveal in search overlay | Cursor blink at insertion point; `ai-typing` class adds blinking cursor |
 | **Map tiles loading** | MapLibre built-in tile loading | Standard map tile progressive loading |
-| **POI detail loading** | Skeleton shimmer in bottom sheet | Gray text placeholders with shimmer animation |
-| **First launch** | Location permission context screen | Value explanation → permission request. Never a blank screen. |
-| **No cached data offline** | Warm message with nearby suggestions | "You're exploring off the grid!" — never "No data available" |
-| **Search zero-state** | Category chips + popular areas | FilterChips: Popular, Nearby Cities, Trending. Never a blank input field. |
+| **POI card loading** | Skeleton shimmer on name/meta rows | Gray placeholder text with shimmer, replaced on load |
+| **Map failure** | Alert banner at top + auto-switch to list | "Map unavailable — showing list view" with warm tone |
+| **First launch** | Location permission context screen | Value explanation with map preview → permission request. Never a blank screen. |
+| **No cached data offline** | Warm message in search overlay | "You're exploring off the grid! Questions will send when online." |
+| **Search zero-state** | Suggested areas with weather + time context | "Nearby" / "Popular" / "Trending" rows. Never a blank input. |
 
 **Loading rules:**
 - Streaming text replaces spinners for all AI content
-- Skeleton shimmer only where content dimensions are known (POI cards, bucket headers)
+- Skeleton shimmer only where content dimensions are known (POI cards, list cards)
 - No full-screen loading overlays — ever
 - Partial content is always better than a loading indicator
 
 ### Navigation Patterns
 
-| Navigation | Pattern | M3 Component |
+| Navigation | Pattern | Component |
 |---|---|---|
-| **Screen switching** | Bottom navigation bar (4 tabs) | `NavigationBar` — Summary, Map, Chat, Saved |
-| **Summary → Chat** | Inline chat prompt (type to navigate) | `InlineChatPrompt` (custom) |
-| **Summary → Map** | Primary button: "View Map (N places)" | `FilledButton` |
-| **Map → POI detail** | Pin tap → bottom sheet | `BottomSheetScaffold` (three-stop) |
-| **Any → Search** | Search icon in top bar | `SearchBar` with `FilterChip` chips |
-| **Back navigation** | System back button / gesture | Standard Android back behavior |
-| **Deep link** | Area name URL opens summary | Standard intent filter |
+| **Surface switching** | Map/List toggle — top-right icon buttons | `IconButton` pair in `TopContextBar` |
+| **Vibe switching** | Tap vibe orb on right rail | `VibeOrb` → updates `activeVibe` state |
+| **Any → POI detail** | Tap pin (map) or card (list) | `ExpandablePOICard` overlay appears |
+| **Any → Search/AI** | Tap bottom search bar | `SearchOverlay` slides up |
+| **Any → Saved/Settings** | Tap FAB → FAB menu | `FabMenu` spring animation |
+| **Area switching** | Type area in search overlay | Top bar + map + pins reload |
+| **Back / dismiss** | System back or tap scrim | Closes overlay; map remains underneath |
+| **Deep link** | Area name URL opens map for that area | Standard intent filter |
 
 **Navigation rules:**
-- Bottom nav is always visible (except during fullscreen map interaction)
-- Active tab highlighted with orange indicator
-- No nested navigation within tabs — flat structure
-- Chat screen preserves area context from summary
-- Map screen shows POIs from the current area summary
-- Back from Chat/Map returns to Summary at the same scroll position
+- There is no navigation stack between screens — everything layers over the map
+- System back always closes the topmost overlay (search → POI card → FAB menu → nothing)
+- The map and list surfaces share state — switching between them preserves active vibe and area
+- No bottom navigation bar — FAB is the only persistent secondary navigation
+- Area context persists across all overlays — search AI answers are always area-aware
 
 ### Content Interaction Patterns
 
 | Interaction | Gesture | Result | Feedback |
 |---|---|---|---|
-| **Read summary** | Scroll | Content flows continuously | Collapsing header, bucket headers as scroll anchors |
-| **Bookmark area** | Tap icon | Area saved to Saved tab | Snackbar with undo, 4s |
-| **Share a fact** | Tap share icon on bucket/highlight | ShareCardRenderer generates image → system share sheet | Brief shimmer, then share sheet |
-| **Ask a question** | Tap inline chat prompt or Chat tab | Navigate to chat with area context | Pre-filled area context in chat |
-| **Explore map** | Tap "View Map" button or Map tab | Navigate to map with POI markers | Map centered on current area |
-| **Tap POI marker** | Tap on map pin | Bottom sheet slides up with POI detail | Three-stop sheet (collapsed → half) |
-| **Refresh area** | Pull-to-refresh on summary | Re-stream area portrait | New streaming animation, old content replaced |
-| **Manual search** | Tap search icon, type area name | New area portrait streams | Same streaming experience as GPS-triggered |
+| **Switch vibe** | Tap vibe orb | Pins + glow zones recolor to that vibe. Unselected orbs dim to 40% / 0.85x scale. Label slides in left of active orb. | Orb scales to 1.1x, glow ring brightens, result count updates |
+| **Tap pin** | Single tap on map pin | ExpandablePOICard pops out centered with spring animation. Map dims behind scrim. | Pin scales up, fill icon switches from outline to filled |
+| **Expand POI card** | Tap "More details" | Card max-height grows to 80%, expanded content fades in. Handle bar changes color. | Smooth height animation + content fade |
+| **Save POI** | Tap Save chip on card | Save chip becomes "Saved". Bookmark badge appears on pin. | Chip transitions, pin badge pops in |
+| **Ask AI about POI** | Tap "Ask AI" chip | Search overlay opens with POI name + context pre-filled. | Overlay slides up, input focused |
+| **Ask AI question** | Type question in search bar | AI response card appears with typing animation, then follow-up chips | Search input border shifts to active-color |
+| **Pan map** | Drag on map surface | Map pans; when drag stops, new pins auto-populate in viewport | "Drag to explore · pins update live" hint on first use |
+| **Switch to list** | Tap list icon (top-right) | Map hides, list mode shows: vibe chip strip + POI LazyColumn | Icon state toggles |
+| **Zoom map** | Tap +/- buttons | Map zooms; zoom badge + scale bar fade in, then fade out | Zoom in/out animation on map tiles |
+| **Open saved/settings** | Tap FAB | FAB rotates to X, scrim appears, menu items spring in | Spring cubic-bezier animation |
 
 ### Confidence Display Pattern
 
@@ -1254,10 +1332,10 @@ Confidence indicators follow a single consistent pattern across all surfaces:
 
 | Device Class | Window Size | Layout Behavior |
 |---|---|---|
-| **Compact phone** (< 600dp) | Standard | Single column. Full-width summary scroll. Bottom nav. This is the primary target. |
-| **Medium phone** (600dp) | Standard | Same layout as compact. Content breathes more with wider margins (24dp edge). |
-| **Large phone / foldable inner** (600–840dp) | Medium | Summary content gets max-width constraint (600dp centered). Map fills full width. Comfortable reading width maintained. |
-| **Tablet** (840dp+) | Expanded | Two-pane: Summary list on left (400dp), detail/map on right. Bottom nav moves to NavigationRail on left edge. Phase 2 — not in MVP. |
+| **Compact phone** (< 600dp) | Standard | Full-screen map. Vibe rail right side. Bottom search bar. FAB bottom-right. This is the primary target. |
+| **Medium phone** (600dp) | Standard | Same layout as compact. Slightly wider orbs and search bar. |
+| **Large phone / foldable inner** (600–840dp) | Medium | Map fills full width. Vibe rail and FAB remain right-anchored. POI card wider (max 360dp). |
+| **Tablet** (840dp+) | Expanded | Two-pane: List mode on left (400dp), map on right. Vibe rail moves to left side of map pane. Phase 2 — not in MVP. |
 
 **Orientation:**
 - **Portrait only for Phase 1a** — locked via manifest. Simplifies layout, matches one-handed use pattern.
@@ -1274,12 +1352,12 @@ Confidence indicators follow a single consistent pattern across all surfaces:
 
 | Component | Compact (< 600dp) | Medium/Large (600–840dp) | Expanded (840dp+, Phase 2) |
 |---|---|---|---|
-| **Summary** | Full-width scroll | Centered with max-width 600dp | Left pane (400dp fixed) |
-| **Map** | Full-screen with bottom sheet | Full-screen with bottom sheet | Right pane (fills remaining) |
-| **Chat** | Full-screen conversational UI | Centered max-width 600dp | Right pane or overlay |
-| **Navigation** | Bottom `NavigationBar` | Bottom `NavigationBar` | Left `NavigationRail` |
-| **Search** | Full-screen overlay | Full-screen overlay | Inline in top bar |
-| **Bottom sheet** | Full-width, three-stop | Max-width 600dp, centered | Inline side panel |
+| **Map** | Full-screen, vibe rail right | Full-screen, vibe rail right | Right pane (fills remaining) |
+| **List** | Full-screen, vibe chips top | Full-screen, vibe chips top | Left pane (400dp fixed) |
+| **POI card** | Centered overlay (300dp wide) | Centered overlay (340dp wide) | Side panel inline |
+| **Navigation (vibe)** | Right-side orb rail | Right-side orb rail | Left `NavigationRail` (Phase 2) |
+| **Search** | Full-screen overlay | Full-screen overlay | Inline in top bar (Phase 2) |
+| **FAB** | Bottom-right | Bottom-right | Hidden (list handles navigation) |
 
 **Compose Implementation:**
 - Use `WindowSizeClass` from `material3-window-size-class` to detect device class
@@ -1294,8 +1372,8 @@ Confidence indicators follow a single consistent pattern across all surfaces:
 
 | Requirement | Implementation | Status |
 |---|---|---|
-| **Color contrast (text)** | Dark charcoal `#2D2926` on beige `#F5EDE3` = 8.2:1 ratio (exceeds AA 4.5:1) | Built into palette |
-| **Color contrast (interactive)** | Orange `#E8722A` on white = 3.5:1 (passes AA for large text/UI components) | Built into palette |
+| **Color contrast (text)** | `#FAFAFA` on `#0A0A0A` = 19.7:1 ratio (exceeds AA 4.5:1 by wide margin) | Built into dark palette |
+| **Color contrast (interactive)** | Vibe accent colors on dark surfaces verified per-vibe: teal `#2BBCB3` on `#0A0A0A` = 5.3:1 (passes AA). All 6 vibe colors verified. | Per-vibe during implementation |
 | **Color independence** | Confidence tiers: icon + color + text label. Never color alone. | Built into ConfidenceTierBadge |
 | **Font scaling** | All text in `sp` units. UI tested at 200% system font scale. | Compose default behavior |
 | **Minimum text size** | Body text 16sp. Labels 12sp. Nothing smaller. | Built into type scale |
@@ -1306,8 +1384,8 @@ Confidence indicators follow a single consistent pattern across all surfaces:
 | Requirement | Implementation |
 |---|---|
 | **Touch targets** | All interactive elements minimum 48dp x 48dp per M3 guidelines |
-| **Gesture alternatives** | All swipe/drag actions have tap alternatives. Bottom sheet has collapse button, not just drag. |
-| **One-handed use** | All primary actions reachable in bottom 60% of screen. Bottom nav, inline chat prompt, map button all bottom-anchored. |
+| **Gesture alternatives** | All swipe/drag actions have tap alternatives. POI card drag handle + "Less" button for collapse. Map zoom via +/- buttons, not pinch-only. |
+| **One-handed use** | All primary actions reachable in bottom 60% of screen. Vibe rail, FAB, and search bar all bottom-anchored on the right/bottom edge — thumb-friendly. |
 | **Timeout tolerance** | No timed interactions. Streaming content stays on screen indefinitely. No auto-dismiss on content. |
 
 #### Screen Reader (TalkBack) Support
@@ -1315,13 +1393,13 @@ Confidence indicators follow a single consistent pattern across all surfaces:
 | Element | TalkBack Behavior |
 |---|---|
 | **Area name header** | Announces area name + visit context ("Alfama, Lisbon. First visit.") |
-| **Bucket headers** | Heading landmarks. TalkBack heading navigation (swipe up/down) jumps between buckets. |
-| **Highlight callouts** | Announced as complementary content. "Highlight: [fact text]" |
-| **Streaming content** | `LiveRegion.Polite` — announces new content without interrupting. Full text readable once complete. |
+| **Vibe orbs** | Each announced as "[Vibe name] vibe, [N] results". Selected state announced. |
+| **POI pins** | Heading landmarks in list mode. Map mode: `contentDescription = "[POI name], [pin type]"`. |
+| **AI response card** | `LiveRegion.Polite` — announces new content as it streams without interrupting. Full text readable once complete. |
 | **Confidence badges** | "Confidence level: Verified" / "Approximate" / "Limited Data" |
 | **Map POI markers** | Each marker has content description: "[POI name], [category]". Accessible list view alternative available for non-visual map interaction. |
-| **Bottom navigation** | Standard M3 NavigationBar TalkBack support (selected state announced). |
-| **Share/Bookmark actions** | "Share [bucket name]" / "Save [area name] to bookmarks" |
+| **Vibe rail** | Each orb: "[vibe name], [count] results". Selected state announced. |
+| **Share/Save actions** | "Share [POI name]" / "Save [POI name]" with state change announced. |
 
 #### Cognitive Accessibility
 
@@ -1330,7 +1408,7 @@ Confidence indicators follow a single consistent pattern across all surfaces:
 | **Progressive disclosure** | Six buckets scannable by header. Depth is opt-in — users choose what to read deeply. |
 | **Consistent patterns** | Same bucket structure everywhere. Same confidence display. Same interaction patterns. |
 | **Clear language** | AI-generated content instructed to use plain language. Technical terms explained inline. |
-| **Predictable navigation** | Bottom nav always visible, same four tabs, same position. No surprise navigation changes. |
+| **Predictable navigation** | Vibe rail always in same position (right side). FAB always bottom-right. Search bar always bottom-left. No surprise layout changes. |
 | **Error recovery** | All errors have clear next actions. Conversational tone. No jargon. |
 
 ### Testing Strategy
@@ -1373,7 +1451,7 @@ Confidence indicators follow a single consistent pattern across all surfaces:
 | **Colors** | Always `MaterialTheme.colorScheme.*`. Never hardcoded hex in composables. |
 | **Touch targets** | Wrap small interactive elements in `Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)`. |
 | **Content descriptions** | Every `Icon`, `Image`, and interactive element has `contentDescription`. Decorative icons use `contentDescription = null`. |
-| **Heading structure** | Bucket headers use `semantics { heading() }` for TalkBack heading navigation. |
+| **Heading structure** | POI names in list mode use `semantics { heading() }`. Vibe chip strip uses `Role.Tab` for each chip. |
 | **Live regions** | Streaming text uses `Modifier.semantics { liveRegion = LiveRegionMode.Polite }`. |
 | **Focus order** | Logical reading order matches visual order. No `focusOrder` overrides needed with standard layouts. |
 | **RTL support** | Use `Modifier.padding(start = ..., end = ...)` never `left`/`right`. Compose handles RTL layout automatically. |

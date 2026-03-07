@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Orbital Map Prototypes</title>
+<style>
+  :root {
+    --safety: #E8A735;
+    --character: #2BBCB3;
+    --history: #C4935A;
+    --nearby: #5B9BD5;
+    --cost: #5CAD6F;
+    --whats: #9B6ED8;
+    --active-color: var(--character);
+    --bg-dark: #0A0A0A;
+    --text-primary: #FAFAFA;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  body[data-accent="safety"] { --active-color: var(--safety); }
+  body[data-accent="character"] { --active-color: var(--character); }
+  body[data-accent="history"] { --active-color: var(--history); }
+  body[data-accent="nearby"] { --active-color: var(--nearby); }
+  body[data-accent="cost"] { --active-color: var(--cost); }
+  body[data-accent="whats"] { --active-color: var(--whats); }
+
+  /* === TOGGLE === */
+  .toggle-bar {
+    display: flex;
+    padding: 48px 14px 10px;
+    gap: 8px;
+    flex-shrink: 0;
+    background: var(--bg-dark);
+  }
+  .toggle-btn {
+    flex: 1;
+    padding: 9px;
+    border: 1.5px solid rgba(255,255,255,0.15);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .toggle-btn.active {
+    border-color: var(--active-color);
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.06);
+  }
+
+  /* === SCREENS === */
+  .screen {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .screen.active { display: flex; }
+
+  /* === AREA LABEL === */
+  .area-label {
+    text-align: center;
+    padding: 6px 0 2px;
+    flex-shrink: 0;
+  }
+  .area-label h2 {
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .area-label .sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
+  /* ============================================ */
+  /* === APPROACH A: CIRCULAR ORBITAL MAP     === */
+  /* ============================================ */
+  .orbital-viewport-a {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 0;
+  }
+
+  .orbital-system-a {
+    position: relative;
+    width: 340px;
+    height: 340px;
+  }
+
+  /* Orbit rings around the map */
+  .orbit-a {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.04);
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .orbit-a.ring-1 { width: 240px; height: 240px; }
+  .orbit-a.ring-2 { width: 290px; height: 290px; }
+  .orbit-a.ring-3 { width: 340px; height: 340px; }
+
+  .orbit-a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.05) 6%, transparent 12%) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: ring-sweep 12s linear infinite;
+  }
+  .orbit-a.ring-2::after { animation-delay: -4s; }
+  .orbit-a.ring-3::after { animation-delay: -8s; }
+  @keyframes ring-sweep {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Circular map in center */
+  .center-map-a {
+    position: absolute;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.08);
+    box-shadow:
+      0 0 30px rgba(0,0,0,0.5),
+      inset 0 0 20px rgba(0,0,0,0.3);
+    z-index: 2;
+  }
+  .map-surface-a {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 35% 40%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 70% 60%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    position: relative;
+  }
+  .map-surface-a::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 20%, rgba(255,255,255,0.05) 20.3%, rgba(255,255,255,0.05) 20.7%, transparent 21%),
+      linear-gradient(90deg, transparent 50%, rgba(255,255,255,0.04) 50.2%, rgba(255,255,255,0.04) 50.6%, transparent 51%),
+      linear-gradient(90deg, transparent 75%, rgba(255,255,255,0.05) 75.2%, rgba(255,255,255,0.05) 75.6%, transparent 76%),
+      linear-gradient(0deg, transparent 28%, rgba(255,255,255,0.05) 28.2%, rgba(255,255,255,0.05) 28.6%, transparent 29%),
+      linear-gradient(0deg, transparent 55%, rgba(255,255,255,0.04) 55.2%, rgba(255,255,255,0.04) 55.6%, transparent 56%),
+      linear-gradient(0deg, transparent 78%, rgba(255,255,255,0.05) 78.2%, rgba(255,255,255,0.05) 78.6%, transparent 79%),
+      linear-gradient(40deg, transparent 38%, rgba(255,255,255,0.03) 38.2%, rgba(255,255,255,0.03) 38.5%, transparent 38.8%);
+  }
+  /* Map active glow border */
+  .center-map-a.active-glow {
+    border-color: color-mix(in srgb, var(--active-color) 40%, transparent);
+    box-shadow:
+      0 0 30px rgba(0,0,0,0.5),
+      0 0 20px color-mix(in srgb, var(--active-color) 12%, transparent),
+      inset 0 0 15px rgba(0,0,0,0.3);
+    transition: all 0.5s ease;
+  }
+
+  /* Orbs for Approach A */
+  .orb-a {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    z-index: 5;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .orb-a:active { transform: scale(0.9); }
+
+  .orb-a .orb-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 20%, rgba(255,255,255,0.08)),
+      color-mix(in srgb, var(--orb-color) 8%, rgba(26,17,24,0.9)));
+    border: 1.5px solid color-mix(in srgb, var(--orb-color) 25%, transparent);
+  }
+  .orb-a .orb-circle::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--orb-color) 12%, transparent), transparent 70%);
+    opacity: 0.4;
+    transition: all 0.4s ease;
+    animation: orb-breathe 4s ease-in-out infinite;
+  }
+  @keyframes orb-breathe {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.06); }
+  }
+
+  .orb-a .orb-circle.w-high { width: 46px; height: 46px; font-size: 20px; }
+  .orb-a .orb-circle.w-mid { width: 40px; height: 40px; font-size: 17px; }
+  .orb-a .orb-circle.w-low { width: 34px; height: 34px; font-size: 15px; }
+
+  .orb-a .orb-lbl {
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: all 0.3s ease;
+    text-align: center;
+    max-width: 50px;
+    line-height: 1.1;
+  }
+
+  .orb-a.selected .orb-circle {
+    border-color: var(--orb-color);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--orb-color) 35%, transparent);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 30%, rgba(255,255,255,0.12)),
+      color-mix(in srgb, var(--orb-color) 15%, rgba(26,17,24,0.8)));
+  }
+  .orb-a.selected .orb-circle::after {
+    opacity: 0.8;
+    inset: -8px;
+  }
+  .orb-a.selected .orb-lbl { color: var(--text-primary); }
+
+  .orbital-system-a.has-selection .orb-a:not(.selected) .orb-circle {
+    opacity: 0.5;
+  }
+  .orbital-system-a.has-selection .orb-a:not(.selected) .orb-circle::after {
+    opacity: 0.1;
+  }
+
+  /* POI pins inside circular map */
+  .poi-a {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .poi-a.visible { opacity: 1; transform: scale(1); }
+  .poi-a .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: var(--active-color);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--active-color) 45%, transparent);
+    transition: all 0.3s ease;
+  }
+  .poi-a .dot::after {
+    content: '';
+    position: absolute;
+    inset: 5px;
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 25%, transparent);
+    transform: translate(-5px, -5px);
+    transition: all 0.3s ease;
+  }
+  .poi-a.active .dot {
+    width: 14px; height: 14px;
+    box-shadow: 0 0 16px color-mix(in srgb, var(--active-color) 60%, transparent);
+  }
+  .poi-a .tip {
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%) translateY(3px);
+    background: rgba(26,17,24,0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--active-color) 30%, transparent);
+    border-radius: 7px;
+    padding: 4px 8px;
+    white-space: nowrap;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 10;
+  }
+  .poi-a.active .tip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ============================================ */
+  /* === APPROACH B: ROUNDED MAP + EDGE ORBS  === */
+  /* ============================================ */
+  .orbital-viewport-b {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 14px;
+    min-height: 0;
+  }
+
+  .orbital-system-b {
+    position: relative;
+    width: 100%;
+    height: 100%;
+  }
+
+  /* Full map with rounded corners */
+  .center-map-b {
+    position: absolute;
+    inset: 24px 0 0 0;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1.5px solid rgba(255,255,255,0.06);
+    z-index: 1;
+  }
+  .center-map-b.active-glow {
+    border-color: color-mix(in srgb, var(--active-color) 30%, transparent);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--active-color) 10%, transparent);
+    transition: all 0.5s ease;
+  }
+  .map-surface-b {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 30% 35%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 65%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    position: relative;
+  }
+  .map-surface-b::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.05) 18.3%, rgba(255,255,255,0.05) 18.7%, transparent 19%),
+      linear-gradient(90deg, transparent 45%, rgba(255,255,255,0.04) 45.2%, rgba(255,255,255,0.04) 45.6%, transparent 46%),
+      linear-gradient(90deg, transparent 72%, rgba(255,255,255,0.05) 72.2%, rgba(255,255,255,0.05) 72.6%, transparent 73%),
+      linear-gradient(0deg, transparent 25%, rgba(255,255,255,0.05) 25.2%, rgba(255,255,255,0.05) 25.6%, transparent 26%),
+      linear-gradient(0deg, transparent 52%, rgba(255,255,255,0.04) 52.2%, rgba(255,255,255,0.04) 52.6%, transparent 53%),
+      linear-gradient(0deg, transparent 78%, rgba(255,255,255,0.05) 78.2%, rgba(255,255,255,0.05) 78.6%, transparent 79%);
+  }
+
+  /* Subtle arc hints for approach B */
+  .arc-hint-b {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.03);
+    pointer-events: none;
+    z-index: 3;
+  }
+  .arc-hint-b.top { width: 300px; height: 80px; left: 50%; top: -16px; transform: translateX(-50%); border-bottom: none; border-radius: 150px 150px 0 0; }
+  .arc-hint-b.bottom { width: 300px; height: 80px; left: 50%; bottom: -16px; transform: translateX(-50%); border-top: none; border-radius: 0 0 150px 150px; }
+
+  /* Orbs for approach B — positioned along map edges */
+  .orb-b {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    cursor: pointer;
+    z-index: 5;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .orb-b:active { transform: scale(0.9); }
+
+  .orb-b .orb-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 22%, rgba(255,255,255,0.1)),
+      color-mix(in srgb, var(--orb-color) 10%, rgba(10,10,10,0.95)));
+    border: 1.5px solid color-mix(in srgb, var(--orb-color) 30%, transparent);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+  }
+  .orb-b .orb-circle::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--orb-color) 10%, transparent), transparent 70%);
+    opacity: 0.4;
+    transition: all 0.4s ease;
+  }
+
+  .orb-b .orb-circle.w-high { width: 44px; height: 44px; font-size: 19px; }
+  .orb-b .orb-circle.w-mid { width: 38px; height: 38px; font-size: 16px; }
+  .orb-b .orb-circle.w-low { width: 33px; height: 33px; font-size: 14px; }
+
+  .orb-b .orb-lbl {
+    font-size: 8px;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: all 0.3s ease;
+  }
+
+  .orb-b.selected .orb-circle {
+    border-color: var(--orb-color);
+    box-shadow: 0 0 18px color-mix(in srgb, var(--orb-color) 35%, transparent);
+  }
+  .orb-b.selected .orb-circle::after { opacity: 0.8; inset: -7px; }
+  .orb-b.selected .orb-lbl { color: var(--text-primary); }
+
+  .orbital-system-b.has-selection .orb-b:not(.selected) .orb-circle { opacity: 0.45; }
+
+  /* POI pins for B */
+  .poi-b {
+    position: absolute;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 3;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .poi-b.visible { opacity: 1; transform: scale(1); }
+  .poi-b .dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--active-color);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--active-color) 40%, transparent);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  .poi-b .dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 25%, transparent);
+    transition: all 0.3s ease;
+  }
+  .poi-b.active .dot {
+    width: 16px; height: 16px;
+    box-shadow: 0 0 18px color-mix(in srgb, var(--active-color) 55%, transparent);
+  }
+  .poi-b .tip {
+    position: absolute;
+    bottom: calc(100% + 5px);
+    left: 50%;
+    transform: translateX(-50%) translateY(3px);
+    background: rgba(26,17,24,0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--active-color) 30%, transparent);
+    border-radius: 7px;
+    padding: 4px 9px;
+    white-space: nowrap;
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 10;
+  }
+  .poi-b.active .tip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* === SHARED SHEET === */
+  .sheet {
+    padding: 12px 18px 28px;
+    background: linear-gradient(to top, rgba(26,17,24,0.98), rgba(10,10,10,0.95));
+    border-top: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    min-height: 105px;
+  }
+  .sheet-handle {
+    width: 36px; height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.12);
+    margin: 0 auto 8px;
+  }
+  .sheet-type-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 3px;
+    transition: opacity 0.25s ease;
+  }
+  .sheet-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 3px;
+    transition: opacity 0.25s ease;
+  }
+  .sheet-text {
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    transition: opacity 0.25s ease;
+  }
+  .sheet-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--active-color);
+    margin-right: 5px;
+    vertical-align: middle;
+    transition: background 0.3s ease;
+  }
+
+  /* === FAB === */
+  .fab {
+    position: fixed;
+    bottom: 32px;
+    right: 16px;
+    width: 48px; height: 48px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--active-color) 80%, #fff), var(--active-color));
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--active-color) 30%, transparent);
+    z-index: 50;
+    transition: all 0.3s ease;
+  }
+  .fab:active { transform: scale(0.9); }
+</style>
+</head>
+<body data-accent="character">
+
+<!-- Toggle -->
+<div class="toggle-bar">
+  <button class="toggle-btn active" onclick="showScreen('a')">A: Circular Orbital</button>
+  <button class="toggle-btn" onclick="showScreen('b')">B: Edge Orbiting</button>
+</div>
+
+<!-- ========== APPROACH A ========== -->
+<div class="screen active" id="screen-a">
+  <div class="area-label">
+    <h2>Doral, Florida</h2>
+    <div class="sub">First visit</div>
+  </div>
+
+  <div class="orbital-viewport-a">
+    <div class="orbital-system-a" id="systemA">
+      <div class="orbit-a ring-1"></div>
+      <div class="orbit-a ring-2"></div>
+      <div class="orbit-a ring-3"></div>
+      <div class="center-map-a" id="mapA">
+        <div class="map-surface-a" id="mapSurfA"></div>
+      </div>
+      <!-- Orbs placed by JS -->
+    </div>
+  </div>
+
+  <div class="sheet" id="sheetA">
+    <div class="sheet-handle"></div>
+    <div class="sheet-type-label" id="typeLabelA">TAP AN ORB</div>
+    <div class="sheet-title" id="titleA">Discover Doral</div>
+    <div class="sheet-text" id="textA">Tap any orbiting category to reveal places on the map.</div>
+  </div>
+</div>
+
+<!-- ========== APPROACH B ========== -->
+<div class="screen" id="screen-b">
+  <div class="area-label">
+    <h2>Doral, Florida</h2>
+    <div class="sub">First visit</div>
+  </div>
+
+  <div class="orbital-viewport-b">
+    <div class="orbital-system-b" id="systemB">
+      <div class="arc-hint-b top"></div>
+      <div class="arc-hint-b bottom"></div>
+      <div class="center-map-b" id="mapB">
+        <div class="map-surface-b" id="mapSurfB"></div>
+      </div>
+      <!-- Orbs placed by JS -->
+    </div>
+  </div>
+
+  <div class="sheet" id="sheetB">
+    <div class="sheet-handle"></div>
+    <div class="sheet-type-label" id="typeLabelB">TAP AN ORB</div>
+    <div class="sheet-title" id="titleB">Discover Doral</div>
+    <div class="sheet-text" id="textB">Tap any orbiting category to reveal places on the map.</div>
+  </div>
+</div>
+
+<!-- FAB -->
+<button class="fab">+</button>
+
+<script>
+  // === DATA ===
+  const categories = {
+    character: {
+      title: 'Character', icon: '🎭',
+      text: "CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district.",
+      pois: [
+        { x: 30, y: 22, name: "CityPlace Doral", desc: "The cultural living room — live music Fridays, Venezuelan bakeries, weekend family gatherings." },
+        { x: 62, y: 40, name: "Downtown Doral", desc: "Walkable Latin dining, art galleries, boutique shops. Weekend farmers market draws crowds." },
+        { x: 25, y: 60, name: "Central Park", desc: "Outdoor yoga, food trucks Thursdays, playgrounds packed every evening with multilingual families." },
+        { x: 72, y: 25, name: "Costa del Sol", desc: "Venezuelan arepas — line out the door at lunch. Locals say best in South Florida." },
+        { x: 50, y: 70, name: "La Estancia", desc: "Argentine steakhouse, live tango Saturday nights. The parrillada for two is legendary." },
+        { x: 80, y: 58, name: "Bulla Gastrobar", desc: "Spanish tapas, Miami twist. Outdoor patio buzzes, especially Sunday brunch." }
+      ]
+    },
+    history: {
+      title: 'History', icon: '🏛️',
+      text: "From unknown farmland to a major city in decades — one of South Florida's most remarkable stories.",
+      pois: [
+        { x: 38, y: 32, name: "Doral Golf Resort", desc: "The Blue Monster put Doral on the map in 1962. All Doral was known for — golf and swamp." },
+        { x: 22, y: 55, name: "Farmland Marker", desc: "Sugarcane fields once stretched endlessly here. Hard to believe — just 40 years ago." },
+        { x: 65, y: 45, name: "Venezuelan Heritage", desc: "Documents the immigration wave that made Doral 'Doralzuela' — a cultural rebirth." },
+        { x: 52, y: 70, name: "Incorporation Site", desc: "Doral became a city in 2003. Youngest in Florida, fastest growing." }
+      ]
+    },
+    safety: {
+      title: 'Safety', icon: '🛡️',
+      text: "One of the safest cities in Miami-Dade — well-lit corridors, community policing, strong neighborhood watch.",
+      pois: [
+        { x: 32, y: 28, name: "Police HQ", desc: "Community outreach programs. Bike patrol is a fixture at CityPlace weekends." },
+        { x: 55, y: 48, name: "NW 87th Corridor", desc: "LED streetlights and cameras. Safest walking corridor in Miami-Dade after 10pm." },
+        { x: 70, y: 62, name: "Neighborhood Watch", desc: "Most active in the county. Crime down 23% since 2022." },
+        { x: 22, y: 68, name: "Safe Routes", desc: "School zone safety — crossing guards, reduced speeds at every public school." },
+        { x: 78, y: 30, name: "Emergency Station", desc: "4.2 minute average response. Among the fastest in Miami-Dade." }
+      ]
+    },
+    nearby: {
+      title: 'Nearby', icon: '📍',
+      text: "15 min to MIA, 25 min to South Beach, next to the Everglades. Perfect launchpad.",
+      pois: [
+        { x: 15, y: 22, name: "MIA Airport", desc: "15 minutes. 170+ destinations. Closest nice neighborhood to the airport." },
+        { x: 82, y: 28, name: "South Beach", desc: "25 minutes. Ocean Drive, Art Deco, world-famous nightlife." },
+        { x: 12, y: 72, name: "Everglades", desc: "Western edge of Doral. Airboats, alligators, sunsets — 10 minutes." },
+        { x: 85, y: 65, name: "Wynwood", desc: "20 min. Street murals, galleries, craft breweries, great brunch." },
+        { x: 50, y: 20, name: "Coral Gables", desc: "15 min south. Mediterranean vibes, Miracle Mile, Venetian Pool." },
+        { x: 48, y: 78, name: "Dolphin Mall", desc: "5 min. 240+ stores, IMAX, bowling alley." }
+      ]
+    },
+    cost: {
+      title: 'Cost', icon: '💰',
+      text: "Surprisingly affordable — $12-18 lunches, $8-14 happy hour. Way cheaper than Brickell.",
+      pois: [
+        { x: 30, y: 25, name: "Arepas El Cacao", desc: "$8-12/person. Best value lunch in Doral, hands down." },
+        { x: 58, y: 42, name: "CityPlace HH", desc: "$8-14 cocktails 4-7pm. Most spots do 2-for-1. Brickell is $18-22." },
+        { x: 25, y: 60, name: "Farmers Market", desc: "Weekly groceries for $40-60. Half supermarket price." },
+        { x: 72, y: 55, name: "Sergio's Cuban", desc: "$10-15 lunch specials. Cuban sandwich is legendary." },
+        { x: 45, y: 72, name: "Free Trolley", desc: "Connects major stops. Saves $200+/month on rides." },
+        { x: 80, y: 32, name: "Costco Doral", desc: "Highest-volume Costco in Florida. Bulk culture is real." }
+      ]
+    },
+    whats: {
+      title: "What's On", icon: '⚡',
+      text: "Friday buzz — CityPlace live music, Downtown packed dining, food truck rally at 7pm.",
+      pois: [
+        { x: 35, y: 28, name: "Live Music", desc: "Tonight 7-10pm: Latin jazz trio at CityPlace. Free entry." },
+        { x: 65, y: 50, name: "Food Trucks", desc: "7pm Downtown lot. 15+ trucks including Mojo Donuts." },
+        { x: 28, y: 62, name: "Park Yoga", desc: "Tomorrow 8am. Free, bring a mat. 50-80 people Saturdays." },
+        { x: 75, y: 30, name: "Art Walk", desc: "Saturday 6-9pm. Local artists, wine tastings at three galleries." },
+        { x: 50, y: 72, name: "Salsa Night", desc: "Friday 9pm at Bulla. Live band, free lessons, gets packed by 10:30." }
+      ]
+    }
+  };
+
+  // === ORB CONFIG ===
+  // Approach A: positioned around circular map, angle from top clockwise
+  const orbConfigA = [
+    { cat: 'character', ring: 2, angle: 350, weight: 'high' },
+    { cat: 'history',   ring: 2, angle: 55,  weight: 'mid' },
+    { cat: 'whats',     ring: 3, angle: 110, weight: 'mid' },
+    { cat: 'nearby',    ring: 3, angle: 185, weight: 'low' },
+    { cat: 'cost',      ring: 3, angle: 250, weight: 'low' },
+    { cat: 'safety',    ring: 2, angle: 300, weight: 'low' },
+  ];
+
+  // Approach B: positioned along map edges (absolute px from top-left of system)
+  const orbConfigB = [
+    { cat: 'character', pos: { x: '50%', y: '0px' },  weight: 'high' },
+    { cat: 'history',   pos: { x: '88%', y: '12%' },  weight: 'mid' },
+    { cat: 'whats',     pos: { x: '92%', y: '50%' },  weight: 'mid' },
+    { cat: 'nearby',    pos: { x: '80%', y: '88%' },  weight: 'low' },
+    { cat: 'cost',      pos: { x: '15%', y: '88%' },  weight: 'low' },
+    { cat: 'safety',    pos: { x: '4%',  y: '45%' },  weight: 'low' },
+  ];
+
+  let stateA = { cat: null, pin: -1 };
+  let stateB = { cat: null, pin: -1 };
+
+  // === PLACE ORBS A ===
+  function placeOrbsA() {
+    const sys = document.getElementById('systemA');
+    const cx = 170, cy = 170;
+    const radii = { 1: 70, 2: 120, 3: 145 };
+
+    orbConfigA.forEach(cfg => {
+      const data = categories[cfg.cat];
+      const r = radii[cfg.ring];
+      const rad = (cfg.angle - 90) * (Math.PI / 180);
+      const x = cx + r * Math.cos(rad);
+      const y = cy + r * Math.sin(rad);
+
+      const orb = document.createElement('div');
+      orb.className = 'orb-a';
+      orb.setAttribute('data-cat', cfg.cat);
+      orb.onclick = () => selectOrbA(cfg.cat);
+
+      const offset = { high: 23, mid: 20, low: 17 }[cfg.weight];
+      orb.style.left = (x - offset) + 'px';
+      orb.style.top = (y - offset) + 'px';
+
+      orb.innerHTML = `
+        <div class="orb-circle w-${cfg.weight}" style="--orb-color: var(--${cfg.cat})">${data.icon}</div>
+        <span class="orb-lbl">${data.title}</span>
+      `;
+      sys.appendChild(orb);
+    });
+  }
+
+  // === PLACE ORBS B ===
+  function placeOrbsB() {
+    const sys = document.getElementById('systemB');
+
+    orbConfigB.forEach(cfg => {
+      const data = categories[cfg.cat];
+      const orb = document.createElement('div');
+      orb.className = 'orb-b';
+      orb.setAttribute('data-cat', cfg.cat);
+      orb.onclick = () => selectOrbB(cfg.cat);
+
+      orb.style.left = cfg.pos.x;
+      orb.style.top = cfg.pos.y;
+      orb.style.transform = 'translate(-50%, -50%)';
+
+      orb.innerHTML = `
+        <div class="orb-circle w-${cfg.weight}" style="--orb-color: var(--${cfg.cat})">${data.icon}</div>
+        <span class="orb-lbl">${data.title}</span>
+      `;
+      sys.appendChild(orb);
+    });
+  }
+
+  // === GENERIC HELPERS ===
+  function createPins(surfaceId, cat, variant) {
+    const surf = document.getElementById(surfaceId);
+    surf.querySelectorAll(`.poi-${variant}`).forEach(p => p.remove());
+    categories[cat].pois.forEach((poi, i) => {
+      const pin = document.createElement('div');
+      pin.className = `poi-${variant}`;
+      pin.style.left = poi.x + '%';
+      pin.style.top = poi.y + '%';
+      pin.setAttribute('data-index', i);
+      pin.onclick = (e) => { e.stopPropagation(); selectPin(variant, cat, i); };
+      pin.innerHTML = `<div class="dot"></div><div class="tip">${poi.name}</div>`;
+      surf.appendChild(pin);
+      setTimeout(() => pin.classList.add('visible'), 80 + i * 70);
+    });
+  }
+
+  function selectPin(variant, cat, index) {
+    const state = variant === 'a' ? stateA : stateB;
+    const suffix = variant === 'a' ? 'A' : 'B';
+    document.querySelectorAll(`.poi-${variant}`).forEach(p => p.classList.remove('active'));
+
+    if (state.pin === index) {
+      state.pin = -1;
+      showOverview(suffix, cat);
+      return;
+    }
+    state.pin = index;
+    document.querySelector(`.poi-${variant}[data-index="${index}"]`)?.classList.add('active');
+
+    const poi = categories[cat].pois[index];
+    fadeSheet(suffix, categories[cat].title.toUpperCase() + ' — PLACE',
+      `<span class="sheet-dot"></span>${poi.name}`, poi.desc);
+  }
+
+  function showOverview(suffix, cat) {
+    const data = categories[cat];
+    document.querySelectorAll(`.poi-${suffix.toLowerCase()}`).forEach(p => p.classList.remove('active'));
+    fadeSheet(suffix, 'CATEGORY OVERVIEW',
+      `<span class="sheet-dot"></span>${data.title}`, data.text);
+  }
+
+  function fadeSheet(suffix, type, title, text) {
+    const tl = document.getElementById('typeLabel' + suffix);
+    const ti = document.getElementById('title' + suffix);
+    const tx = document.getElementById('text' + suffix);
+    tl.style.opacity = '0'; ti.style.opacity = '0'; tx.style.opacity = '0';
+    setTimeout(() => {
+      tl.textContent = type;
+      ti.innerHTML = title;
+      tx.textContent = text;
+      tl.style.opacity = '1'; ti.style.opacity = '1'; tx.style.opacity = '1';
+    }, 180);
+  }
+
+  // === SELECT ORB A ===
+  function selectOrbA(cat) {
+    const sys = document.getElementById('systemA');
+    const map = document.getElementById('mapA');
+    if (stateA.cat === cat) { deselectA(); return; }
+    stateA.cat = cat; stateA.pin = -1;
+    document.body.setAttribute('data-accent', cat);
+    sys.classList.add('has-selection');
+    map.classList.add('active-glow');
+    sys.querySelectorAll('.orb-a').forEach(o =>
+      o.classList.toggle('selected', o.getAttribute('data-cat') === cat));
+    showOverview('A', cat);
+    createPins('mapSurfA', cat, 'a');
+  }
+
+  function deselectA() {
+    stateA.cat = null; stateA.pin = -1;
+    const sys = document.getElementById('systemA');
+    sys.classList.remove('has-selection');
+    document.getElementById('mapA').classList.remove('active-glow');
+    sys.querySelectorAll('.orb-a').forEach(o => o.classList.remove('selected'));
+    document.getElementById('mapSurfA').querySelectorAll('.poi-a').forEach(p => p.remove());
+    fadeSheet('A', 'TAP AN ORB', 'Discover Doral', 'Tap any orbiting category to reveal places on the map.');
+  }
+
+  // === SELECT ORB B ===
+  function selectOrbB(cat) {
+    const sys = document.getElementById('systemB');
+    const map = document.getElementById('mapB');
+    if (stateB.cat === cat) { deselectB(); return; }
+    stateB.cat = cat; stateB.pin = -1;
+    document.body.setAttribute('data-accent', cat);
+    sys.classList.add('has-selection');
+    map.classList.add('active-glow');
+    sys.querySelectorAll('.orb-b').forEach(o =>
+      o.classList.toggle('selected', o.getAttribute('data-cat') === cat));
+    showOverview('B', cat);
+    createPins('mapSurfB', cat, 'b');
+  }
+
+  function deselectB() {
+    stateB.cat = null; stateB.pin = -1;
+    const sys = document.getElementById('systemB');
+    sys.classList.remove('has-selection');
+    document.getElementById('mapB').classList.remove('active-glow');
+    sys.querySelectorAll('.orb-b').forEach(o => o.classList.remove('selected'));
+    document.getElementById('mapSurfB').querySelectorAll('.poi-b').forEach(p => p.remove());
+    fadeSheet('B', 'TAP AN ORB', 'Discover Doral', 'Tap any orbiting category to reveal places on the map.');
+  }
+
+  // Tap empty map to deselect pin
+  document.getElementById('mapSurfA').addEventListener('click', () => {
+    if (stateA.pin !== -1 && stateA.cat) { stateA.pin = -1; showOverview('A', stateA.cat); }
+  });
+  document.getElementById('mapSurfB').addEventListener('click', () => {
+    if (stateB.pin !== -1 && stateB.cat) { stateB.pin = -1; showOverview('B', stateB.cat); }
+  });
+
+  // === SCREEN TOGGLE ===
+  function showScreen(v) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('screen-' + v).classList.add('active');
+    document.querySelector(`.toggle-btn[onclick*="'${v}'"]`).classList.add('active');
+  }
+
+  // === INIT ===
+  placeOrbsA();
+  placeOrbsB();
+</script>
+</body>
+</html>

@@ -67,6 +67,7 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.sqldelight.android.driver)
             implementation(libs.maplibre.android)
+            implementation(libs.maplibre.plugin.annotation)
             implementation(libs.koin.android)
             implementation(libs.kotlinx.coroutines.android)
             implementation(libs.play.services.location)

@@ -30,8 +30,12 @@ The 6 bucket types IN ORDER are:
 After the last bucket, output this delimiter:
 ---POIS---
 
-Then output a JSON array of notable points of interest:
-[{"name":"POI name","type":"category","description":"brief description","confidence":"HIGH|MEDIUM|LOW","latitude":51.5074,"longitude":-0.1278}]
+Then output a JSON array of points of interest:
+[{"poi":"Time Out Market","type":"food","vibe":"character","insight":"Curated food hall with 24 restaurants","hours":"Sun-Wed 10am-12am, Thu-Sat 10am-2am","liveStatus":"open","confidence":"HIGH","rating":4.5,"latitude":38.71,"longitude":-9.13,"vibeInsights":{"character":"A gathering hub for locals","history":"Converted 1892 iron market hall","cost":"Mid-range, ${'$'}10-25"}}]
+
+Valid vibe values: character, history, whats_on, safety, nearby, cost
+Valid liveStatus values: open, busy, closed
+Valid type values: food, entertainment, park, historic, shopping, arts, transit, safety, beach, district
 
 IMPORTANT:
 - Output ONLY the JSON objects and delimiters, no other text
@@ -42,5 +46,9 @@ IMPORTANT:
 - NEVER include the strings "---BUCKET---" or "---POIS---" inside JSON field values
 - For each POI, provide decimal GPS coordinates to 4 decimal places. Coordinates are required for map marker placement. Only include a POI if you can provide coordinates with reasonable confidence
         """.trimIndent()
+    }
+
+    fun buildAiSearchPrompt(query: String, areaName: String): String {
+        return """You are a knowledgeable local guide for $areaName. Answer the following question concisely as if you are a local expert: "$query". Keep your response under 120 words. Be specific and practical. Do not use bullet points."""
     }
 }

@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Galaxy Orb + Interactive Map</title>
+<style>
+  :root {
+    --safety: #E8A735;
+    --character: #2BBCB3;
+    --history: #C4935A;
+    --nearby: #5B9BD5;
+    --cost: #5CAD6F;
+    --whats: #9B6ED8;
+    --active-color: var(--character);
+    --bg-dark: #1A1118;
+    --bg-card: rgba(26,17,24,0.95);
+    --text-primary: #FAFAFA;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0A0A0A;
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  body[data-accent="safety"] { --active-color: var(--safety); }
+  body[data-accent="character"] { --active-color: var(--character); }
+  body[data-accent="history"] { --active-color: var(--history); }
+  body[data-accent="nearby"] { --active-color: var(--nearby); }
+  body[data-accent="cost"] { --active-color: var(--cost); }
+  body[data-accent="whats"] { --active-color: var(--whats); }
+
+  /* === GALAXY AREA === */
+  .galaxy-container {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    flex-shrink: 0;
+    overflow: visible;
+  }
+
+  /* Living canvas background behind galaxy */
+  .galaxy-bg {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 50%,
+      rgba(40, 25, 35, 0.8) 0%,
+      rgba(10, 10, 10, 1) 70%);
+    overflow: hidden;
+  }
+  .galaxy-bg::after {
+    content: '';
+    position: absolute;
+    inset: -20px;
+    background:
+      radial-gradient(circle at 30% 40%, color-mix(in srgb, var(--active-color) 5%, transparent) 0%, transparent 40%),
+      radial-gradient(circle at 70% 55%, color-mix(in srgb, var(--active-color) 3%, transparent) 0%, transparent 35%);
+    transition: background 0.8s ease;
+  }
+
+  /* Orbit rings */
+  .orbit-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.05);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+  }
+  .orbit-ring.ring-1 { width: 100px; height: 100px; }
+  .orbit-ring.ring-2 { width: 180px; height: 180px; }
+  .orbit-ring.ring-3 { width: 260px; height: 260px; }
+
+  /* Ring sweep glow */
+  .orbit-ring::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.06) 8%, transparent 16%) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: ring-sweep 10s linear infinite;
+  }
+  .orbit-ring.ring-2::after { animation-delay: -3.3s; animation-duration: 12s; }
+  .orbit-ring.ring-3::after { animation-delay: -6.6s; animation-duration: 14s; }
+  @keyframes ring-sweep {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Center hub */
+  .galaxy-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 5;
+    pointer-events: none;
+  }
+  .center-area-name {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
+  }
+  .center-subtitle {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 1px;
+    letter-spacing: 0.3px;
+  }
+
+  /* === GALAXY ORBS === */
+  .galaxy-orb {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    cursor: pointer;
+    z-index: 10;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .galaxy-orb:active {
+    transform: scale(0.9);
+  }
+
+  .orb-body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  /* Orb sizes by engagement weight */
+  .orb-body.weight-high {
+    width: 48px; height: 48px; font-size: 20px;
+  }
+  .orb-body.weight-mid {
+    width: 42px; height: 42px; font-size: 18px;
+  }
+  .orb-body.weight-low {
+    width: 36px; height: 36px; font-size: 16px;
+  }
+
+  .orb-body {
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 20%, rgba(255,255,255,0.08)),
+      color-mix(in srgb, var(--orb-color) 8%, rgba(26,17,24,0.9)));
+    border: 1.5px solid color-mix(in srgb, var(--orb-color) 25%, transparent);
+  }
+
+  /* Orb glow */
+  .orb-body::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--orb-color) 15%, transparent),
+      transparent 70%);
+    opacity: 0.4;
+    transition: all 0.4s ease;
+    animation: orb-breathe 4s ease-in-out infinite;
+  }
+  @keyframes orb-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.08); opacity: 0.5; }
+  }
+
+  .orb-name {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+    transition: all 0.3s ease;
+    text-align: center;
+    max-width: 55px;
+    line-height: 1.1;
+  }
+
+  /* Selected orb state */
+  .galaxy-orb.selected .orb-body {
+    border-color: var(--orb-color);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--orb-color) 35%, transparent);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 30%, rgba(255,255,255,0.12)),
+      color-mix(in srgb, var(--orb-color) 15%, rgba(26,17,24,0.8)));
+  }
+  .galaxy-orb.selected .orb-body::after {
+    opacity: 0.8;
+    inset: -10px;
+  }
+  .galaxy-orb.selected .orb-name {
+    color: var(--text-primary);
+  }
+
+  /* Unselected orbs dim slightly when another is selected */
+  .galaxy-container.has-selection .galaxy-orb:not(.selected) .orb-body {
+    opacity: 0.6;
+  }
+  .galaxy-container.has-selection .galaxy-orb:not(.selected) .orb-body::after {
+    opacity: 0.15;
+  }
+
+  /* === MAP AREA === */
+  .map-area {
+    flex: 1;
+    margin: 0 12px;
+    border-radius: 14px;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+  }
+  .map-bg {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 25% 35%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 65%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    position: relative;
+  }
+  .map-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.05) 18.3%, rgba(255,255,255,0.05) 18.8%, transparent 19.3%),
+      linear-gradient(90deg, transparent 42%, rgba(255,255,255,0.04) 42.2%, rgba(255,255,255,0.04) 42.7%, transparent 43%),
+      linear-gradient(90deg, transparent 68%, rgba(255,255,255,0.05) 68.3%, rgba(255,255,255,0.05) 68.8%, transparent 69.3%),
+      linear-gradient(90deg, transparent 88%, rgba(255,255,255,0.04) 88.2%, rgba(255,255,255,0.04) 88.7%, transparent 89%),
+      linear-gradient(0deg, transparent 22%, rgba(255,255,255,0.05) 22.2%, rgba(255,255,255,0.05) 22.7%, transparent 23%),
+      linear-gradient(0deg, transparent 48%, rgba(255,255,255,0.04) 48.2%, rgba(255,255,255,0.04) 48.7%, transparent 49%),
+      linear-gradient(0deg, transparent 72%, rgba(255,255,255,0.05) 72.2%, rgba(255,255,255,0.05) 72.7%, transparent 73%),
+      linear-gradient(38deg, transparent 35%, rgba(255,255,255,0.03) 35.2%, rgba(255,255,255,0.03) 35.6%, transparent 36%),
+      linear-gradient(140deg, transparent 60%, rgba(255,255,255,0.03) 60.2%, rgba(255,255,255,0.03) 60.6%, transparent 61%);
+  }
+  .map-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 19.3%, rgba(255,255,255,0.015) 19.3%, rgba(255,255,255,0.015) 42%, transparent 42%),
+      linear-gradient(0deg, transparent 23%, rgba(255,255,255,0.01) 23%, rgba(255,255,255,0.01) 48%, transparent 48%),
+      linear-gradient(90deg, transparent 43%, rgba(255,255,255,0.012) 43%, rgba(255,255,255,0.012) 68%, transparent 68%),
+      linear-gradient(0deg, transparent 49%, rgba(255,255,255,0.008) 49%, rgba(255,255,255,0.008) 72%, transparent 72%);
+  }
+
+  /* No-selection map hint */
+  .map-hint-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .map-hint-overlay.hidden { opacity: 0; }
+  .map-hint-text {
+    font-size: 13px;
+    color: var(--text-dim);
+    text-align: center;
+    padding: 0 40px;
+    line-height: 1.5;
+  }
+
+  /* POI pins */
+  .poi-pin {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 4;
+    opacity: 0;
+    transform: scale(0) translate(-50%, -50%);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .poi-pin.visible {
+    opacity: 1;
+    transform: scale(1) translate(-50%, -50%);
+  }
+  .poi-pin .pin-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--active-color);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--active-color) 40%, transparent);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  .poi-pin .pin-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 25%, transparent);
+    transition: all 0.3s ease;
+  }
+  .poi-pin.active .pin-dot {
+    width: 18px;
+    height: 18px;
+    box-shadow: 0 0 22px color-mix(in srgb, var(--active-color) 55%, transparent);
+  }
+  .poi-pin.active .pin-dot::after {
+    inset: -6px;
+    border-color: color-mix(in srgb, var(--active-color) 45%, transparent);
+    border-width: 2px;
+  }
+  .pin-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(26,17,24,0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--active-color) 30%, transparent);
+    border-radius: 8px;
+    padding: 5px 10px;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    z-index: 10;
+  }
+  .poi-pin.active .pin-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .poi-pin .pin-ping {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--active-color);
+    animation: pin-ping 1.5s ease-out 0.3s 1;
+    pointer-events: none;
+  }
+  @keyframes pin-ping {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(2.8); opacity: 0; }
+  }
+
+  /* === SHEET === */
+  .sheet {
+    padding: 12px 18px 10px;
+    background: linear-gradient(to top, rgba(26,17,24,0.98), rgba(26,17,24,0.92));
+    border-top: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    min-height: 115px;
+    transition: all 0.3s ease;
+  }
+  .sheet-handle {
+    width: 36px;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.12);
+    margin: 0 auto 8px;
+  }
+  .sheet-type-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 3px;
+    transition: opacity 0.25s ease;
+  }
+  .sheet-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    transition: opacity 0.25s ease;
+  }
+  .sheet-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    transition: opacity 0.25s ease;
+  }
+  .sheet-category-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--active-color);
+    margin-right: 6px;
+    vertical-align: middle;
+    transition: background 0.3s ease;
+  }
+
+  /* === FLOATING NAV FAB === */
+  .fab-container {
+    position: fixed;
+    bottom: 28px;
+    right: 16px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .fab-main {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--active-color) 80%, #fff), var(--active-color));
+    border: none;
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+      0 4px 16px color-mix(in srgb, var(--active-color) 35%, transparent),
+      0 0 24px color-mix(in srgb, var(--active-color) 15%, transparent);
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    z-index: 2;
+  }
+  .fab-main:active {
+    transform: scale(0.92);
+  }
+  .fab-main.open {
+    transform: rotate(45deg);
+    background: rgba(255,255,255,0.15);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  /* Subtle pulse to invite interaction */
+  .fab-main::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 20%, transparent);
+    animation: fab-pulse 3s ease-in-out infinite;
+  }
+  .fab-main.open::after { animation: none; opacity: 0; }
+  @keyframes fab-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.15); opacity: 0; }
+  }
+
+  /* FAB menu items */
+  .fab-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    transform: scale(0.5) translateY(20px);
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .fab-item.visible {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: auto;
+  }
+  .fab-item:nth-child(1) { transition-delay: 0.05s; }
+  .fab-item:nth-child(2) { transition-delay: 0.1s; }
+  .fab-item:nth-child(3) { transition-delay: 0.15s; }
+
+  .fab-item-label {
+    background: rgba(26,17,24,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .fab-item-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(26,17,24,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    transition: all 0.25s ease;
+  }
+  .fab-item:active .fab-item-icon {
+    transform: scale(0.9);
+    background: color-mix(in srgb, var(--active-color) 20%, rgba(26,17,24,0.92));
+    border-color: color-mix(in srgb, var(--active-color) 40%, transparent);
+  }
+
+  /* Scrim overlay when FAB is open */
+  .fab-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .fab-scrim.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+</style>
+</head>
+<body data-accent="character">
+
+<!-- Galaxy -->
+<div class="galaxy-container" id="galaxyContainer">
+  <div class="galaxy-bg"></div>
+
+  <!-- Orbit rings -->
+  <div class="orbit-ring ring-1"></div>
+  <div class="orbit-ring ring-2"></div>
+  <div class="orbit-ring ring-3"></div>
+
+  <!-- Center -->
+  <div class="galaxy-center">
+    <div class="center-area-name">Doral</div>
+    <div class="center-subtitle">First visit</div>
+  </div>
+
+  <!-- Orbs will be placed by JS -->
+</div>
+
+<!-- Map -->
+<div class="map-area">
+  <div class="map-bg" id="mapBg"></div>
+  <div class="map-hint-overlay" id="mapHint">
+    <div class="map-hint-text">Tap an orb above to explore this area</div>
+  </div>
+</div>
+
+<!-- Sheet -->
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-type-label" id="sheetTypeLabel">TAP AN ORB TO BEGIN</div>
+  <div class="sheet-title" id="sheetTitle">Discover Doral</div>
+  <div class="sheet-text" id="sheetText">Explore the galaxy above — each orb reveals a different facet of this area. Tap one to see what's here.</div>
+</div>
+
+<!-- FAB Scrim -->
+<div class="fab-scrim" id="fabScrim" onclick="toggleFab()"></div>
+
+<!-- Floating Nav FAB -->
+<div class="fab-container" id="fabContainer">
+  <button class="fab-main" id="fabMain" onclick="toggleFab()">+</button>
+  <div class="fab-item" data-action="chat">
+    <span class="fab-item-label">Chat with AI</span>
+    <div class="fab-item-icon">💬</div>
+  </div>
+  <div class="fab-item" data-action="saved">
+    <span class="fab-item-label">Saved Places</span>
+    <div class="fab-item-icon">🔖</div>
+  </div>
+  <div class="fab-item" data-action="settings">
+    <span class="fab-item-label">Settings</span>
+    <div class="fab-item-icon">⚙️</div>
+  </div>
+</div>
+
+<script>
+  // === CATEGORY DATA ===
+  const categories = {
+    character: {
+      title: 'Character', icon: '🎭',
+      text: "CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district. Families gather on weekend evenings at the cultural living room of the community.",
+      pois: [
+        { x: 35, y: 20, name: "CityPlace Doral", desc: "The cultural living room — live music every Friday, Venezuelan bakeries, Colombian coffee shops, and weekend family gatherings." },
+        { x: 62, y: 38, name: "Downtown Doral", desc: "A walkable mix of upscale Latin dining, art galleries, and boutique shops. Weekend farmers market draws crowds from all over." },
+        { x: 22, y: 55, name: "Doral Central Park", desc: "Where the community comes alive — outdoor yoga, food trucks on Thursdays, and playgrounds packed every evening." },
+        { x: 78, y: 22, name: "Costa del Sol", desc: "Authentic Venezuelan arepas and empanadas. Line out the door at lunch — locals say it's the best in South Florida." },
+        { x: 48, y: 68, name: "La Estancia Argentina", desc: "Traditional Argentine steakhouse with live tango on Saturday nights. The parrillada for two is legendary." },
+        { x: 85, y: 58, name: "Bulla Gastrobar", desc: "Spanish tapas with a Miami twist. The outdoor patio buzzes with energy, especially during Sunday brunch." }
+      ]
+    },
+    history: {
+      title: 'History', icon: '🏛️',
+      text: "Doral transformed from unknown farmland into a major city in just decades. The area's rapid growth through the 1990s is one of South Florida's most remarkable stories.",
+      pois: [
+        { x: 40, y: 30, name: "Doral Golf Resort", desc: "The legendary Blue Monster course put Doral on the map in 1962. For decades, this was all Doral was known for." },
+        { x: 25, y: 55, name: "Old Farmland Marker", desc: "A small plaque marks where sugarcane fields once stretched endlessly. Hard to believe this was all farmland 40 years ago." },
+        { x: 68, y: 42, name: "Venezuelan Heritage Ctr", desc: "Documents the massive Venezuelan immigration wave that transformed Doral into 'Doralzuela' — a cultural rebirth." },
+        { x: 55, y: 68, name: "Incorporation Site", desc: "Where Doral officially became a city in 2003. One of the youngest cities in Florida, yet one of the fastest growing." }
+      ]
+    },
+    safety: {
+      title: 'Safety', icon: '🛡️',
+      text: "One of the safest cities in Miami-Dade County, with well-lit corridors, active community policing, and a strong neighborhood watch culture.",
+      pois: [
+        { x: 30, y: 25, name: "Doral Police HQ", desc: "State-of-the-art facility with community outreach. Bike patrol is a fixture at CityPlace every weekend." },
+        { x: 55, y: 45, name: "NW 87th Corridor", desc: "Recently upgraded with LED streetlights and cameras. One of the safest walking corridors in Miami-Dade after 10pm." },
+        { x: 72, y: 60, name: "Neighborhood Watch", desc: "Most active watch program in the county. Monthly meetings, dedicated app, crime down 23% since 2022." },
+        { x: 20, y: 65, name: "Safe Routes Program", desc: "School zone safety with crossing guards, reduced speeds, and parent volunteers at every public school." },
+        { x: 82, y: 28, name: "Emergency Response", desc: "Average response time: 4.2 minutes. Among the fastest in Miami-Dade." }
+      ]
+    },
+    nearby: {
+      title: 'Nearby', icon: '📍',
+      text: "15 minutes from MIA, 25 minutes from South Beach, right next to the Everglades. A perfect launchpad for South Florida.",
+      pois: [
+        { x: 15, y: 20, name: "Miami Int'l Airport", desc: "Just 15 minutes east. 170+ destinations worldwide — Doral is the closest nice neighborhood to the airport." },
+        { x: 85, y: 25, name: "South Beach", desc: "25 minutes via the expressway. Ocean Drive, Art Deco, and world-famous nightlife." },
+        { x: 10, y: 70, name: "Everglades", desc: "Gateway is literally at Doral's western edge. Airboat tours, alligator spotting, sunsets — 10 minutes away." },
+        { x: 88, y: 65, name: "Wynwood", desc: "20 minutes to Miami's art mecca. Street murals, galleries, craft breweries, and the best brunch spots." },
+        { x: 50, y: 18, name: "Coral Gables", desc: "15 minutes south. Mediterranean architecture, Miracle Mile shopping, and the iconic Venetian Pool." },
+        { x: 48, y: 78, name: "Dolphin Mall", desc: "5 minutes — 240+ stores, IMAX theater, and massive bowling alley." }
+      ]
+    },
+    cost: {
+      title: 'Cost', icon: '💰',
+      text: "Surprisingly affordable — more budget-friendly than Brickell or Coral Gables. Expect $12-18 lunch plates and $8-14 happy hour cocktails.",
+      pois: [
+        { x: 32, y: 22, name: "Arepas El Cacao", desc: "$8-12 per person. Enormous Venezuelan arepas. Best value lunch in Doral." },
+        { x: 58, y: 40, name: "CityPlace Happy Hour", desc: "$8-14 cocktails, 4-7pm. Most restaurants do 2-for-1. Compare to $18-22 in Brickell." },
+        { x: 25, y: 58, name: "Farmers Market", desc: "Fresh produce at wholesale prices every Saturday. Family groceries for $40-60." },
+        { x: 72, y: 55, name: "Sergio's Cuban", desc: "$10-15 lunch specials. Cuban sandwich and croqueta preparada are local legends." },
+        { x: 45, y: 72, name: "Free Trolley", desc: "Connects major stops across the city. No Uber for local errands — saving $200+/month." },
+        { x: 80, y: 30, name: "Costco Doral", desc: "One of highest-volume Costcos in Florida. Bulk buying culture is strong here." },
+        { x: 15, y: 40, name: "Aji Limon Peruvian", desc: "$14-22 dinner. Incredible ceviche at half the price of Coral Gables Peruvian spots." }
+      ]
+    },
+    whats: {
+      title: "What's On", icon: '⚡',
+      text: "Friday evening buzz — CityPlace hosts live music, Downtown Doral has packed dining, food truck rally kicks off at 7pm.",
+      pois: [
+        { x: 38, y: 25, name: "Live Music @ CityPlace", desc: "Tonight 7-10pm: Latin jazz trio. Free entry, grab a cocktail and enjoy plaza seating." },
+        { x: 65, y: 48, name: "Food Truck Rally", desc: "7pm at Downtown Doral lot. 15+ trucks including Mojo Donuts and Korean-Mexican fusion." },
+        { x: 28, y: 60, name: "Yoga in the Park", desc: "Tomorrow 8am at Central Park. Free community yoga — bring a mat. 50-80 people on Saturdays." },
+        { x: 75, y: 30, name: "Art Walk", desc: "Saturday 6-9pm. Local artists on the promenade. Wine tastings at three galleries." },
+        { x: 50, y: 72, name: "Salsa Night @ Bulla", desc: "Every Friday 9pm. Live band, free lessons at 9, open dancing at 10. Arrive early." }
+      ]
+    }
+  };
+
+  // === ORB LAYOUT CONFIG ===
+  // ring: 1 (inner), 2 (middle), 3 (outer)
+  // angle: degrees from top (0 = 12 o'clock, clockwise)
+  // weight: high, mid, low (based on engagement)
+  const orbConfig = [
+    { cat: 'character', ring: 2, angle: 0,   weight: 'high' },  // top — most engaged
+    { cat: 'history',   ring: 2, angle: 60,  weight: 'mid' },
+    { cat: 'whats',     ring: 3, angle: 120, weight: 'mid' },
+    { cat: 'nearby',    ring: 3, angle: 200, weight: 'low' },
+    { cat: 'safety',    ring: 2, angle: 240, weight: 'low' },
+    { cat: 'cost',      ring: 3, angle: 310, weight: 'low' },
+  ];
+
+  let currentCat = null;
+  let currentPinIndex = -1;
+
+  // === PLACE ORBS ===
+  function placeOrbs() {
+    const container = document.getElementById('galaxyContainer');
+    const cx = container.offsetWidth / 2;
+    const cy = container.offsetHeight / 2;
+
+    const ringRadii = { 1: 50, 2: 90, 3: 130 };
+
+    orbConfig.forEach(cfg => {
+      const data = categories[cfg.cat];
+      const r = ringRadii[cfg.ring];
+      const angleRad = (cfg.angle - 90) * (Math.PI / 180); // -90 so 0 = top
+      const x = cx + r * Math.cos(angleRad);
+      const y = cy + r * Math.sin(angleRad);
+
+      const orb = document.createElement('div');
+      orb.className = 'galaxy-orb';
+      orb.setAttribute('data-cat', cfg.cat);
+      orb.onclick = () => selectOrb(cfg.cat);
+
+      // Size offset based on weight
+      const sizeOffset = { high: 24, mid: 21, low: 18 }[cfg.weight];
+
+      orb.style.left = (x - sizeOffset) + 'px';
+      orb.style.top = (y - sizeOffset) + 'px';
+
+      orb.innerHTML = `
+        <div class="orb-body weight-${cfg.weight}" style="--orb-color: var(--${cfg.cat})">
+          ${data.icon}
+        </div>
+        <span class="orb-name">${data.title}</span>
+      `;
+
+      container.appendChild(orb);
+    });
+  }
+
+  // === SELECT ORB ===
+  function selectOrb(cat) {
+    // Deselect if tapping same orb
+    if (currentCat === cat) {
+      deselectAll();
+      return;
+    }
+
+    currentCat = cat;
+    currentPinIndex = -1;
+    document.body.setAttribute('data-accent', cat);
+
+    const container = document.getElementById('galaxyContainer');
+    container.classList.add('has-selection');
+
+    // Update orb selection
+    document.querySelectorAll('.galaxy-orb').forEach(o => {
+      o.classList.toggle('selected', o.getAttribute('data-cat') === cat);
+    });
+
+    // Hide map hint
+    document.getElementById('mapHint').classList.add('hidden');
+
+    // Show category overview in sheet
+    showCategoryOverview(cat);
+
+    // Update map pins
+    createPins(cat);
+  }
+
+  // === DESELECT ALL ===
+  function deselectAll() {
+    currentCat = null;
+    currentPinIndex = -1;
+
+    const container = document.getElementById('galaxyContainer');
+    container.classList.remove('has-selection');
+    document.querySelectorAll('.galaxy-orb').forEach(o => o.classList.remove('selected'));
+
+    // Show map hint
+    document.getElementById('mapHint').classList.remove('hidden');
+
+    // Clear pins
+    document.getElementById('mapBg').querySelectorAll('.poi-pin').forEach(p => p.remove());
+
+    // Reset sheet
+    const typeLabel = document.getElementById('sheetTypeLabel');
+    const title = document.getElementById('sheetTitle');
+    const text = document.getElementById('sheetText');
+    typeLabel.style.opacity = '0';
+    title.style.opacity = '0';
+    text.style.opacity = '0';
+    setTimeout(() => {
+      typeLabel.textContent = 'TAP AN ORB TO BEGIN';
+      title.textContent = 'Discover Doral';
+      text.textContent = "Explore the galaxy above — each orb reveals a different facet of this area. Tap one to see what's here.";
+      typeLabel.style.opacity = '1';
+      title.style.opacity = '1';
+      text.style.opacity = '1';
+    }, 200);
+  }
+
+  // === CREATE MAP PINS ===
+  function createPins(cat) {
+    const map = document.getElementById('mapBg');
+    map.querySelectorAll('.poi-pin').forEach(p => p.remove());
+    const pois = categories[cat].pois;
+    pois.forEach((poi, i) => {
+      const pin = document.createElement('div');
+      pin.className = 'poi-pin';
+      pin.style.left = poi.x + '%';
+      pin.style.top = poi.y + '%';
+      pin.setAttribute('data-index', i);
+      pin.onclick = (e) => { e.stopPropagation(); selectPin(cat, i); };
+      pin.innerHTML = `
+        <div class="pin-dot"></div>
+        <div class="pin-ping"></div>
+        <div class="pin-tooltip">${poi.name}</div>
+      `;
+      map.appendChild(pin);
+      setTimeout(() => pin.classList.add('visible'), 100 + i * 80);
+    });
+  }
+
+  // === SELECT PIN ===
+  function selectPin(cat, index) {
+    document.querySelectorAll('.poi-pin').forEach(p => p.classList.remove('active'));
+
+    if (currentPinIndex === index) {
+      currentPinIndex = -1;
+      showCategoryOverview(cat);
+      return;
+    }
+
+    currentPinIndex = index;
+    const pin = document.querySelector(`.poi-pin[data-index="${index}"]`);
+    if (pin) pin.classList.add('active');
+
+    const poi = categories[cat].pois[index];
+    const typeLabel = document.getElementById('sheetTypeLabel');
+    const title = document.getElementById('sheetTitle');
+    const text = document.getElementById('sheetText');
+
+    typeLabel.style.opacity = '0';
+    title.style.opacity = '0';
+    text.style.opacity = '0';
+
+    setTimeout(() => {
+      typeLabel.textContent = categories[cat].title.toUpperCase() + ' — PLACE';
+      title.innerHTML = `<span class="sheet-category-dot"></span>${poi.name}`;
+      text.textContent = poi.desc;
+      typeLabel.style.opacity = '1';
+      title.style.opacity = '1';
+      text.style.opacity = '1';
+    }, 200);
+  }
+
+  // === SHOW CATEGORY OVERVIEW ===
+  function showCategoryOverview(cat) {
+    const data = categories[cat];
+    const typeLabel = document.getElementById('sheetTypeLabel');
+    const title = document.getElementById('sheetTitle');
+    const text = document.getElementById('sheetText');
+
+    document.querySelectorAll('.poi-pin').forEach(p => p.classList.remove('active'));
+
+    typeLabel.style.opacity = '0';
+    title.style.opacity = '0';
+    text.style.opacity = '0';
+
+    setTimeout(() => {
+      typeLabel.textContent = 'CATEGORY OVERVIEW';
+      title.innerHTML = `<span class="sheet-category-dot"></span>${data.title}`;
+      text.textContent = data.text;
+      typeLabel.style.opacity = '1';
+      title.style.opacity = '1';
+      text.style.opacity = '1';
+    }, 200);
+  }
+
+  // Tap empty map to deselect pin
+  document.getElementById('mapBg').addEventListener('click', () => {
+    if (currentPinIndex !== -1 && currentCat) {
+      document.querySelectorAll('.poi-pin').forEach(p => p.classList.remove('active'));
+      currentPinIndex = -1;
+      showCategoryOverview(currentCat);
+    }
+  });
+
+  // === FAB MENU ===
+  let fabOpen = false;
+
+  function toggleFab() {
+    fabOpen = !fabOpen;
+    const main = document.getElementById('fabMain');
+    const items = document.querySelectorAll('.fab-item');
+    const scrim = document.getElementById('fabScrim');
+
+    main.classList.toggle('open', fabOpen);
+    scrim.classList.toggle('visible', fabOpen);
+
+    items.forEach(item => {
+      item.classList.toggle('visible', fabOpen);
+    });
+  }
+
+  // === INIT ===
+  placeOrbs();
+</script>
+</body>
+</html>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Pill Tabs + Interactive Map</title>
+<style>
+  :root {
+    --safety: #E8A735;
+    --character: #2BBCB3;
+    --history: #C4935A;
+    --nearby: #5B9BD5;
+    --cost: #5CAD6F;
+    --whats: #9B6ED8;
+    --active-color: var(--character);
+    --bg-dark: #1A1118;
+    --text-primary: #FAFAFA;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0A0A0A;
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* Accent color on body */
+  body[data-accent="safety"] { --active-color: var(--safety); }
+  body[data-accent="character"] { --active-color: var(--character); }
+  body[data-accent="history"] { --active-color: var(--history); }
+  body[data-accent="nearby"] { --active-color: var(--nearby); }
+  body[data-accent="cost"] { --active-color: var(--cost); }
+  body[data-accent="whats"] { --active-color: var(--whats); }
+
+  /* === HEADER === */
+  .header {
+    padding: 48px 18px 14px;
+    background: linear-gradient(180deg, rgba(26,17,24,0.95) 0%, rgba(10,10,10,1) 100%);
+    flex-shrink: 0;
+  }
+  .header h3 {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-dim);
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 800;
+    margin-top: 2px;
+    letter-spacing: -0.3px;
+  }
+
+  /* === PILL STRIP === */
+  .pill-strip {
+    display: flex;
+    gap: 7px;
+    padding: 10px 18px 12px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+  }
+  .pill-strip::-webkit-scrollbar { display: none; }
+
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 24px;
+    border: 1.5px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .pill .icon {
+    font-size: 15px;
+    transition: transform 0.35s ease;
+  }
+  .pill .label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.35s ease;
+  }
+  .pill.selected {
+    background: color-mix(in srgb, var(--cat-color) 20%, transparent);
+    border-color: var(--cat-color);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--cat-color) 20%, transparent);
+  }
+  .pill.selected .label {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+  .pill.selected .icon {
+    transform: scale(1.1);
+  }
+  .pill:active {
+    transform: scale(0.95);
+  }
+
+  /* === MAP AREA === */
+  .map-area {
+    flex: 1;
+    margin: 0 14px;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+  }
+  .map-bg {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 25% 35%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 65%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    position: relative;
+  }
+  /* Fake roads */
+  .map-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.05) 18.3%, rgba(255,255,255,0.05) 18.8%, transparent 19.3%),
+      linear-gradient(90deg, transparent 42%, rgba(255,255,255,0.04) 42.2%, rgba(255,255,255,0.04) 42.7%, transparent 43%),
+      linear-gradient(90deg, transparent 68%, rgba(255,255,255,0.05) 68.3%, rgba(255,255,255,0.05) 68.8%, transparent 69.3%),
+      linear-gradient(90deg, transparent 88%, rgba(255,255,255,0.04) 88.2%, rgba(255,255,255,0.04) 88.7%, transparent 89%),
+      linear-gradient(0deg, transparent 22%, rgba(255,255,255,0.05) 22.2%, rgba(255,255,255,0.05) 22.7%, transparent 23%),
+      linear-gradient(0deg, transparent 48%, rgba(255,255,255,0.04) 48.2%, rgba(255,255,255,0.04) 48.7%, transparent 49%),
+      linear-gradient(0deg, transparent 72%, rgba(255,255,255,0.05) 72.2%, rgba(255,255,255,0.05) 72.7%, transparent 73%),
+      linear-gradient(38deg, transparent 35%, rgba(255,255,255,0.03) 35.2%, rgba(255,255,255,0.03) 35.6%, transparent 36%),
+      linear-gradient(140deg, transparent 60%, rgba(255,255,255,0.03) 60.2%, rgba(255,255,255,0.03) 60.6%, transparent 61%);
+  }
+  /* Area blocks for realism */
+  .map-bg::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 19.3%, rgba(255,255,255,0.015) 19.3%, rgba(255,255,255,0.015) 42%, transparent 42%),
+      linear-gradient(0deg, transparent 23%, rgba(255,255,255,0.01) 23%, rgba(255,255,255,0.01) 48%, transparent 48%),
+      linear-gradient(90deg, transparent 43%, rgba(255,255,255,0.012) 43%, rgba(255,255,255,0.012) 68%, transparent 68%),
+      linear-gradient(0deg, transparent 49%, rgba(255,255,255,0.008) 49%, rgba(255,255,255,0.008) 72%, transparent 72%);
+  }
+
+  /* POI pins */
+  .poi-pin {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 2;
+    opacity: 0;
+    transform: scale(0) translateX(-50%) translateY(-50%);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .poi-pin.visible {
+    opacity: 1;
+    transform: scale(1) translateX(-50%) translateY(-50%);
+  }
+  .poi-pin .pin-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--active-color);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--active-color) 45%, transparent);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  .poi-pin .pin-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 30%, transparent);
+    transition: all 0.3s ease;
+  }
+  .poi-pin.active .pin-dot {
+    width: 18px;
+    height: 18px;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--active-color) 60%, transparent);
+  }
+  .poi-pin.active .pin-dot::after {
+    inset: -6px;
+    border-color: color-mix(in srgb, var(--active-color) 50%, transparent);
+    border-width: 2px;
+  }
+
+  /* Pin label tooltip */
+  .pin-tooltip {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(26,17,24,0.92);
+    backdrop-filter: blur(8px);
+    border: 1px solid color-mix(in srgb, var(--active-color) 30%, transparent);
+    border-radius: 8px;
+    padding: 5px 10px;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    transform: translateX(-50%) translateY(4px);
+    z-index: 10;
+  }
+  .poi-pin.active .pin-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Ping animation */
+  @keyframes pin-ping {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(2.8); opacity: 0; }
+  }
+  .poi-pin .pin-ping {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    border: 1px solid var(--active-color);
+    animation: pin-ping 1.5s ease-out 0.3s 1;
+    pointer-events: none;
+  }
+
+  /* === SHEET === */
+  .sheet {
+    padding: 14px 20px 14px;
+    background: linear-gradient(to top, rgba(26,17,24,0.98), rgba(26,17,24,0.92));
+    border-top: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    min-height: 130px;
+    transition: all 0.3s ease;
+  }
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.15);
+    margin: 0 auto 10px;
+  }
+  .sheet-type-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-dim);
+    margin-bottom: 3px;
+    transition: opacity 0.25s ease;
+  }
+  .sheet-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 5px;
+    transition: opacity 0.25s ease;
+  }
+  .sheet-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    transition: opacity 0.25s ease;
+  }
+  .sheet-category-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--active-color);
+    margin-right: 6px;
+    vertical-align: middle;
+    transition: background 0.3s ease;
+  }
+
+  /* === BOTTOM NAV === */
+  .bottom-nav {
+    display: flex;
+    background: rgba(26,17,24,0.98);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 6px 0 28px;
+    flex-shrink: 0;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 6px;
+  }
+  .nav-item .nav-icon { font-size: 18px; opacity: 0.5; }
+  .nav-item .nav-label { font-size: 10px; color: var(--text-dim); }
+  .nav-item.active .nav-icon { opacity: 1; }
+  .nav-item.active .nav-label { color: var(--active-color); }
+</style>
+</head>
+<body data-accent="character">
+
+<!-- Header -->
+<div class="header">
+  <h3>Exploring</h3>
+  <h1>Doral, Florida</h1>
+</div>
+
+<!-- Pill Strip -->
+<div class="pill-strip" id="pillStrip"></div>
+
+<!-- Map -->
+<div class="map-area">
+  <div class="map-bg" id="mapBg"></div>
+</div>
+
+<!-- Sheet -->
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-type-label" id="sheetTypeLabel">CATEGORY OVERVIEW</div>
+  <div class="sheet-title" id="sheetTitle"><span class="sheet-category-dot"></span>Character</div>
+  <div class="sheet-text" id="sheetText">CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district. Families gather on weekend evenings at the cultural living room of the community.</div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <div class="nav-item active">
+    <span class="nav-icon">🔍</span>
+    <span class="nav-label">Summary</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">💬</span>
+    <span class="nav-label">Chat</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">🔖</span>
+    <span class="nav-label">Saved</span>
+  </div>
+</div>
+
+<script>
+  // === DATA ===
+  const categories = {
+    character: {
+      title: 'Character', icon: '🎭',
+      text: "CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district. Families gather on weekend evenings at the cultural living room of the community.",
+      pois: [
+        { x: 35, y: 20, name: "CityPlace Doral", desc: "The cultural living room — live music every Friday, Venezuelan bakeries, Colombian coffee shops, and weekend family gatherings that make this Doral's beating heart." },
+        { x: 62, y: 38, name: "Downtown Doral", desc: "A walkable mix of upscale Latin dining, art galleries, and boutique shops. The weekend farmers market draws crowds from all over Miami-Dade." },
+        { x: 22, y: 55, name: "Doral Central Park", desc: "Where the community comes alive — outdoor yoga, food trucks on Thursdays, and a playground that's packed every evening with multilingual families." },
+        { x: 78, y: 22, name: "Costa del Sol", desc: "Authentic Venezuelan arepas and empanadas. This tiny spot has a line out the door at lunch — locals say it's the best in South Florida." },
+        { x: 48, y: 65, name: "La Estancia Argentina", desc: "Traditional Argentine steakhouse with live tango on Saturday nights. The parrillada for two is legendary." },
+        { x: 85, y: 58, name: "Bulla Gastrobar", desc: "Spanish tapas with a Miami twist. The outdoor patio buzzes with energy, especially during their famous Sunday brunch." }
+      ]
+    },
+    history: {
+      title: 'History', icon: '🏛️',
+      text: "Doral transformed from unknown farmland into a major city in just decades. The area's rapid growth through the 1990s into a multicultural hub is one of South Florida's most remarkable stories.",
+      pois: [
+        { x: 40, y: 30, name: "Doral Golf Resort", desc: "The legendary Blue Monster course put Doral on the map in 1962. For decades, this was all Doral was known for — golf and swampland." },
+        { x: 25, y: 55, name: "Old Doral Farmland Marker", desc: "A small plaque marks where sugarcane fields once stretched endlessly. Hard to believe this was all farmland just 40 years ago." },
+        { x: 68, y: 42, name: "Venezuelan Heritage Center", desc: "Documents the massive Venezuelan immigration wave of the 2000s that transformed Doral into 'Doralzuela' — a cultural rebirth." },
+        { x: 55, y: 68, name: "Doral Incorporation Site", desc: "Where Doral officially became a city in 2003. One of the youngest cities in Florida, yet one of the fastest growing." }
+      ]
+    },
+    safety: {
+      title: 'Safety', icon: '🛡️',
+      text: "Doral is recognized as one of the safest cities in Miami-Dade County, with well-lit commercial corridors, active community policing, and a strong neighborhood watch culture.",
+      pois: [
+        { x: 30, y: 25, name: "Doral Police HQ", desc: "State-of-the-art facility with community outreach programs. Their bike patrol unit is a fixture at CityPlace every weekend." },
+        { x: 55, y: 45, name: "Well-Lit Corridor: NW 87th", desc: "Recently upgraded with LED streetlights and security cameras. One of the safest walking corridors in all of Miami-Dade after 10pm." },
+        { x: 72, y: 60, name: "Neighborhood Watch Hub", desc: "The most active neighborhood watch program in the county. Monthly meetings, a dedicated app, and real results — crime down 23% since 2022." },
+        { x: 20, y: 65, name: "Safe Routes Program", desc: "School zone safety initiative with crossing guards, reduced speed limits, and parent volunteer networks at every public school." },
+        { x: 82, y: 28, name: "Emergency Response Station", desc: "Average response time: 4.2 minutes. Among the fastest in Miami-Dade, thanks to strategic station placement throughout the city." }
+      ]
+    },
+    nearby: {
+      title: 'Nearby', icon: '📍',
+      text: "Doral's strategic location puts you 15 minutes from Miami International Airport, 25 minutes from South Beach, and right next to the Everglades. A perfect launchpad for South Florida.",
+      pois: [
+        { x: 15, y: 20, name: "Miami Int'l Airport", desc: "Just 15 minutes east. MIA serves 170+ destinations worldwide — Doral is the closest nice neighborhood to the airport." },
+        { x: 85, y: 25, name: "South Beach", desc: "25 minutes via the expressway. Ocean Drive, Art Deco architecture, and world-famous nightlife are a quick drive from your Doral base." },
+        { x: 10, y: 70, name: "Everglades Nat'l Park", desc: "The gateway to the Everglades is literally at Doral's western edge. Airboat tours, alligator spotting, and stunning sunsets — 10 minutes away." },
+        { x: 88, y: 65, name: "Wynwood Arts District", desc: "20 minutes to Miami's art mecca. Street murals, galleries, craft breweries, and some of the best brunch spots in the city." },
+        { x: 50, y: 18, name: "Coral Gables", desc: "15 minutes south. The 'City Beautiful' offers Mediterranean architecture, Miracle Mile shopping, and the iconic Venetian Pool." },
+        { x: 48, y: 78, name: "Dolphin Mall", desc: "5 minutes away — South Florida's mega outlet mall with 240+ stores, an IMAX theater, and a massive bowling alley." }
+      ]
+    },
+    cost: {
+      title: 'Cost', icon: '💰',
+      text: "Surprisingly affordable — more budget-friendly than Brickell or Coral Gables, with excellent value at family restaurants. Expect $12-18 lunch plates and $8-14 happy hour cocktails.",
+      pois: [
+        { x: 32, y: 22, name: "Arepas El Cacao ($)", desc: "$8-12 per person. Enormous Venezuelan arepas stuffed with your choice of filling. Best value lunch in Doral, hands down." },
+        { x: 58, y: 40, name: "CityPlace Happy Hour", desc: "$8-14 cocktails during happy hour (4-7pm). Most restaurants here offer 2-for-1 deals. Compare to $18-22 in Brickell." },
+        { x: 25, y: 58, name: "Doral Farmers Market", desc: "Fresh produce at wholesale prices every Saturday. A family's weekly groceries for $40-60 — half what you'd pay at a supermarket." },
+        { x: 72, y: 55, name: "Sergio's Cuban ($)", desc: "$10-15 lunch specials with generous portions. Their Cuban sandwich and croqueta preparada are local legends." },
+        { x: 45, y: 72, name: "Free Trolley System", desc: "Doral's free trolley connects major stops across the city. No Uber needed for local errands — saving residents $200+/month." },
+        { x: 80, y: 30, name: "Costco Doral", desc: "One of the highest-volume Costcos in Florida. Bulk buying culture is strong here — families stock up weekly." },
+        { x: 15, y: 40, name: "Ají Limón Peruvian ($$)", desc: "$14-22 dinner plates. Incredible ceviche and lomo saltado at half the price of Peruvian spots in Coral Gables." }
+      ]
+    },
+    whats: {
+      title: "What's Happening", icon: '⚡',
+      text: "This Friday evening, Doral is buzzing with post-work revelry. CityPlace hosts live music tonight, Downtown Doral has packed dining, and the food truck rally kicks off at 7pm.",
+      pois: [
+        { x: 38, y: 25, name: "Live Music @ CityPlace", desc: "Tonight 7-10pm: Latin jazz trio on the main stage. Free entry, grab a cocktail from any nearby bar and enjoy from the plaza seating." },
+        { x: 65, y: 48, name: "Food Truck Rally", desc: "Starting at 7pm in the Downtown Doral lot. 15+ trucks tonight including the famous Mojo Donuts truck and a new Korean-Mexican fusion spot." },
+        { x: 28, y: 60, name: "Yoga in the Park", desc: "Tomorrow 8am at Doral Central Park. Free community yoga session — bring a mat. Usually 50-80 people on Saturday mornings." },
+        { x: 75, y: 30, name: "Art Walk", desc: "This Saturday 6-9pm. Local artists display work along the Downtown Doral promenade. Wine tastings at three participating galleries." },
+        { x: 50, y: 72, name: "Salsa Night @ Bulla", desc: "Every Friday 9pm-midnight. Live salsa band, free dance lessons at 9, open dancing at 10. Gets packed by 10:30 — arrive early." }
+      ]
+    }
+  };
+
+  // Engagement order — simulates user's discovery fingerprint
+  // Most engaged categories first (this would be dynamic in real app)
+  let engagementOrder = ['character', 'history', 'whats', 'nearby', 'safety', 'cost'];
+  let currentCat = 'character';
+  let currentPinIndex = -1; // -1 means category overview, not a specific POI
+
+  // === BUILD PILL STRIP ===
+  function buildPillStrip(selectedCat) {
+    const strip = document.getElementById('pillStrip');
+    strip.innerHTML = '';
+    // Selected category goes first, rest by engagement order
+    const ordered = [selectedCat, ...engagementOrder.filter(c => c !== selectedCat)];
+
+    ordered.forEach(cat => {
+      const data = categories[cat];
+      const pill = document.createElement('div');
+      pill.className = 'pill' + (cat === selectedCat ? ' selected' : '');
+      pill.setAttribute('data-cat', cat);
+      pill.style.setProperty('--cat-color', `var(--${cat})`);
+      pill.onclick = () => selectCategory(cat);
+      pill.innerHTML = `<span class="icon">${data.icon}</span><span class="label">${data.title}</span>`;
+      strip.appendChild(pill);
+    });
+  }
+
+  // === CREATE MAP PINS ===
+  function createPins(cat) {
+    const map = document.getElementById('mapBg');
+    map.querySelectorAll('.poi-pin').forEach(p => p.remove());
+    const pois = categories[cat].pois;
+    pois.forEach((poi, i) => {
+      const pin = document.createElement('div');
+      pin.className = 'poi-pin';
+      pin.style.left = poi.x + '%';
+      pin.style.top = poi.y + '%';
+      pin.setAttribute('data-index', i);
+      pin.onclick = (e) => { e.stopPropagation(); selectPin(cat, i); };
+      pin.innerHTML = `
+        <div class="pin-dot"></div>
+        <div class="pin-ping"></div>
+        <div class="pin-tooltip">${poi.name}</div>
+      `;
+      map.appendChild(pin);
+      setTimeout(() => pin.classList.add('visible'), 100 + i * 80);
+    });
+  }
+
+  // === SELECT CATEGORY (via pill tap) ===
+  function selectCategory(cat) {
+    if (cat === currentCat) return;
+    currentCat = cat;
+    currentPinIndex = -1;
+    document.body.setAttribute('data-accent', cat);
+
+    // Rebuild strip with tapped category first
+    buildPillStrip(cat);
+
+    // Show category overview in sheet
+    showCategoryOverview(cat);
+
+    // Update map pins
+    createPins(cat);
+  }
+
+  // === SELECT PIN (via map dot tap) ===
+  function selectPin(cat, index) {
+    // Deselect all pins
+    document.querySelectorAll('.poi-pin').forEach(p => p.classList.remove('active'));
+
+    // If tapping same pin, deselect and go back to category overview
+    if (currentPinIndex === index) {
+      currentPinIndex = -1;
+      showCategoryOverview(cat);
+      return;
+    }
+
+    currentPinIndex = index;
+
+    // Highlight tapped pin
+    const pin = document.querySelector(`.poi-pin[data-index="${index}"]`);
+    if (pin) pin.classList.add('active');
+
+    // Update sheet with POI info
+    const poi = categories[cat].pois[index];
+    const typeLabel = document.getElementById('sheetTypeLabel');
+    const title = document.getElementById('sheetTitle');
+    const text = document.getElementById('sheetText');
+
+    // Crossfade
+    typeLabel.style.opacity = '0';
+    title.style.opacity = '0';
+    text.style.opacity = '0';
+
+    setTimeout(() => {
+      typeLabel.textContent = categories[cat].title.toUpperCase() + ' — PLACE';
+      title.innerHTML = `<span class="sheet-category-dot"></span>${poi.name}`;
+      text.textContent = poi.desc;
+      typeLabel.style.opacity = '1';
+      title.style.opacity = '1';
+      text.style.opacity = '1';
+    }, 200);
+  }
+
+  // === SHOW CATEGORY OVERVIEW ===
+  function showCategoryOverview(cat) {
+    const data = categories[cat];
+    const typeLabel = document.getElementById('sheetTypeLabel');
+    const title = document.getElementById('sheetTitle');
+    const text = document.getElementById('sheetText');
+
+    typeLabel.style.opacity = '0';
+    title.style.opacity = '0';
+    text.style.opacity = '0';
+
+    setTimeout(() => {
+      typeLabel.textContent = 'CATEGORY OVERVIEW';
+      title.innerHTML = `<span class="sheet-category-dot"></span>${data.title}`;
+      text.textContent = data.text;
+      typeLabel.style.opacity = '1';
+      title.style.opacity = '1';
+      text.style.opacity = '1';
+    }, 200);
+  }
+
+  // === TAP MAP BACKGROUND to deselect pin ===
+  document.getElementById('mapBg').addEventListener('click', () => {
+    if (currentPinIndex !== -1) {
+      document.querySelectorAll('.poi-pin').forEach(p => p.classList.remove('active'));
+      currentPinIndex = -1;
+      showCategoryOverview(currentCat);
+    }
+  });
+
+  // === INIT ===
+  buildPillStrip('character');
+  createPins('character');
+</script>
+</body>
+</html>

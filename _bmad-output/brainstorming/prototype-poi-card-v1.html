@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — POI Card Design</title>
+<style>
+  :root {
+    --safety: #E8A735;
+    --character: #2BBCB3;
+    --history: #C4935A;
+    --nearby: #5B9BD5;
+    --cost: #5CAD6F;
+    --whats: #9B6ED8;
+    --active-color: var(--character);
+    --bg-dark: #0A0A0A;
+    --text-primary: #FAFAFA;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body[data-accent="character"] { --active-color: var(--character); }
+  body[data-accent="cost"] { --active-color: var(--cost); }
+  body[data-accent="whats"] { --active-color: var(--whats); }
+
+  /* === CONTEXT SWITCHER === */
+  .context-bar {
+    padding: 48px 14px 10px;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .ctx-btn {
+    flex: 1;
+    padding: 9px 8px;
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+  }
+  .ctx-btn.active {
+    border-color: var(--active-color);
+    color: var(--text-primary);
+    background: color-mix(in srgb, var(--active-color) 10%, transparent);
+  }
+
+  .context-label {
+    text-align: center;
+    padding: 4px 0 8px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* === MAP AREA === */
+  .map-area {
+    flex: 1;
+    margin: 0 12px;
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+    border: 1.5px solid rgba(255,255,255,0.06);
+    background:
+      radial-gradient(circle at 30% 35%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 65%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+  }
+  .map-area::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.05) 18.3%, rgba(255,255,255,0.05) 18.7%, transparent 19%),
+      linear-gradient(90deg, transparent 50%, rgba(255,255,255,0.04) 50.2%, rgba(255,255,255,0.04) 50.6%, transparent 51%),
+      linear-gradient(90deg, transparent 78%, rgba(255,255,255,0.05) 78.2%, rgba(255,255,255,0.05) 78.6%, transparent 79%),
+      linear-gradient(0deg, transparent 28%, rgba(255,255,255,0.05) 28.2%, rgba(255,255,255,0.05) 28.6%, transparent 29%),
+      linear-gradient(0deg, transparent 58%, rgba(255,255,255,0.04) 58.2%, rgba(255,255,255,0.04) 58.6%, transparent 59%),
+      linear-gradient(0deg, transparent 82%, rgba(255,255,255,0.05) 82.2%, rgba(255,255,255,0.05) 82.6%, transparent 83%);
+  }
+
+  /* === MAP PIN === */
+  .map-pin {
+    position: absolute;
+    left: 45%;
+    top: 45%;
+    transform: translate(-50%, -50%);
+    z-index: 5;
+    cursor: pointer;
+  }
+  .pin-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--active-color);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--active-color) 50%, transparent);
+    position: relative;
+    transition: all 0.3s ease;
+  }
+  .pin-dot::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    border: 2px solid color-mix(in srgb, var(--active-color) 35%, transparent);
+  }
+  .map-pin.expanded .pin-dot {
+    box-shadow: 0 0 24px color-mix(in srgb, var(--active-color) 60%, transparent);
+  }
+
+  /* Simple tooltip (tier 1) */
+  .pin-name-tip {
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px) scale(0.9);
+    background: rgba(20,14,20,0.93);
+    backdrop-filter: blur(12px);
+    border: 1px solid color-mix(in srgb, var(--active-color) 25%, transparent);
+    border-radius: 10px;
+    padding: 7px 14px;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-primary);
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 10;
+  }
+  .pin-name-tip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(20,14,20,0.93);
+  }
+  .map-pin.tapped .pin-name-tip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    pointer-events: auto;
+    cursor: pointer;
+  }
+  .pin-name-tip .tap-hint {
+    font-size: 9px;
+    color: var(--text-dim);
+    font-weight: 500;
+    margin-top: 2px;
+  }
+
+  /* === POI CARD (tier 2) — the "woah" === */
+  .poi-card {
+    position: absolute;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    transform: translateX(-50%) translateY(10px) scale(0.85);
+    width: 300px;
+    background: rgba(22,16,22,0.96);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 20;
+    box-shadow:
+      0 8px 32px rgba(0,0,0,0.5),
+      0 0 20px color-mix(in srgb, var(--active-color) 8%, transparent);
+  }
+  .poi-card::after {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 14px; height: 14px;
+    background: rgba(22,16,22,0.96);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+  }
+  .map-pin.expanded .poi-card {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+    pointer-events: auto;
+  }
+
+  /* Photo carousel */
+  .card-photos {
+    width: 100%;
+    height: 120px;
+    position: relative;
+    overflow: hidden;
+  }
+  .photo-slide {
+    position: absolute;
+    inset: 0;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+  }
+  .photo-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* Simulated photos with gradients */
+  .photo-slide.p1 {
+    background: linear-gradient(135deg, #4a332a 0%, #7a5a3a 40%, #5a3a2a 100%);
+  }
+  .photo-slide.p2 {
+    background: linear-gradient(135deg, #2a3a4a 0%, #3a5a6a 40%, #2a4a5a 100%);
+    transform: translateX(100%);
+  }
+  .photo-slide.p3 {
+    background: linear-gradient(135deg, #3a4a2a 0%, #5a6a3a 40%, #4a5a2a 100%);
+    transform: translateX(200%);
+  }
+  /* Simulated restaurant/place imagery */
+  .photo-slide::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 30% 60%, rgba(255,200,100,0.15) 0%, transparent 40%),
+      radial-gradient(circle at 70% 40%, rgba(255,255,255,0.08) 0%, transparent 30%);
+  }
+  .photo-slide .photo-icon {
+    position: absolute;
+    left: 50%; top: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 36px;
+    opacity: 0.4;
+  }
+
+  /* Photo dots */
+  .photo-dots {
+    position: absolute;
+    bottom: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    z-index: 3;
+  }
+  .photo-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    transition: all 0.3s ease;
+  }
+  .photo-dot.active {
+    width: 14px;
+    border-radius: 3px;
+    background: var(--active-color);
+  }
+
+  /* Swipe hint */
+  .swipe-hint {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8px;
+    color: rgba(255,255,255,0.4);
+    background: rgba(0,0,0,0.4);
+    padding: 3px 7px;
+    border-radius: 8px;
+    z-index: 3;
+    animation: swipe-nudge 2s ease-in-out 1s 2;
+  }
+  @keyframes swipe-nudge {
+    0%, 100% { transform: translateY(-50%) translateX(0); }
+    50% { transform: translateY(-50%) translateX(-4px); }
+  }
+
+  /* Photo gradient overlay */
+  .photo-gradient {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 40px;
+    background: linear-gradient(to top, rgba(22,16,22,0.96), transparent);
+    z-index: 2;
+  }
+
+  /* Card body */
+  .card-body {
+    padding: 10px 14px 12px;
+  }
+
+  /* Name row */
+  .card-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .card-name {
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+  }
+  .card-rating {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #FFD700;
+  }
+  .card-rating .star {
+    font-size: 12px;
+    animation: star-sparkle 2s ease-in-out infinite;
+  }
+  @keyframes star-sparkle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.15); }
+  }
+
+  /* Meta row */
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+  .meta-sep {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex-shrink: 0;
+  }
+
+  /* Live status bar */
+  .live-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+
+  /* Busyness indicator */
+  .buzz-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+  }
+  .buzz-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .buzz-dot.live {
+    background: #4ADE80;
+    box-shadow: 0 0 8px rgba(74,222,128,0.5);
+  }
+  .buzz-dot.live::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1px solid rgba(74,222,128,0.3);
+    animation: buzz-ping 2s ease-out infinite;
+  }
+  .buzz-dot.busy {
+    background: #FB923C;
+    box-shadow: 0 0 8px rgba(251,146,60,0.5);
+  }
+  .buzz-dot.busy::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1px solid rgba(251,146,60,0.3);
+    animation: buzz-ping 1.5s ease-out infinite;
+  }
+  @keyframes buzz-ping {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(2); opacity: 0; }
+  }
+  .buzz-text {
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .buzz-text.live { color: #4ADE80; }
+  .buzz-text.busy { color: #FB923C; }
+
+  /* Wait time / social proof */
+  .live-detail {
+    font-size: 10px;
+    color: var(--text-secondary);
+    text-align: right;
+    line-height: 1.3;
+  }
+
+  /* Buzz bar */
+  .buzz-bar {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 10px;
+    padding: 0 2px;
+  }
+  .buzz-bar-seg {
+    flex: 1;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.08);
+    overflow: hidden;
+    position: relative;
+  }
+  .buzz-bar-seg.filled {
+    background: var(--active-color);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--active-color) 30%, transparent);
+  }
+  .buzz-bar-seg.filled.hot {
+    animation: bar-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes bar-pulse {
+    0%, 100% { opacity: 0.8; }
+    50% { opacity: 1; }
+  }
+
+  /* Contextual insight (changes per category) */
+  .card-insight {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 10px;
+    background: color-mix(in srgb, var(--active-color) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--active-color) 15%, transparent);
+    border-radius: 10px;
+    margin-bottom: 10px;
+  }
+  .insight-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .insight-text {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+  }
+  .insight-text strong {
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+
+  /* Action chips */
+  .card-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .action-chip {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    padding: 8px 6px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.04);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.25s ease;
+  }
+  .action-chip:active {
+    transform: scale(0.95);
+    background: color-mix(in srgb, var(--active-color) 15%, transparent);
+    border-color: color-mix(in srgb, var(--active-color) 30%, transparent);
+    color: var(--text-primary);
+  }
+  .action-chip .chip-icon { font-size: 13px; }
+
+  /* === INSTRUCTIONS === */
+  .instructions {
+    padding: 14px 18px 30px;
+    flex-shrink: 0;
+  }
+  .instructions p {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    text-align: center;
+  }
+  .instructions .step {
+    color: var(--text-secondary);
+    font-weight: 600;
+  }
+</style>
+</head>
+<body data-accent="character">
+
+<!-- Context switcher — see same POI through different category lenses -->
+<div class="context-bar">
+  <button class="ctx-btn active" onclick="setLens('character')">🎭 Character</button>
+  <button class="ctx-btn" onclick="setLens('cost')">💰 Cost</button>
+  <button class="ctx-btn" onclick="setLens('whats')">⚡ What's On</button>
+</div>
+<div class="context-label" id="lensLabel">SAME PLACE, DIFFERENT STORY — TAP LENSES ABOVE</div>
+
+<!-- Map with single pin -->
+<div class="map-area">
+  <div class="map-pin" id="mapPin" onclick="tapPin()">
+    <div class="pin-dot"></div>
+
+    <!-- Tier 1: Name tooltip -->
+    <div class="pin-name-tip" id="nameTip">
+      Costa del Sol
+      <div class="tap-hint">Tap for details</div>
+    </div>
+
+    <!-- Tier 2: Full POI Card -->
+    <div class="poi-card" id="poiCard">
+      <!-- Photo carousel -->
+      <div class="card-photos" id="photoCarousel" onclick="event.stopPropagation()">
+        <div class="photo-slide p1" id="slide1"><span class="photo-icon">🍽️</span></div>
+        <div class="photo-slide p2" id="slide2"><span class="photo-icon">🪑</span></div>
+        <div class="photo-slide p3" id="slide3"><span class="photo-icon">🌮</span></div>
+        <div class="photo-gradient"></div>
+        <div class="photo-dots">
+          <div class="photo-dot active" id="dot1"></div>
+          <div class="photo-dot" id="dot2"></div>
+          <div class="photo-dot" id="dot3"></div>
+        </div>
+        <div class="swipe-hint">swipe ›</div>
+      </div>
+
+      <!-- Card body -->
+      <div class="card-body" onclick="event.stopPropagation()">
+        <!-- Name + Rating -->
+        <div class="card-name-row">
+          <div class="card-name">Costa del Sol</div>
+          <div class="card-rating"><span class="star">⭐</span> 4.7</div>
+        </div>
+
+        <!-- Meta -->
+        <div class="card-meta">
+          <span>Venezuelan</span>
+          <div class="meta-sep"></div>
+          <span>$</span>
+          <div class="meta-sep"></div>
+          <span>0.3 mi</span>
+          <div class="meta-sep"></div>
+          <span>Open til 10pm</span>
+        </div>
+
+        <!-- Live status -->
+        <div class="live-status">
+          <div class="buzz-indicator">
+            <div class="buzz-dot busy"></div>
+            <span class="buzz-text busy" id="buzzText">Lively now</span>
+          </div>
+          <div class="live-detail" id="liveDetail">~10 min wait<br>at the door</div>
+        </div>
+
+        <!-- Buzz bar -->
+        <div class="buzz-bar" id="buzzBar">
+          <div class="buzz-bar-seg filled"></div>
+          <div class="buzz-bar-seg filled"></div>
+          <div class="buzz-bar-seg filled"></div>
+          <div class="buzz-bar-seg filled hot"></div>
+          <div class="buzz-bar-seg"></div>
+          <div class="buzz-bar-seg"></div>
+        </div>
+
+        <!-- Contextual insight (changes per lens!) -->
+        <div class="card-insight" id="cardInsight">
+          <span class="insight-icon">🎭</span>
+          <div class="insight-text" id="insightText"><strong>Local favorite since 2015</strong> — authentic Venezuelan arepas that line out the door. This is the real Doral character.</div>
+        </div>
+
+        <!-- Actions -->
+        <div class="card-actions">
+          <div class="action-chip"><span class="chip-icon">🧭</span> Navigate</div>
+          <div class="action-chip"><span class="chip-icon">🔖</span> Save</div>
+          <div class="action-chip"><span class="chip-icon">💬</span> Ask AI</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="instructions">
+  <p>
+    <span class="step">Step 1:</span> Tap the pin dot<br>
+    <span class="step">Step 2:</span> Tap the name tooltip<br>
+    <span class="step">Step 3:</span> Switch category lenses above — watch the insight change<br>
+    <span class="step">Step 4:</span> Swipe photos in the card
+  </p>
+</div>
+
+<script>
+  const pin = document.getElementById('mapPin');
+  let pinState = 0; // 0=idle, 1=name, 2=card
+
+  function tapPin() {
+    if (pinState === 0) {
+      pinState = 1;
+      pin.classList.add('tapped');
+      pin.classList.remove('expanded');
+    } else if (pinState === 1) {
+      pinState = 2;
+      pin.classList.remove('tapped');
+      pin.classList.add('expanded');
+    } else {
+      pinState = 0;
+      pin.classList.remove('tapped', 'expanded');
+    }
+  }
+
+  // Tap name tooltip to expand to card
+  document.getElementById('nameTip').addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (pinState === 1) {
+      pinState = 2;
+      pin.classList.remove('tapped');
+      pin.classList.add('expanded');
+    }
+  });
+
+  // Photo carousel swipe
+  let currentSlide = 0;
+  const carousel = document.getElementById('photoCarousel');
+  let touchStartX = 0;
+
+  carousel.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  });
+  carousel.addEventListener('touchend', (e) => {
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 40) {
+      if (dx < 0 && currentSlide < 2) currentSlide++;
+      if (dx > 0 && currentSlide > 0) currentSlide--;
+      updateSlides();
+    }
+  });
+  // Mouse fallback
+  carousel.addEventListener('mousedown', (e) => { touchStartX = e.clientX; });
+  carousel.addEventListener('mouseup', (e) => {
+    const dx = e.clientX - touchStartX;
+    if (Math.abs(dx) > 40) {
+      if (dx < 0 && currentSlide < 2) currentSlide++;
+      if (dx > 0 && currentSlide > 0) currentSlide--;
+      updateSlides();
+    }
+  });
+
+  function updateSlides() {
+    document.getElementById('slide1').style.transform = `translateX(${-currentSlide * 100}%)`;
+    document.getElementById('slide2').style.transform = `translateX(${(1 - currentSlide) * 100}%)`;
+    document.getElementById('slide3').style.transform = `translateX(${(2 - currentSlide) * 100}%)`;
+    document.getElementById('dot1').classList.toggle('active', currentSlide === 0);
+    document.getElementById('dot2').classList.toggle('active', currentSlide === 1);
+    document.getElementById('dot3').classList.toggle('active', currentSlide === 2);
+  }
+
+  // === CONTEXTUAL LENS — same place, different story ===
+  const lenses = {
+    character: {
+      icon: '🎭',
+      insight: '<strong>Local favorite since 2015</strong> — authentic Venezuelan arepas that line out the door. This is the real Doral character.',
+      buzzText: 'Lively now',
+      buzzClass: 'busy',
+      liveDetail: '~10 min wait<br>at the door',
+      buzzFill: 4,
+    },
+    cost: {
+      icon: '💰',
+      insight: '<strong>$8-12 per person</strong> — best value lunch in Doral. A full arepa platter with juice costs less than a Starbucks order in Brickell.',
+      buzzText: 'Good value',
+      buzzClass: 'live',
+      liveDetail: 'Avg spend<br><strong>$10/person</strong>',
+      buzzFill: 2,
+    },
+    whats: {
+      icon: '⚡',
+      insight: '<strong>Extended hours tonight!</strong> Open til midnight for Friday vibes. Their special: 2-for-1 arepas after 8pm. Get there before the line builds.',
+      buzzText: 'Buzzing tonight',
+      buzzClass: 'busy',
+      liveDetail: 'Special til<br><strong>midnight</strong>',
+      buzzFill: 5,
+    }
+  };
+
+  function setLens(cat) {
+    document.body.setAttribute('data-accent', cat);
+    const lens = lenses[cat];
+
+    // Update buttons
+    document.querySelectorAll('.ctx-btn').forEach(b => b.classList.remove('active'));
+    document.querySelector(`.ctx-btn[onclick*="${cat}"]`).classList.add('active');
+
+    // Update card insight
+    document.getElementById('cardInsight').querySelector('.insight-icon').textContent = lens.icon;
+    document.getElementById('insightText').innerHTML = lens.insight;
+
+    // Update buzz
+    document.getElementById('buzzText').textContent = lens.buzzText;
+    document.getElementById('buzzText').className = 'buzz-text ' + lens.buzzClass;
+    document.querySelector('.buzz-dot').className = 'buzz-dot ' + lens.buzzClass;
+    document.getElementById('liveDetail').innerHTML = lens.liveDetail;
+
+    // Update buzz bar
+    const segs = document.querySelectorAll('.buzz-bar-seg');
+    segs.forEach((seg, i) => {
+      seg.className = 'buzz-bar-seg';
+      if (i < lens.buzzFill) {
+        seg.classList.add('filled');
+        if (i === lens.buzzFill - 1) seg.classList.add('hot');
+      }
+    });
+
+    // Update lens label
+    document.getElementById('lensLabel').textContent =
+      `VIEWING THROUGH ${cat.toUpperCase()} LENS`;
+  }
+</script>
+</body>
+</html>

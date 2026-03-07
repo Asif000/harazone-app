@@ -3,6 +3,7 @@ package com.areadiscovery.ui.map
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.domain.model.Vibe
 
 @Composable
 expect fun MapComposable(
@@ -11,5 +12,7 @@ expect fun MapComposable(
     longitude: Double,
     zoomLevel: Double,
     pois: List<POI>,
+    activeVibe: Vibe,
     onPoiSelected: (POI?) -> Unit,
+    onMapRenderFailed: () -> Unit,
 )

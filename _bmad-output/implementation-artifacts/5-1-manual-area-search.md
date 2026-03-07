@@ -1,6 +1,6 @@
 # Story 5.1: Manual Area Search
 
-Status: review
+Status: done
 
 ## Story
 

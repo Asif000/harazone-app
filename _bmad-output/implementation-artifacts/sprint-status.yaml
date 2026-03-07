@@ -73,16 +73,35 @@ development_status:
   3-4-poi-accessible-list-view: done
   epic-3-retrospective: optional
 
-  # Epic 4: AI Chat — Ask About Your Area (Phase 1a + 1b)
+  # ACTIVE QUICK SPECS (tracked outside epic structure)
+  # tech-spec-v3-fullscreen-map: implementation-complete (2026-03-06)
+  # tech-spec-localisation-phase-a-ai-locale: in-progress (2026-03-06)
+
+  # V3 ARCHITECTURE PIVOT — WIP
+  # tech-spec-v3-fullscreen-map: wip (status: 2026-03-06)
+  # V3 retires SummaryScreen, SearchScreen, and BottomNavBar entirely.
+  # Full-screen MapLibre map becomes the sole primary surface.
+  # IMPACT:
+  #   - Epic 4 (AI Chat): chat is absorbed into V3 AI search overlay (streamChatResponse).
+  #     Dedicated ChatScreen stories likely superseded — reassess after V3 ships.
+  #   - Story 5.2 (Onboarding): references SummaryScreen as post-permission destination.
+  #     Must be updated to target MapScreen (V3) instead once V3 is done.
+  #   - tech-spec-summary-hero-redesign, chip-cloud-dashboard-v1, radial-galaxy-chip-layout:
+  #     all marked superseded — SummaryScreen components will be deleted in V3.
+
+  # Epic 4: In-Map AI Conversation (Phase 1a + 1b)
+  # NOTE: Partially absorbed by V3 (AI search overlay). Reassess after V3 ships.
   epic-4: backlog
   4-1-simple-chat-screen-and-streaming-responses: backlog
   4-2-multi-turn-conversation-with-context: backlog
   4-3-source-links-and-deep-reading: backlog
   epic-4-retrospective: optional
 
-  # Epic 5: Manual Search & Onboarding (Phase 1b)
+  # Epic 5: Onboarding & Permission Flow (Phase 1b)
   epic-5: in-progress
-  5-1-manual-area-search: review
+  5-1-manual-area-search: done
+  # NOTE: Story 5.2 references SummaryScreen as post-permission destination.
+  # Must be updated once V3 ships — destination changes to MapScreen (V3).
   5-2-location-permission-flow-and-value-first-onboarding: backlog
   epic-5-retrospective: optional
 

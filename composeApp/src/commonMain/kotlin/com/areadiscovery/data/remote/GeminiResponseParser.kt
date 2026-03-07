@@ -50,12 +50,19 @@ internal data class SourceJson(
 
 @Serializable
 internal data class PoiJson(
-    val name: String,
+    @SerialName("poi") val poi: String = "",
+    val name: String = "",
     val type: String,
-    val description: String,
+    val description: String = "",
     val confidence: String = "MEDIUM",
     val latitude: Double? = null,
-    val longitude: Double? = null
+    val longitude: Double? = null,
+    val vibe: String = "",
+    val insight: String = "",
+    val hours: String? = null,
+    val liveStatus: String? = null,
+    val rating: Float? = null,
+    val vibeInsights: Map<String, String> = emptyMap(),
 )
 
 internal class GeminiResponseParser {
@@ -142,12 +149,18 @@ internal class GeminiResponseParser {
             val poisJson = json.decodeFromString<List<PoiJson>>(jsonString)
             poisJson.map { poiJson ->
                 POI(
-                    name = poiJson.name,
+                    name = poiJson.poi.ifBlank { poiJson.name },
                     type = poiJson.type,
                     description = poiJson.description,
                     confidence = parseConfidence(poiJson.confidence),
                     latitude = poiJson.latitude,
-                    longitude = poiJson.longitude
+                    longitude = poiJson.longitude,
+                    vibe = poiJson.vibe,
+                    insight = poiJson.insight,
+                    hours = poiJson.hours,
+                    liveStatus = poiJson.liveStatus,
+                    rating = poiJson.rating,
+                    vibeInsights = poiJson.vibeInsights,
                 )
             }
         } catch (e: Exception) {

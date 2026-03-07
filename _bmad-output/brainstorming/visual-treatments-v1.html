@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AreaDiscovery — Dashboard Visual Explorations</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #07090f; --surface: #0d1117; --border: rgba(255,255,255,0.08);
+  --text: #c9d1d9; --muted: #6e7681; --accent: #7c83fd;
+}
+body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; padding: 28px; min-height: 100vh; }
+h1 { font-size: 20px; font-weight: 700; color: white; }
+.subtitle { font-size: 13px; color: var(--muted); margin-top: 4px; margin-bottom: 24px; }
+
+/* TABS */
+.tab-bar { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+.tab { padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--muted); border-radius: 6px 6px 0 0; border: 1px solid transparent; border-bottom: none; margin-bottom: -1px; transition: all 0.15s; background: transparent; user-select: none; }
+.tab.active { background: var(--surface); border-color: var(--border); color: white; }
+.tab:hover:not(.active) { color: var(--text); }
+
+/* PANELS */
+.panel { display: none; }
+.panel.active { display: block; }
+
+/* CONTROLS */
+.controls { display: flex; gap: 10px; align-items: center; margin-bottom: 20px; flex-wrap: wrap; }
+.btn { padding: 7px 20px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-play { background: #3d5afe; color: white; }
+.btn-play:hover:not(:disabled) { background: #5c6bc0; }
+.btn-play:disabled { opacity: 0.4; cursor: default; }
+.btn-reset { background: transparent; border: 1px solid var(--border); color: var(--muted); cursor: pointer; }
+.btn-reset:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+.status-lbl { font-size: 12px; color: var(--muted); min-width: 140px; }
+
+/* PHONE FRAME */
+.phone-frame { width: 360px; background: var(--surface); border-radius: 40px; border: 6px solid #1c1f26; box-shadow: 0 0 0 1px rgba(255,255,255,0.04), 0 40px 80px rgba(0,0,0,0.7); overflow: hidden; margin: 0 auto; }
+.phone-bar { height: 52px; background: #0a0d14; display: flex; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--border); gap: 8px; }
+.phone-area-name { font-size: 16px; font-weight: 700; color: white; }
+.phone-badge { font-size: 10px; color: rgba(255,255,255,0.35); margin-left: auto; }
+.phone-body { padding: 16px; }
+
+/* ALERT BANNER */
+.alert-banner { background: rgba(165,214,167,0.08); border: 1px solid rgba(165,214,167,0.2); border-radius: 10px; padding: 9px 13px; display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 12px; color: #a5d6a7; }
+
+/* NOTE BOX */
+.note { margin-top: 18px; padding: 14px 18px; background: rgba(255,255,255,0.02); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; font-size: 12px; color: var(--muted); line-height: 1.8; max-width: 700px; margin-left: auto; margin-right: auto; }
+.note strong { color: var(--text); font-size: 13px; display: block; margin-bottom: 4px; }
+.pro { color: #56d364; }
+.con { color: #f85149; }
+.idea { color: #e3b341; }
+
+/* =========================================================
+   TREATMENT A — CONSTELLATION STAR MAP
+   ========================================================= */
+.const-area { position: relative; width: 100%; height: 440px; background: #05070c; border-radius: 0 0 34px 34px; overflow: hidden; }
+#canvas-a { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+
+.cnode { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 5px; transform: translate(-50%, -50%) scale(0.1); opacity: 0; transition: opacity 0.5s ease, transform 0.55s cubic-bezier(0.34, 1.56, 0.64, 1); width: 88px; text-align: center; z-index: 2; }
+.cnode.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.corb { border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1.5px solid var(--c); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.07), transparent 65%); box-shadow: 0 0 18px var(--g); width: 50px; height: 50px; font-size: 20px; flex-shrink: 0; }
+.cnode.wow .corb { width: 66px; height: 66px; font-size: 26px; box-shadow: 0 0 32px var(--g), 0 0 70px var(--g2, transparent); animation: wow-pulse-a 2.8s ease-in-out infinite; }
+@keyframes wow-pulse-a { 0%,100% { box-shadow: 0 0 32px var(--g), 0 0 70px var(--g2, transparent); } 50% { box-shadow: 0 0 50px var(--g), 0 0 110px var(--g2, transparent); } }
+.cname { font-size: 10px; font-weight: 600; color: var(--c); line-height: 1; }
+.clabel { font-size: 9px; color: rgba(255,255,255,0.45); line-height: 1.4; margin-top: 1px; }
+
+@keyframes ring-out-a { 0% { transform: translate(-50%,-50%) scale(1); opacity: 0.8; } 100% { transform: translate(-50%,-50%) scale(4.5); opacity: 0; } }
+.spawn-ring { position: absolute; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.5); animation: ring-out-a 0.9s ease-out forwards; pointer-events: none; z-index: 3; width: 50px; height: 50px; }
+
+/* =========================================================
+   TREATMENT B — GLASS CHIPS + STARFIELD
+   ========================================================= */
+.shimmer-area { background: #06071a; border-radius: 12px; padding: 14px; position: relative; min-height: 180px; overflow: hidden; }
+#canvas-b { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.chip-flow { display: flex; flex-wrap: wrap; gap: 9px; position: relative; z-index: 2; }
+
+.schip { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 100px; font-size: 12px; font-weight: 500; cursor: pointer; opacity: 0; border: 1.5px solid var(--c); background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01)); backdrop-filter: blur(10px); color: var(--c); box-shadow: 0 0 16px var(--g); white-space: nowrap; transform: scale(0.55) translateY(10px); }
+.schip.visible { animation: chip-spring-b 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 1; }
+@keyframes chip-spring-b { 0% { transform: scale(0.55) translateY(10px); } 100% { transform: scale(1) translateY(0); } }
+.schip.wow { padding: 9px 16px; font-size: 13px; box-shadow: 0 0 24px var(--g), 0 0 50px var(--g2, transparent); }
+.schip.wow.visible { animation: chip-spring-wow-b 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 1; }
+@keyframes chip-spring-wow-b { 0% { transform: scale(0.5) translateY(12px); } 65% { transform: scale(1.1) translateY(-2px); } 100% { transform: scale(1.05) translateY(0); } }
+.schip .sicon { font-size: 14px; }
+
+@keyframes particle-fly-b { 0% { transform: translate(0,0); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)); opacity: 0; } }
+.bparticle { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: var(--pc, white); pointer-events: none; z-index: 10; animation: particle-fly-b 0.65s ease-out forwards; }
+
+.shimmer-sweep { position: absolute; top: 0; bottom: 0; width: 100px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.07), transparent); pointer-events: none; z-index: 5; left: -100px; transition: none; }
+.shimmer-sweep.go { animation: sweep-b 0.85s ease-in-out forwards; }
+@keyframes sweep-b { from { left: -100px; } to { left: 100%; } }
+
+/* =========================================================
+   TREATMENT C — RADIAL GALAXY
+   ========================================================= */
+.galaxy-area { background: radial-gradient(ellipse at 50% 50%, #0b0f1e 0%, #060709 85%); border-radius: 0 0 34px 34px; position: relative; height: 420px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+#canvas-c { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+.galaxy-ring { position: relative; width: 300px; height: 300px; z-index: 2; flex-shrink: 0; }
+
+.gchip { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 5px; transform: translate(-50%, -50%); opacity: 0; text-align: center; width: 72px; transition: opacity 0.7s ease; }
+.gchip.visible { opacity: 1; }
+.gorb { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; border: 1.5px solid var(--c); background: radial-gradient(circle at 35% 30%, rgba(255,255,255,0.08), transparent 70%); box-shadow: 0 0 20px var(--g), 0 0 50px var(--g2, transparent); flex-shrink: 0; }
+.gchip.visible.wow .gorb { animation: wow-pulse-c 3s ease-in-out infinite; }
+@keyframes wow-pulse-c { 0%,100% { box-shadow: 0 0 40px var(--g), 0 0 80px var(--g2); } 50% { box-shadow: 0 0 65px var(--g), 0 0 130px var(--g2); } }
+.gname { font-size: 9.5px; font-weight: 600; color: var(--c); line-height: 1; }
+.glabel { font-size: 8.5px; color: rgba(255,255,255,0.45); line-height: 1.4; margin-top: 1px; }
+
+@keyframes sonar-out { 0% { transform: translate(-50%,-50%) scale(0.15); opacity: 0.9; } 100% { transform: translate(-50%,-50%) scale(4); opacity: 0; } }
+.sonar-ring { position: absolute; border-radius: 50%; width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); pointer-events: none; z-index: 5; animation: sonar-out 1.4s ease-out forwards; }
+</style>
+</head>
+<body>
+
+<h1>Dashboard Visual Explorations</h1>
+<p class="subtitle">Brainstorming: Chip cloud alternatives — "constellation forming" as AI buckets stream in &nbsp;·&nbsp; AreaDiscovery 2026-03-06</p>
+
+<div class="tab-bar">
+  <div class="tab active" onclick="switchTab('a')">A — Constellation Star Map</div>
+  <div class="tab" onclick="switchTab('b')">B — Glass Chips + Starfield</div>
+  <div class="tab" onclick="switchTab('c')">C — Radial Galaxy</div>
+</div>
+
+<!-- ===== PANEL A ===== -->
+<div class="panel active" id="panel-a">
+  <div class="controls">
+    <button class="btn btn-play" id="btn-a" onclick="playA()">&#9654; Stream chips in</button>
+    <button class="btn btn-reset" onclick="resetA()">&#8635; Reset</button>
+    <span class="status-lbl" id="status-a">Ready — 6 chips</span>
+  </div>
+  <div class="phone-frame">
+    <div class="phone-bar">
+      <span class="phone-area-name">&#128205; Coconut Grove</span>
+      <span class="phone-badge">STREAMING</span>
+    </div>
+    <div class="const-area" id="const-area">
+      <canvas id="canvas-a"></canvas>
+    </div>
+  </div>
+  <div class="note">
+    <strong>A — Constellation Star Map</strong>
+    Chips are positioned nodes in a star chart — not a list. Canvas draws connecting lines between related nodes as each arrives. HISTORY is the North Star (top center). Lines animate in as new nodes become visible. On completion all lines briefly brighten.<br><br>
+    <span class="pro">&#10003; Genuinely feels like a constellation forming — because it is one</span><br>
+    <span class="pro">&#10003; Spatial relationships feel intentional (History &#8594; Character &#8594; Safety = cultural heritage chain)</span><br>
+    <span class="pro">&#10003; Unique — nothing comparable in the market</span><br>
+    <span class="con">&#10007; Compose: needs custom Box() absolute positioning + DrawScope for lines (~3-4 days)</span><br>
+    <span class="con">&#10007; Only works well for exactly 6 buckets — fragile if count ever changes</span><br>
+    <span class="idea">&#128161; Dev path: Box(Modifier.fillMaxSize()) with absoluteOffset() per chip + Canvas DrawScope for lines</span>
+  </div>
+</div>
+
+<!-- ===== PANEL B ===== -->
+<div class="panel" id="panel-b">
+  <div class="controls">
+    <button class="btn btn-play" id="btn-b" onclick="playB()">&#9654; Stream chips in</button>
+    <button class="btn btn-reset" onclick="resetB()">&#8635; Reset</button>
+    <span class="status-lbl" id="status-b">Ready — 6 chips</span>
+  </div>
+  <div class="phone-frame">
+    <div class="phone-bar">
+      <span class="phone-area-name">&#128205; Coconut Grove</span>
+      <span class="phone-badge">STREAMING</span>
+    </div>
+    <div class="phone-body">
+      <div class="alert-banner">&#9889; Farmers market this Saturday — 8am to 1pm</div>
+      <div class="shimmer-area" id="shimmer-area">
+        <canvas id="canvas-b"></canvas>
+        <div class="chip-flow" id="chip-flow-b"></div>
+        <div class="shimmer-sweep" id="shimmer-sweep"></div>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    <strong>B — Glass Chips + Starfield (Enhanced FlowRow)</strong>
+    Keeps FlowRow layout but completely redesigns chip visuals: frosted glass with per-bucket accent colors, twinkling starfield background, spring-bounce entry + particle burst per chip, count-up animation for numbers. History chip is larger + continuous glow. Completion = shimmer wave sweep.<br><br>
+    <span class="pro">&#10003; Lowest-risk Android impl — extends existing ChipCloud.kt, mostly visual tweaks (~1-2 days)</span><br>
+    <span class="pro">&#10003; Feels dramatically more alive than current SuggestionChip style</span><br>
+    <span class="pro">&#10003; AlertBanner + accent colors make each bucket feel distinct</span><br>
+    <span class="con">&#10007; Still a grid/list — rows don't feel like a constellation, just a prettier list</span><br>
+    <span class="idea">&#128161; Dev path: replace SuggestionChip with custom @Composable + Canvas starfield layer</span>
+  </div>
+</div>
+
+<!-- ===== PANEL C ===== -->
+<div class="panel" id="panel-c">
+  <div class="controls">
+    <button class="btn btn-play" id="btn-c" onclick="playC()">&#9654; Stream chips in</button>
+    <button class="btn btn-reset" onclick="resetC()">&#8635; Reset</button>
+    <span class="status-lbl" id="status-c">Ready — 6 chips</span>
+  </div>
+  <div class="phone-frame">
+    <div class="phone-bar">
+      <span class="phone-area-name">&#128205; Coconut Grove</span>
+      <span class="phone-badge">STREAMING</span>
+    </div>
+    <div style="padding:0;display:flex;align-items:center;justify-content:center;">
+      <div class="galaxy-area" style="width:100%">
+        <canvas id="canvas-c"></canvas>
+        <div class="galaxy-ring" id="galaxy-ring"></div>
+      </div>
+    </div>
+  </div>
+  <div class="note">
+    <strong>C — Radial Galaxy (HISTORY as gravity well)</strong>
+    HISTORY is the central sun — large glowing orb at center. The 5 other buckets arrive at pentagon positions around it. Each arrival fires a sonar pulse expanding from the HISTORY center. Canvas draws dashed orbital ring + spokes as chips appear. Completion: triple sonar burst.<br><br>
+    <span class="pro">&#10003; HISTORY-as-gravity-well makes thematic sense — place identity radiates from its history</span><br>
+    <span class="pro">&#10003; Best "solar system forming" metaphor — each chip feels like a planet coalescing</span><br>
+    <span class="con">&#10007; Labels around the ring can crowd on small screens</span><br>
+    <span class="con">&#10007; Fixed positions — same fragility as A if bucket count changes</span><br>
+    <span class="idea">&#128161; Dev path: Box() absolute positioning + DrawScope for orbital ring/spokes (~3 days)</span>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const CHIPS = [
+  { id:'history',   icon:'🏛️', name:'History',   label:'1847 · 1923 · 1987 · Now',      wow:true,  c:'#ce93d8', g:'rgba(206,147,216,0.5)', g2:'rgba(206,147,216,0.15)' },
+  { id:'character', icon:'🎭', name:'Character', label:'Art Deco 1920s architecture',    wow:false, c:'#80deea', g:'rgba(128,222,234,0.28)' },
+  { id:'happening', icon:'⚡', name:"What's On", label:'Farmers market every Saturday',  wow:false, c:'#a5d6a7', g:'rgba(165,214,167,0.28)' },
+  { id:'safety',    icon:'🛡️', name:'Safety',    label:'Very safe — low crime rate',     wow:false, c:'#90caf9', g:'rgba(144,202,249,0.28)' },
+  { id:'cost',      icon:'💰', name:'Cost',      label:'47 cafes within walking dist.',  wow:false, c:'#ffcc80', g:'rgba(255,204,128,0.28)', countUp:47 },
+  { id:'nearby',    icon:'📍', name:'Nearby',    label:'Brickell City Centre 0.3mi',     wow:false, c:'#f48fb1', g:'rgba(244,143,177,0.28)' },
+];
+
+const STREAM_ORDER = ['history','character','happening','safety','cost','nearby'];
+
+function sleep(ms) { return new Promise(r => setTimeout(r,ms)); }
+function $id(id) { return document.getElementById(id); }
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', ['a','b','c'][i]===id));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  $id('panel-'+id).classList.add('active');
+  if (id==='a') { sizeA(); startStarsA(); }
+  if (id==='b') { initB(); }
+  if (id==='c') { initC(); }
+}
+
+// ============================================================
+// TREATMENT A — CONSTELLATION STAR MAP
+// ============================================================
+// Positions as [left%, top%] within the const-area
+const CPOS = {
+  history:   [50, 10],
+  character: [21, 37],
+  happening: [79, 37],
+  safety:    [12, 66],
+  cost:      [88, 66],
+  nearby:    [50, 90],
+};
+const CLINES = [
+  ['history','character'],['history','happening'],
+  ['character','happening'],
+  ['character','safety'],['happening','cost'],
+  ['safety','nearby'],['cost','nearby'],
+];
+
+let aVis = new Set(), aRunning = false, aStarRAF = null, aStars = [];
+
+function sizeA() {
+  const area = $id('const-area');
+  const c = $id('canvas-a');
+  c.width = area.offsetWidth;
+  c.height = area.offsetHeight;
+}
+
+function buildNodesA() {
+  const area = $id('const-area');
+  area.querySelectorAll('.cnode,.spawn-ring').forEach(n=>n.remove());
+  CHIPS.forEach(chip => {
+    const [lp,tp] = CPOS[chip.id];
+    const n = document.createElement('div');
+    n.className = 'cnode' + (chip.wow?' wow':'');
+    n.id = 'cnode-'+chip.id;
+    n.style.cssText = `left:${lp}%;top:${tp}%;--c:${chip.c};--g:${chip.g};--g2:${chip.g2||'transparent'}`;
+    n.innerHTML = `<div class="corb">${chip.icon}</div><div class="cname">${chip.name}</div><div class="clabel">${chip.label}</div>`;
+    area.appendChild(n);
+  });
+}
+
+function startStarsA() {
+  const c = $id('canvas-a');
+  const w = c.width, h = c.height;
+  if (!aStars.length) {
+    aStars = Array.from({length:70}, ()=>({
+      x: Math.random()*w, y: Math.random()*h,
+      r: Math.random()*1.2+0.2,
+      baseOp: Math.random()*0.25+0.05,
+      speed: Math.random()*0.025+0.006,
+      phase: Math.random()*Math.PI*2,
+    }));
+  }
+  if (aStarRAF) cancelAnimationFrame(aStarRAF);
+  let frame = 0;
+  function tick() {
+    frame++;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,w,h);
+    aStars.forEach(s => {
+      const op = s.baseOp + Math.sin(frame*s.speed+s.phase)*s.baseOp*0.8;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${Math.max(0,op)})`; ctx.fill();
+    });
+    drawLinesA(ctx, c.width, c.height);
+    aStarRAF = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function getNodeCenter(id, w, h) {
+  const [lp,tp] = CPOS[id];
+  return { x: w*lp/100, y: h*tp/100 };
+}
+
+function drawLinesA(ctx, w, h) {
+  if (aVis.size < 2) return;
+  CLINES.forEach(([a,b]) => {
+    if (!aVis.has(a) || !aVis.has(b)) return;
+    const pa = getNodeCenter(a,w,h), pb = getNodeCenter(b,w,h);
+    ctx.beginPath(); ctx.moveTo(pa.x,pa.y); ctx.lineTo(pb.x,pb.y);
+    ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+    ctx.lineWidth = 1; ctx.setLineDash([3,6]); ctx.stroke(); ctx.setLineDash([]);
+  });
+}
+
+function spawnRingA(chipId) {
+  const area = $id('const-area');
+  const [lp,tp] = CPOS[chipId];
+  const r = document.createElement('div');
+  r.className = 'spawn-ring';
+  r.style.cssText = `left:${lp}%;top:${tp}%`;
+  area.appendChild(r);
+  setTimeout(()=>r.remove(), 1000);
+}
+
+async function playA() {
+  if (aRunning) return;
+  aRunning = true; $id('btn-a').disabled = true;
+  for (let i=0; i<STREAM_ORDER.length; i++) {
+    const id = STREAM_ORDER[i];
+    await sleep(i===0?300:720);
+    spawnRingA(id);
+    await sleep(100);
+    $id('cnode-'+id).classList.add('visible');
+    aVis.add(id);
+    $id('status-a').textContent = `Chip ${i+1}/6 — ${CHIPS.find(c=>c.id===id).name}`;
+  }
+  await sleep(400);
+  $id('status-a').textContent = '&#10003; Portrait complete';
+  $id('btn-a').disabled = false;
+  aRunning = false;
+}
+
+function resetA() {
+  aRunning = false; aVis.clear();
+  $id('btn-a').disabled = false;
+  $id('status-a').textContent = 'Ready — 6 chips';
+  buildNodesA();
+}
+
+function initA() {
+  sizeA(); buildNodesA(); startStarsA();
+}
+
+// ============================================================
+// TREATMENT B — GLASS CHIPS + STARFIELD
+// ============================================================
+let bRunning = false, bVis = new Set(), bRAF = null, bStars = [];
+
+function initB() {
+  bRunning = false; bVis.clear();
+  $id('btn-b').disabled = false;
+  $id('status-b').textContent = 'Ready — 6 chips';
+
+  // build chips
+  const flow = $id('chip-flow-b');
+  flow.innerHTML = '';
+  CHIPS.forEach(chip => {
+    const el = document.createElement('div');
+    el.className = 'schip'+(chip.wow?' wow':'');
+    el.id = 'schip-'+chip.id;
+    el.style.cssText = `--c:${chip.c};--g:${chip.g};--g2:${chip.g2||'transparent'}`;
+    let label = chip.label;
+    if (chip.countUp) label = `<span id="bcount-${chip.id}">0</span> cafes within walking dist.`;
+    el.innerHTML = `<span class="sicon">${chip.icon}</span><span>${label}</span>`;
+    flow.appendChild(el);
+  });
+
+  // reset shimmer
+  const sw = $id('shimmer-sweep');
+  sw.classList.remove('go'); void sw.offsetWidth;
+
+  // starfield canvas
+  const area = $id('shimmer-area');
+  const c = $id('canvas-b');
+  c.width = area.offsetWidth; c.height = area.offsetHeight;
+  bStars = Array.from({length:55}, ()=>({
+    x: Math.random()*c.width, y: Math.random()*c.height,
+    r: Math.random()*0.9+0.2,
+    baseOp: Math.random()*0.18+0.04,
+    speed: Math.random()*0.022+0.006,
+    phase: Math.random()*Math.PI*2,
+  }));
+  if (bRAF) cancelAnimationFrame(bRAF);
+  let frame=0;
+  function tick() {
+    frame++;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0,0,c.width,c.height);
+    bStars.forEach(s=>{
+      const op = s.baseOp+Math.sin(frame*s.speed+s.phase)*s.baseOp*0.9;
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${Math.max(0,op)})`; ctx.fill();
+    });
+    bRAF = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function burstParticlesB(chipEl, color) {
+  const area = $id('shimmer-area');
+  const ar = area.getBoundingClientRect();
+  const cr = chipEl.getBoundingClientRect();
+  const cx = cr.left-ar.left+cr.width/2;
+  const cy = cr.top-ar.top+cr.height/2;
+  for (let i=0;i<10;i++) {
+    const p = document.createElement('div');
+    p.className='bparticle';
+    const angle=(i/10)*Math.PI*2;
+    const dist=18+Math.random()*18;
+    p.style.cssText=`left:${cx}px;top:${cy}px;--pc:${color};--dx:${Math.cos(angle)*dist}px;--dy:${Math.sin(angle)*dist}px`;
+    area.appendChild(p);
+    setTimeout(()=>p.remove(),700);
+  }
+}
+
+function countUpB(id, target) {
+  const el = $id('bcount-'+id);
+  if (!el) return;
+  let cur=0; const steps=28; const iv=400/steps;
+  const t=setInterval(()=>{
+    cur=Math.min(cur+Math.ceil(target/steps),target);
+    el.textContent=cur;
+    if(cur>=target) clearInterval(t);
+  },iv);
+}
+
+async function playB() {
+  if (bRunning) return;
+  bRunning=true; $id('btn-b').disabled=true;
+  for (let i=0;i<STREAM_ORDER.length;i++) {
+    const id=STREAM_ORDER[i];
+    await sleep(i===0?300:650);
+    const chip=CHIPS.find(c=>c.id===id);
+    const el=$id('schip-'+id);
+    el.classList.add('visible');
+    bVis.add(id);
+    setTimeout(()=>burstParticlesB(el,chip.c),60);
+    if (chip.countUp) setTimeout(()=>countUpB(id,chip.countUp),100);
+    $id('status-b').textContent=`Chip ${i+1}/6 — ${chip.name}`;
+  }
+  await sleep(500);
+  const sw=$id('shimmer-sweep');
+  sw.classList.remove('go'); void sw.offsetWidth; sw.classList.add('go');
+  await sleep(900);
+  $id('status-b').textContent='&#10003; Portrait complete';
+  $id('btn-b').disabled=false;
+  bRunning=false;
+}
+
+function resetB() { initB(); }
+
+// ============================================================
+// TREATMENT C — RADIAL GALAXY
+// ============================================================
+// Pentagon: center (150,150) in 300x300 ring, outer r=110
+// Angles from top, clockwise: 270°, 342°, 54°, 126°, 198°
+const GPOS = {
+  history:   { x:150, y:150, size:68 },
+  safety:    { x:150, y: 40, size:44 },
+  character: { x:246, y: 95, size:44 },
+  cost:      { x:216, y:238, size:44 },
+  nearby:    { x: 84, y:238, size:44 },
+  happening: { x: 54, y: 95, size:44 },
+};
+const GALAXY_STREAM = ['history','safety','character','cost','nearby','happening'];
+
+let cRunning=false, cVis=new Set(), cStars=[];
+
+function initC() {
+  cRunning=false; cVis.clear();
+  $id('btn-c').disabled=false;
+  $id('status-c').textContent='Ready — 6 chips';
+
+  const ring=$id('galaxy-ring');
+  ring.innerHTML='';
+  CHIPS.forEach(chip=>{
+    const pos=GPOS[chip.id];
+    const el=document.createElement('div');
+    el.className='gchip'+(chip.wow?' wow':'');
+    el.id='gchip-'+chip.id;
+    el.style.cssText=`left:${pos.x}px;top:${pos.y}px;--c:${chip.c};--g:${chip.g};--g2:${chip.g2||'transparent'}`;
+    el.innerHTML=`<div class="gorb" style="width:${pos.size}px;height:${pos.size}px;font-size:${Math.round(pos.size*0.38)}px">${chip.icon}</div><div class="gname">${chip.name}</div><div class="glabel">${chip.label}</div>`;
+    ring.appendChild(el);
+  });
+
+  // size canvas and draw initial state
+  const area = document.querySelector('.galaxy-area');
+  const c=$id('canvas-c');
+  c.width=area.offsetWidth; c.height=area.offsetHeight;
+
+  // generate static stars
+  cStars=Array.from({length:55},()=>({
+    x:Math.random()*c.width, y:Math.random()*c.height,
+    r:Math.random()*0.9+0.2,
+    op:Math.random()*0.15+0.03,
+  }));
+  drawGalaxyC();
+}
+
+function getGalaxyOffset() {
+  const area=document.querySelector('.galaxy-area');
+  const ring=$id('galaxy-ring');
+  const ar=area.getBoundingClientRect();
+  const rr=ring.getBoundingClientRect();
+  return { ox:rr.left-ar.left, oy:rr.top-ar.top };
+}
+
+function drawGalaxyC() {
+  const c=$id('canvas-c');
+  if(!c) return;
+  const ctx=c.getContext('2d');
+  const cw=c.width, ch=c.height;
+  ctx.clearRect(0,0,cw,ch);
+
+  // static stars
+  cStars.forEach(s=>{
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,255,${s.op})`; ctx.fill();
+  });
+
+  if (!$id('galaxy-ring')) return;
+  const {ox,oy}=getGalaxyOffset();
+  const cx=ox+150, cy=oy+150;
+
+  // orbital ring (dashed circle)
+  if (cVis.size>1) {
+    const alpha=Math.min(0.12,(cVis.size-1)*0.03);
+    ctx.beginPath(); ctx.arc(cx,cy,110,0,Math.PI*2);
+    ctx.strokeStyle=`rgba(255,255,255,${alpha})`;
+    ctx.lineWidth=1; ctx.setLineDash([2,8]); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // spokes from center to visible outer chips
+  Object.entries(GPOS).forEach(([id,pos])=>{
+    if(id==='history'||!cVis.has(id)) return;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.lineTo(ox+pos.x, oy+pos.y);
+    ctx.strokeStyle='rgba(255,255,255,0.07)';
+    ctx.lineWidth=1; ctx.setLineDash([2,5]); ctx.stroke(); ctx.setLineDash([]);
+  });
+}
+
+function fireSonar(cx, cy, delay, color) {
+  setTimeout(()=>{
+    const area=document.querySelector('.galaxy-area');
+    if(!area) return;
+    const r=document.createElement('div');
+    r.className='sonar-ring';
+    r.style.cssText=`left:${cx}px;top:${cy}px;border-color:${color||'rgba(255,255,255,0.3)'}`;
+    area.appendChild(r);
+    setTimeout(()=>r.remove(),1600);
+  },delay);
+}
+
+async function playC() {
+  if(cRunning) return;
+  cRunning=true; $id('btn-c').disabled=true;
+
+  const {ox,oy}=getGalaxyOffset();
+  const hcx=ox+150, hcy=oy+150;
+
+  for(let i=0;i<GALAXY_STREAM.length;i++){
+    const id=GALAXY_STREAM[i];
+    await sleep(i===0?300:760);
+    const chip=CHIPS.find(c=>c.id===id);
+    $id('gchip-'+id).classList.add('visible');
+    cVis.add(id);
+    fireSonar(hcx,hcy,0,chip.c.replace('rgb','rgba').replace(')',',0.45)').replace(/rgba\(rgba/,'rgba'));
+    drawGalaxyC();
+    $id('status-c').textContent=`Chip ${i+1}/6 — ${chip.name}`;
+  }
+
+  // triple sonar burst on completion
+  await sleep(400);
+  [0,320,640].forEach(d=>fireSonar(hcx,hcy,d,'rgba(255,255,255,0.35)'));
+  await sleep(800);
+  $id('status-c').textContent='&#10003; Portrait complete';
+  $id('btn-c').disabled=false;
+  cRunning=false;
+}
+
+function resetC() { initC(); }
+
+// ============================================================
+// BOOT
+// ============================================================
+window.addEventListener('DOMContentLoaded', ()=>{
+  initA();
+  // B and C init lazily on tab switch
+});
+</script>
+</body>
+</html>

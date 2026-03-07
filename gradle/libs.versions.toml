@@ -19,6 +19,7 @@ ktor = "3.4.0"
 koin-bom = "4.1.1"
 sqldelight = "2.2.1"
 maplibre = "11.11.0"
+maplibre-annotation = "3.0.2"
 buildkonfig = "0.17.1"
 kotlinx-serialization = "1.8.1"
 kotlinx-coroutines = "1.10.2"
@@ -84,6 +85,7 @@ play-services-location = { module = "com.google.android.gms:play-services-locati
 
 # MapLibre (Android only)
 maplibre-android = { module = "org.maplibre.gl:android-sdk", version.ref = "maplibre" }
+maplibre-plugin-annotation = { module = "org.maplibre.gl:android-plugin-annotation-v9", version.ref = "maplibre-annotation" }
 
 # Logging
 kermit = { module = "co.touchlab:kermit", version.ref = "kermit" }

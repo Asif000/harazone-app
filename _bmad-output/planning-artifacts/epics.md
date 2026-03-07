@@ -249,13 +249,13 @@ Users switch to an interactive map displaying AI-generated points of interest as
 **Infrastructure:** MapLibre integration (expect/actual), POI markers from AI response, three-stop bottom sheet, POIDetailCard, accessible POI list view
 **NFRs as ACs:** NFR4, NFR21, NFR24
 
-### Epic 4: AI Chat — Ask About Your Area (Phase 1a + 1b)
+### Epic 4: In-Map AI Conversation (Phase 1a + 1b)
 Users ask follow-up questions about their area and get streaming AI responses with source attribution. Phase 1b adds multi-turn conversation with context and outbound source links.
 **FRs covered:** FR8, FR10, FR11
 **Infrastructure:** Chat screen, ChatViewModel, ChatStateMapper, InlineChatPrompt (summary → chat bridge), conversation history storage, source link rendering
 **NFRs as ACs:** NFR5
 
-### Epic 5: Manual Search & Onboarding (Phase 1b)
+### Epic 5: Onboarding & Permission Flow (Phase 1b)
 Users can explore any area worldwide by name, use the app fully without granting location permission, and get a value-first onboarding experience that demonstrates the app's worth before asking for trust.
 **FRs covered:** FR17, FR18, FR32, FR33
 **Infrastructure:** Search screen with category chips, SearchViewModel, location permission flow with value explanation, manual search as first-class fallback
@@ -609,7 +609,7 @@ So that I can discover points of interest without needing visual map interaction
 
 ---
 
-## Epic 4: AI Chat — Ask About Your Area
+## Epic 4: In-Map AI Conversation
 
 Users ask follow-up questions about their area and get streaming AI responses with source attribution. Phase 1b adds multi-turn conversation with context and outbound source links.
 
@@ -668,7 +668,7 @@ So that I can verify information or explore topics beyond what the AI summarized
 
 ---
 
-## Epic 5: Manual Search & Onboarding
+## Epic 5: Onboarding & Permission Flow
 
 Users can explore any area worldwide by name, use the app fully without granting location permission, and get a value-first onboarding experience that demonstrates the app's worth before asking for trust.
 

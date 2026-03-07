@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Split Horizon Orbital Map</title>
+<style>
+  :root {
+    --safety: #E8A735;
+    --character: #2BBCB3;
+    --history: #C4935A;
+    --nearby: #5B9BD5;
+    --cost: #5CAD6F;
+    --whats: #9B6ED8;
+    --active-color: var(--character);
+    --bg-dark: #0A0A0A;
+    --text-primary: #FAFAFA;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body[data-accent="safety"] { --active-color: var(--safety); }
+  body[data-accent="character"] { --active-color: var(--character); }
+  body[data-accent="history"] { --active-color: var(--history); }
+  body[data-accent="nearby"] { --active-color: var(--nearby); }
+  body[data-accent="cost"] { --active-color: var(--cost); }
+  body[data-accent="whats"] { --active-color: var(--whats); }
+
+  /* === CONTEXT STRIP === */
+  .context-strip {
+    padding: 48px 16px 6px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    letter-spacing: 0.2px;
+  }
+  .ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .ctx-item .ci { font-size: 11px; }
+  .ctx-sep {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+  .ctx-temp { font-weight: 700; color: var(--text-primary); }
+  .ctx-vibe {
+    color: var(--active-color);
+    font-weight: 700;
+  }
+
+  /* === LOCATION BADGE (tap to search) === */
+  .map-location {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    right: 12px;
+    z-index: 15;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(10,10,10,0.65);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 5px 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  .map-location .loc-icon {
+    font-size: 12px;
+    opacity: 0.5;
+  }
+  .map-location .loc-name {
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    flex: 1;
+  }
+  .map-location .loc-tag {
+    font-size: 8px;
+    color: var(--text-dim);
+    background: rgba(255,255,255,0.05);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .map-location .loc-search-icon {
+    font-size: 11px;
+    opacity: 0.3;
+    transition: opacity 0.2s;
+  }
+  .map-location:active .loc-search-icon { opacity: 0.7; }
+
+  /* === SEARCH OVERLAY === */
+  .search-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(10,10,10,0.97);
+    backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    max-width: 390px;
+    margin: 0 auto;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(8px);
+    transition: all 0.3s ease;
+  }
+  .search-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .search-bar {
+    padding: 50px 14px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .search-input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 10px 12px;
+  }
+  .search-input-wrap .si-icon { font-size: 14px; opacity: 0.4; }
+  .search-input {
+    flex: 1;
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 600;
+    font-family: inherit;
+  }
+  .search-input::placeholder { color: var(--text-dim); font-weight: 400; }
+  .search-cancel {
+    font-size: 13px;
+    color: var(--active-color);
+    font-weight: 600;
+    cursor: pointer;
+    padding: 8px 4px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .search-section {
+    padding: 14px 18px 6px;
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--text-dim);
+  }
+  .search-results {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 40px;
+  }
+  .search-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .search-item:active { background: rgba(255,255,255,0.04); }
+  .search-item .si-emoji {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.05);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+  .search-item .si-info { flex: 1; }
+  .search-item .si-name {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 1px;
+  }
+  .search-item .si-detail {
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+  .search-item .si-meta {
+    text-align: right;
+  }
+  .search-item .si-weather {
+    font-size: 10px;
+    color: var(--text-secondary);
+  }
+  .search-item .si-time {
+    font-size: 9px;
+    color: var(--text-dim);
+  }
+
+  /* === MAP DRAG INDICATOR === */
+  .map-drag-hint {
+    position: absolute;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 6;
+    font-size: 9px;
+    color: var(--text-dim);
+    background: rgba(10,10,10,0.6);
+    backdrop-filter: blur(4px);
+    padding: 4px 10px;
+    border-radius: 8px;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    pointer-events: none;
+  }
+  .map-drag-hint.visible { opacity: 1; }
+  .map-surface.dragging {
+    cursor: grabbing;
+  }
+  .map-surface { cursor: grab; }
+
+  /* === TOP ORB ROW === */
+  .orb-row {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: 0;
+    padding: 6px 10px 0;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .orb-row.bottom-row {
+    align-items: flex-start;
+    padding: 0 10px 6px;
+  }
+
+  /* Arc SVG behind orb rows */
+  .arc-svg {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+  }
+  .orb-row:not(.bottom-row) .arc-svg {
+    bottom: -2px;
+    height: 30px;
+  }
+  .orb-row.bottom-row .arc-svg {
+    top: -2px;
+    height: 30px;
+  }
+  .arc-line {
+    fill: none;
+    stroke: rgba(255,255,255,0.04);
+    stroke-width: 1;
+  }
+
+  /* Orb item */
+  .orb-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;
+    -webkit-user-select: none;
+    user-select: none;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    z-index: 2;
+  }
+  .orb-item:active { transform: scale(0.92); }
+  .orb-row:not(.bottom-row) .orb-item { padding: 4px 12px 8px; }
+  .orb-row.bottom-row .orb-item { padding: 8px 12px 4px; }
+
+  .orb-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    position: relative;
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 22%, rgba(255,255,255,0.08)),
+      color-mix(in srgb, var(--orb-color) 8%, rgba(26,17,24,0.9)));
+    border: 1.5px solid color-mix(in srgb, var(--orb-color) 25%, transparent);
+  }
+  .orb-circle::after {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      color-mix(in srgb, var(--orb-color) 12%, transparent), transparent 70%);
+    opacity: 0.35;
+    transition: all 0.4s ease;
+    animation: orb-breathe 4.5s ease-in-out infinite;
+  }
+  @keyframes orb-breathe {
+    0%, 100% { opacity: 0.25; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.06); }
+  }
+
+  /* Engagement weight sizes — bottom row bigger (thumb-friendly) */
+  .orb-circle.w-high { width: 52px; height: 52px; font-size: 23px; }
+  .orb-circle.w-mid  { width: 46px; height: 46px; font-size: 20px; }
+  .orb-circle.w-low  { width: 40px; height: 40px; font-size: 17px; }
+
+  .orb-name {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-dim);
+    margin-top: 3px;
+    transition: all 0.3s ease;
+    text-align: center;
+  }
+
+  /* Tether line from orb to map */
+  .orb-tether {
+    position: absolute;
+    width: 1px;
+    background: rgba(255,255,255,0.06);
+    transition: all 0.4s ease;
+  }
+  .orb-row:not(.bottom-row) .orb-tether {
+    bottom: 0;
+    height: 8px;
+    left: 50%;
+  }
+  .orb-row.bottom-row .orb-tether {
+    top: 0;
+    height: 8px;
+    left: 50%;
+  }
+
+  /* Selected state */
+  .orb-item.selected .orb-circle {
+    border-color: var(--orb-color);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--orb-color) 35%, transparent);
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 30%, rgba(255,255,255,0.12)),
+      color-mix(in srgb, var(--orb-color) 15%, rgba(26,17,24,0.8)));
+  }
+  .orb-item.selected .orb-circle::after {
+    opacity: 0.85;
+    inset: -9px;
+  }
+  .orb-item.selected .orb-name {
+    color: var(--text-primary);
+  }
+  .orb-item.selected .orb-tether {
+    background: var(--active-color);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--active-color) 40%, transparent);
+    height: 12px;
+  }
+
+  /* Dim unselected when something is selected */
+  .orb-row.has-selection .orb-item:not(.selected) .orb-circle {
+    opacity: 0.45;
+  }
+  .orb-row.has-selection .orb-item:not(.selected) .orb-circle::after {
+    opacity: 0.1;
+  }
+
+  /* === MAP === */
+  .map-container {
+    flex: 1;
+    margin: 0 12px;
+    border-radius: 18px;
+    overflow: hidden;
+    position: relative;
+    min-height: 0;
+    border: 1.5px solid rgba(255,255,255,0.06);
+    transition: all 0.5s ease;
+  }
+  .map-container.active-glow {
+    border-color: color-mix(in srgb, var(--active-color) 30%, transparent);
+    box-shadow: 0 0 24px color-mix(in srgb, var(--active-color) 8%, transparent);
+  }
+  .map-surface {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 30% 35%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 75% 65%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    position: relative;
+  }
+  .map-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transition: all 0.6s ease;
+    background:
+      linear-gradient(90deg, transparent 16%, rgba(255,255,255,0.05) 16.3%, rgba(255,255,255,0.05) 16.7%, transparent 17%),
+      linear-gradient(90deg, transparent 38%, rgba(255,255,255,0.04) 38.2%, rgba(255,255,255,0.04) 38.6%, transparent 39%),
+      linear-gradient(90deg, transparent 62%, rgba(255,255,255,0.05) 62.2%, rgba(255,255,255,0.05) 62.6%, transparent 63%),
+      linear-gradient(90deg, transparent 84%, rgba(255,255,255,0.04) 84.2%, rgba(255,255,255,0.04) 84.6%, transparent 85%),
+      linear-gradient(0deg, transparent 20%, rgba(255,255,255,0.05) 20.2%, rgba(255,255,255,0.05) 20.6%, transparent 21%),
+      linear-gradient(0deg, transparent 45%, rgba(255,255,255,0.04) 45.2%, rgba(255,255,255,0.04) 45.6%, transparent 46%),
+      linear-gradient(0deg, transparent 68%, rgba(255,255,255,0.05) 68.2%, rgba(255,255,255,0.05) 68.6%, transparent 69%),
+      linear-gradient(0deg, transparent 88%, rgba(255,255,255,0.04) 88.2%, rgba(255,255,255,0.04) 88.6%, transparent 89%),
+      linear-gradient(35deg, transparent 32%, rgba(255,255,255,0.025) 32.2%, rgba(255,255,255,0.025) 32.5%, transparent 32.8%),
+      linear-gradient(140deg, transparent 58%, rgba(255,255,255,0.025) 58.2%, rgba(255,255,255,0.025) 58.5%, transparent 58.8%);
+  }
+
+  /* Zoom level indicator */
+  .zoom-badge {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-size: 9px;
+    letter-spacing: 0.8px;
+    color: var(--text-dim);
+    background: rgba(10,10,10,0.6);
+    padding: 3px 8px;
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+    z-index: 5;
+    transition: opacity 0.3s ease;
+    opacity: 0;
+  }
+  .zoom-badge.visible { opacity: 1; }
+
+  /* Map scale bar */
+  .scale-bar {
+    position: absolute;
+    bottom: 10px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .scale-bar.visible { opacity: 1; }
+  .scale-bar .bar {
+    height: 2px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 1px;
+    transition: width 0.6s ease;
+  }
+  .scale-bar .bar-label {
+    font-size: 8px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  /* Zoom transition animation on map surface */
+  .map-surface.zoom-in {
+    animation: zoom-in-effect 0.6s ease forwards;
+  }
+  .map-surface.zoom-out {
+    animation: zoom-out-effect 0.6s ease forwards;
+  }
+  @keyframes zoom-in-effect {
+    0% { transform: scale(0.92); opacity: 0.6; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  @keyframes zoom-out-effect {
+    0% { transform: scale(1.08); opacity: 0.6; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Map hint */
+  .map-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 3;
+    pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  .map-hint.hidden { opacity: 0; }
+  .map-hint span {
+    font-size: 12px;
+    color: var(--text-dim);
+    background: rgba(10,10,10,0.6);
+    padding: 8px 16px;
+    border-radius: 12px;
+    backdrop-filter: blur(5px);
+  }
+
+  /* POI pins */
+  .poi {
+    position: absolute;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 4;
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .poi.visible { opacity: 1; transform: scale(1); }
+
+  .poi .pin-dot {
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--active-color);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--active-color) 40%, transparent);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  .poi .pin-dot::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 22%, transparent);
+    transition: all 0.3s ease;
+  }
+  .poi.active .pin-dot {
+    width: 16px; height: 16px;
+    box-shadow: 0 0 20px color-mix(in srgb, var(--active-color) 55%, transparent);
+  }
+  .poi.active .pin-dot::after {
+    inset: -6px;
+    border-width: 2px;
+    border-color: color-mix(in srgb, var(--active-color) 40%, transparent);
+  }
+
+  /* Pin pulse ring on appear */
+  .poi .pin-ring {
+    position: absolute;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    border: 1px solid var(--active-color);
+    pointer-events: none;
+    animation: pin-ring-out 1.2s ease-out 0.4s 1;
+  }
+  @keyframes pin-ring-out {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(3); opacity: 0; }
+  }
+
+  /* Pin name label — always visible */
+  .poi .pin-tip {
+    position: absolute;
+    left: 50%;
+    background: rgba(20,14,20,0.88);
+    backdrop-filter: blur(10px);
+    border: 1px solid color-mix(in srgb, var(--active-color) 20%, transparent);
+    border-radius: 8px;
+    padding: 3px 8px;
+    white-space: nowrap;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--text-secondary);
+    pointer-events: none;
+    z-index: 10;
+    transition: all 0.3s ease;
+  }
+  /* Position set by JS to avoid overlaps — default is below */
+  .poi .pin-tip.below {
+    top: calc(100% + 6px);
+    transform: translateX(-50%);
+  }
+  .poi .pin-tip.above {
+    bottom: calc(100% + 6px);
+    transform: translateX(-50%);
+  }
+  .poi .pin-tip.right {
+    left: calc(100% + 6px);
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .poi .pin-tip.left {
+    right: calc(100% + 6px);
+    left: auto;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+  .poi.active .pin-tip {
+    color: var(--text-primary);
+    border-color: color-mix(in srgb, var(--active-color) 40%, transparent);
+    background: rgba(20,14,20,0.95);
+  }
+
+  /* === POI CARD (tier 2) === */
+  .poi-card-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .poi-card-overlay.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .poi-card-scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    border-radius: 18px;
+  }
+  .poi-card {
+    position: relative;
+    width: 290px;
+    max-height: 90%;
+    background: rgba(22,16,22,0.97);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    overflow: hidden;
+    transform: translateY(12px) scale(0.92);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow:
+      0 8px 32px rgba(0,0,0,0.5),
+      0 0 24px color-mix(in srgb, var(--active-color) 8%, transparent);
+    overflow-y: auto;
+  }
+  .poi-card-overlay.visible .poi-card {
+    transform: translateY(0) scale(1);
+  }
+
+  /* Photo area */
+  .card-photos {
+    width: 100%;
+    height: 110px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-photo {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    opacity: 0.35;
+    transition: transform 0.4s ease, opacity 0.4s ease;
+  }
+  .card-photo.p1 { background: linear-gradient(135deg, #4a332a, #7a5a3a, #5a3a2a); }
+  .card-photo.p2 { background: linear-gradient(135deg, #2a3a4a, #3a5a6a, #2a4a5a); transform: translateX(100%); }
+  .card-photo.p3 { background: linear-gradient(135deg, #3a4a2a, #5a6a3a, #4a5a2a); transform: translateX(200%); }
+  .card-photo::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 30% 60%, rgba(255,200,100,0.12), transparent 40%);
+  }
+  .card-photo-grad {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 35px;
+    background: linear-gradient(to top, rgba(22,16,22,0.97), transparent);
+    z-index: 2;
+  }
+  .card-photo-dots {
+    position: absolute;
+    bottom: 7px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    z-index: 3;
+  }
+  .card-pdot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.3);
+    transition: all 0.3s ease;
+  }
+  .card-pdot.on {
+    width: 14px;
+    border-radius: 3px;
+    background: var(--active-color);
+  }
+
+  /* Card body */
+  .card-body { padding: 10px 14px 14px; }
+  .card-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 3px;
+  }
+  .card-name { font-size: 15px; font-weight: 800; letter-spacing: -0.2px; }
+  .card-rating {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #FFD700;
+  }
+  .card-rating .star {
+    font-size: 11px;
+    animation: star-sparkle 2s ease-in-out infinite;
+  }
+  @keyframes star-sparkle {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.7; transform: scale(1.15); }
+  }
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+  .card-meta .msep {
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: var(--text-dim);
+  }
+
+  /* Live status */
+  .card-live {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 9px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 9px;
+    margin-bottom: 8px;
+  }
+  .live-left {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex: 1;
+  }
+  .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .live-dot.green { background: #4ADE80; box-shadow: 0 0 6px rgba(74,222,128,0.5); }
+  .live-dot.orange { background: #FB923C; box-shadow: 0 0 6px rgba(251,146,60,0.5); }
+  .live-dot::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1px solid currentColor;
+    animation: ldot-ping 2s ease-out infinite;
+  }
+  .live-dot.green { color: rgba(74,222,128,0.3); }
+  .live-dot.orange { color: rgba(251,146,60,0.3); }
+  @keyframes ldot-ping {
+    0% { transform: scale(1); opacity: 0.5; }
+    100% { transform: scale(2.2); opacity: 0; }
+  }
+  .live-label { font-size: 10px; font-weight: 600; }
+  .live-label.green { color: #4ADE80; }
+  .live-label.orange { color: #FB923C; }
+  .live-right {
+    font-size: 9px;
+    color: var(--text-secondary);
+    text-align: right;
+    line-height: 1.3;
+  }
+
+  /* Buzz bar */
+  .card-buzz {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 8px;
+  }
+  .buzz-seg {
+    flex: 1;
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.06);
+  }
+  .buzz-seg.on {
+    background: var(--active-color);
+    box-shadow: 0 0 4px color-mix(in srgb, var(--active-color) 25%, transparent);
+  }
+  .buzz-seg.hot {
+    animation: bpulse 1.5s ease-in-out infinite;
+  }
+  @keyframes bpulse { 0%,100% { opacity: 0.8; } 50% { opacity: 1; } }
+
+  /* Contextual insight */
+  .card-insight {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 7px 9px;
+    background: color-mix(in srgb, var(--active-color) 7%, transparent);
+    border: 1px solid color-mix(in srgb, var(--active-color) 12%, transparent);
+    border-radius: 9px;
+    margin-bottom: 8px;
+  }
+  .insight-ico { font-size: 13px; flex-shrink: 0; margin-top: 1px; }
+  .insight-txt {
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--text-secondary);
+  }
+  .insight-txt strong { color: var(--text-primary); font-weight: 700; }
+
+  /* Action chips */
+  .card-actions {
+    display: flex;
+    gap: 5px;
+  }
+  .act-chip {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 7px 4px;
+    border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .act-chip:active {
+    transform: scale(0.95);
+    background: color-mix(in srgb, var(--active-color) 12%, transparent);
+    border-color: color-mix(in srgb, var(--active-color) 25%, transparent);
+    color: var(--text-primary);
+  }
+  .act-chip .aci { font-size: 12px; }
+
+  /* Bottom spacer for safe area */
+  .bottom-safe { height: 8px; flex-shrink: 0; }
+
+  /* === FAB === */
+  .fab-wrap {
+    position: fixed;
+    bottom: 32px;
+    right: 14px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 10px;
+  }
+  .fab-btn {
+    width: 50px; height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--active-color) 80%, #fff), var(--active-color));
+    border: none;
+    color: #fff;
+    font-size: 22px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow:
+      0 4px 14px color-mix(in srgb, var(--active-color) 30%, transparent),
+      0 0 20px color-mix(in srgb, var(--active-color) 10%, transparent);
+    transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    z-index: 2;
+  }
+  .fab-btn:active { transform: scale(0.9); }
+  .fab-btn.open { transform: rotate(45deg); background: rgba(255,255,255,0.12); box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .fab-btn::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 18%, transparent);
+    animation: fab-glow 3s ease-in-out infinite;
+  }
+  .fab-btn.open::after { animation: none; opacity: 0; }
+  @keyframes fab-glow {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.12); opacity: 0; }
+  }
+
+  .fab-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    opacity: 0;
+    transform: scale(0.5) translateY(16px);
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+  }
+  .fab-option.show { opacity: 1; transform: scale(1) translateY(0); pointer-events: auto; }
+  .fab-option:nth-child(1) { transition-delay: 0.04s; }
+  .fab-option:nth-child(2) { transition-delay: 0.08s; }
+  .fab-option:nth-child(3) { transition-delay: 0.12s; }
+
+  .fab-label {
+    background: rgba(20,14,20,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 7px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+  }
+  .fab-icon {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: rgba(20,14,20,0.92);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .fab-option:active .fab-icon {
+    background: color-mix(in srgb, var(--active-color) 18%, rgba(20,14,20,0.92));
+    border-color: color-mix(in srgb, var(--active-color) 35%, transparent);
+  }
+
+  .fab-scrim {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .fab-scrim.show { opacity: 1; pointer-events: auto; }
+</style>
+</head>
+<body data-accent="character">
+
+<!-- Context Strip -->
+<div class="context-strip">
+  <div class="ctx-item"><span class="ci">☀️</span> <span class="ctx-temp">78°F</span> Partly cloudy</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item"><span class="ci">🕖</span> 7:12 PM EST</div>
+  <div class="ctx-sep"></div>
+  <div class="ctx-item"><span class="ctx-vibe">6 places buzzing</span></div>
+</div>
+
+<!-- Top Orb Row (most engaged) -->
+<div class="orb-row" id="topRow">
+  <svg class="arc-svg" viewBox="0 0 390 30" preserveAspectRatio="none">
+    <path class="arc-line" d="M 60 0 Q 195 30 330 0" />
+  </svg>
+</div>
+
+<!-- Map -->
+<div class="map-container" id="mapContainer">
+  <div class="map-surface" id="mapSurface"></div>
+  <div class="map-location" id="locBadge" onclick="openSearch()">
+    <span class="loc-icon">📍</span>
+    <span class="loc-name" id="locName">Doral, Florida</span>
+    <span class="loc-tag" id="locTag">First visit</span>
+    <span class="loc-search-icon">🔍</span>
+  </div>
+  <div class="map-hint" id="mapHint"><span>Tap an orb to explore</span></div>
+  <div class="map-drag-hint" id="dragHint">Drag to explore · pins update live</div>
+  <div class="zoom-badge" id="zoomBadge">NEIGHBORHOOD</div>
+  <div class="scale-bar" id="scaleBar">
+    <div class="bar" id="scaleBarLine" style="width: 40px"></div>
+    <span class="bar-label" id="scaleBarLabel">0.5 mi</span>
+  </div>
+  <!-- POI Card Overlay (tier 2) -->
+  <div class="poi-card-overlay" id="poiCardOverlay">
+    <div class="poi-card-scrim" onclick="closePoiCard()"></div>
+    <div class="poi-card" id="poiCard">
+      <div class="card-photos" id="cardPhotos"></div>
+      <div class="card-body" id="cardBody"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Orb Row (less engaged) -->
+<div class="orb-row bottom-row" id="bottomRow">
+  <svg class="arc-svg" viewBox="0 0 390 30" preserveAspectRatio="none">
+    <path class="arc-line" d="M 60 30 Q 195 0 330 30" />
+  </svg>
+</div>
+
+<div class="bottom-safe"></div>
+
+<!-- Search Overlay -->
+<div class="search-overlay" id="searchOverlay">
+  <div class="search-bar">
+    <div class="search-input-wrap">
+      <span class="si-icon">🔍</span>
+      <input class="search-input" id="searchInput" type="text" placeholder="Search any area..." autocomplete="off">
+    </div>
+    <span class="search-cancel" onclick="closeSearch()">Cancel</span>
+  </div>
+  <div class="search-results" id="searchResults">
+    <div class="search-section">NEARBY AREAS</div>
+    <div class="search-item" onclick="switchArea('wynwood')">
+      <div class="si-emoji">🎨</div>
+      <div class="si-info"><div class="si-name">Wynwood</div><div class="si-detail">Arts District · 20 min east</div></div>
+      <div class="si-meta"><div class="si-weather">☀️ 79°F</div><div class="si-time">7:12 PM</div></div>
+    </div>
+    <div class="search-item" onclick="switchArea('brickell')">
+      <div class="si-emoji">🏙️</div>
+      <div class="si-info"><div class="si-name">Brickell</div><div class="si-detail">Financial District · 18 min</div></div>
+      <div class="si-meta"><div class="si-weather">☀️ 80°F</div><div class="si-time">7:12 PM</div></div>
+    </div>
+    <div class="search-item" onclick="switchArea('coconut')">
+      <div class="si-emoji">🌴</div>
+      <div class="si-info"><div class="si-name">Coconut Grove</div><div class="si-detail">Waterfront · 22 min south</div></div>
+      <div class="si-meta"><div class="si-weather">☀️ 79°F</div><div class="si-time">7:12 PM</div></div>
+    </div>
+    <div class="search-section">SAVED AREAS</div>
+    <div class="search-item" onclick="switchArea('tokyo')">
+      <div class="si-emoji">🗼</div>
+      <div class="si-info"><div class="si-name">Shibuya, Tokyo</div><div class="si-detail">Last visited 3 months ago</div></div>
+      <div class="si-meta"><div class="si-weather">🌧️ 58°F</div><div class="si-time">8:12 AM+1</div></div>
+    </div>
+    <div class="search-item" onclick="switchArea('barcelona')">
+      <div class="si-emoji">🏛️</div>
+      <div class="si-info"><div class="si-name">El Born, Barcelona</div><div class="si-detail">Saved · never visited</div></div>
+      <div class="si-meta"><div class="si-weather">⛅ 62°F</div><div class="si-time">1:12 AM+1</div></div>
+    </div>
+    <div class="search-section">TRENDING</div>
+    <div class="search-item" onclick="switchArea('lisbon')">
+      <div class="si-emoji">🇵🇹</div>
+      <div class="si-info"><div class="si-name">Alfama, Lisbon</div><div class="si-detail">Historic quarter · Trending with travelers</div></div>
+      <div class="si-meta"><div class="si-weather">☁️ 59°F</div><div class="si-time">12:12 AM+1</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FAB -->
+<div class="fab-scrim" id="fabScrim" onclick="toggleFab()"></div>
+<div class="fab-wrap">
+  <button class="fab-btn" id="fabBtn" onclick="toggleFab()">+</button>
+  <div class="fab-option" data-action="chat">
+    <span class="fab-label">Chat with AI</span>
+    <div class="fab-icon">💬</div>
+  </div>
+  <div class="fab-option" data-action="saved">
+    <span class="fab-label">Saved Places</span>
+    <div class="fab-icon">🔖</div>
+  </div>
+  <div class="fab-option" data-action="settings">
+    <span class="fab-label">Settings</span>
+    <div class="fab-icon">⚙️</div>
+  </div>
+</div>
+
+<script>
+  // === DATA ===
+  const categories = {
+    character: {
+      title: 'Character', icon: '🎭',
+      text: "CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district.",
+      pois: [
+        { x: 32, y: 18, name: "CityPlace Doral", desc: "The cultural living room — live music Fridays, Venezuelan bakeries, weekend family gatherings.",
+          rating: 4.6, reviews: 2840, type: "Entertainment Complex", price: "$$",
+          buzz: 7, live: { status: 'green', label: 'Lively', detail: '~200 people\nLive music starting' },
+          photos: ['🎶','🏙️','🌮'], insights: {
+            character: { ico: '🎭', text: '<strong>Cultural heartbeat</strong> of Doral — 12 Venezuelan bakeries within walking distance' },
+            cost: { ico: '💰', text: 'Free entry. Dinner avg <strong>$14-22/person</strong>. Parking free after 6pm' },
+            whats: { ico: '⚡', text: '<strong>Live Latin jazz trio tonight</strong> 7-10pm. Free entry, grab a table early' },
+          }},
+        { x: 65, y: 35, name: "Downtown Doral", desc: "Walkable Latin dining, art galleries, boutique shops. Weekend farmers market draws crowds.",
+          rating: 4.4, reviews: 1950, type: "District", price: "$$",
+          buzz: 6, live: { status: 'green', label: 'Busy', detail: '~150 people\nDining rush' },
+          photos: ['🏘️','🎨','🛍️'], insights: {
+            character: { ico: '🎭', text: '<strong>Art-meets-food district</strong> — 6 galleries + 20 restaurants in 3 blocks' },
+            cost: { ico: '💰', text: 'Lunch specials <strong>$10-16</strong>. Best deal: Sergio\'s combo $11.99' },
+            whats: { ico: '⚡', text: '<strong>Food truck rally tonight</strong> 7pm. 15+ trucks, live DJ' },
+          }},
+        { x: 20, y: 52, name: "Central Park", desc: "Outdoor yoga, food trucks Thursdays, playgrounds packed every evening.",
+          rating: 4.7, reviews: 3100, type: "Park", price: "Free",
+          buzz: 5, live: { status: 'green', label: 'Active', detail: '~80 people\nJoggers & families' },
+          photos: ['🌳','🧘','🎪'], insights: {
+            character: { ico: '🎭', text: '<strong>Community gathering spot</strong> — yoga, food trucks, evening soccer matches' },
+            cost: { ico: '💰', text: '<strong>Completely free.</strong> Yoga Saturdays free, food trucks avg $8-12' },
+            whats: { ico: '⚡', text: '<strong>Food trucks Thursday 6pm.</strong> Park yoga tomorrow 8am — bring a mat' },
+          }},
+        { x: 75, y: 20, name: "Costa del Sol", desc: "Venezuelan arepas — line out the door at lunch. Best in South Florida.",
+          rating: 4.8, reviews: 1420, type: "Venezuelan Restaurant", price: "$",
+          buzz: 8, live: { status: 'orange', label: '15 min wait', detail: '~40 people\nLunch rush' },
+          photos: ['🫓','🇻🇪','🍽️'], insights: {
+            character: { ico: '🎭', text: '<strong>Local institution</strong> — 3rd generation family recipe. Line = badge of honor' },
+            cost: { ico: '💰', text: '<strong>$8-12/person.</strong> Best value lunch in Doral. Cash gets 5% off' },
+            whats: { ico: '⚡', text: 'Open late tonight til <strong>11pm</strong>. Usually closes at 9' },
+          }},
+        { x: 48, y: 65, name: "La Estancia", desc: "Argentine steakhouse, live tango Saturday nights. Parrillada for two is legendary.",
+          rating: 4.5, reviews: 890, type: "Argentine Steakhouse", price: "$$$",
+          buzz: 6, live: { status: 'green', label: 'Open', detail: 'Reservations\navailable' },
+          photos: ['🥩','💃','🍷'], insights: {
+            character: { ico: '🎭', text: '<strong>Tango Saturdays</strong> — live band, couples dancing, authentic Buenos Aires vibe' },
+            cost: { ico: '💰', text: 'Parrillada for two <strong>$58</strong>. Worth it. Happy hour wine $9' },
+            whats: { ico: '⚡', text: '<strong>Live tango tomorrow</strong> 8pm. Book parrillada — sells out by 7' },
+          }},
+        { x: 82, y: 55, name: "Bulla Gastrobar", desc: "Spanish tapas, Miami twist. Outdoor patio buzzes, especially Sunday brunch.",
+          rating: 4.3, reviews: 2200, type: "Spanish Tapas", price: "$$",
+          buzz: 9, live: { status: 'green', label: 'Buzzing', detail: '~120 people\nPatio packed' },
+          photos: ['🍤','🥘','🍹'], insights: {
+            character: { ico: '🎭', text: '<strong>The social scene</strong> — where Doral goes to see and be seen. Sunday brunch is iconic' },
+            cost: { ico: '💰', text: 'Tapas <strong>$12-18</strong>. Sangria pitcher $28. Brunch with bottomless mimosas $35' },
+            whats: { ico: '⚡', text: '<strong>Salsa night Friday 9pm.</strong> Free lessons, live band. Packed by 10:30' },
+          }}
+      ]
+    },
+    history: {
+      title: 'History', icon: '🏛️',
+      text: "From farmland to a major city in decades — one of South Florida's most remarkable urban transformations.",
+      pois: [
+        { x: 38, y: 28, name: "Doral Golf Resort", desc: "The Blue Monster put Doral on the map in 1962. All it was known for — golf and swamp.",
+          rating: 4.2, reviews: 5600, type: "Historic Resort", price: "$$$$",
+          buzz: 4, live: { status: 'green', label: 'Open', detail: 'Tours available\nPro shop open' },
+          photos: ['⛳','🏨','🏆'], insights: {
+            history: { ico: '🏛️', text: 'Est. <strong>1962</strong> — Alfred Kaskel\'s vision turned swampland into a world-class resort' },
+            character: { ico: '🎭', text: 'Still the <strong>prestige anchor</strong>. PGA Tour history in every fairway' },
+            cost: { ico: '💰', text: 'Green fees <strong>$150-350</strong>. Resort rooms from $280/night. Tour: free' },
+          }},
+        { x: 22, y: 55, name: "Farmland Marker", desc: "Sugarcane stretched endlessly here. Hard to believe — just 40 years ago.",
+          rating: 4.0, reviews: 120, type: "Historic Marker", price: "Free",
+          buzz: 1, live: { status: 'green', label: 'Open', detail: 'Public access\n24/7' },
+          photos: ['🌾','📜','🗺️'], insights: {
+            history: { ico: '🏛️', text: '<strong>1980s:</strong> Nothing but sugarcane fields. The transformation is staggering' },
+            character: { ico: '🎭', text: 'A <strong>humbling reminder</strong> — this entire city was farmland in living memory' },
+          }},
+        { x: 68, y: 42, name: "Venezuelan Heritage", desc: "Documents the immigration wave that made Doral 'Doralzuela.'",
+          rating: 4.4, reviews: 340, type: "Cultural Center", price: "Free",
+          buzz: 3, live: { status: 'green', label: 'Open', detail: 'Exhibit hours\n10am-6pm' },
+          photos: ['🇻🇪','📸','🎭'], insights: {
+            history: { ico: '🏛️', text: '<strong>2000s wave:</strong> Thousands fled Chávez, chose Doral. Changed the city forever' },
+            character: { ico: '🎭', text: 'Why Doral is <strong>"Doralzuela"</strong> — the story of cultural transformation' },
+          }},
+        { x: 52, y: 70, name: "Incorporation Site", desc: "Doral became a city in 2003. Youngest in Florida, fastest growing.",
+          rating: 3.9, reviews: 85, type: "Government", price: "Free",
+          buzz: 2, live: { status: 'green', label: 'Open', detail: 'City Hall\nopen til 5pm' },
+          photos: ['🏛️','📋','🎉'], insights: {
+            history: { ico: '🏛️', text: '<strong>June 24, 2003:</strong> Doral incorporated. From unincorporated land to one of FL\'s fastest-growing cities' },
+            character: { ico: '🎭', text: 'The <strong>youngest city</strong> in Miami-Dade with the most ambition per square mile' },
+          }}
+      ]
+    },
+    whats: {
+      title: "What's On", icon: '⚡',
+      text: "Friday buzz — CityPlace live music, Downtown packed dining, food truck rally at 7pm.",
+      pois: [
+        { x: 35, y: 25, name: "Live Music", desc: "Tonight 7-10pm: Latin jazz trio at CityPlace. Free entry.",
+          rating: 4.6, reviews: 420, type: "Live Event", price: "Free",
+          buzz: 8, live: { status: 'green', label: 'Starting soon', detail: '7pm tonight\nFree entry' },
+          photos: ['🎵','🎷','🌃'], insights: {
+            whats: { ico: '⚡', text: '<strong>Latin jazz trio</strong> 7-10pm. Grab food first — lines build by 7:30' },
+            character: { ico: '🎭', text: 'CityPlace <strong>Friday ritual</strong> — music is the excuse, community is the reason' },
+          }},
+        { x: 65, y: 48, name: "Food Trucks", desc: "7pm Downtown lot. 15+ trucks including Mojo Donuts.",
+          rating: 4.5, reviews: 680, type: "Food Event", price: "$",
+          buzz: 7, live: { status: 'green', label: 'Setting up', detail: 'Trucks arriving\nStarts 7pm' },
+          photos: ['🚚','🍩','🌮'], insights: {
+            whats: { ico: '⚡', text: '<strong>15+ trucks tonight.</strong> Mojo Donuts, Palate Party, El Rey del Taco. Arrive by 7' },
+            cost: { ico: '💰', text: 'Most items <strong>$8-14</strong>. Best value: El Rey combo $9. Bring cash for shorter lines' },
+          }},
+        { x: 25, y: 62, name: "Park Yoga", desc: "Tomorrow 8am. Free, bring a mat. 50-80 people Saturdays.",
+          rating: 4.7, reviews: 290, type: "Fitness Event", price: "Free",
+          buzz: 3, live: { status: 'green', label: 'Tomorrow', detail: 'Sat 8am\nBring a mat' },
+          photos: ['🧘','🌅','🌳'], insights: {
+            whats: { ico: '⚡', text: '<strong>Tomorrow 8am.</strong> 50-80 people usually. Arrive 7:45 for good spot' },
+            cost: { ico: '💰', text: '<strong>Completely free.</strong> Instructor is volunteer. Tips welcome' },
+          }},
+        { x: 75, y: 28, name: "Art Walk", desc: "Saturday 6-9pm. Local artists, wine tastings at three galleries.",
+          rating: 4.3, reviews: 510, type: "Art Event", price: "Free",
+          buzz: 5, live: { status: 'green', label: 'Tomorrow', detail: 'Sat 6-9pm\n3 galleries' },
+          photos: ['🖼️','🍷','🎨'], insights: {
+            whats: { ico: '⚡', text: '<strong>Saturday Art Walk 6-9pm.</strong> Three galleries, complimentary wine. Local artists' },
+            character: { ico: '🎭', text: 'Doral\'s <strong>creative side</strong> — growing art scene punches above its weight' },
+          }},
+        { x: 50, y: 72, name: "Salsa Night", desc: "Friday 9pm at Bulla. Live band, free lessons, packed by 10:30.",
+          rating: 4.8, reviews: 750, type: "Nightlife", price: "$$",
+          buzz: 9, live: { status: 'green', label: 'Tonight!', detail: '9pm at Bulla\nFree lessons' },
+          photos: ['💃','🎺','🍹'], insights: {
+            whats: { ico: '⚡', text: '<strong>FREE salsa lessons 9pm</strong> then live band. Get there early — packed by 10:30' },
+            cost: { ico: '💰', text: 'No cover. Drinks <strong>$12-16</strong>. Lesson is free. Best deal in Miami nightlife' },
+          }}
+      ]
+    },
+    safety: {
+      title: 'Safety', icon: '🛡️',
+      text: "One of the safest in Miami-Dade — well-lit corridors, community policing, strong watch programs.",
+      pois: [
+        { x: 30, y: 22, name: "Police HQ", desc: "Community outreach. Bike patrol at CityPlace every weekend.",
+          rating: 4.1, reviews: 180, type: "Police Station", price: "N/A",
+          buzz: 3, live: { status: 'green', label: 'Staffed 24/7', detail: 'Bike patrol\nactive now' },
+          photos: ['🚔','👮','🏢'], insights: {
+            safety: { ico: '🛡️', text: '<strong>Community-first policing.</strong> Bike patrols, school visits, weekend presence at CityPlace' },
+          }},
+        { x: 55, y: 45, name: "NW 87th Safe Corridor", desc: "LED lights and cameras. Safest walk in Miami-Dade after 10pm.",
+          rating: 4.5, reviews: 95, type: "Safe Zone", price: "N/A",
+          buzz: 2, live: { status: 'green', label: 'Well-lit', detail: '24 cameras\nLED corridor' },
+          photos: ['💡','📹','🛤️'], insights: {
+            safety: { ico: '🛡️', text: '<strong>Safest night walk in Miami-Dade.</strong> 24 HD cameras, LED lighting, emergency buttons every 200ft' },
+          }},
+        { x: 72, y: 60, name: "Neighborhood Watch", desc: "Most active in the county. Crime down 23% since 2022.",
+          rating: 4.6, reviews: 210, type: "Community Program", price: "N/A",
+          buzz: 4, live: { status: 'green', label: 'Active', detail: 'Patrols tonight\n8pm-12am' },
+          photos: ['👁️','🏘️','📱'], insights: {
+            safety: { ico: '🛡️', text: 'Crime down <strong>23% since 2022.</strong> Most active neighborhood watch in Miami-Dade County' },
+          }},
+        { x: 20, y: 65, name: "Safe Routes", desc: "School zone safety at every public school.",
+          rating: 4.3, reviews: 150, type: "School Safety", price: "N/A",
+          buzz: 2, live: { status: 'green', label: 'Active', detail: 'School zones\nmonitored' },
+          photos: ['🏫','🚸','✅'], insights: {
+            safety: { ico: '🛡️', text: '<strong>Every public school</strong> has dedicated crossing guards, speed cameras, and safe walking corridors' },
+          }},
+        { x: 80, y: 30, name: "Emergency Station", desc: "4.2 min average response. Among fastest in Miami-Dade.",
+          rating: 4.4, reviews: 320, type: "Fire/EMS Station", price: "N/A",
+          buzz: 3, live: { status: 'green', label: 'Staffed', detail: '4.2 min avg\nresponse' },
+          photos: ['🚑','🚒','⏱️'], insights: {
+            safety: { ico: '🛡️', text: '<strong>4.2 min average response</strong> — among the fastest in Miami-Dade. Station 1 is 0.8 miles away' },
+          }}
+      ]
+    },
+    nearby: {
+      title: 'Nearby', icon: '📍',
+      text: "15 min to MIA, 25 min to South Beach, next to the Everglades. Perfect launchpad.",
+      pois: [
+        { x: 12, y: 20, name: "MIA Airport", desc: "15 minutes. 170+ destinations. Closest nice hood to the airport.",
+          rating: 3.8, reviews: 42000, type: "Airport", price: "N/A",
+          buzz: 8, live: { status: 'green', label: 'Normal ops', detail: 'No delays\n15 min drive' },
+          photos: ['✈️','🌎','🧳'], insights: {
+            nearby: { ico: '📍', text: '<strong>15 min drive.</strong> 170+ destinations. Doral is the closest upscale neighborhood to MIA' },
+            cost: { ico: '💰', text: 'Uber to MIA <strong>$12-18</strong>. Free trolley connects to MIA shuttle' },
+          }},
+        { x: 85, y: 25, name: "South Beach", desc: "25 minutes. Ocean Drive, Art Deco, world-class nightlife.",
+          rating: 4.4, reviews: 28000, type: "Beach District", price: "$$$",
+          buzz: 9, live: { status: 'green', label: 'Busy', detail: 'Friday night\npeak vibes' },
+          photos: ['🏖️','🌴','🌊'], insights: {
+            nearby: { ico: '📍', text: '<strong>25 min east.</strong> Ocean Drive, Art Deco, world-class nightlife & dining' },
+            cost: { ico: '💰', text: 'Parking <strong>$20-30</strong>. Uber from Doral $22-30. Go for the day, come home to Doral' },
+          }},
+        { x: 10, y: 72, name: "Everglades", desc: "At Doral's western edge. Airboats, alligators — 10 minutes.",
+          rating: 4.6, reviews: 8500, type: "National Park", price: "$",
+          buzz: 4, live: { status: 'green', label: 'Open', detail: 'Tours running\ntil sunset' },
+          photos: ['🐊','🚤','🌿'], insights: {
+            nearby: { ico: '📍', text: '<strong>10 min west.</strong> Airboat tours, alligator encounters — wild Florida at your doorstep' },
+            cost: { ico: '💰', text: 'Airboat tours <strong>$28-45</strong>. Park entry $30/vehicle. Best value: weekday mornings' },
+          }},
+        { x: 88, y: 65, name: "Wynwood", desc: "20 min. Murals, galleries, breweries, and great brunch.",
+          rating: 4.5, reviews: 15000, type: "Arts District", price: "$$",
+          buzz: 7, live: { status: 'green', label: 'Buzzing', detail: 'Gallery openings\ntonight' },
+          photos: ['🎨','🍺','🖌️'], insights: {
+            nearby: { ico: '📍', text: '<strong>20 min east.</strong> World-famous murals, craft breweries, rooftop bars' },
+            cost: { ico: '💰', text: 'Free to walk. Brunch avg <strong>$18-28</strong>. Brewery flights $14' },
+          }},
+        { x: 50, y: 15, name: "Coral Gables", desc: "15 min south. Mediterranean vibes, Miracle Mile.",
+          rating: 4.3, reviews: 9800, type: "City", price: "$$$",
+          buzz: 5, live: { status: 'green', label: 'Open', detail: 'Shops open\ntil 9pm' },
+          photos: ['🏛️','🌺','🛍️'], insights: {
+            nearby: { ico: '📍', text: '<strong>15 min south.</strong> Mediterranean architecture, Miracle Mile, Venetian Pool' },
+          }},
+        { x: 48, y: 80, name: "Dolphin Mall", desc: "5 min — 240+ stores, IMAX.",
+          rating: 4.0, reviews: 18000, type: "Shopping Mall", price: "$$",
+          buzz: 7, live: { status: 'green', label: 'Open', detail: '240+ stores\nIMAX showing' },
+          photos: ['🛒','🎬','👗'], insights: {
+            nearby: { ico: '📍', text: '<strong>5 min away.</strong> 240+ stores, IMAX, food court with 30+ options' },
+            cost: { ico: '💰', text: 'Outlet prices — <strong>30-70% off</strong> retail. Best deals at Nike, Gap, Coach' },
+          }}
+      ]
+    },
+    cost: {
+      title: 'Cost', icon: '💰',
+      text: "Surprisingly affordable — $12-18 lunches, $8-14 happy hour. Way cheaper than Brickell.",
+      pois: [
+        { x: 30, y: 22, name: "Arepas El Cacao", desc: "$8-12/person. Best value lunch in Doral.",
+          rating: 4.7, reviews: 980, type: "Venezuelan", price: "$",
+          buzz: 7, live: { status: 'orange', label: '10 min wait', detail: 'Lunch rush\nworth the wait' },
+          photos: ['🫓','💵','😋'], insights: {
+            cost: { ico: '💰', text: '<strong>$8-12/person.</strong> Best arepa value in South FL. Cash discount 5%' },
+            character: { ico: '🎭', text: 'Authentic <strong>family-run spot</strong> — recipes from Mérida, Venezuela. No shortcuts' },
+          }},
+        { x: 58, y: 38, name: "CityPlace Happy Hour", desc: "$8-14 cocktails 4-7pm. Brickell charges $18-22.",
+          rating: 4.3, reviews: 1500, type: "Happy Hour", price: "$",
+          buzz: 6, live: { status: 'green', label: 'Happy hour!', detail: '4-7pm today\n$8-14 drinks' },
+          photos: ['🍸','🌅','💰'], insights: {
+            cost: { ico: '💰', text: 'Cocktails <strong>$8-14</strong> vs Brickell\'s $18-22. Same quality, half the price' },
+            whats: { ico: '⚡', text: '<strong>Happy hour 4-7pm daily.</strong> Best seats: outdoor patio facing the fountain' },
+          }},
+        { x: 22, y: 58, name: "Farmers Market", desc: "Weekly groceries for $40-60. Half supermarket price.",
+          rating: 4.5, reviews: 620, type: "Market", price: "$",
+          buzz: 4, live: { status: 'green', label: 'Tomorrow', detail: 'Sat 8am-2pm\nFresh produce' },
+          photos: ['🥑','🍅','🧺'], insights: {
+            cost: { ico: '💰', text: 'Weekly groceries <strong>$40-60</strong> — literally half of Publix prices. Go early for best picks' },
+            whats: { ico: '⚡', text: '<strong>Saturday 8am-2pm.</strong> 40+ vendors. Arrive by 9 for peak selection' },
+          }},
+        { x: 72, y: 55, name: "Sergio's Cuban", desc: "$10-15 lunch specials. Cuban sandwich is legendary.",
+          rating: 4.4, reviews: 3200, type: "Cuban Restaurant", price: "$",
+          buzz: 6, live: { status: 'green', label: 'Open', detail: 'Lunch special\non now' },
+          photos: ['🥪','🍛','☕'], insights: {
+            cost: { ico: '💰', text: 'Lunch combo <strong>$11.99</strong> — sandwich, side, drink. Best value sit-down in Doral' },
+            character: { ico: '🎭', text: '<strong>Cuban diner institution.</strong> Open since 1975. Cafecito is $1.25 and perfect' },
+          }},
+        { x: 45, y: 72, name: "Free Trolley", desc: "Connects the city. Saves $200+/month on rides.",
+          rating: 4.1, reviews: 450, type: "Transit", price: "Free",
+          buzz: 3, live: { status: 'green', label: 'Running', detail: 'Every 20 min\nFree rides' },
+          photos: ['🚋','🗺️','💚'], insights: {
+            cost: { ico: '💰', text: '<strong>100% free.</strong> Saves $200+/month on Uber. Connects CityPlace, Downtown, parks' },
+            nearby: { ico: '📍', text: 'Connects to <strong>MIA shuttle.</strong> Full city coverage every 20 minutes' },
+          }},
+        { x: 82, y: 30, name: "Costco Doral", desc: "Highest-volume Costco in FL. Bulk culture.",
+          rating: 4.2, reviews: 4100, type: "Wholesale", price: "$",
+          buzz: 8, live: { status: 'orange', label: 'Very busy', detail: 'Friday rush\n20 min checkout' },
+          photos: ['🛒','📦','🏪'], insights: {
+            cost: { ico: '💰', text: '<strong>Highest-volume Costco in Florida.</strong> Doral loves bulk. Membership pays for itself in 2 months' },
+            character: { ico: '🎭', text: 'A Doral <strong>cultural landmark</strong> — Saturday Costco run is practically a social event' },
+          }}
+      ]
+    }
+  };
+
+  // Split horizon: top = less engaged (smaller), bottom = most engaged (bigger, thumb-friendly)
+  const topCats  = ['safety', 'nearby', 'cost'];
+  const botCats  = ['character', 'history', 'whats'];
+  const weights  = { character: 'high', history: 'mid', whats: 'mid', safety: 'low', nearby: 'low', cost: 'low' };
+
+  // Zoom levels per category — simulates MapLibre flyTo()
+  const zoomLevels = {
+    character: { level: 'NEIGHBORHOOD', scale: '0.5 mi', barWidth: 40, direction: 'in' },
+    history:   { level: 'NEIGHBORHOOD', scale: '0.5 mi', barWidth: 40, direction: 'in' },
+    whats:     { level: 'NEIGHBORHOOD', scale: '0.3 mi', barWidth: 30, direction: 'in' },
+    safety:    { level: 'CITY',         scale: '1 mi',   barWidth: 55, direction: 'out' },
+    nearby:    { level: 'REGIONAL',     scale: '5 mi',   barWidth: 65, direction: 'out' },
+    cost:      { level: 'CITY',         scale: '1 mi',   barWidth: 55, direction: 'out' },
+  };
+
+  let currentCat = null;
+  let currentPin = -1;
+  let prevZoomDir = null;
+  let cardPhotoIdx = 0;
+
+  // === BUILD ORB ROWS ===
+  function buildRow(rowId, cats) {
+    const row = document.getElementById(rowId);
+    cats.forEach(cat => {
+      const data = categories[cat];
+      const item = document.createElement('div');
+      item.className = 'orb-item';
+      item.setAttribute('data-cat', cat);
+      item.onclick = () => selectOrb(cat);
+      item.innerHTML = `
+        <div class="orb-circle w-${weights[cat]}" style="--orb-color: var(--${cat})">${data.icon}</div>
+        <span class="orb-name">${data.title}</span>
+        <div class="orb-tether"></div>
+      `;
+      row.appendChild(item);
+    });
+  }
+
+  // === SELECT ORB ===
+  function selectOrb(cat) {
+    if (currentCat === cat) { deselectAll(); return; }
+    currentCat = cat;
+    currentPin = -1;
+    document.body.setAttribute('data-accent', cat);
+    document.getElementById('mapContainer').classList.add('active-glow');
+    document.getElementById('mapHint').classList.add('hidden');
+
+    document.querySelectorAll('.orb-row').forEach(r => r.classList.add('has-selection'));
+    document.querySelectorAll('.orb-item').forEach(o =>
+      o.classList.toggle('selected', o.getAttribute('data-cat') === cat));
+
+    applyZoom(cat);
+    createPins(cat);
+  }
+
+  function applyZoom(cat) {
+    const z = zoomLevels[cat];
+    const surf = document.getElementById('mapSurface');
+    const badge = document.getElementById('zoomBadge');
+    const bar = document.getElementById('scaleBar');
+    const barLine = document.getElementById('scaleBarLine');
+    const barLabel = document.getElementById('scaleBarLabel');
+
+    const animClass = z.direction === 'out' ? 'zoom-out' : 'zoom-in';
+    surf.classList.remove('zoom-in', 'zoom-out');
+    void surf.offsetWidth;
+    surf.classList.add(animClass);
+    prevZoomDir = z.direction;
+
+    badge.textContent = z.level;
+    badge.classList.add('visible');
+    barLine.style.width = z.barWidth + 'px';
+    barLabel.textContent = z.scale;
+    bar.classList.add('visible');
+  }
+
+  function deselectAll() {
+    currentCat = null;
+    currentPin = -1;
+    document.querySelectorAll('.orb-row').forEach(r => r.classList.remove('has-selection'));
+    document.querySelectorAll('.orb-item').forEach(o => o.classList.remove('selected'));
+    document.getElementById('mapContainer').classList.remove('active-glow');
+    document.getElementById('mapHint').classList.remove('hidden');
+    document.getElementById('mapSurface').querySelectorAll('.poi').forEach(p => p.remove());
+    document.getElementById('mapSurface').classList.remove('zoom-in', 'zoom-out');
+    document.getElementById('zoomBadge').classList.remove('visible');
+    document.getElementById('scaleBar').classList.remove('visible');
+    closePoiCard();
+    prevZoomDir = null;
+  }
+
+  // === MAP PINS with always-visible, non-overlapping labels ===
+  function createPins(cat) {
+    const surf = document.getElementById('mapSurface');
+    surf.querySelectorAll('.poi').forEach(p => p.remove());
+    closePoiCard();
+
+    const pois = categories[cat].pois;
+    const pinEls = [];
+
+    pois.forEach((poi, i) => {
+      const pin = document.createElement('div');
+      pin.className = 'poi';
+      pin.style.left = poi.x + '%';
+      pin.style.top = poi.y + '%';
+      pin.style.transform = 'translate(-50%, -50%)';
+      pin.setAttribute('data-idx', i);
+      pin.onclick = (e) => { e.stopPropagation(); tapPin(cat, i); };
+      pin.innerHTML = `
+        <div class="pin-dot"></div>
+        <div class="pin-ring"></div>
+        <div class="pin-tip below">${poi.name}</div>
+      `;
+      surf.appendChild(pin);
+      pinEls.push({ el: pin, poi, idx: i });
+      setTimeout(() => pin.classList.add('visible'), 80 + i * 70);
+    });
+
+    // After all pins placed, resolve label overlaps
+    requestAnimationFrame(() => resolveLabels(pinEls));
+  }
+
+  // Simple label placement: try below, above, right, left — pick first non-overlapping
+  function resolveLabels(pinEls) {
+    const placements = []; // { rect, el }
+
+    pinEls.forEach(({ el, poi }) => {
+      const tip = el.querySelector('.pin-tip');
+      const directions = ['below', 'above', 'right', 'left'];
+      let placed = false;
+
+      for (const dir of directions) {
+        tip.className = 'pin-tip ' + dir;
+        const rect = tip.getBoundingClientRect();
+        const overlaps = placements.some(p => rectsOverlap(rect, p.rect, 4));
+        if (!overlaps) {
+          placements.push({ rect, el: tip });
+          placed = true;
+          break;
+        }
+      }
+      // If all directions overlap, keep last tried (left) — best effort
+      if (!placed) {
+        placements.push({ rect: tip.getBoundingClientRect(), el: tip });
+      }
+    });
+  }
+
+  function rectsOverlap(a, b, gap) {
+    return !(a.right + gap < b.left || a.left - gap > b.right ||
+             a.bottom + gap < b.top || a.top - gap > b.bottom);
+  }
+
+  // Single tap = full card
+  function tapPin(cat, idx) {
+    document.querySelectorAll('.poi').forEach(p => p.classList.remove('active'));
+
+    if (currentPin === idx) {
+      // Tap same pin again → close card
+      currentPin = -1;
+      closePoiCard();
+      return;
+    }
+
+    currentPin = idx;
+    document.querySelector(`.poi[data-idx="${idx}"]`)?.classList.add('active');
+    showPoiCard(cat, idx);
+  }
+
+  // === POI CARD ===
+  function showPoiCard(cat, idx) {
+    const poi = categories[cat].pois[idx];
+    const overlay = document.getElementById('poiCardOverlay');
+    const photosEl = document.getElementById('cardPhotos');
+    const bodyEl = document.getElementById('cardBody');
+    cardPhotoIdx = 0;
+
+    const photoClasses = ['p1','p2','p3'];
+    photosEl.innerHTML = poi.photos.map((emoji, i) =>
+      `<div class="card-photo ${photoClasses[i]}" data-pidx="${i}">${emoji}</div>`
+    ).join('') +
+    `<div class="card-photo-grad"></div>
+     <div class="card-photo-dots">
+       ${poi.photos.map((_, i) => `<div class="card-pdot${i === 0 ? ' on' : ''}" data-pidx="${i}"></div>`).join('')}
+     </div>`;
+
+    const insight = (poi.insights && poi.insights[cat]) ||
+                    (poi.insights && poi.insights[Object.keys(poi.insights)[0]]) ||
+                    { ico: '💡', text: poi.desc };
+
+    const buzzSegs = Array.from({length: 10}, (_, i) => {
+      const on = i < poi.buzz;
+      const hot = on && i >= 7;
+      return `<div class="buzz-seg${on ? ' on' : ''}${hot ? ' hot' : ''}"></div>`;
+    }).join('');
+
+    bodyEl.innerHTML = `
+      <div class="card-name-row">
+        <span class="card-name">${poi.name}</span>
+        <span class="card-rating"><span class="star">★</span> ${poi.rating}</span>
+      </div>
+      <div class="card-meta">
+        <span>${poi.type}</span>
+        <span class="msep"></span>
+        <span>${poi.price}</span>
+        <span class="msep"></span>
+        <span>${poi.reviews.toLocaleString()} reviews</span>
+      </div>
+      <div class="card-live">
+        <div class="live-left">
+          <div class="live-dot ${poi.live.status}"></div>
+          <span class="live-label ${poi.live.status}">${poi.live.label}</span>
+        </div>
+        <div class="live-right">${poi.live.detail.replace('\n', '<br>')}</div>
+      </div>
+      <div class="card-buzz">${buzzSegs}</div>
+      <div class="card-insight">
+        <span class="insight-ico">${insight.ico}</span>
+        <span class="insight-txt">${insight.text}</span>
+      </div>
+      <div class="card-actions">
+        <div class="act-chip"><span class="aci">🧭</span> Directions</div>
+        <div class="act-chip"><span class="aci">🔖</span> Save</div>
+        <div class="act-chip"><span class="aci">💬</span> Ask AI</div>
+      </div>
+    `;
+
+    requestAnimationFrame(() => overlay.classList.add('visible'));
+    setupPhotoSwipe(photosEl, poi.photos.length);
+  }
+
+  function closePoiCard() {
+    document.getElementById('poiCardOverlay')?.classList.remove('visible');
+  }
+
+  function setupPhotoSwipe(container, count) {
+    let startX = 0;
+    container.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }, { passive: true });
+    container.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) {
+        if (dx < 0 && cardPhotoIdx < count - 1) cardPhotoIdx++;
+        else if (dx > 0 && cardPhotoIdx > 0) cardPhotoIdx--;
+        updatePhotoSlide(container);
+      }
+    }, { passive: true });
+    container.addEventListener('click', (e) => {
+      e.stopPropagation();
+      cardPhotoIdx = (cardPhotoIdx + 1) % count;
+      updatePhotoSlide(container);
+    });
+  }
+
+  function updatePhotoSlide(container) {
+    container.querySelectorAll('.card-photo').forEach((ph, i) => {
+      ph.style.transform = `translateX(${(i - cardPhotoIdx) * 100}%)`;
+      ph.style.opacity = i === cardPhotoIdx ? '0.35' : '0';
+    });
+    container.querySelectorAll('.card-pdot').forEach((d, i) => {
+      d.classList.toggle('on', i === cardPhotoIdx);
+    });
+  }
+
+  // Tap empty map — dismiss card
+  document.getElementById('mapSurface').addEventListener('click', () => {
+    if (currentPin !== -1) {
+      document.querySelectorAll('.poi').forEach(p => p.classList.remove('active'));
+      currentPin = -1;
+      closePoiCard();
+    }
+  });
+
+  // === FAB ===
+  let fabOpen = false;
+  function toggleFab() {
+    fabOpen = !fabOpen;
+    document.getElementById('fabBtn').classList.toggle('open', fabOpen);
+    document.getElementById('fabScrim').classList.toggle('show', fabOpen);
+    document.querySelectorAll('.fab-option').forEach(o => o.classList.toggle('show', fabOpen));
+  }
+
+  // === SEARCH ===
+  function openSearch() {
+    const overlay = document.getElementById('searchOverlay');
+    overlay.classList.add('open');
+    setTimeout(() => document.getElementById('searchInput').focus(), 300);
+  }
+
+  function closeSearch() {
+    document.getElementById('searchOverlay').classList.remove('open');
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchInput').blur();
+  }
+
+  // Simulated area data for demo
+  const areaData = {
+    wynwood: { name: 'Wynwood, Miami', tag: 'Arts District', weather: '☀️ 79°F Sunny', time: '7:12 PM EST', vibe: '9 places buzzing' },
+    brickell: { name: 'Brickell, Miami', tag: 'Financial Hub', weather: '☀️ 80°F Clear', time: '7:12 PM EST', vibe: '12 places buzzing' },
+    coconut: { name: 'Coconut Grove', tag: 'Waterfront', weather: '☀️ 79°F Breezy', time: '7:12 PM EST', vibe: '5 places buzzing' },
+    tokyo: { name: 'Shibuya, Tokyo', tag: 'Saved area', weather: '🌧️ 58°F Rain', time: '8:12 AM JST', vibe: '24 places buzzing' },
+    barcelona: { name: 'El Born, Barcelona', tag: 'Never visited', weather: '⛅ 62°F Overcast', time: '1:12 AM CET', vibe: '3 places buzzing' },
+    lisbon: { name: 'Alfama, Lisbon', tag: 'Trending', weather: '☁️ 59°F Cloudy', time: '12:12 AM WET', vibe: '7 places buzzing' },
+  };
+
+  function switchArea(areaKey) {
+    const area = areaData[areaKey];
+    if (!area) return;
+
+    // Update location badge
+    document.getElementById('locName').textContent = area.name;
+    document.getElementById('locTag').textContent = area.tag;
+
+    // Update context strip
+    const strip = document.querySelector('.context-strip');
+    const parts = area.weather.split(' ');
+    strip.innerHTML = `
+      <div class="ctx-item"><span class="ci">${parts[0]}</span> <span class="ctx-temp">${parts[1]}</span> ${parts.slice(2).join(' ')}</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item"><span class="ci">🕖</span> ${area.time}</div>
+      <div class="ctx-sep"></div>
+      <div class="ctx-item"><span class="ctx-vibe">${area.vibe}</span></div>
+    `;
+
+    // Reset map state
+    deselectAll();
+    closeSearch();
+  }
+
+  // Search filtering
+  document.getElementById('searchInput').addEventListener('input', (e) => {
+    const q = e.target.value.toLowerCase();
+    document.querySelectorAll('.search-item').forEach(item => {
+      const name = item.querySelector('.si-name').textContent.toLowerCase();
+      const detail = item.querySelector('.si-detail').textContent.toLowerCase();
+      item.style.display = (name.includes(q) || detail.includes(q) || q === '') ? 'flex' : 'none';
+    });
+    // Show/hide section headers based on visible items
+    document.querySelectorAll('.search-section').forEach(sec => {
+      let next = sec.nextElementSibling;
+      let hasVisible = false;
+      while (next && !next.classList.contains('search-section')) {
+        if (next.style.display !== 'none') hasVisible = true;
+        next = next.nextElementSibling;
+      }
+      sec.style.display = hasVisible ? '' : 'none';
+    });
+  });
+
+  // === MAP DRAG (simulated pan) ===
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let mapOffsetX = 0, mapOffsetY = 0;
+  const surf = document.getElementById('mapSurface');
+
+  surf.addEventListener('mousedown', startDrag);
+  surf.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) startDrag(e.touches[0]);
+  }, { passive: true });
+
+  function startDrag(e) {
+    isDragging = true;
+    dragStartX = e.clientX - mapOffsetX;
+    dragStartY = e.clientY - mapOffsetY;
+    surf.classList.add('dragging');
+  }
+
+  document.addEventListener('mousemove', (e) => { if (isDragging) dragMove(e); });
+  document.addEventListener('touchmove', (e) => {
+    if (isDragging && e.touches.length === 1) dragMove(e.touches[0]);
+  }, { passive: true });
+
+  function dragMove(e) {
+    mapOffsetX = e.clientX - dragStartX;
+    mapOffsetY = e.clientY - dragStartY;
+    // Clamp to reasonable bounds
+    mapOffsetX = Math.max(-80, Math.min(80, mapOffsetX));
+    mapOffsetY = Math.max(-60, Math.min(60, mapOffsetY));
+    surf.style.transform = `translate(${mapOffsetX}px, ${mapOffsetY}px)`;
+
+    // Show drag hint on first meaningful drag
+    const dist = Math.sqrt(mapOffsetX * mapOffsetX + mapOffsetY * mapOffsetY);
+    if (dist > 15) {
+      document.getElementById('dragHint').classList.add('visible');
+    }
+  }
+
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+
+  function endDrag() {
+    if (!isDragging) return;
+    isDragging = false;
+    surf.classList.remove('dragging');
+
+    const dist = Math.sqrt(mapOffsetX * mapOffsetX + mapOffsetY * mapOffsetY);
+    if (dist > 30 && currentCat) {
+      // Simulate "new area loaded" — shuffle pins with slight animation
+      simulatePanRefresh();
+    }
+
+    // Snap back smoothly
+    surf.style.transition = 'transform 0.4s ease';
+    surf.style.transform = 'translate(0, 0)';
+    mapOffsetX = 0;
+    mapOffsetY = 0;
+    setTimeout(() => { surf.style.transition = ''; }, 400);
+
+    // Hide drag hint after a moment
+    setTimeout(() => document.getElementById('dragHint').classList.remove('visible'), 1500);
+  }
+
+  function simulatePanRefresh() {
+    if (!currentCat) return;
+    const pois = categories[currentCat].pois;
+    // Briefly flash pins to simulate refresh
+    document.querySelectorAll('.poi').forEach((p, i) => {
+      p.classList.remove('visible');
+      // Re-appear with slight position jitter to simulate new viewport
+      setTimeout(() => {
+        const jitterX = (Math.random() - 0.5) * 8;
+        const jitterY = (Math.random() - 0.5) * 8;
+        const origX = parseFloat(p.style.left);
+        const origY = parseFloat(p.style.top);
+        p.style.left = Math.max(5, Math.min(92, origX + jitterX)) + '%';
+        p.style.top = Math.max(8, Math.min(88, origY + jitterY)) + '%';
+        p.classList.add('visible');
+      }, 100 + i * 50);
+    });
+  }
+
+  // === INIT ===
+  buildRow('topRow', topCats);
+  buildRow('bottomRow', botCats);
+</script>
+</body>
+</html>

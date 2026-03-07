@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Full Galaxy Flow Prototype</title>
+<style>
+  :root {
+    --safety: #E8A735;
+    --character: #2BBCB3;
+    --history: #C4935A;
+    --nearby: #5B9BD5;
+    --cost: #5CAD6F;
+    --whats: #9B6ED8;
+    --active-color: var(--character);
+    --bg-dark: #1A1118;
+    --bg-card: rgba(26,17,24,0.95);
+    --text-primary: #FAFAFA;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+    --transition-speed: 0.7s;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0A0A0A;
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* === HERO CARD === */
+  .hero-card {
+    background: linear-gradient(135deg, #D4722A 0%, #C45A20 50%, #B8481A 100%);
+    padding: 48px 20px 18px;
+    position: relative;
+    z-index: 10;
+    transition: all var(--transition-speed) var(--ease-out-expo);
+  }
+  .hero-card.compressed {
+    padding: 48px 20px 10px;
+  }
+  .hero-location {
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .hero-subtitle {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 2px;
+    font-weight: 500;
+  }
+  .hero-summary {
+    margin-top: 10px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 13px;
+    line-height: 1.45;
+    transition: all var(--transition-speed) var(--ease-out-expo);
+    max-height: 100px;
+    overflow: hidden;
+  }
+  .hero-card.compressed .hero-summary {
+    max-height: 0;
+    padding: 0 14px;
+    margin-top: 0;
+    opacity: 0;
+  }
+
+  /* === MAIN CONTAINER === */
+  .galaxy-map-container {
+    position: relative;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* === LIVING CANVAS BACKGROUND === */
+  .living-canvas {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .living-canvas .photo-layer {
+    position: absolute;
+    inset: -20px;
+    background:
+      url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600"><defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="%23C4721A"/><stop offset="40%" stop-color="%23A0522D"/><stop offset="100%" stop-color="%231A1118"/></linearGradient><linearGradient id="ground" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="%232D1B12"/><stop offset="50%" stop-color="%23392215"/><stop offset="100%" stop-color="%232D1B12"/></linearGradient></defs><rect fill="url(%23sky)" width="400" height="600"/><rect fill="url(%23ground)" y="350" width="400" height="250" opacity="0.7"/><circle cx="320" cy="100" r="40" fill="%23E8A735" opacity="0.15"/><rect x="50" y="300" width="80" height="200" rx="4" fill="%23ffffff" opacity="0.03"/><rect x="160" y="280" width="60" height="220" rx="4" fill="%23ffffff" opacity="0.04"/><rect x="250" y="310" width="90" height="190" rx="4" fill="%23ffffff" opacity="0.03"/></svg>');
+    background-size: cover;
+    background-position: center;
+    filter: blur(25px);
+    opacity: 0.4;
+    animation: canvas-drift 20s ease-in-out infinite alternate;
+  }
+  @keyframes canvas-drift {
+    0% { transform: translate(0, 0) scale(1.1); }
+    100% { transform: translate(-10px, -5px) scale(1.15); }
+  }
+  .living-canvas .overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg,
+      rgba(26,17,24,0.5) 0%,
+      rgba(26,17,24,0.75) 40%,
+      rgba(26,17,24,0.9) 100%);
+  }
+
+  /* === RADIAL GALAXY (EXPLORE STATE) === */
+  .galaxy {
+    position: relative;
+    z-index: 2;
+    transition: all var(--transition-speed) var(--ease-out-expo);
+    overflow: visible;
+  }
+  .galaxy.explore {
+    height: 340px;
+    opacity: 1;
+  }
+  .galaxy.filtered {
+    height: 0;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .galaxy-inner {
+    position: relative;
+    width: 100%;
+    height: 340px;
+  }
+
+  /* Orbit rings */
+  .orbit-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.06);
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+  }
+  .orbit-ring.ring-1 { width: 140px; height: 140px; }
+  .orbit-ring.ring-2 { width: 230px; height: 230px; }
+  .orbit-ring.ring-3 { width: 310px; height: 310px; }
+
+  /* Orbit glow pulse */
+  .orbit-ring::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background: conic-gradient(from 0deg, transparent 0%, rgba(255,255,255,0.08) 10%, transparent 20%) border-box;
+    -webkit-mask: linear-gradient(#fff 0 0) padding-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: ring-sweep 8s linear infinite;
+  }
+  .orbit-ring.ring-2::after { animation-delay: -2.5s; }
+  .orbit-ring.ring-3::after { animation-delay: -5s; }
+  @keyframes ring-sweep {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  /* Center hub */
+  .galaxy-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    z-index: 5;
+  }
+  .center-category {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 600;
+    transition: color 0.5s ease;
+    color: var(--active-color);
+  }
+  .center-text {
+    font-size: 12px;
+    color: var(--text-secondary);
+    max-width: 150px;
+    line-height: 1.4;
+    margin-top: 4px;
+    transition: opacity 0.4s ease;
+  }
+
+  /* Galaxy orbs */
+  .galaxy-orb {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    z-index: 5;
+    transition: all 0.6s var(--ease-spring);
+  }
+  .galaxy-orb .orb-body {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    background: radial-gradient(circle at 35% 35%,
+      color-mix(in srgb, var(--orb-color) 25%, rgba(255,255,255,0.1)),
+      color-mix(in srgb, var(--orb-color) 10%, rgba(26,17,24,0.8)));
+    border: 1.5px solid color-mix(in srgb, var(--orb-color) 40%, transparent);
+    position: relative;
+    transition: all 0.6s var(--ease-spring);
+  }
+  /* Orb glow */
+  .galaxy-orb .orb-body::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--orb-color) 20%, transparent), transparent 70%);
+    opacity: 0.5;
+    transition: opacity 0.5s ease;
+    animation: orb-breathe 4s ease-in-out infinite;
+  }
+  @keyframes orb-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.1); opacity: 0.6; }
+  }
+  .galaxy-orb .orb-name {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: color 0.4s ease;
+  }
+
+  /* Vibe-weighted sizing — "Character" is most engaged */
+  .galaxy-orb[data-cat="character"] .orb-body { width: 60px; height: 60px; font-size: 26px; }
+  .galaxy-orb[data-cat="character"] .orb-body::after { opacity: 0.8; }
+  .galaxy-orb[data-cat="history"] .orb-body { width: 54px; height: 54px; font-size: 23px; }
+  .galaxy-orb[data-cat="safety"] .orb-body { width: 46px; height: 46px; font-size: 20px; }
+  .galaxy-orb[data-cat="cost"] .orb-body { width: 44px; height: 44px; font-size: 19px; }
+
+  /* Orb positions — radial layout */
+  .galaxy-orb:nth-child(1) { left: 50%; top: 2%; transform: translateX(-50%); }      /* safety - top */
+  .galaxy-orb:nth-child(2) { right: 6%; top: 18%; }                                    /* character - top right */
+  .galaxy-orb:nth-child(3) { right: 4%; bottom: 22%; }                                 /* nearby - bottom right */
+  .galaxy-orb:nth-child(4) { left: 50%; bottom: 2%; transform: translateX(-50%); }    /* history - bottom */
+  .galaxy-orb:nth-child(5) { left: 4%; bottom: 22%; }                                  /* cost - bottom left */
+  .galaxy-orb:nth-child(6) { left: 6%; top: 18%; }                                     /* whats - top left */
+
+  /* Surprise nudge pulse on "cost" (the unexpected one) */
+  .galaxy-orb[data-cat="cost"] .orb-body {
+    animation: surprise-nudge 5s ease-in-out 3s 2;
+  }
+  @keyframes surprise-nudge {
+    0%, 80%, 100% { box-shadow: none; }
+    85%, 95% { box-shadow: 0 0 20px color-mix(in srgb, var(--cost) 40%, transparent); }
+  }
+  .surprise-hint {
+    position: absolute;
+    left: 2%;
+    bottom: 30%;
+    background: rgba(92, 173, 111, 0.15);
+    border: 1px solid rgba(92, 173, 111, 0.3);
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 10px;
+    color: var(--cost);
+    max-width: 100px;
+    line-height: 1.3;
+    opacity: 0;
+    animation: hint-appear 8s ease-in-out 4s 1 forwards;
+    pointer-events: none;
+  }
+  @keyframes hint-appear {
+    0%, 10% { opacity: 0; transform: translateY(5px); }
+    15%, 75% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-5px); }
+  }
+
+  /* === MAP HINT (EXPLORE STATE) === */
+  .map-hint {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 45px;
+    z-index: 1;
+    overflow: hidden;
+    opacity: 0.5;
+    transition: all var(--transition-speed) var(--ease-out-expo);
+  }
+  .map-hint .map-tiles {
+    width: 120%;
+    height: 200px;
+    background:
+      linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.05) 18.5%, rgba(255,255,255,0.05) 19%, transparent 19.5%),
+      linear-gradient(90deg, transparent 45%, rgba(255,255,255,0.04) 45.3%, rgba(255,255,255,0.04) 45.8%, transparent 46%),
+      linear-gradient(90deg, transparent 72%, rgba(255,255,255,0.05) 72.3%, rgba(255,255,255,0.05) 72.8%, transparent 73%),
+      linear-gradient(0deg, transparent 30%, rgba(255,255,255,0.04) 30.3%, rgba(255,255,255,0.04) 30.8%, transparent 31%),
+      linear-gradient(0deg, transparent 60%, rgba(255,255,255,0.05) 60.3%, rgba(255,255,255,0.05) 60.8%, transparent 61%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    animation: map-parallax 25s linear infinite;
+  }
+  @keyframes map-parallax {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-20%, 0); }
+  }
+  .map-hint-fade {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 25px;
+    background: linear-gradient(to bottom, var(--bg-dark), transparent);
+    z-index: 2;
+  }
+
+  /* === PILL STRIP (FILTERED STATE) === */
+  .pill-strip {
+    display: flex;
+    gap: 7px;
+    padding: 10px 14px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    position: relative;
+    z-index: 5;
+    opacity: 0;
+    max-height: 0;
+    transition: all var(--transition-speed) var(--ease-out-expo);
+  }
+  .pill-strip::-webkit-scrollbar { display: none; }
+  .pill-strip.visible {
+    opacity: 1;
+    max-height: 60px;
+  }
+
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 7px 12px;
+    border-radius: 20px;
+    border: 1.5px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.04);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.35s var(--ease-out-expo);
+    flex-shrink: 0;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .pill .icon { font-size: 14px; }
+  .pill .label {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    transition: color 0.3s ease;
+  }
+  .pill.selected {
+    background: color-mix(in srgb, var(--cat-color) 18%, transparent);
+    border-color: color-mix(in srgb, var(--cat-color) 60%, transparent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--cat-color) 20%, transparent);
+  }
+  .pill.selected .label {
+    color: var(--text-primary);
+    font-weight: 600;
+  }
+
+  /* === MAP (FILTERED STATE) === */
+  .map-full {
+    flex: 1;
+    position: relative;
+    z-index: 2;
+    opacity: 0;
+    transform: translateY(40px);
+    transition: all var(--transition-speed) var(--ease-out-expo);
+    margin: 0 12px;
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .map-full.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .map-full .map-surface {
+    width: 100%;
+    height: 100%;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(255,255,255,0.03) 0%, transparent 50%),
+      radial-gradient(circle at 70% 60%, rgba(255,255,255,0.02) 0%, transparent 40%),
+      linear-gradient(160deg, #1a2332 0%, #0f1923 50%, #162029 100%);
+    position: relative;
+  }
+  .map-full .map-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 15%, rgba(255,255,255,0.04) 15.3%, rgba(255,255,255,0.04) 15.8%, transparent 16.3%),
+      linear-gradient(90deg, transparent 40%, rgba(255,255,255,0.03) 40.2%, rgba(255,255,255,0.03) 40.7%, transparent 41%),
+      linear-gradient(90deg, transparent 65%, rgba(255,255,255,0.04) 65.3%, rgba(255,255,255,0.04) 65.8%, transparent 66.3%),
+      linear-gradient(90deg, transparent 85%, rgba(255,255,255,0.03) 85.3%, rgba(255,255,255,0.03) 85.8%, transparent 86.3%),
+      linear-gradient(0deg, transparent 25%, rgba(255,255,255,0.04) 25.2%, rgba(255,255,255,0.04) 25.7%, transparent 26%),
+      linear-gradient(0deg, transparent 50%, rgba(255,255,255,0.03) 50.2%, rgba(255,255,255,0.03) 50.7%, transparent 51%),
+      linear-gradient(0deg, transparent 75%, rgba(255,255,255,0.04) 75.2%, rgba(255,255,255,0.04) 75.7%, transparent 76%),
+      linear-gradient(35deg, transparent 30%, rgba(255,255,255,0.02) 30.2%, rgba(255,255,255,0.02) 30.5%, transparent 30.8%),
+      linear-gradient(135deg, transparent 55%, rgba(255,255,255,0.02) 55.2%, rgba(255,255,255,0.02) 55.5%, transparent 55.8%);
+  }
+  /* Map label */
+  .map-label {
+    position: absolute;
+    bottom: 10px;
+    left: 12px;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.5px;
+  }
+
+  /* POI pins */
+  .poi-pin {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: var(--active-color);
+    box-shadow: 0 0 14px color-mix(in srgb, var(--active-color) 50%, transparent);
+    opacity: 0;
+    transform: scale(0);
+    transition: all 0.4s var(--ease-spring);
+    z-index: 2;
+  }
+  .poi-pin.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+  .poi-pin::before {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid color-mix(in srgb, var(--active-color) 35%, transparent);
+  }
+  /* Ping animation on pin appearance */
+  .poi-pin::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    border: 1px solid var(--active-color);
+    opacity: 0;
+    animation: pin-ping 1.5s ease-out 0.5s 1;
+  }
+  @keyframes pin-ping {
+    0% { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(2.5); opacity: 0; }
+  }
+
+  /* === CATEGORY SHEET === */
+  .cat-sheet {
+    position: relative;
+    z-index: 10;
+    background: linear-gradient(to top, var(--bg-card), rgba(26,17,24,0.95));
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: all var(--transition-speed) var(--ease-out-expo);
+  }
+  .cat-sheet.visible {
+    max-height: 160px;
+    padding: 14px 18px 16px;
+  }
+  .sheet-handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255,255,255,0.15);
+    margin: 0 auto 10px;
+  }
+  .sheet-cat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    font-weight: 700;
+    color: var(--active-color);
+    transition: color 0.4s ease;
+    margin-bottom: 5px;
+  }
+  .sheet-narrative {
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+    transition: opacity 0.3s ease;
+  }
+
+  /* === BACK BUTTON (FILTERED STATE) === */
+  .back-btn {
+    position: fixed;
+    top: 52px;
+    right: 14px;
+    z-index: 50;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.15);
+    background: rgba(26,17,24,0.8);
+    backdrop-filter: blur(10px);
+    color: var(--text-secondary);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.4s ease;
+  }
+  .back-btn.visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .back-btn:active {
+    transform: scale(0.9);
+    background: rgba(255,255,255,0.1);
+  }
+
+  /* === BOTTOM NAV === */
+  .bottom-nav {
+    display: flex;
+    background: rgba(26,17,24,0.98);
+    border-top: 1px solid rgba(255,255,255,0.06);
+    padding: 8px 0 28px;
+    position: relative;
+    z-index: 20;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 6px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+  .nav-item .nav-icon { font-size: 20px; }
+  .nav-item .nav-label { font-size: 10px; color: var(--text-dim); }
+  .nav-item.active .nav-label { color: var(--active-color); }
+
+  /* === ENTRANCE CHOREOGRAPHY === */
+  .entrance .hero-card { opacity: 0; transform: translateY(-20px); }
+  .entrance .galaxy-orb { opacity: 0; transform: scale(0.3); }
+  .entrance .orbit-ring { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  .entrance .galaxy-center { opacity: 0; }
+  .entrance .map-hint { opacity: 0; }
+
+  .entrance-animate .hero-card {
+    animation: entrance-hero 0.6s var(--ease-out-expo) forwards;
+  }
+  @keyframes entrance-hero {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .entrance-animate .orbit-ring {
+    animation: entrance-ring 0.8s var(--ease-out-expo) forwards;
+  }
+  .orbit-ring.ring-1 { animation-delay: 0.3s !important; }
+  .orbit-ring.ring-2 { animation-delay: 0.45s !important; }
+  .orbit-ring.ring-3 { animation-delay: 0.6s !important; }
+  @keyframes entrance-ring {
+    to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  }
+
+  .entrance-animate .galaxy-center {
+    animation: entrance-fade 0.5s ease 0.5s forwards;
+  }
+
+  /* Character orb blooms first (most engaged) */
+  .entrance-animate .galaxy-orb[data-cat="character"] {
+    animation: entrance-orb 0.6s var(--ease-spring) 0.5s forwards;
+  }
+  .entrance-animate .galaxy-orb[data-cat="history"] {
+    animation: entrance-orb 0.6s var(--ease-spring) 0.65s forwards;
+  }
+  .entrance-animate .galaxy-orb[data-cat="whats"] {
+    animation: entrance-orb 0.6s var(--ease-spring) 0.7s forwards;
+  }
+  .entrance-animate .galaxy-orb[data-cat="nearby"] {
+    animation: entrance-orb 0.6s var(--ease-spring) 0.75s forwards;
+  }
+  .entrance-animate .galaxy-orb[data-cat="safety"] {
+    animation: entrance-orb 0.6s var(--ease-spring) 0.8s forwards;
+  }
+  .entrance-animate .galaxy-orb[data-cat="cost"] {
+    animation: entrance-orb 0.6s var(--ease-spring) 0.85s forwards;
+  }
+  @keyframes entrance-orb {
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .entrance-animate .map-hint {
+    animation: entrance-fade 0.6s ease 1.2s forwards;
+  }
+  @keyframes entrance-fade {
+    to { opacity: 0.5; }
+  }
+
+  /* === STATE INDICATOR === */
+  .state-indicator {
+    position: fixed;
+    top: 52px;
+    left: 14px;
+    z-index: 50;
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    background: rgba(0,0,0,0.5);
+    padding: 4px 8px;
+    border-radius: 6px;
+    backdrop-filter: blur(5px);
+    transition: opacity 0.4s ease;
+  }
+
+  /* Accent color on entire body for filtered state */
+  body[data-accent="safety"] { --active-color: var(--safety); }
+  body[data-accent="character"] { --active-color: var(--character); }
+  body[data-accent="history"] { --active-color: var(--history); }
+  body[data-accent="nearby"] { --active-color: var(--nearby); }
+  body[data-accent="cost"] { --active-color: var(--cost); }
+  body[data-accent="whats"] { --active-color: var(--whats); }
+</style>
+</head>
+<body data-accent="character" class="entrance">
+
+<div class="state-indicator" id="stateLabel">EXPLORE</div>
+<div class="back-btn" id="backBtn" onclick="goBack()">&#x2715;</div>
+
+<!-- Hero Card -->
+<div class="hero-card" id="heroCard">
+  <div class="hero-location">Doral, Florida</div>
+  <div class="hero-subtitle">First visit</div>
+  <div class="hero-summary">
+    This Friday evening, Doral is buzzing with post-work and weekend revelry, with popular destinations like CityPlace Doral hosting live music and packed dining.
+  </div>
+</div>
+
+<!-- Galaxy + Map Container -->
+<div class="galaxy-map-container">
+
+  <!-- Living Canvas Background -->
+  <div class="living-canvas">
+    <div class="photo-layer"></div>
+    <div class="overlay"></div>
+  </div>
+
+  <!-- Radial Galaxy (EXPLORE) -->
+  <div class="galaxy explore" id="galaxy">
+    <div class="galaxy-inner">
+      <!-- Orbit rings -->
+      <div class="orbit-ring ring-1"></div>
+      <div class="orbit-ring ring-2"></div>
+      <div class="orbit-ring ring-3"></div>
+
+      <!-- Center hub -->
+      <div class="galaxy-center" id="galaxyCenter">
+        <div class="center-category" id="centerCat">Character</div>
+        <div class="center-text" id="centerText">CityPlace Doral has become the cultural living room</div>
+      </div>
+
+      <!-- Orbs (ordered by engagement: character first) -->
+      <div class="galaxy-orb" data-cat="safety" style="--orb-color: var(--safety)" onclick="tapOrb('safety')">
+        <div class="orb-body">🛡️</div>
+        <span class="orb-name">Safety</span>
+      </div>
+      <div class="galaxy-orb" data-cat="character" style="--orb-color: var(--character)" onclick="tapOrb('character')">
+        <div class="orb-body">🎭</div>
+        <span class="orb-name">Character</span>
+      </div>
+      <div class="galaxy-orb" data-cat="nearby" style="--orb-color: var(--nearby)" onclick="tapOrb('nearby')">
+        <div class="orb-body">📍</div>
+        <span class="orb-name">Nearby</span>
+      </div>
+      <div class="galaxy-orb" data-cat="history" style="--orb-color: var(--history)" onclick="tapOrb('history')">
+        <div class="orb-body">🏛️</div>
+        <span class="orb-name">History</span>
+      </div>
+      <div class="galaxy-orb" data-cat="cost" style="--orb-color: var(--cost)" onclick="tapOrb('cost')">
+        <div class="orb-body">💰</div>
+        <span class="orb-name">Cost</span>
+      </div>
+      <div class="galaxy-orb" data-cat="whats" style="--orb-color: var(--whats)" onclick="tapOrb('whats')">
+        <div class="orb-body">⚡</div>
+        <span class="orb-name">What's</span>
+      </div>
+
+      <!-- Surprise nudge hint -->
+      <div class="surprise-hint">Surprisingly affordable area!</div>
+    </div>
+
+    <!-- Map hint sliver at bottom -->
+    <div class="map-hint" id="mapHint">
+      <div class="map-hint-fade"></div>
+      <div class="map-tiles"></div>
+    </div>
+  </div>
+
+  <!-- Pill Strip (FILTERED) -->
+  <div class="pill-strip" id="pillStrip"></div>
+
+  <!-- Full Map (FILTERED) -->
+  <div class="map-full" id="mapFull">
+    <div class="map-surface" id="mapSurface"></div>
+    <div class="map-label">Doral, FL — filtered view</div>
+  </div>
+
+  <!-- Category Sheet -->
+  <div class="cat-sheet" id="catSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-cat-label" id="sheetCatLabel">Character</div>
+    <div class="sheet-narrative" id="sheetNarrative">CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district that has become the cultural living room of the community.</div>
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<div class="bottom-nav">
+  <div class="nav-item active">
+    <span class="nav-icon">🔍</span>
+    <span class="nav-label">Summary</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">💬</span>
+    <span class="nav-label">Chat</span>
+  </div>
+  <div class="nav-item">
+    <span class="nav-icon">🔖</span>
+    <span class="nav-label">Saved</span>
+  </div>
+</div>
+
+<script>
+  // === DATA ===
+  const categories = {
+    character: {
+      title: 'Character', icon: '🎭',
+      text: "CityPlace Doral pulses with Venezuelan bakeries, Colombian coffee shops, and a thriving Latin business district that has become the cultural living room of the community.",
+      centerText: "CityPlace Doral has become the cultural living room"
+    },
+    history: {
+      title: 'History', icon: '🏛️',
+      text: "Doral transformed from unknown farmland into a major city in just decades. The area's rapid growth through the 1990s into a multicultural hub is one of South Florida's most remarkable urban stories.",
+      centerText: "From farmland to multicultural hub in decades"
+    },
+    safety: {
+      title: 'Safety', icon: '🛡️',
+      text: "Doral is recognized as one of the safest cities in Miami-Dade County, with well-lit commercial corridors, active community policing, and a strong neighborhood watch culture.",
+      centerText: "One of the safest cities in Miami-Dade"
+    },
+    nearby: {
+      title: 'Nearby', icon: '📍',
+      text: "Doral's strategic location puts you 15 minutes from Miami International Airport, 25 minutes from South Beach, and right next to the Everglades — a perfect launchpad for South Florida.",
+      centerText: "15 min to MIA, 25 min to South Beach"
+    },
+    cost: {
+      title: 'Cost', icon: '💰',
+      text: "Surprisingly affordable — more budget-friendly than Brickell or Coral Gables, with excellent value at family restaurants. Expect $12-18 lunch plates and $8-14 happy hour cocktails.",
+      centerText: "More affordable than Brickell or Coral Gables"
+    },
+    whats: {
+      title: "What's Happening", icon: '⚡',
+      text: "This Friday evening, Doral is buzzing with post-work revelry. CityPlace hosts live music tonight, Downtown Doral has packed dining, and the food truck rally kicks off at 7pm.",
+      centerText: "Live music at CityPlace tonight"
+    }
+  };
+
+  // Engagement-ordered (most engaged first) — simulating user's discovery fingerprint
+  const engagementOrder = ['character', 'history', 'whats', 'nearby', 'safety', 'cost'];
+
+  const pinPositions = {
+    safety: [{x:22,y:28},{x:48,y:18},{x:72,y:42},{x:35,y:62},{x:80,y:30},{x:58,y:70}],
+    character: [{x:38,y:22},{x:18,y:48},{x:62,y:40},{x:78,y:18},{x:28,y:68},{x:55,y:62},{x:45,y:42}],
+    history: [{x:42,y:32},{x:28,y:52},{x:62,y:28},{x:48,y:58},{x:72,y:55}],
+    nearby: [{x:12,y:18},{x:88,y:22},{x:8,y:68},{x:85,y:62},{x:48,y:12},{x:50,y:78},{x:30,y:40}],
+    cost: [{x:32,y:22},{x:52,y:38},{x:22,y:52},{x:68,y:58},{x:42,y:68},{x:58,y:18},{x:78,y:42},{x:15,y:35}],
+    whats: [{x:38,y:28},{x:58,y:48},{x:28,y:42},{x:68,y:22},{x:48,y:68},{x:75,y:55}]
+  };
+
+  let currentState = 'explore'; // explore | filtered
+  let currentCat = 'character';
+  let centerRotationTimer = null;
+  let centerRotationIndex = 0;
+
+  // === CENTER TEXT ROTATION ===
+  function startCenterRotation() {
+    centerRotationIndex = 0; // starts with most-engaged category
+    rotateCenterText();
+    centerRotationTimer = setInterval(rotateCenterText, 4500);
+  }
+
+  function stopCenterRotation() {
+    if (centerRotationTimer) clearInterval(centerRotationTimer);
+  }
+
+  function rotateCenterText() {
+    const cat = engagementOrder[centerRotationIndex % engagementOrder.length];
+    const data = categories[cat];
+    const centerCat = document.getElementById('centerCat');
+    const centerText = document.getElementById('centerText');
+
+    centerCat.style.opacity = '0';
+    centerText.style.opacity = '0';
+
+    setTimeout(() => {
+      centerCat.textContent = data.title;
+      centerCat.style.color = `var(--${cat})`;
+      centerText.textContent = data.centerText;
+      document.body.setAttribute('data-accent', cat);
+      centerCat.style.opacity = '1';
+      centerText.style.opacity = '1';
+    }, 300);
+
+    centerRotationIndex++;
+  }
+
+  // === BUILD PILL STRIP (engagement ordered) ===
+  function buildPillStrip(selectedCat) {
+    const strip = document.getElementById('pillStrip');
+    strip.innerHTML = '';
+
+    // Reorder: selected first, then rest by engagement
+    const ordered = [selectedCat, ...engagementOrder.filter(c => c !== selectedCat)];
+
+    ordered.forEach(cat => {
+      const data = categories[cat];
+      const pill = document.createElement('div');
+      pill.className = 'pill' + (cat === selectedCat ? ' selected' : '');
+      pill.setAttribute('data-cat', cat);
+      pill.style.setProperty('--cat-color', `var(--${cat})`);
+      pill.onclick = () => selectPill(cat);
+      pill.innerHTML = `<span class="icon">${data.icon}</span><span class="label">${data.title}</span>`;
+      strip.appendChild(pill);
+    });
+  }
+
+  // === CREATE MAP PINS ===
+  function createPins(cat) {
+    const surface = document.getElementById('mapSurface');
+    surface.querySelectorAll('.poi-pin').forEach(p => p.remove());
+    const pins = pinPositions[cat] || [];
+    pins.forEach((pos, i) => {
+      const pin = document.createElement('div');
+      pin.className = 'poi-pin';
+      pin.style.left = pos.x + '%';
+      pin.style.top = pos.y + '%';
+      surface.appendChild(pin);
+      setTimeout(() => pin.classList.add('visible'), 100 + i * 90);
+    });
+  }
+
+  // === TAP ORB (EXPLORE → FILTERED) ===
+  function tapOrb(cat) {
+    if (currentState === 'filtered') return;
+    currentState = 'filtered';
+    currentCat = cat;
+    stopCenterRotation();
+
+    document.body.setAttribute('data-accent', cat);
+    document.getElementById('stateLabel').textContent = 'FILTERED — ' + categories[cat].title;
+
+    // Compress hero
+    document.getElementById('heroCard').classList.add('compressed');
+
+    // Hide galaxy
+    const galaxy = document.getElementById('galaxy');
+    galaxy.classList.remove('explore');
+    galaxy.classList.add('filtered');
+
+    // Build and show pill strip
+    buildPillStrip(cat);
+    setTimeout(() => {
+      document.getElementById('pillStrip').classList.add('visible');
+    }, 200);
+
+    // Show map
+    setTimeout(() => {
+      document.getElementById('mapFull').classList.add('visible');
+      createPins(cat);
+    }, 250);
+
+    // Show sheet
+    setTimeout(() => {
+      updateSheet(cat);
+      document.getElementById('catSheet').classList.add('visible');
+    }, 400);
+
+    // Show back button
+    document.getElementById('backBtn').classList.add('visible');
+  }
+
+  // === SELECT PILL (FILTERED category switch) ===
+  function selectPill(cat) {
+    if (cat === currentCat) return;
+    currentCat = cat;
+    document.body.setAttribute('data-accent', cat);
+    document.getElementById('stateLabel').textContent = 'FILTERED — ' + categories[cat].title;
+
+    // Update pill selection
+    document.querySelectorAll('.pill').forEach(p => {
+      p.classList.toggle('selected', p.getAttribute('data-cat') === cat);
+    });
+
+    // Crossfade map pins
+    createPins(cat);
+
+    // Crossfade sheet
+    const narrative = document.getElementById('sheetNarrative');
+    narrative.style.opacity = '0';
+    setTimeout(() => {
+      updateSheet(cat);
+      narrative.style.opacity = '1';
+    }, 250);
+  }
+
+  function updateSheet(cat) {
+    const data = categories[cat];
+    document.getElementById('sheetCatLabel').textContent = data.title;
+    document.getElementById('sheetNarrative').textContent = data.text;
+  }
+
+  // === GO BACK (FILTERED → EXPLORE) ===
+  function goBack() {
+    if (currentState === 'explore') return;
+    currentState = 'explore';
+    document.getElementById('stateLabel').textContent = 'EXPLORE';
+
+    // Expand hero
+    document.getElementById('heroCard').classList.remove('compressed');
+
+    // Hide filtered elements
+    document.getElementById('pillStrip').classList.remove('visible');
+    document.getElementById('mapFull').classList.remove('visible');
+    document.getElementById('catSheet').classList.remove('visible');
+    document.getElementById('backBtn').classList.remove('visible');
+
+    // Show galaxy
+    setTimeout(() => {
+      const galaxy = document.getElementById('galaxy');
+      galaxy.classList.remove('filtered');
+      galaxy.classList.add('explore');
+
+      // Restart center rotation
+      setTimeout(() => startCenterRotation(), 500);
+    }, 200);
+
+    // Clear pins
+    document.getElementById('mapSurface').querySelectorAll('.poi-pin').forEach(p => p.remove());
+  }
+
+  // === ENTRANCE CHOREOGRAPHY ===
+  setTimeout(() => {
+    document.body.classList.remove('entrance');
+    document.body.classList.add('entrance-animate');
+
+    // Start center rotation after entrance completes
+    setTimeout(() => startCenterRotation(), 2000);
+  }, 300);
+
+  // Add transition to center elements
+  document.getElementById('centerCat').style.transition = 'opacity 0.3s ease, color 0.4s ease';
+  document.getElementById('centerText').style.transition = 'opacity 0.3s ease';
+  document.getElementById('sheetNarrative').style.transition = 'opacity 0.25s ease';
+</script>
+</body>
+</html>

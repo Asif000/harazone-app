@@ -76,15 +76,16 @@ class GeminiAreaIntelligenceProviderTest {
     }
 
     @Test
-    fun streamChatResponse_returnsEmptyFlow() = runTest {
-        val provider = createProvider()
+    fun streamChatResponse_failsFastWithBlankApiKey() = runTest {
+        val provider = createProvider(apiKey = "")
 
-        val tokens = mutableListOf<com.areadiscovery.domain.model.ChatToken>()
-        provider.streamChatResponse("query", "area", emptyList()).collect {
-            tokens.add(it)
+        val error = assertFailsWith<DomainErrorException> {
+            provider.streamChatResponse("query", "area", emptyList()).collect {}
         }
 
-        assertTrue(tokens.isEmpty())
+        val apiError = error.domainError as DomainError.ApiError
+        assertEquals(0, apiError.code)
+        assertEquals("Gemini API key not configured", apiError.message)
     }
 
     // --- isRetryableError tests (via reflection-free approach: test behavior through error mapping) ---

@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.domain.model.Vibe
+import com.areadiscovery.domain.provider.AreaIntelligenceProvider
+import com.areadiscovery.domain.provider.WeatherProvider
 import com.areadiscovery.domain.service.AreaContextFactory
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
 import com.areadiscovery.location.LocationProvider
@@ -24,12 +27,15 @@ class MapViewModel(
     private val getAreaPortrait: GetAreaPortraitUseCase,
     private val areaContextFactory: AreaContextFactory,
     private val analyticsTracker: AnalyticsTracker,
+    private val weatherProvider: WeatherProvider,
+    private val aiProvider: AreaIntelligenceProvider? = null,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
     private var loadJob: Job? = null
+    private var searchJob: Job? = null
 
     init {
         loadLocation()
@@ -50,9 +56,143 @@ class MapViewModel(
         }
     }
 
+    fun clearPoiSelection() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(selectedPoi = null)
+    }
+
     fun toggleListView() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = current.copy(showListView = !current.showListView)
+    }
+
+    fun switchVibe(vibe: Vibe) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(activeVibe = vibe)
+        analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to vibe.name))
+    }
+
+    fun openSearchOverlay() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(
+            isSearchOverlayOpen = true,
+            searchQuery = "",
+            aiResponse = "",
+            followUpChips = emptyList(),
+            isAiResponding = false,
+        )
+    }
+
+    fun updateSearchQuery(query: String) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(searchQuery = query)
+    }
+
+    fun closeSearchOverlay() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(isSearchOverlayOpen = false)
+        searchJob?.cancel()
+    }
+
+    fun submitSearch(query: String) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        searchJob?.cancel()
+
+        if (isQuestion(query)) {
+            _uiState.value = current.copy(
+                searchQuery = query,
+                aiResponse = "",
+                isAiResponding = true,
+                followUpChips = emptyList(),
+            )
+            analyticsTracker.trackEvent("search_question_submitted", mapOf("query" to query))
+
+            searchJob = viewModelScope.launch {
+                try {
+                    aiProvider?.streamChatResponse(query, current.areaName, emptyList())
+                        ?.catch { e ->
+                            AppLogger.e(e) { "AI search failed" }
+                            val s = _uiState.value as? MapUiState.Ready ?: return@catch
+                            _uiState.value = s.copy(
+                                aiResponse = "Something went wrong. Please try again.",
+                                isAiResponding = false,
+                            )
+                        }
+                        ?.collect { token ->
+                            val state = _uiState.value as? MapUiState.Ready ?: return@collect
+                            if (token.isComplete) {
+                                _uiState.value = state.copy(
+                                    isAiResponding = false,
+                                    followUpChips = computeFollowUpChips(query),
+                                )
+                            } else {
+                                _uiState.value = state.copy(
+                                    aiResponse = state.aiResponse + token.text,
+                                )
+                            }
+                        }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLogger.e(e) { "AI search error" }
+                    val state = _uiState.value as? MapUiState.Ready ?: return@launch
+                    _uiState.value = state.copy(
+                        aiResponse = "Something went wrong. Please try again.",
+                        isAiResponding = false,
+                    )
+                }
+            }
+        } else {
+            _uiState.value = current.copy(
+                searchQuery = query,
+                isAiResponding = true,
+            )
+            analyticsTracker.trackEvent("search_area_submitted", mapOf("query" to query))
+
+            searchJob = viewModelScope.launch {
+                try {
+                    val context = areaContextFactory.create()
+                    getAreaPortrait(query, context)
+                        .catch { e -> AppLogger.e(e) { "Area search failed" } }
+                        .collect { update ->
+                            if (update is BucketUpdate.PortraitComplete) {
+                                val pois = update.pois
+                                val state = _uiState.value as? MapUiState.Ready ?: return@collect
+                                val counts = computeVibePoiCounts(pois)
+                                val newActiveVibe = if ((counts[state.activeVibe] ?: 0) == 0) {
+                                    Vibe.entries.maxByOrNull { counts[it] ?: 0 } ?: Vibe.DEFAULT
+                                } else {
+                                    state.activeVibe
+                                }
+                                _uiState.value = state.copy(
+                                    pois = pois,
+                                    areaName = query,
+                                    vibePoiCounts = counts,
+                                    activeVibe = newActiveVibe,
+                                    isSearchOverlayOpen = false,
+                                    isAiResponding = false,
+                                )
+                            }
+                        }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    AppLogger.e(e) { "Area search error" }
+                    val state = _uiState.value as? MapUiState.Ready ?: return@launch
+                    _uiState.value = state.copy(isAiResponding = false)
+                }
+            }
+        }
+    }
+
+    fun toggleFab() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(isFabExpanded = !current.isFabExpanded)
+    }
+
+    fun onMapRenderFailed() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(mapRenderFailed = true, showListView = true)
     }
 
     fun retry() {
@@ -101,6 +241,17 @@ class MapViewModel(
                     longitude = coords.longitude,
                 )
 
+                // Fetch weather in parallel
+                launch {
+                    val weatherResult = weatherProvider.getWeather(coords.latitude, coords.longitude)
+                    if (weatherResult.isSuccess) {
+                        val current = _uiState.value as? MapUiState.Ready ?: return@launch
+                        _uiState.value = current.copy(weather = weatherResult.getOrNull())
+                    } else {
+                        AppLogger.e(weatherResult.exceptionOrNull()) { "Map: weather fetch failed" }
+                    }
+                }
+
                 val context = areaContextFactory.create()
                 getAreaPortrait(areaName, context)
                     .catch { e -> AppLogger.e(e) { "Map: portrait fetch failed" } }
@@ -109,7 +260,11 @@ class MapViewModel(
                             val pois = update.pois
                             val current = _uiState.value
                             if (current is MapUiState.Ready) {
-                                _uiState.value = current.copy(pois = pois)
+                                val counts = computeVibePoiCounts(pois)
+                                _uiState.value = current.copy(
+                                    pois = pois,
+                                    vibePoiCounts = counts,
+                                )
                                 analyticsTracker.trackEvent(
                                     "map_opened",
                                     mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
@@ -125,6 +280,38 @@ class MapViewModel(
             }
         }
     }
+
+    private fun computeVibePoiCounts(pois: List<POI>): Map<Vibe, Int> {
+        val hasAnyVibes = pois.any { it.vibe.isNotBlank() }
+        return if (hasAnyVibes) {
+            Vibe.entries.associateWith { v -> pois.count { it.vibe.equals(v.name, ignoreCase = true) } }
+        } else {
+            // No vibes assigned — show total count on every vibe
+            Vibe.entries.associateWith { pois.size }
+        }
+    }
+
+    private fun isQuestion(query: String): Boolean {
+        val q = query.trim().lowercase()
+        if (q.endsWith("?")) return true
+        val words = q.split(" ", limit = 2)
+        if (words.size < 2) return false
+        val questionStarters = setOf("what", "where", "when", "who", "how", "is", "are", "can", "does", "why")
+        return words[0] in questionStarters
+    }
+
+    private fun computeFollowUpChips(query: String): List<String> {
+        val q = query.lowercase()
+        return when {
+            q.containsAny("safe", "crime", "danger") -> listOf("Is it safe at night?", "What areas to avoid?")
+            q.containsAny("food", "eat", "restaurant", "drink") -> listOf("Best time to visit?", "Vegetarian options?")
+            q.containsAny("history", "historic", "old", "founded") -> listOf("When was it built?", "Any famous events here?")
+            q.containsAny("cost", "price", "expensive", "cheap") -> listOf("Budget tips?", "Free things to do?")
+            else -> listOf("Tell me more", "What's nearby?")
+        }
+    }
+
+    private fun String.containsAny(vararg terms: String) = terms.any { this.contains(it) }
 
     companion object {
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."

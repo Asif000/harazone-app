@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AreaDiscovery Animation Brainstorm</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; }
+
+  h1 { text-align: center; padding: 24px; font-size: 20px; color: #8af; letter-spacing: 1px; }
+  .subtitle { text-align: center; color: #667; font-size: 13px; margin-top: -16px; margin-bottom: 24px; }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 0 20px 40px; max-width: 1200px; margin: 0 auto; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: #12122a;
+    border: 1px solid #222244;
+    border-radius: 16px;
+    padding: 20px;
+    min-height: 380px;
+    display: flex;
+    flex-direction: column;
+  }
+  .card h2 { font-size: 15px; color: #aaf; margin-bottom: 4px; }
+  .card .source { font-size: 11px; color: #556; margin-bottom: 12px; font-style: italic; }
+  .card .desc { font-size: 12px; color: #889; margin-bottom: 16px; line-height: 1.5; }
+
+  .stage {
+    flex: 1;
+    background: #08081a;
+    border-radius: 12px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+  }
+
+  .btn-row { display: flex; gap: 8px; margin-top: 12px; justify-content: center; }
+  button {
+    background: #1a1a3a;
+    color: #8af;
+    border: 1px solid #334;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  button:hover { background: #252550; }
+  button.active { background: #335; border-color: #88f; }
+
+  /* ===== TREATMENT A: Mission Control / Telemetry Lock-in ===== */
+  .telemetry-chip {
+    position: absolute;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    filter: blur(8px);
+    transform: scale(1.3);
+    border: 1px solid transparent;
+  }
+  .telemetry-chip.resolve {
+    animation: telemetryResolve 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  }
+  .telemetry-chip.resolve.locked {
+    animation: telemetryResolve 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
+               lockFlash 0.3s 0.5s ease-out forwards;
+  }
+  @keyframes telemetryResolve {
+    0% { opacity: 0.3; filter: blur(8px); transform: scale(1.3); }
+    60% { opacity: 0.8; filter: blur(2px); transform: scale(1.05); }
+    80% { opacity: 1; filter: blur(0.5px); transform: scale(0.98); }
+    100% { opacity: 1; filter: blur(0); transform: scale(1); }
+  }
+  @keyframes lockFlash {
+    0% { border-color: #4f8; box-shadow: 0 0 12px #4f83; }
+    100% { border-color: #2a4a3a; box-shadow: 0 0 0px transparent; }
+  }
+
+  /* Number stabilize */
+  .num-stabilize {
+    font-family: 'SF Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: #4f8;
+    letter-spacing: 2px;
+  }
+
+  /* ===== TREATMENT B: Weather Radar / Storm Formation ===== */
+  .weather-chip {
+    position: absolute;
+    padding: 8px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transform: scale(0);
+  }
+  .weather-chip.form {
+    animation: stormForm 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  @keyframes stormForm {
+    0% { opacity: 0; transform: scale(0) rotate(-30deg); }
+    50% { opacity: 0.7; transform: scale(1.15) rotate(5deg); }
+    70% { opacity: 0.9; transform: scale(0.95) rotate(-2deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+  .weather-chip.form::after {
+    content: '';
+    position: absolute;
+    inset: -3px;
+    border-radius: 22px;
+    background: radial-gradient(circle, transparent 50%, currentColor 100%);
+    opacity: 0;
+    animation: pressureWave 1s 0.3s ease-out forwards;
+  }
+  @keyframes pressureWave {
+    0% { opacity: 0.4; inset: -3px; }
+    100% { opacity: 0; inset: -20px; }
+  }
+
+  /* ===== TREATMENT C: Music Visualizer / Beat Drop ===== */
+  .music-chip {
+    position: absolute;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+    transform: translateY(20px) scaleY(0.3);
+  }
+  .music-chip.drop {
+    animation: beatDrop 0.4s cubic-bezier(0.0, 0.0, 0.2, 1) forwards;
+  }
+  @keyframes beatDrop {
+    0% { opacity: 0; transform: translateY(20px) scaleY(0.3); }
+    50% { opacity: 1; transform: translateY(-4px) scaleY(1.1) scaleX(0.95); }
+    70% { transform: translateY(2px) scaleY(0.97) scaleX(1.02); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .music-chip.drop::before {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 10%;
+    right: 10%;
+    height: 3px;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: 0;
+    animation: bassLine 0.3s 0.2s ease-out forwards;
+  }
+  @keyframes bassLine {
+    0% { opacity: 0.8; transform: scaleX(0.3); }
+    100% { opacity: 0; transform: scaleX(1.5); }
+  }
+
+  /* ===== TREATMENT D: Particle Crystallization ===== */
+  .crystal-chip {
+    position: absolute;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+  }
+  .crystal-chip.crystallize {
+    animation: crystallize 1s ease-out forwards;
+  }
+  @keyframes crystallize {
+    0% { opacity: 0; filter: blur(12px) brightness(2); transform: scale(2); }
+    30% { opacity: 0.5; filter: blur(6px) brightness(1.5); transform: scale(1.2); }
+    60% { opacity: 0.8; filter: blur(1px) brightness(1.1); transform: scale(1.02); }
+    100% { opacity: 1; filter: blur(0) brightness(1); transform: scale(1); }
+  }
+  /* particle sparks */
+  .crystal-chip.crystallize .spark {
+    position: absolute;
+    width: 3px; height: 3px;
+    border-radius: 50%;
+    background: white;
+    animation: sparkFly 0.6s ease-out forwards;
+  }
+  @keyframes sparkFly {
+    0% { opacity: 1; transform: translate(0, 0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(0); }
+  }
+
+  /* ===== TREATMENT E: Ink Bleed / Watercolor ===== */
+  .ink-chip {
+    position: absolute;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+  }
+  .ink-chip.bleed {
+    animation: inkBleed 0.9s ease-out forwards;
+  }
+  @keyframes inkBleed {
+    0% { opacity: 0; clip-path: circle(0% at 50% 50%); filter: saturate(3) blur(2px); }
+    40% { opacity: 0.8; clip-path: circle(55% at 48% 52%); filter: saturate(1.5) blur(1px); }
+    70% { opacity: 0.95; clip-path: circle(80% at 50% 50%); filter: saturate(1.1) blur(0); }
+    100% { opacity: 1; clip-path: circle(100% at 50% 50%); filter: saturate(1) blur(0); }
+  }
+
+  /* ===== TREATMENT F: Glitch / Digital Artifact ===== */
+  .glitch-chip {
+    position: absolute;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0;
+  }
+  .glitch-chip.glitch {
+    animation: glitchIn 0.5s steps(8) forwards;
+  }
+  @keyframes glitchIn {
+    0% { opacity: 0; transform: translate(0, 0); clip-path: inset(0 100% 0 0); }
+    12% { opacity: 1; transform: translate(-3px, 2px); clip-path: inset(0 60% 0 0); color: #f44; }
+    25% { transform: translate(2px, -1px); clip-path: inset(30% 0 50% 0); color: #4ff; }
+    37% { transform: translate(-1px, 1px); clip-path: inset(0 0 0 0); }
+    50% { transform: translate(2px, 0); clip-path: inset(40% 0 0 0); }
+    62% { transform: translate(0, -1px); clip-path: inset(0 0 30% 0); }
+    75% { transform: translate(-1px, 0); clip-path: inset(0); color: inherit; }
+    100% { opacity: 1; transform: translate(0, 0); clip-path: inset(0); }
+  }
+
+  /* Completion effects */
+  .completion-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .completion-overlay.sweep {
+    animation: completionSweep 0.8s ease-out forwards;
+    background: linear-gradient(90deg, transparent, rgba(100,180,255,0.15), transparent);
+    background-size: 200% 100%;
+  }
+  @keyframes completionSweep {
+    0% { opacity: 1; background-position: 200% 0; }
+    100% { opacity: 0; background-position: -100% 0; }
+  }
+
+  /* Status bar for telemetry */
+  .status-bar {
+    position: absolute;
+    bottom: 8px;
+    left: 12px;
+    right: 12px;
+    height: 2px;
+    background: #1a1a2a;
+    border-radius: 1px;
+    overflow: hidden;
+  }
+  .status-bar .fill {
+    height: 100%;
+    width: 0%;
+    background: #4f8;
+    border-radius: 1px;
+    transition: width 0.3s ease-out;
+  }
+
+  /* Voting section */
+  .vote-section {
+    background: #12122a;
+    border: 1px solid #222244;
+    border-radius: 16px;
+    padding: 24px;
+    margin: 0 20px 40px;
+    max-width: 1160px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .vote-section h2 { color: #aaf; font-size: 15px; margin-bottom: 16px; }
+  .vote-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media (max-width: 800px) { .vote-grid { grid-template-columns: repeat(2, 1fr); } }
+  .vote-btn {
+    padding: 12px;
+    text-align: center;
+    font-size: 13px;
+    background: #1a1a3a;
+    border: 2px solid #222;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: #aaa;
+  }
+  .vote-btn:hover { border-color: #88f; color: #fff; background: #252550; }
+  .vote-btn.selected { border-color: #4f8; color: #4f8; background: #1a2a1a; }
+  .vote-btn .emoji { font-size: 24px; display: block; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+<h1>Animation Brainstorm — AreaDiscovery</h1>
+<p class="subtitle">Click "Play" on each treatment to compare. Which FEELS right for discovering a neighborhood?</p>
+
+<div class="grid">
+
+  <!-- TREATMENT A: Mission Control -->
+  <div class="card">
+    <h2>A. Mission Control — Telemetry Lock-in</h2>
+    <div class="source">Cross-pollinated from: NASA mission dashboards, satellite tracking</div>
+    <div class="desc">Chips "resolve" from blur like a signal being acquired. Numbers stabilize like instrument readings. Green flash on lock. Data feels consequential.</div>
+    <div class="stage" id="stageA">
+      <div class="status-bar"><div class="fill" id="statusA"></div></div>
+      <div class="completion-overlay" id="completeA"></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="playA()">Play</button>
+      <button onclick="playA('slow')">Slow</button>
+    </div>
+  </div>
+
+  <!-- TREATMENT B: Weather Radar -->
+  <div class="card">
+    <h2>B. Storm Formation — Pressure Wave</h2>
+    <div class="source">Cross-pollinated from: Weather radar, atmospheric pressure maps</div>
+    <div class="desc">Chips spiral into existence like storm cells forming. Pressure wave ripples outward on arrival. Organic, slightly chaotic energy. Nature forming patterns.</div>
+    <div class="stage" id="stageB">
+      <div class="completion-overlay" id="completeB"></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="playB()">Play</button>
+      <button onclick="playB('slow')">Slow</button>
+    </div>
+  </div>
+
+  <!-- TREATMENT C: Music Visualizer -->
+  <div class="card">
+    <h2>C. Beat Drop — Bass Hit</h2>
+    <div class="source">Cross-pollinated from: Music visualizers, DJ software, Spotify Canvas</div>
+    <div class="desc">Chips slam in like bass drops — squash/stretch on impact, bass-line pulse underneath. Rhythmic, punchy, energetic. Each chip has IMPACT.</div>
+    <div class="stage" id="stageC">
+      <div class="completion-overlay" id="completeC"></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="playC()">Play</button>
+      <button onclick="playC('slow')">Slow</button>
+    </div>
+  </div>
+
+  <!-- TREATMENT D: Particle Crystallization -->
+  <div class="card">
+    <h2>D. Crystallization — Particle Collapse</h2>
+    <div class="source">Cross-pollinated from: Chemistry simulations, procedural generation, magic systems</div>
+    <div class="desc">Bright scattered particles collapse and crystallize into a solid chip. Like matter forming from energy. Sparks fly off on solidification. Magical, scientific.</div>
+    <div class="stage" id="stageD">
+      <div class="completion-overlay" id="completeD"></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="playD()">Play</button>
+      <button onclick="playD('slow')">Slow</button>
+    </div>
+  </div>
+
+  <!-- TREATMENT E: Ink Bleed -->
+  <div class="card">
+    <h2>E. Ink Bleed — Watercolor Reveal</h2>
+    <div class="source">Cross-pollinated from: Calligraphy apps, art tools, paper textures</div>
+    <div class="desc">Chips bleed into view like ink on paper — circle reveal expanding outward, slight color saturation bloom. Organic, artful, warm. Discovery as art.</div>
+    <div class="stage" id="stageE">
+      <div class="completion-overlay" id="completeE"></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="playE()">Play</button>
+      <button onclick="playE('slow')">Slow</button>
+    </div>
+  </div>
+
+  <!-- TREATMENT F: Digital Glitch -->
+  <div class="card">
+    <h2>F. Glitch — Digital Artifact</h2>
+    <div class="source">Cross-pollinated from: Cyberpunk UI, hacking scenes, AR interfaces</div>
+    <div class="desc">Chips glitch into existence with RGB splits, scan lines, and stepped animation. Data being decoded from a signal. Edgy, techy, futuristic.</div>
+    <div class="stage" id="stageF">
+      <div class="completion-overlay" id="completeF"></div>
+    </div>
+    <div class="btn-row">
+      <button onclick="playF()">Play</button>
+      <button onclick="playF('slow')">Slow</button>
+    </div>
+  </div>
+</div>
+
+<!-- Voting -->
+<div class="vote-section">
+  <h2>Which feels right for "discovering your neighborhood"? (click to mark favorites)</h2>
+  <div class="vote-grid">
+    <div class="vote-btn" onclick="toggleVote(this)"><span class="emoji">🛰️</span>A. Mission Control</div>
+    <div class="vote-btn" onclick="toggleVote(this)"><span class="emoji">🌀</span>B. Storm Formation</div>
+    <div class="vote-btn" onclick="toggleVote(this)"><span class="emoji">🎵</span>C. Beat Drop</div>
+    <div class="vote-btn" onclick="toggleVote(this)"><span class="emoji">✨</span>D. Crystallization</div>
+    <div class="vote-btn" onclick="toggleVote(this)"><span class="emoji">🎨</span>E. Ink Bleed</div>
+    <div class="vote-btn" onclick="toggleVote(this)"><span class="emoji">⚡</span>F. Glitch</div>
+  </div>
+</div>
+
+<script>
+const chipData = [
+  { icon: '🏛️', label: 'Built 1926', color: '#c9a84c', bg: '#2a2410' },
+  { icon: '☕', label: '47 cafes', color: '#8bc49a', bg: '#102a18', isNum: true, num: 47 },
+  { icon: '🎭', label: 'Jazz District', color: '#a48bc4', bg: '#1a1028' },
+  { icon: '🌳', label: '12 parks', color: '#6bc46b', bg: '#0a2a0a', isNum: true, num: 12 },
+  { icon: '⚡', label: 'Live music tonight', color: '#c4564b', bg: '#2a1010' },
+  { icon: '📸', label: 'Art Deco gems', color: '#4ba8c4', bg: '#0a1a2a' },
+  { icon: '🍕', label: '23 restaurants', color: '#c4884b', bg: '#2a1a0a', isNum: true, num: 23 },
+  { icon: '🏠', label: 'Historic homes', color: '#c4c44b', bg: '#2a2a0a' },
+];
+
+const positions = [
+  { x: 15, y: 18 }, { x: 55, y: 12 }, { x: 30, y: 45 },
+  { x: 65, y: 42 }, { x: 10, y: 72 }, { x: 48, y: 70 },
+  { x: 78, y: 25 }, { x: 75, y: 65 },
+];
+
+function clearStage(id) {
+  const stage = document.getElementById(id);
+  stage.querySelectorAll('[class*="-chip"]').forEach(el => el.remove());
+}
+
+function createChip(className, data, pos) {
+  const el = document.createElement('div');
+  el.className = className;
+  el.style.left = pos.x + '%';
+  el.style.top = pos.y + '%';
+  el.style.color = data.color;
+  el.style.background = data.bg;
+  el.style.border = '1px solid ' + data.color + '44';
+  el.innerHTML = data.icon + ' ' + (data.isNum ? '0' : data.label);
+  el.dataset.targetNum = data.num || 0;
+  el.dataset.label = data.label;
+  el.dataset.isNum = data.isNum || false;
+  return el;
+}
+
+function animateNumber(el, target, duration) {
+  const start = performance.now();
+  const icon = el.innerHTML.split(' ')[0];
+  const label = el.dataset.label;
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const current = Math.round(eased * target);
+    el.innerHTML = icon + ' ' + current + ' ' + label.replace(/\d+\s*/, '');
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ===== TREATMENT A: Mission Control =====
+function playA(speed) {
+  clearStage('stageA');
+  const stage = document.getElementById('stageA');
+  const bar = document.getElementById('statusA');
+  const overlay = document.getElementById('completeA');
+  bar.style.width = '0%';
+  overlay.className = 'completion-overlay';
+  const delay = speed === 'slow' ? 600 : 300;
+
+  chipData.forEach((data, i) => {
+    setTimeout(() => {
+      const chip = createChip('telemetry-chip', data, positions[i]);
+      stage.appendChild(chip);
+      requestAnimationFrame(() => {
+        chip.classList.add('resolve', 'locked');
+        if (data.isNum) {
+          setTimeout(() => animateNumber(chip, data.num, 400), 400);
+        }
+      });
+      bar.style.width = ((i + 1) / chipData.length * 100) + '%';
+
+      if (i === chipData.length - 1) {
+        setTimeout(() => {
+          overlay.className = 'completion-overlay sweep';
+          bar.style.background = '#4f8';
+        }, 700);
+      }
+    }, i * delay);
+  });
+}
+
+// ===== TREATMENT B: Storm Formation =====
+function playB(speed) {
+  clearStage('stageB');
+  const stage = document.getElementById('stageB');
+  const overlay = document.getElementById('completeB');
+  overlay.className = 'completion-overlay';
+  const delay = speed === 'slow' ? 600 : 300;
+
+  chipData.forEach((data, i) => {
+    setTimeout(() => {
+      const chip = createChip('weather-chip', data, positions[i]);
+      stage.appendChild(chip);
+      requestAnimationFrame(() => {
+        chip.classList.add('form');
+        if (data.isNum) {
+          setTimeout(() => animateNumber(chip, data.num, 500), 300);
+        }
+      });
+      if (i === chipData.length - 1) {
+        setTimeout(() => { overlay.className = 'completion-overlay sweep'; }, 900);
+      }
+    }, i * delay);
+  });
+}
+
+// ===== TREATMENT C: Beat Drop =====
+function playC(speed) {
+  clearStage('stageC');
+  const stage = document.getElementById('stageC');
+  const overlay = document.getElementById('completeC');
+  overlay.className = 'completion-overlay';
+  const delay = speed === 'slow' ? 500 : 250;
+
+  chipData.forEach((data, i) => {
+    setTimeout(() => {
+      const chip = createChip('music-chip', data, positions[i]);
+      stage.appendChild(chip);
+      requestAnimationFrame(() => {
+        chip.classList.add('drop');
+        if (data.isNum) {
+          setTimeout(() => animateNumber(chip, data.num, 300), 200);
+        }
+      });
+      if (i === chipData.length - 1) {
+        setTimeout(() => { overlay.className = 'completion-overlay sweep'; }, 500);
+      }
+    }, i * delay);
+  });
+}
+
+// ===== TREATMENT D: Crystallization =====
+function playD(speed) {
+  clearStage('stageD');
+  const stage = document.getElementById('stageD');
+  const overlay = document.getElementById('completeD');
+  overlay.className = 'completion-overlay';
+  const delay = speed === 'slow' ? 700 : 350;
+
+  chipData.forEach((data, i) => {
+    setTimeout(() => {
+      const chip = createChip('crystal-chip', data, positions[i]);
+      // Add spark particles
+      for (let s = 0; s < 6; s++) {
+        const spark = document.createElement('div');
+        spark.className = 'spark';
+        const angle = (s / 6) * Math.PI * 2;
+        const dist = 20 + Math.random() * 15;
+        spark.style.setProperty('--sx', Math.cos(angle) * dist + 'px');
+        spark.style.setProperty('--sy', Math.sin(angle) * dist + 'px');
+        spark.style.left = '50%';
+        spark.style.top = '50%';
+        spark.style.animationDelay = (0.1 + Math.random() * 0.3) + 's';
+        spark.style.background = data.color;
+        chip.appendChild(spark);
+      }
+      stage.appendChild(chip);
+      requestAnimationFrame(() => {
+        chip.classList.add('crystallize');
+        if (data.isNum) {
+          setTimeout(() => animateNumber(chip, data.num, 500), 500);
+        }
+      });
+      if (i === chipData.length - 1) {
+        setTimeout(() => { overlay.className = 'completion-overlay sweep'; }, 1100);
+      }
+    }, i * delay);
+  });
+}
+
+// ===== TREATMENT E: Ink Bleed =====
+function playE(speed) {
+  clearStage('stageE');
+  const stage = document.getElementById('stageE');
+  const overlay = document.getElementById('completeE');
+  overlay.className = 'completion-overlay';
+  const delay = speed === 'slow' ? 600 : 300;
+
+  chipData.forEach((data, i) => {
+    setTimeout(() => {
+      const chip = createChip('ink-chip', data, positions[i]);
+      stage.appendChild(chip);
+      requestAnimationFrame(() => {
+        chip.classList.add('bleed');
+        if (data.isNum) {
+          setTimeout(() => animateNumber(chip, data.num, 500), 400);
+        }
+      });
+      if (i === chipData.length - 1) {
+        setTimeout(() => { overlay.className = 'completion-overlay sweep'; }, 1000);
+      }
+    }, i * delay);
+  });
+}
+
+// ===== TREATMENT F: Glitch =====
+function playF(speed) {
+  clearStage('stageF');
+  const stage = document.getElementById('stageF');
+  const overlay = document.getElementById('completeF');
+  overlay.className = 'completion-overlay';
+  const delay = speed === 'slow' ? 600 : 280;
+
+  chipData.forEach((data, i) => {
+    setTimeout(() => {
+      const chip = createChip('glitch-chip', data, positions[i]);
+      stage.appendChild(chip);
+      requestAnimationFrame(() => {
+        chip.classList.add('glitch');
+        if (data.isNum) {
+          setTimeout(() => animateNumber(chip, data.num, 300), 400);
+        }
+      });
+      if (i === chipData.length - 1) {
+        setTimeout(() => { overlay.className = 'completion-overlay sweep'; }, 600);
+      }
+    }, i * delay);
+  });
+}
+
+function toggleVote(el) {
+  el.classList.toggle('selected');
+}
+</script>
+</body>
+</html>

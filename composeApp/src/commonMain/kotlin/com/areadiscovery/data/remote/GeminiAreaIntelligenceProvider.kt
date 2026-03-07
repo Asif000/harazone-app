@@ -129,7 +129,64 @@ internal class GeminiAreaIntelligenceProvider(
         query: String,
         areaName: String,
         conversationHistory: List<ChatMessage>
-    ): Flow<ChatToken> = emptyFlow()
+    ): Flow<ChatToken> = flow {
+        val apiKey = apiKeyProvider.geminiApiKey
+        if (apiKey.isBlank()) {
+            throw DomainErrorException(DomainError.ApiError(0, "Gemini API key not configured"))
+        }
+
+        AppLogger.d { "GeminiAreaIntelligenceProvider: streaming chat for '$query' in '$areaName'" }
+
+        val prompt = promptBuilder.buildAiSearchPrompt(query, areaName)
+        val requestBody = json.encodeToString(
+            GeminiRequest(
+                contents = listOf(
+                    GeminiRequestContent(
+                        parts = listOf(GeminiRequestPart(text = prompt))
+                    )
+                )
+            )
+        )
+
+        var hasEmitted = false
+
+        val result = withRetry(
+            maxAttempts = MAX_RETRY_ATTEMPTS,
+            initialDelayMs = 200,
+            maxDelayMs = 2000,
+            isRetryable = { e -> !hasEmitted && e is Exception && isRetryableError(e) }
+        ) {
+            httpClient.sse(
+                urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
+                request = {
+                    method = HttpMethod.Post
+                    parameter("alt", "sse")
+                    parameter("key", apiKey)
+                    contentType(ContentType.Application.Json)
+                    setBody(requestBody)
+                }
+            ) {
+                incoming.collect { event ->
+                    val data = event.data ?: return@collect
+                    val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
+                    hasEmitted = true
+                    emit(ChatToken(text = text, isComplete = false))
+                }
+            }
+
+            emit(ChatToken(text = "", isComplete = true))
+            AppLogger.d { "GeminiAreaIntelligenceProvider: chat streaming complete" }
+        }
+
+        if (result.isFailure) {
+            val error = result.exceptionOrNull()
+            throw when (error) {
+                is DomainErrorException -> error
+                is Exception -> mapToDomainErrorException(error)
+                else -> mapToDomainErrorException(RuntimeException("Unexpected error", error))
+            }
+        }
+    }
 
     private fun isRetryableError(e: Exception): Boolean = when (e) {
         is ServerResponseException -> true  // 5xx — transient server errors

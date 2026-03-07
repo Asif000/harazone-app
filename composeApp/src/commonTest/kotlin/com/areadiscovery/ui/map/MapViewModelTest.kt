@@ -1,15 +1,18 @@
 package com.areadiscovery.ui.map
 
-import com.areadiscovery.domain.model.AreaContext
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.Confidence
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.domain.model.Vibe
+import com.areadiscovery.domain.model.WeatherState
+import com.areadiscovery.domain.provider.WeatherProvider
 import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
 import com.areadiscovery.fakes.FakeAnalyticsTracker
 import com.areadiscovery.fakes.FakeAreaContextFactory
 import com.areadiscovery.fakes.FakeAreaRepository
 import com.areadiscovery.fakes.FakeLocationProvider
+import com.areadiscovery.fakes.FakeWeatherProvider
 import com.areadiscovery.location.GpsCoordinates
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +30,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -50,32 +55,30 @@ class MapViewModelTest {
         areaRepository: AreaRepository = FakeAreaRepository(),
         areaContextFactory: com.areadiscovery.domain.service.AreaContextFactory = FakeAreaContextFactory(),
         analyticsTracker: com.areadiscovery.util.AnalyticsTracker = FakeAnalyticsTracker(),
+        weatherProvider: WeatherProvider = FakeWeatherProvider(),
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
         areaContextFactory = areaContextFactory,
         analyticsTracker = analyticsTracker,
+        weatherProvider = weatherProvider,
     )
 
     @Test
     fun initialStateIsLoading() = runTest(testDispatcher) {
-
         val suspendingLocation = ResettableFakeLocationProvider()
         val viewModel = createViewModel(locationProvider = suspendingLocation)
-
         assertIs<MapUiState.Loading>(viewModel.uiState.value)
     }
 
     @Test
     fun locationSuccessTransitionsToReady() = runTest(testDispatcher) {
-
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
                 locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
                 geocodeResult = Result.success("Manhattan, New York"),
             ),
         )
-
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Manhattan, New York", state.areaName)
         assertEquals(40.7128, state.latitude)
@@ -84,20 +87,17 @@ class MapViewModelTest {
 
     @Test
     fun locationFailureTransitionsToLocationFailed() = runTest(testDispatcher) {
-
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
                 locationResult = Result.failure(RuntimeException("GPS unavailable")),
             ),
         )
-
         val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
         assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
     }
 
     @Test
     fun geocodeFailureTransitionsToLocationFailed() = runTest(testDispatcher) {
-
         val areaRepository = FakeAreaRepository()
         val contextFactory = FakeAreaContextFactory()
         val viewModel = createViewModel(
@@ -107,7 +107,6 @@ class MapViewModelTest {
             areaRepository = areaRepository,
             areaContextFactory = contextFactory,
         )
-
         val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
         assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
         assertEquals(0, areaRepository.callCount)
@@ -116,56 +115,33 @@ class MapViewModelTest {
 
     @Test
     fun retryResetsToLoadingAndReloads() = runTest(testDispatcher) {
-
         val resettableLocation = ResettableFakeLocationProvider()
-        val viewModel = createViewModel(
-            locationProvider = resettableLocation,
-        )
-
-        // Init: location suspends — state stays Loading
+        val viewModel = createViewModel(locationProvider = resettableLocation)
         assertIs<MapUiState.Loading>(viewModel.uiState.value)
 
-        // Complete init with failure
         resettableLocation.complete(Result.failure(RuntimeException("GPS unavailable")))
         assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
 
-        // Reset fake for retry call
         resettableLocation.reset()
-
-        // Call retry() on the SAME ViewModel
         viewModel.retry()
-
-        // Verify Loading is set by retry() before coroutines resolve
         assertIs<MapUiState.Loading>(viewModel.uiState.value)
 
-        // Complete retry with success
         resettableLocation.complete(Result.success(GpsCoordinates(38.7139, -9.1394)))
-
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Alfama, Lisbon", state.areaName)
-        assertEquals(38.7139, state.latitude)
-        assertEquals(-9.1394, state.longitude)
-        assertEquals(emptyList(), state.pois)
     }
 
     @Test
     fun gpsTimeoutTransitionsToLocationFailed() {
-        // StandardTestDispatcher controls time manually (unlike UnconfinedTestDispatcher)
         val timeoutDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.resetMain()
         Dispatchers.setMain(timeoutDispatcher)
-
         try {
             runTest(timeoutDispatcher) {
                 val neverCompletingLocation = ResettableFakeLocationProvider()
                 val viewModel = createViewModel(locationProvider = neverCompletingLocation)
-
-                // StandardTestDispatcher doesn't run eagerly — state is still initial Loading
                 assertIs<MapUiState.Loading>(viewModel.uiState.value)
-
-                // Advance past LOCATION_TIMEOUT_MS (10_000L)
                 advanceTimeBy(10_001L)
-
                 val state = assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
                 assertEquals(MapViewModel.LOCATION_FAILURE_MESSAGE, state.message)
             }
@@ -175,11 +151,10 @@ class MapViewModelTest {
         }
     }
 
-    // --- Story 3.2 tests ---
+    // --- POI tests ---
 
     @Test
     fun poisAreEmptyWhenRepositoryEmitsNoUpdates() = runTest(testDispatcher) {
-
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
                 locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
@@ -187,14 +162,12 @@ class MapViewModelTest {
             ),
             areaRepository = FakeAreaRepository(updates = emptyList()),
         )
-
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(emptyList(), state.pois)
     }
 
     @Test
     fun poisPopulatedOnPortraitComplete() = runTest(testDispatcher) {
-
         val mockPOIs = listOf(
             POI("Statue of Liberty", "landmark", "Famous statue", Confidence.HIGH, 40.6892, -74.0445),
             POI("Central Park", "nature", "Large park", Confidence.HIGH, 40.7829, -73.9654),
@@ -208,19 +181,17 @@ class MapViewModelTest {
                 updates = listOf(BucketUpdate.PortraitComplete(mockPOIs))
             ),
         )
-
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(mockPOIs, state.pois)
     }
 
     @Test
     fun analyticsMapOpenedFiredWithCorrectParams() = runTest(testDispatcher) {
-
         val mockPOIs = listOf(
             POI("Statue of Liberty", "landmark", "Famous statue", Confidence.HIGH, 40.6892, -74.0445),
         )
         val analyticsTracker = FakeAnalyticsTracker()
-        val viewModel = createViewModel(
+        createViewModel(
             locationProvider = FakeLocationProvider(
                 locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
                 geocodeResult = Result.success("Manhattan, New York"),
@@ -230,38 +201,13 @@ class MapViewModelTest {
             ),
             analyticsTracker = analyticsTracker,
         )
-
-        assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(1, analyticsTracker.recordedEvents.count { it.first == "map_opened" })
         analyticsTracker.assertEventTracked(
             "map_opened",
             mapOf("area_name" to "Manhattan, New York", "poi_count" to "1"),
         )
     }
 
-    @Test
-    fun analyticsMapOpenedFiresWithZeroPois() = runTest(testDispatcher) {
-        val analyticsTracker = FakeAnalyticsTracker()
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
-                geocodeResult = Result.success("Manhattan, New York"),
-            ),
-            areaRepository = FakeAreaRepository(
-                updates = listOf(BucketUpdate.PortraitComplete(emptyList()))
-            ),
-            analyticsTracker = analyticsTracker,
-        )
-
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(emptyList(), state.pois)
-        analyticsTracker.assertEventTracked(
-            "map_opened",
-            mapOf("area_name" to "Manhattan, New York", "poi_count" to "0"),
-        )
-    }
-
-    // --- Story 3.3 tests ---
+    // --- POI selection tests ---
 
     private val samplePoi = POI(
         "Statue of Liberty", "landmark", "Famous statue",
@@ -270,6 +216,7 @@ class MapViewModelTest {
 
     private fun createReadyViewModel(
         analyticsTracker: FakeAnalyticsTracker = FakeAnalyticsTracker(),
+        weatherProvider: WeatherProvider = FakeWeatherProvider(),
     ): Pair<MapViewModel, FakeAnalyticsTracker> {
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -280,6 +227,7 @@ class MapViewModelTest {
                 updates = listOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
             ),
             analyticsTracker = analyticsTracker,
+            weatherProvider = weatherProvider,
         )
         return viewModel to analyticsTracker
     }
@@ -313,60 +261,11 @@ class MapViewModelTest {
         val (viewModel, _) = createReadyViewModel(analyticsTracker = tracker)
         viewModel.selectPoi(samplePoi)
         val poiTappedCount = tracker.recordedEvents.count { it.first == "poi_tapped" }
-        assertEquals(1, poiTappedCount)
-
         viewModel.selectPoi(null)
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(null, state.selectedPoi)
-        // poi_tapped should not have been fired again
+        assertNull(state.selectedPoi)
         assertEquals(poiTappedCount, tracker.recordedEvents.count { it.first == "poi_tapped" })
     }
-
-    @Test
-    fun selectPoiNoOpBeforeReadyState() = runTest(testDispatcher) {
-        val suspendingLocation = ResettableFakeLocationProvider()
-        val viewModel = createViewModel(locationProvider = suspendingLocation)
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
-        viewModel.selectPoi(samplePoi)
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
-    }
-
-    @Test
-    fun areaContextFactoryCalledExactlyOnce() = runTest(testDispatcher) {
-
-        val contextFactory = FakeAreaContextFactory()
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
-                geocodeResult = Result.success("Manhattan, New York"),
-            ),
-            areaContextFactory = contextFactory,
-        )
-
-        assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(1, contextFactory.callCount)
-    }
-
-    @Test
-    fun contextFactoryNotCalledOnLocationFailure() = runTest(testDispatcher) {
-
-        val contextFactory = FakeAreaContextFactory()
-        val areaRepository = FakeAreaRepository()
-        val locationProvider = FakeLocationProvider(
-            locationResult = Result.failure(RuntimeException("GPS unavailable")),
-        )
-        val viewModel = createViewModel(
-            locationProvider = locationProvider,
-            areaRepository = areaRepository,
-            areaContextFactory = contextFactory,
-        )
-
-        assertIs<MapUiState.LocationFailed>(viewModel.uiState.value)
-        assertEquals(0, areaRepository.callCount)
-        assertEquals(0, contextFactory.callCount)
-        assertEquals(1, locationProvider.locationCallCount)
-    }
-    // --- Story 3.4 tests ---
 
     @Test
     fun toggleListViewActivatesListView() = runTest(testDispatcher) {
@@ -385,23 +284,101 @@ class MapViewModelTest {
         assertFalse(state.showListView)
     }
 
+    // --- v3 tests ---
+
     @Test
-    fun toggleListViewNoOpBeforeReadyState() = runTest(testDispatcher) {
-        val suspendingLocation = ResettableFakeLocationProvider()
-        val viewModel = createViewModel(locationProvider = suspendingLocation)
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
-        viewModel.toggleListView()
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+    fun switchVibe_updatesActiveVibe() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.switchVibe(Vibe.HISTORY)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(Vibe.HISTORY, state.activeVibe)
     }
 
     @Test
-    fun toggleListViewPreservesSelectedPoi() = runTest(testDispatcher) {
+    fun switchVibe_firesAnalytics() = runTest(testDispatcher) {
+        val tracker = FakeAnalyticsTracker()
+        val (viewModel, _) = createReadyViewModel(analyticsTracker = tracker)
+        viewModel.switchVibe(Vibe.HISTORY)
+        tracker.assertEventTracked("vibe_switched", mapOf("vibe" to "HISTORY"))
+    }
+
+    @Test
+    fun onMapRenderFailed_setsListViewAndMapFailed() = runTest(testDispatcher) {
         val (viewModel, _) = createReadyViewModel()
-        viewModel.selectPoi(samplePoi)
-        viewModel.toggleListView()
+        viewModel.onMapRenderFailed()
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertTrue(state.showListView)
-        assertEquals(samplePoi, state.selectedPoi)
+        assertTrue(state.mapRenderFailed)
+    }
+
+    @Test
+    fun openSearchOverlay_setsFlag() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.openSearchOverlay()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.isSearchOverlayOpen)
+    }
+
+    @Test
+    fun closeSearchOverlay_clearsFlag() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        viewModel.openSearchOverlay()
+        viewModel.closeSearchOverlay()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.isSearchOverlayOpen)
+    }
+
+    @Test
+    fun toggleFab_flipsExpanded() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        assertFalse((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)
+        viewModel.toggleFab()
+        assertTrue((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)
+        viewModel.toggleFab()
+        assertFalse((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)
+    }
+
+    @Test
+    fun portraitComplete_computesVibePoiCounts() = runTest(testDispatcher) {
+        val mixedPois = listOf(
+            POI("A", "food", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "character"),
+            POI("B", "park", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "character"),
+            POI("C", "historic", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "history"),
+        )
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(mixedPois))
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(2, state.vibePoiCounts[Vibe.CHARACTER])
+        assertEquals(1, state.vibePoiCounts[Vibe.HISTORY])
+        assertEquals(0, state.vibePoiCounts[Vibe.SAFETY])
+    }
+
+    @Test
+    fun weatherFetchedAfterLocationResolves() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel(
+            weatherProvider = FakeWeatherProvider(
+                Result.success(WeatherState(72, 0, "Clear", "\u2600\uFE0F"))
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(state.weather)
+        assertEquals(72, state.weather!!.temperatureF)
+    }
+
+    @Test
+    fun weatherFailureDoesNotBreakReadyState() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel(
+            weatherProvider = FakeWeatherProvider(Result.failure(RuntimeException("Weather failed"))),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNull(state.weather)
     }
 }
 

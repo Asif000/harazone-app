@@ -7,8 +7,8 @@
 | Epic 1: Skeleton & Streaming UX | 7/7 done | Phase 1a | ~7 | 0.5 | ✅ Done |
 | Epic 2: Live Area Portrait & AI | 5/5 done | Phase 1a | ~5 | 0.5 | ✅ Done |
 | Epic 3: Interactive Map & POI | 4/4 done | Phase 1a | ~4 | 1 (day 2) | ✅ Done |
-| Epic 4: AI Chat | 0/3 done | Phase 1a+b | ~4 | — | ⏳ Backlog |
-| Epic 5: Manual Search & Onboarding | 1/2 done | Phase 1b | ~3 | day 3 | 🔧 In Progress |
+| Epic 4: In-Map AI Conversation | 0/3 done | Phase 1a+b | ~4 | — | ⏳ Backlog |
+| Epic 5: Onboarding & Permission Flow | 1/2 done | Phase 1b | ~3 | day 3 | 🔧 In Progress |
 | Epic 6: Bookmarks & Saved Areas | 0/2 done | Phase 1b | ~3 | — | ⏳ Backlog |
 | Epic 7: Offline Experience | 0/4 done | Phase 1b | ~5 | — | ⏳ Backlog |
 | Epic 8: Adaptive Intelligence | 0/3 done | Phase 1b | ~4 | — | ⏳ Backlog |
@@ -23,6 +23,13 @@
 **Epic 3:** ████████████ 100% (4/4)
 
 **Phase 1a Total:** 100% ✅ Complete
+
+## Active Quick Specs
+
+| Spec | Status | Started |
+|------|--------|---------|
+| V3 Full-Screen Map | ✅ implementation-complete | 2026-03-06 |
+| Localisation Phase A — AI Locale Injection | 🔧 in-progress | 2026-03-06 |
 
 ## Schedule Status
 

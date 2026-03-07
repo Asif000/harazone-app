@@ -48,6 +48,10 @@ not valid json either"""
 
         const val VALID_SSE_EVENT = """{"candidates":[{"content":{"parts":[{"text":"Hello world"}],"role":"model"}}]}"""
         const val MALFORMED_SSE_EVENT = """{"not_valid": true}"""
+
+        const val V3_POIS_RESPONSE = """{"type":"SAFETY","highlight":"Safe area","content":"Low crime.","confidence":"HIGH","sources":[]}
+---POIS---
+[{"poi":"Time Out Market","type":"food","vibe":"character","insight":"Curated food hall with 24 restaurants","hours":"Sun-Wed 10am-12am","liveStatus":"open","confidence":"HIGH","rating":4.5,"latitude":38.71,"longitude":-9.13,"vibeInsights":{"character":"A gathering hub for locals","history":"Converted 1892 iron market hall"}},{"name":"Old Church","type":"historic","description":"A very old church","vibe":"history","insight":"Built in 1200","confidence":"MEDIUM","latitude":38.72,"longitude":-9.14}]"""
     }
 
     @Test
@@ -271,6 +275,54 @@ not valid json either"""
         val bucketCompletes = allUpdates.filterIsInstance<BucketUpdate.BucketComplete>()
         assertEquals(1, bucketCompletes.size)
         assertEquals(BucketType.SAFETY, bucketCompletes[0].content.type)
+    }
+
+    // --- v3 POI field tests ---
+
+    @Test
+    fun parseFullResponse_v3Pois_parsesVibe() {
+        val result = parser.parseFullResponse(V3_POIS_RESPONSE)
+        assertTrue(result.isSuccess)
+        val updates = result.getOrThrow()
+        val portrait = updates.last() as BucketUpdate.PortraitComplete
+        assertEquals(2, portrait.pois.size)
+        assertEquals("character", portrait.pois[0].vibe)
+        assertEquals("history", portrait.pois[1].vibe)
+    }
+
+    @Test
+    fun parseFullResponse_v3Pois_parsesInsight() {
+        val result = parser.parseFullResponse(V3_POIS_RESPONSE)
+        val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
+        assertTrue(portrait.pois[0].insight.isNotEmpty())
+        assertEquals("Curated food hall with 24 restaurants", portrait.pois[0].insight)
+    }
+
+    @Test
+    fun parseFullResponse_v3Pois_parsesVibeInsights() {
+        val result = parser.parseFullResponse(V3_POIS_RESPONSE)
+        val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
+        val vibeInsights = portrait.pois[0].vibeInsights
+        assertTrue(vibeInsights.isNotEmpty())
+        assertEquals("A gathering hub for locals", vibeInsights["character"])
+        assertEquals("Converted 1892 iron market hall", vibeInsights["history"])
+    }
+
+    @Test
+    fun parseFullResponse_v3Pois_parsesLiveStatus() {
+        val result = parser.parseFullResponse(V3_POIS_RESPONSE)
+        val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
+        assertEquals("open", portrait.pois[0].liveStatus)
+    }
+
+    @Test
+    fun parseFullResponse_v3Pois_fallsBackToNameFieldWhenPoiMissing() {
+        val result = parser.parseFullResponse(V3_POIS_RESPONSE)
+        val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
+        // First POI uses "poi" key -> "Time Out Market"
+        assertEquals("Time Out Market", portrait.pois[0].name)
+        // Second POI uses "name" key (no "poi") -> "Old Church"
+        assertEquals("Old Church", portrait.pois[1].name)
     }
 
     @Test

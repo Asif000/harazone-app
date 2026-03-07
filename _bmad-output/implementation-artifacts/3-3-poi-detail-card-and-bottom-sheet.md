@@ -381,6 +381,7 @@ Claude Opus 4.6
 ### Change Log
 
 - 2026-03-05: Story 3.3 implementation — POI detail card, bottom sheet integration, marker tap handling, navigate intent, 4 new tests
+- 2026-03-05: Code review (3 rounds) — fixed: ActivityNotFoundException guard (resolveActivity + Boolean return chain), @Preview for POIDetailCard, rememberUpdatedState for onPoiSelected lambda, SnackbarHost peek padding, SHEET_PEEK_HEIGHT constant, addOnMapClickListener comment, <queries> manifest declaration for geo: intent, @Preview import order. Deferred: resolveActivity API 33 deprecation (lint only), scaffold state reset on retry (V1 accepted).
 
 ### File List
 
@@ -394,5 +395,6 @@ Claude Opus 4.6
 - MODIFY: `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/navigation/AppNavigation.kt`
 - MODIFY: `composeApp/src/commonMain/kotlin/com/areadiscovery/App.kt`
 - MODIFY: `composeApp/src/androidMain/kotlin/com/areadiscovery/MainActivity.kt`
+- MODIFY: `composeApp/src/androidMain/AndroidManifest.xml`
 - MODIFY: `composeApp/src/commonTest/kotlin/com/areadiscovery/ui/map/MapViewModelTest.kt`
 - MODIFY: `_bmad-output/implementation-artifacts/sprint-status.yaml`

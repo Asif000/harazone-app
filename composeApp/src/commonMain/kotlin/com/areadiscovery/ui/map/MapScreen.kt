@@ -5,53 +5,45 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.material3.BottomSheetScaffold
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SheetValue
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberBottomSheetScaffoldState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.areadiscovery.ui.components.POIDetailCard
-import com.areadiscovery.ui.summary.ContentNoteBanner
+import com.areadiscovery.ui.components.AlertBanner
+import com.areadiscovery.ui.components.ContentNoteBanner
+import com.areadiscovery.ui.map.components.AISearchBar
+import com.areadiscovery.ui.map.components.ExpandablePoiCard
+import com.areadiscovery.ui.map.components.FabMenu
+import com.areadiscovery.ui.map.components.FabScrim
+import com.areadiscovery.ui.map.components.SearchOverlay
+import com.areadiscovery.ui.map.components.TopContextBar
+import com.areadiscovery.ui.map.components.VibeRail
 import com.areadiscovery.ui.theme.spacing
 import kotlinx.coroutines.launch
 import org.koin.compose.viewmodel.koinViewModel
 
-private val SHEET_PEEK_HEIGHT = 88.dp
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapScreen(
     viewModel: MapViewModel = koinViewModel(),
-    onPoiCountChanged: (Int) -> Unit = {},
     onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Boolean = { _, _, _ -> false },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    val poiCount = (uiState as? MapUiState.Ready)?.pois?.size ?: 0
-    LaunchedEffect(poiCount) {
-        onPoiCountChanged(poiCount)
-    }
 
     when (val state = uiState) {
         is MapUiState.Loading -> {
@@ -80,144 +72,163 @@ fun MapScreen(
         }
 
         is MapUiState.Ready -> {
-            val scaffoldState = rememberBottomSheetScaffoldState()
-            val snackbarHostState = remember { SnackbarHostState() }
-            val coroutineScope = rememberCoroutineScope()
-
-            // Auto-expand/collapse sheet based on POI selection
-            LaunchedEffect(state.selectedPoi) {
-                if (state.selectedPoi != null) {
-                    scaffoldState.bottomSheetState.expand()
-                } else {
-                    scaffoldState.bottomSheetState.partialExpand()
-                }
-            }
-
-            // Clear selection when user drags sheet down
-            val sheetValue = scaffoldState.bottomSheetState.currentValue
-            LaunchedEffect(sheetValue) {
-                if (sheetValue == SheetValue.PartiallyExpanded && state.selectedPoi != null) {
-                    viewModel.selectPoi(null)
-                }
-            }
-
-            Box(Modifier.fillMaxSize()) {
-                BottomSheetScaffold(
-                    scaffoldState = scaffoldState,
-                    sheetPeekHeight = SHEET_PEEK_HEIGHT,
-                    sheetContent = {
-                        if (state.selectedPoi != null) {
-                            POIDetailCard(
-                                poi = state.selectedPoi,
-                                onSaveClick = {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Bookmarks coming soon")
-                                    }
-                                },
-                                onShareClick = {
-                                    coroutineScope.launch {
-                                        snackbarHostState.showSnackbar("Sharing coming soon")
-                                    }
-                                },
-                                onNavigateClick = {
-                                    val lat = state.selectedPoi.latitude
-                                    val lon = state.selectedPoi.longitude
-                                    if (lat != null && lon != null) {
-                                        val handled = onNavigateToMaps(lat, lon, state.selectedPoi.name)
-                                        if (!handled) {
-                                            coroutineScope.launch {
-                                                snackbarHostState.showSnackbar("No maps app available")
-                                            }
-                                        }
-                                    } else {
-                                        coroutineScope.launch {
-                                            snackbarHostState.showSnackbar("Location not available for this place")
-                                        }
-                                    }
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = MaterialTheme.spacing.md,
-                                        vertical = MaterialTheme.spacing.sm,
-                                    ),
-                            )
-                        } else {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(
-                                        horizontal = MaterialTheme.spacing.md,
-                                        vertical = MaterialTheme.spacing.sm,
-                                    ),
-                            ) {
-                                Text(
-                                    text = state.areaName,
-                                    style = MaterialTheme.typography.headlineSmall,
-                                )
-                                Spacer(Modifier.height(MaterialTheme.spacing.xs))
-                                Text(
-                                    text = if (state.pois.isNotEmpty()) {
-                                        "${state.pois.size} places to explore"
-                                    } else {
-                                        "Explore this area"
-                                    },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                        }
-                    },
-                ) { paddingValues ->
-                    if (state.showListView) {
-                        POIListView(
-                            pois = state.pois,
-                            onPoiClick = { poi -> viewModel.selectPoi(poi) },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(paddingValues),
-                        )
-                    } else {
-                        MapComposable(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(paddingValues),
-                            latitude = state.latitude,
-                            longitude = state.longitude,
-                            zoomLevel = 14.0,
-                            pois = state.pois,
-                            onPoiSelected = { poi -> viewModel.selectPoi(poi) },
-                        )
-                    }
-                }
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = MaterialTheme.spacing.sm)
-                        .wrapContentWidth(),
-                ) {
-                    SegmentedButton(
-                        selected = !state.showListView,
-                        onClick = { if (state.showListView) viewModel.toggleListView() },
-                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                    ) {
-                        Text("Map")
-                    }
-                    SegmentedButton(
-                        selected = state.showListView,
-                        onClick = { if (!state.showListView) viewModel.toggleListView() },
-                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                    ) {
-                        Text("List")
-                    }
-                }
-                SnackbarHost(
-                    hostState = snackbarHostState,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = SHEET_PEEK_HEIGHT),
-                )
-            }
+            ReadyContent(state, viewModel, onNavigateToMaps)
         }
+    }
+}
+
+@Composable
+private fun ReadyContent(
+    state: MapUiState.Ready,
+    viewModel: MapViewModel,
+    onNavigateToMaps: (Double, Double, String) -> Boolean,
+) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+
+    Box(Modifier.fillMaxSize()) {
+        // Base: map or list
+        if (state.showListView) {
+            POIListView(
+                pois = state.pois,
+                activeVibe = state.activeVibe,
+                onVibeSelected = { viewModel.switchVibe(it) },
+                onPoiClick = { viewModel.selectPoi(it) },
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            MapComposable(
+                modifier = Modifier.fillMaxSize(),
+                latitude = state.latitude,
+                longitude = state.longitude,
+                zoomLevel = 14.0,
+                pois = state.pois,
+                activeVibe = state.activeVibe,
+                onPoiSelected = { poi -> viewModel.selectPoi(poi) },
+                onMapRenderFailed = { viewModel.onMapRenderFailed() },
+            )
+        }
+
+        // Alert banner for map render failure
+        if (state.mapRenderFailed && state.showListView) {
+            AlertBanner(
+                message = "Map unavailable. Showing list view.",
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 64.dp)
+                    .padding(horizontal = 16.dp)
+                    .fillMaxWidth(),
+            )
+        }
+
+        // Top context bar
+        TopContextBar(
+            areaName = state.areaName,
+            visitTag = state.visitTag,
+            weather = state.weather,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 8.dp),
+        )
+
+        // Vibe rail (right side, bottom-aligned above FAB)
+        VibeRail(
+            activeVibe = state.activeVibe,
+            vibePoiCounts = state.vibePoiCounts,
+            onVibeSelected = { viewModel.switchVibe(it) },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 8.dp, bottom = 88.dp),
+        )
+
+        // Expandable POI card
+        if (state.selectedPoi != null) {
+            ExpandablePoiCard(
+                poi = state.selectedPoi,
+                activeVibe = state.activeVibe,
+                onDismiss = { viewModel.clearPoiSelection() },
+                onDirectionsClick = { lat, lon, name ->
+                    val handled = onNavigateToMaps(lat, lon, name)
+                    if (!handled) {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("No maps app available")
+                        }
+                    }
+                },
+                onAskAiClick = { query ->
+                    viewModel.clearPoiSelection()
+                    viewModel.openSearchOverlay()
+                    viewModel.submitSearch(query)
+                },
+                onSaveClick = {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Bookmarks coming soon")
+                    }
+                },
+                onShareClick = {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("Sharing coming soon")
+                    }
+                },
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+
+        // FAB scrim
+        FabScrim(
+            visible = state.isFabExpanded,
+            onClick = { viewModel.toggleFab() },
+        )
+
+        // FAB menu
+        val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        FabMenu(
+            isExpanded = state.isFabExpanded,
+            onToggle = { viewModel.toggleFab() },
+            onSavedPlaces = {
+                viewModel.toggleFab()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Coming soon")
+                }
+            },
+            onSettings = {
+                viewModel.toggleFab()
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar("Coming soon")
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = navBarPadding + 16.dp, end = 16.dp),
+        )
+
+        // AI search bar
+        AISearchBar(
+            onTap = { viewModel.openSearchOverlay() },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 80.dp),
+        )
+
+        // Search overlay
+        if (state.isSearchOverlayOpen) {
+            SearchOverlay(
+                query = state.searchQuery,
+                aiResponse = state.aiResponse,
+                isAiResponding = state.isAiResponding,
+                followUpChips = state.followUpChips,
+                onQueryChange = { viewModel.updateSearchQuery(it) },
+                onSubmit = { viewModel.submitSearch(it) },
+                onDismiss = { viewModel.closeSearchOverlay() },
+            )
+        }
+
+        // Snackbar host
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 80.dp),
+        )
     }
 }
