@@ -58,8 +58,8 @@ Items deferred during code review — to be picked up in relevant future stories
 |----------|------|------|-------------|
 | MEDIUM | `clusterPois` uses Manhattan distance in degrees — inconsistent glow zone radius at different latitudes (0.005° = ~550m equator, ~275m at 60°N). Replace with Haversine-based distance. | `MapComposable.android.kt` | Future UX polish |
 | MEDIUM | AI search `conversationHistory` always empty — follow-up chips produce standalone answers with no context from prior questions. Need to store chat turns in state and pass to `streamChatResponse`. | `MapViewModel.kt` | AI search enhancement |
+| **HIGH** | **Auto-refresh area portrait on pan/zoom** — Core UX: when user pans to a new area, detect camera idle, reverse-geocode new center, debounce (500ms), re-fetch portrait if area name changed. Needs `onCameraIdle(lat, lng)` callback through expect/actual MapComposable, ViewModel debounce logic, loading state while keeping old pins visible. **This is essential for the "discover anywhere" experience.** | `MapComposable.kt`, `MapViewModel.kt` | **Next quick spec** |
 | MEDIUM | Add +/- zoom control buttons as Compose overlays on the map. MapLibre 11.x removed built-in zoom controls. Need `onZoomIn`/`onZoomOut` callbacks through expect/actual MapComposable. | `MapComposable.kt`, `MapScreen.kt` | UX polish |
-| MEDIUM | Auto-refresh area portrait when user pans/zooms to a new area. Detect camera idle, reverse-geocode new center, debounce, re-fetch portrait if area name changed. | `MapComposable.kt`, `MapViewModel.kt` | New feature / story |
 
 ---
 

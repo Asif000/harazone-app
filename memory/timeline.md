@@ -30,6 +30,7 @@
 |------|--------|---------|
 | V3 Full-Screen Map | ✅ implementation-complete | 2026-03-06 |
 | Localisation Phase A — AI Locale Injection | 🔧 in-progress | 2026-03-06 |
+| Rebrand: HaraZone + Custom Icon | 🔧 in-progress | 2026-03-06 |
 
 ## Schedule Status
 
