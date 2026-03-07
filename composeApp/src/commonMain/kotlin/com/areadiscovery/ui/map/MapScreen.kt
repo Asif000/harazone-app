@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -125,6 +126,7 @@ private fun ReadyContent(
                 latitude = state.latitude,
                 longitude = state.longitude,
                 zoomLevel = 14.0,
+                cameraMoveId = state.cameraMoveId,
                 pois = state.pois,
                 activeVibe = state.activeVibe,
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
@@ -296,6 +298,32 @@ private fun ReadyContent(
                 .align(Alignment.BottomEnd)
                 .padding(bottom = navBarPadding + 16.dp, end = 16.dp),
         )
+
+        // MyLocation button (Position C — left side, above AI bar)
+        AnimatedVisibility(
+            visible = state.showMyLocation && !state.isSearchingArea && !state.isSearchOverlayOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 12.dp, bottom = navBarPadding + 84.dp),
+        ) {
+            Surface(
+                onClick = { viewModel.returnToCurrentLocation() },
+                shape = RoundedCornerShape(50),
+                color = MapFloatingUiDark.copy(alpha = 0.92f),
+                modifier = Modifier.size(40.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.MyLocation,
+                        contentDescription = "Return to my location",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
 
         // AI search bar
         AISearchBar(

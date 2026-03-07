@@ -15,6 +15,7 @@ actual fun MapComposable(
     latitude: Double,
     longitude: Double,
     zoomLevel: Double,
+    cameraMoveId: Int,
     pois: List<POI>,
     activeVibe: Vibe?,
     onPoiSelected: (POI?) -> Unit,

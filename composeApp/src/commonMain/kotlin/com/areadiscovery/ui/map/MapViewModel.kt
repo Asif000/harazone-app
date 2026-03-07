@@ -44,6 +44,7 @@ class MapViewModel(
     private var loadJob: Job? = null
     private var searchJob: Job? = null
     private var cameraIdleJob: Job? = null
+    private var returnToLocationJob: Job? = null
     private var pendingLat: Double = 0.0
     private var pendingLng: Double = 0.0
     private var pendingAreaName: String = ""
@@ -88,6 +89,7 @@ class MapViewModel(
         val current = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = current.copy(
             isSearchOverlayOpen = true,
+            showMyLocation = false,
             searchQuery = "",
             aiResponse = "",
             followUpChips = emptyList(),
@@ -102,7 +104,10 @@ class MapViewModel(
 
     fun closeSearchOverlay() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(isSearchOverlayOpen = false)
+        _uiState.value = current.copy(
+            isSearchOverlayOpen = false,
+            showMyLocation = isAwayFromGps(current.latitude, current.longitude, current),
+        )
         searchJob?.cancel()
     }
 
@@ -207,6 +212,13 @@ class MapViewModel(
         if (lat == 0.0 && lng == 0.0) return
         if (searchJob?.isActive == true) return
         if (_uiState.value !is MapUiState.Ready) return
+        val readyState = _uiState.value as? MapUiState.Ready ?: return
+        if (!isAwayFromGps(lat, lng, readyState)) {
+            if (readyState.showMyLocation || readyState.showSearchThisArea) {
+                _uiState.value = readyState.copy(showMyLocation = false, showSearchThisArea = false)
+            }
+            return
+        }
         cameraIdleJob?.cancel()
         cameraIdleJob = viewModelScope.launch {
             delay(500)
@@ -221,7 +233,11 @@ class MapViewModel(
             pendingLat = lat
             pendingLng = lng
             pendingAreaName = if (isNew) newAreaName else current.areaName
-            _uiState.value = current.copy(showSearchThisArea = true, isNewArea = isNew)
+            _uiState.value = current.copy(
+                showSearchThisArea = true,
+                isNewArea = isNew,
+                showMyLocation = isAwayFromGps(lat, lng, current),
+            )
         }
     }
 
@@ -233,6 +249,7 @@ class MapViewModel(
         val lng = pendingLng
         _uiState.value = current.copy(
             showSearchThisArea = false,
+            showMyLocation = false,
             isSearchingArea = true,
             vibePoiCounts = emptyMap(),
             pois = emptyList(),
@@ -262,6 +279,7 @@ class MapViewModel(
                                 vibePoiCounts = counts,
                                 activeVibe = null,
                                 isSearchingArea = false,
+                                showMyLocation = isAwayFromGps(lat, lng, state),
                             )
                         }
                     }
@@ -274,6 +292,92 @@ class MapViewModel(
                 val s = _uiState.value as? MapUiState.Ready
                 if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
+            }
+        }
+    }
+
+    fun returnToCurrentLocation() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        cameraIdleJob?.cancel()
+        searchJob?.cancel()
+        returnToLocationJob?.cancel()
+
+        // Hide button immediately for instant feedback (F1 + F3)
+        _uiState.value = current.copy(showMyLocation = false)
+
+        returnToLocationJob = viewModelScope.launch {
+            try {
+                val locResult = locationProvider.getCurrentLocation()
+                if (locResult.isFailure) {
+                    _errorEvents.tryEmit("Can't find your location. Please try again.")
+                    return@launch
+                }
+                val coords = locResult.getOrThrow()
+                val geocodeResult = locationProvider.reverseGeocode(coords.latitude, coords.longitude)
+                val gpsAreaName = geocodeResult.getOrNull() ?: current.areaName
+
+                val state = _uiState.value as? MapUiState.Ready ?: return@launch
+                val gpsToken = gpsAreaName.substringBefore(",").trim()
+                val currentToken = state.areaName.substringBefore(",").trim()
+                val isSameArea = gpsToken.equals(currentToken, ignoreCase = true)
+
+                analyticsTracker.trackEvent(
+                    "return_to_location",
+                    mapOf("same_area" to isSameArea.toString()),
+                )
+
+                if (isSameArea) {
+                    _uiState.value = state.copy(
+                        latitude = coords.latitude,
+                        longitude = coords.longitude,
+                        gpsLatitude = coords.latitude,
+                        gpsLongitude = coords.longitude,
+                        showMyLocation = false,
+                        showSearchThisArea = false,
+                        cameraMoveId = state.cameraMoveId + 1,
+                    )
+                } else {
+                    _uiState.value = state.copy(
+                        latitude = coords.latitude,
+                        longitude = coords.longitude,
+                        gpsLatitude = coords.latitude,
+                        gpsLongitude = coords.longitude,
+                        showMyLocation = false,
+                        showSearchThisArea = false,
+                        cameraMoveId = state.cameraMoveId + 1,
+                        isSearchingArea = true,
+                        pois = emptyList(),
+                        vibePoiCounts = emptyMap(),
+                        activeVibe = null,
+                    )
+                    val context = areaContextFactory.create()
+                    getAreaPortrait(gpsAreaName, context)
+                        .catch { e ->
+                            AppLogger.e(e) { "Return to location: portrait fetch failed" }
+                            val s = _uiState.value as? MapUiState.Ready ?: return@catch
+                            _uiState.value = s.copy(isSearchingArea = false)
+                            _errorEvents.tryEmit("Couldn't load area info. Try again.")
+                        }
+                        .collect { update ->
+                            if (update is BucketUpdate.PortraitComplete) {
+                                val pois = update.pois
+                                val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                                val counts = computeVibePoiCounts(pois)
+                                _uiState.value = s.copy(
+                                    areaName = gpsAreaName,
+                                    pois = pois,
+                                    vibePoiCounts = counts,
+                                    activeVibe = null,
+                                    isSearchingArea = false,
+                                )
+                            }
+                        }
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Return to location: unexpected error" }
+                _errorEvents.tryEmit("Can't find your location. Please try again.")
             }
         }
     }
@@ -322,6 +426,8 @@ class MapViewModel(
                     areaName = areaName,
                     latitude = coords.latitude,
                     longitude = coords.longitude,
+                    gpsLatitude = coords.latitude,
+                    gpsLongitude = coords.longitude,
                     isSearchingArea = true,
                 )
 
@@ -397,6 +503,11 @@ class MapViewModel(
             q.containsAny("cost", "price", "expensive", "cheap") -> listOf("Budget tips?", "Free things to do?")
             else -> listOf("Tell me more", "What's nearby?")
         }
+    }
+
+    private fun isAwayFromGps(cameraLat: Double, cameraLng: Double, state: MapUiState.Ready): Boolean {
+        return kotlin.math.abs(cameraLat - state.gpsLatitude) > 0.0009 ||
+               kotlin.math.abs(cameraLng - state.gpsLongitude) > 0.0009
     }
 
     private fun String.containsAny(vararg terms: String) = terms.any { this.contains(it) }

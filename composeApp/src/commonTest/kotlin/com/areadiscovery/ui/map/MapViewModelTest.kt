@@ -766,7 +766,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun onCameraIdle_showsRefreshButtonWhenPanningBackToSameArea() = runTest(testDispatcher) {
+    fun onCameraIdle_hidesButtonsWhenPanningBackNearGps() = runTest(testDispatcher) {
         val locationProvider = object : com.areadiscovery.location.LocationProvider {
             private var callIndex = 0
             override suspend fun getCurrentLocation() =
@@ -775,8 +775,7 @@ class MapViewModelTest {
                 callIndex++
                 return when {
                     callIndex <= 1 -> Result.success("Alfama, Lisbon")
-                    callIndex == 2 -> Result.success("Bairro Alto, Lisbon")
-                    else -> Result.success("Alfama, Lisbon")
+                    else -> Result.success("Bairro Alto, Lisbon")
                 }
             }
         }
@@ -787,11 +786,184 @@ class MapViewModelTest {
         testScheduler.advanceUntilIdle()
         assertTrue((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
 
+        // Pan back near GPS — both buttons should hide
         viewModel.onCameraIdle(38.7139, -9.1394)
         testScheduler.advanceUntilIdle()
         val state2 = viewModel.uiState.value as MapUiState.Ready
-        assertTrue(state2.showSearchThisArea)
-        assertFalse(state2.isNewArea)
+        assertFalse(state2.showSearchThisArea)
+        assertFalse(state2.showMyLocation)
+    }
+
+    // --- Return to current location tests ---
+
+    @Test
+    fun returnToCurrentLocation_sameArea_movesCameraWithoutRefetch() = runTest(testDispatcher) {
+        val initialPois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0),
+        )
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var locationCallCount = 0
+            override suspend fun getCurrentLocation(): Result<GpsCoordinates> {
+                locationCallCount++
+                return Result.success(GpsCoordinates(40.7128, -74.0060))
+            }
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                return Result.success("Manhattan, New York")
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(initialPois))
+            ),
+        )
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Manhattan, New York", state1.areaName)
+        assertEquals(initialPois, state1.pois)
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(40.7128, state2.latitude, 0.001)
+        assertEquals(-74.0060, state2.longitude, 0.001)
+        assertEquals(40.7128, state2.gpsLatitude, 0.001)
+        assertEquals(-74.0060, state2.gpsLongitude, 0.001)
+        assertFalse(state2.showMyLocation)
+        assertFalse(state2.isSearchingArea)
+        assertEquals(initialPois, state2.pois)
+    }
+
+    @Test
+    fun returnToCurrentLocation_incrementsCameraMoveIdEvenWhenCoordsUnchanged() = runTest(testDispatcher) {
+        // Regression: when user pans without searching, state lat/lng stay at GPS coords.
+        // returnToCurrentLocation must still trigger a camera move via cameraMoveId.
+        val viewModel = createViewModel()
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val initialMoveId = state1.cameraMoveId
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state2.cameraMoveId > initialMoveId,
+            "cameraMoveId must increment to force LaunchedEffect re-fire")
+    }
+
+    @Test
+    fun returnToCurrentLocation_differentArea_refetchesPortrait() = runTest(testDispatcher) {
+        val newPois = listOf(
+            POI("New Place", "park", "desc", Confidence.HIGH, 2.0, 3.0),
+        )
+        val repoCallIndex = intArrayOf(0)
+        val repo = object : AreaRepository {
+            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
+                repoCallIndex[0]++
+                return kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(
+                    if (repoCallIndex[0] <= 1) listOf(POI("Old", "food", "d", Confidence.HIGH, 1.0, 1.0))
+                    else newPois
+                ))
+            }
+        }
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var locationCallCount = 0
+            override suspend fun getCurrentLocation(): Result<GpsCoordinates> {
+                locationCallCount++
+                return if (locationCallCount <= 1) Result.success(GpsCoordinates(40.7128, -74.0060))
+                else Result.success(GpsCoordinates(51.5074, -0.1278))
+            }
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                return if (latitude > 50.0) Result.success("London, UK")
+                else Result.success("Manhattan, New York")
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = repo,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("London, UK", state.areaName)
+        assertEquals(newPois, state.pois)
+        assertFalse(state.isSearchingArea)
+        assertEquals(51.5074, state.gpsLatitude, 0.001)
+    }
+
+    @Test
+    fun returnToCurrentLocation_gpsFailure_emitsError() = runTest(testDispatcher) {
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var callCount = 0
+            override suspend fun getCurrentLocation(): Result<GpsCoordinates> {
+                callCount++
+                return if (callCount <= 1) Result.success(GpsCoordinates(40.7128, -74.0060))
+                else Result.failure(RuntimeException("GPS unavailable"))
+            }
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double) =
+                Result.success("Manhattan, New York")
+        }
+        val viewModel = createViewModel(locationProvider = locationProvider)
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        val errors = mutableListOf<String>()
+        val collectJob = launch { viewModel.errorEvents.collect { errors.add(it) } }
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, errors.size)
+        assertEquals("Can't find your location. Please try again.", errors[0])
+        // State should be unchanged
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(state1.latitude, state2.latitude, 0.001)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun returnToCurrentLocation_firesAnalytics() = runTest(testDispatcher) {
+        val tracker = FakeAnalyticsTracker()
+        val viewModel = createViewModel(
+            analyticsTracker = tracker,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        tracker.assertEventTracked("return_to_location", mapOf("same_area" to "true"))
+    }
+
+    @Test
+    fun onCameraIdle_showsMyLocationWhenFarFromGps() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state1.showMyLocation)
+
+        // Pan far from GPS (default GPS is from FakeLocationProvider)
+        viewModel.onCameraIdle(50.0, 30.0)
+        testScheduler.advanceUntilIdle()
+
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state2.showMyLocation)
+    }
+
+    @Test
+    fun onCameraIdle_hidesMyLocationWhenNearGps() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Pan far away first
+        viewModel.onCameraIdle(50.0, 30.0)
+        testScheduler.advanceUntilIdle()
+        assertTrue((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
+
+        // Pan back near GPS (FakeLocationProvider defaults: 38.7139, -9.1394)
+        viewModel.onCameraIdle(38.7139, -9.1394)
+        testScheduler.advanceUntilIdle()
+        assertFalse((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
     }
 
     @Test

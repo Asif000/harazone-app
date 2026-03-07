@@ -54,6 +54,7 @@ actual fun MapComposable(
     latitude: Double,
     longitude: Double,
     zoomLevel: Double,
+    cameraMoveId: Int,
     pois: List<POI>,
     activeVibe: Vibe?,
     onPoiSelected: (POI?) -> Unit,
@@ -94,13 +95,14 @@ actual fun MapComposable(
     }
 
     // Camera + style setup
-    LaunchedEffect(latitude, longitude) {
+    LaunchedEffect(latitude, longitude, cameraMoveId) {
         if (latitude == 0.0 && longitude == 0.0) return@LaunchedEffect
         mapView.getMapAsync { map ->
             if (isDestroyed[0]) return@getMapAsync
             mapRef[0] = map
             if (styleLoaded.value) {
-                map.moveCamera(CameraUpdateFactory.newLatLng(LatLng(latitude, longitude)))
+                suppressCameraIdle[0] = true
+                map.animateCamera(CameraUpdateFactory.newLatLng(LatLng(latitude, longitude)), 600, null)
             } else if (!styleLoading[0]) {
                 styleLoading[0] = true
 

@@ -27,6 +27,10 @@ sealed class MapUiState {
         val showSearchThisArea: Boolean = false,
         val isNewArea: Boolean = false,
         val isSearchingArea: Boolean = false,
+        val gpsLatitude: Double = 0.0,
+        val gpsLongitude: Double = 0.0,
+        val showMyLocation: Boolean = false,
+        val cameraMoveId: Int = 0,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }
