@@ -15,16 +15,14 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 
 class WikipediaImageRepository(private val httpClient: HttpClient) {
 
     companion object {
         private const val USER_AGENT = "AreaDiscovery/1.0 (https://github.com/areadiscovery; contact@areadiscovery.com)"
-        internal const val MAX_CONCURRENT_REQUESTS = 5
+        const val MAX_CONCURRENT_REQUESTS = 5
+        private val json = Json { ignoreUnknownKeys = true }
     }
-
-    private val json = Json { ignoreUnknownKeys = true }
 
     @Serializable
     private data class WikiSummary(val thumbnail: WikiThumbnail? = null)

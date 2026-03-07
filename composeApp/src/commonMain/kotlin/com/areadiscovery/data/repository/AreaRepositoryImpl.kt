@@ -54,6 +54,13 @@ class AreaRepositoryImpl(
         const val CACHE_TTL_SEMI_STATIC_MS = 3 * MS_PER_DAY
         const val CACHE_TTL_DYNAMIC_MS = 12 * MS_PER_HOUR
         private val json = Json { ignoreUnknownKeys = true }
+
+        fun resolveTileUrl(ref: String): String? {
+            if (!ref.startsWith("maptiler-satellite://")) return null
+            val parts = ref.removePrefix("maptiler-satellite://").split("/")
+            if (parts.size != 3) return null
+            return "https://api.maptiler.com/tiles/satellite-v2/${parts[0]}/${parts[1]}/${parts[2]}.jpg?key=${BuildKonfig.MAPTILER_API_KEY}"
+        }
     }
 
     private fun getTtlMs(bucketType: BucketType): Long = when (bucketType) {
@@ -167,7 +174,7 @@ class AreaRepositoryImpl(
             async {
                 semaphore.withPermit {
                     val wikiUrl = wikipediaImageRepository.getImageUrl(poi.wikiSlug, poi.name)
-                    val imageUrl = wikiUrl ?: buildSatelliteTileUrl(poi.latitude, poi.longitude)
+                    val imageUrl = wikiUrl ?: buildSatelliteTileRef(poi.latitude, poi.longitude)
                     AppLogger.d { "enrichPoisWithImages: '${poi.name}' -> wiki=${wikiUrl != null}, mapTiler=${imageUrl != null && wikiUrl == null}, final=${imageUrl?.take(60)}" }
                     poi.copy(imageUrl = imageUrl)
                 }
@@ -177,14 +184,14 @@ class AreaRepositoryImpl(
         result
     }
 
-    private fun buildSatelliteTileUrl(lat: Double?, lng: Double?): String? {
+    internal fun buildSatelliteTileRef(lat: Double?, lng: Double?): String? {
         if (lat == null || lng == null) return null
         val z = 17
         val n = 1 shl z // 2^z
         val x = ((lng + 180.0) / 360.0 * n).toInt().coerceIn(0, n - 1)
         val latRad = lat * kotlin.math.PI / 180.0
         val y = ((1.0 - kotlin.math.ln(kotlin.math.tan(latRad) + 1.0 / kotlin.math.cos(latRad)) / kotlin.math.PI) / 2.0 * n).toInt().coerceIn(0, n - 1)
-        return "https://api.maptiler.com/tiles/satellite-v2/$z/$x/$y.jpg?key=${BuildKonfig.MAPTILER_API_KEY}"
+        return "maptiler-satellite://$z/$x/$y"
     }
 
     private fun writePoisToCache(pois: List<POI>, areaName: String, language: String) {

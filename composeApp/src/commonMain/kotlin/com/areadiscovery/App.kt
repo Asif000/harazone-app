@@ -17,14 +17,19 @@ fun App(
     onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Boolean = { _, _, _ -> false },
 ) {
     KoinApplication(application = { platformConfig(); modules(appModule()) }) {
-        val httpClient: HttpClient = koinInject()
-        setSingletonImageLoaderFactory { context ->
-            ImageLoader.Builder(context)
-                .components { add(KtorNetworkFetcherFactory(httpClient)) }
-                .build()
-        }
+        CoilSetup()
         AreaDiscoveryTheme {
             MapScreen(onNavigateToMaps = onNavigateToMaps)
         }
+    }
+}
+
+@Composable
+private fun CoilSetup() {
+    val httpClient: HttpClient = koinInject()
+    setSingletonImageLoaderFactory { context ->
+        ImageLoader.Builder(context)
+            .components { add(KtorNetworkFetcherFactory(httpClient)) }
+            .build()
     }
 }

@@ -48,9 +48,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import com.areadiscovery.data.repository.AreaRepositoryImpl
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.ui.theme.MapSurfaceDark
@@ -99,10 +101,12 @@ fun ExpandablePoiCard(
             )
             // Image overlaid on top if URL is available
             if (poi.imageUrl != null) {
+                val resolvedUrl = AreaRepositoryImpl.resolveTileUrl(poi.imageUrl!!) ?: poi.imageUrl
                 AsyncImage(
-                    model = poi.imageUrl,
+                    model = resolvedUrl,
                     contentDescription = poi.name,
                     contentScale = ContentScale.Crop,
+                    placeholder = ColorPainter(vibeColor.copy(alpha = 0.15f)),
                     modifier = Modifier.matchParentSize(),
                 )
             }

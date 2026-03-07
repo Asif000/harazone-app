@@ -557,10 +557,14 @@ class AreaRepositoryTest {
             repeat(BucketType.entries.size) { awaitItem() }
             val portrait = awaitItem()
             assertIs<BucketUpdate.PortraitComplete>(portrait)
-            // POIs are enriched with imageUrl (MapTiler fallback since mock Wikipedia returns no thumbnail)
+            // POIs are enriched with imageUrl (MapTiler satellite tile ref since mock Wikipedia returns no thumbnail)
             assertEquals(mockPois.size, portrait.pois.size)
             assertEquals(mockPois[0].name, portrait.pois[0].name)
             assertEquals(mockPois[1].name, portrait.pois[1].name)
+            // H-4: verify MapTiler fallback actually populates imageUrl
+            assertNotNull(portrait.pois[0].imageUrl, "MapTiler fallback should populate imageUrl")
+            assertTrue(portrait.pois[0].imageUrl!!.startsWith("maptiler-satellite://"), "imageUrl should be a MapTiler satellite tile ref")
+            assertNotNull(portrait.pois[1].imageUrl, "MapTiler fallback should populate imageUrl for second POI")
             awaitComplete()
         }
 
@@ -695,6 +699,88 @@ class AreaRepositoryTest {
             assertEquals("https://upload.wikimedia.org/enriched.jpg", portrait.pois[0].imageUrl)
             awaitComplete()
         }
+    }
+
+    @Test
+    fun cacheMissMultiPoiMixedWikiResults_failedPoiGetsMapTilerOthersUnaffected() = testScope.runTest {
+        var callCount = 0
+        val wikiMockEngine = MockEngine { _ ->
+            callCount++
+            // Odd calls (slug attempts): first POI slug fails, second POI slug succeeds
+            // Call 1: POI1 wikiSlug -> 404
+            // Call 2: POI1 poiName -> 404
+            // Call 3: POI1 Commons -> 404
+            // Call 4: POI2 wikiSlug -> success
+            if (callCount <= 3) respond("Not found", status = HttpStatusCode.NotFound)
+            else respond(
+                content = """{"title":"Test","thumbnail":{"source":"https://upload.wikimedia.org/good.jpg","width":320,"height":240}}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val mixedRepo = AreaRepositoryImpl(
+            aiProvider = fakeProvider,
+            database = database,
+            scope = testScope,
+            clock = fakeClock,
+            connectivityObserver = { fakeConnectivity.observe() },
+            wikipediaImageRepository = WikipediaImageRepository(HttpClient(wikiMockEngine)),
+            ioDispatcher = testDispatcher,
+        )
+
+        val mixedPois = listOf(
+            POI("Unknown Place", "cafe", "Nice", Confidence.HIGH, 40.0, -9.0, wikiSlug = "Bad_Slug"),
+            POI("Famous Place", "landmark", "Great", Confidence.HIGH, 41.0, -8.0, wikiSlug = "Good_Slug"),
+        )
+        fakeProvider.emissions = defaultBucketEmissions().map {
+            if (it is BucketUpdate.PortraitComplete) BucketUpdate.PortraitComplete(pois = mixedPois)
+            else it
+        }
+
+        mixedRepo.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) { awaitItem() }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(2, portrait.pois.size)
+            // POI 1: all wiki tiers failed -> MapTiler satellite tile ref
+            assertTrue(portrait.pois[0].imageUrl!!.startsWith("maptiler-satellite://"), "Failed POI should get MapTiler fallback")
+            // POI 2: wiki succeeded
+            assertEquals("https://upload.wikimedia.org/good.jpg", portrait.pois[1].imageUrl)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun cacheHitDoesNotCallWikipediaImageRepository() = testScope.runTest {
+        var wikiCallCount = 0
+        val countingEngine = MockEngine { _ ->
+            wikiCallCount++
+            respond("{}", HttpStatusCode.OK)
+        }
+        val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val countingRepo = AreaRepositoryImpl(
+            aiProvider = fakeProvider,
+            database = database,
+            scope = testScope,
+            clock = fakeClock,
+            connectivityObserver = { fakeConnectivity.observe() },
+            wikipediaImageRepository = WikipediaImageRepository(HttpClient(countingEngine)),
+            ioDispatcher = testDispatcher,
+        )
+
+        populateAllBucketsValid()
+        populatePoiCache()
+
+        countingRepo.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) { awaitItem() }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(mockPois, portrait.pois)
+            awaitComplete()
+        }
+
+        assertEquals(0, wikiCallCount, "Wikipedia should not be called on cache hit")
     }
 
     @Test

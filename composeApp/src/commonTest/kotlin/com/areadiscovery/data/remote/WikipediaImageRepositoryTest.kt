@@ -13,6 +13,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 private const val JSON_CT = "application/json"
+private const val COMMONS_RESPONSE = """{"batchcomplete":"","query":{"pages":{"12345":{"pageid":12345,"ns":6,"title":"File:Photo.jpg","imageinfo":[{"thumburl":"https://upload.wikimedia.org/commons/thumb/photo.jpg","thumbwidth":800,"thumbheight":600,"url":"https://upload.wikimedia.org/commons/photo.jpg"}]}}}}"""
 
 class WikipediaImageRepositoryTest {
 
@@ -85,6 +86,51 @@ class WikipediaImageRepositoryTest {
         val result = repo.getImageUrl("Valid_Wiki_Slug", "POI Name")
         assertEquals("https://img.example.com/photo.jpg", result)
         assertEquals(1, callCount, "Only one Wikipedia call when wikiSlug succeeds")
+    }
+
+    @Test
+    fun getImageUrl_commonsHappyPath_returnsThumburl() = runTest {
+        var callCount = 0
+        val engine = MockEngine { _ ->
+            callCount++
+            // First two calls: Wikipedia slug + name (both 404)
+            if (callCount <= 2) respond("Not found", status = HttpStatusCode.NotFound)
+            // Third call: Commons search succeeds
+            else respond(
+                content = COMMONS_RESPONSE,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, JSON_CT)
+            )
+        }
+        val repo = WikipediaImageRepository(HttpClient(engine))
+        val result = repo.getImageUrl("Bad_Slug", "Some Place")
+        assertEquals("https://upload.wikimedia.org/commons/thumb/photo.jpg", result)
+        assertEquals(3, callCount, "Should try wiki slug, poi name, then Commons")
+    }
+
+    @Test
+    fun getImageUrl_allTiersFail_returnsNull() = runTest {
+        val engine = MockEngine { _ ->
+            respond("Not found", status = HttpStatusCode.NotFound)
+        }
+        val repo = WikipediaImageRepository(HttpClient(engine))
+        assertNull(repo.getImageUrl("Bad_Slug", "Unknown_Place"))
+    }
+
+    @Test
+    fun getImageUrl_commonsNoPages_returnsNull() = runTest {
+        var callCount = 0
+        val engine = MockEngine { _ ->
+            callCount++
+            if (callCount <= 2) respond("Not found", status = HttpStatusCode.NotFound)
+            else respond(
+                content = """{"batchcomplete":"","query":{"searchinfo":{"totalhits":0}}}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, JSON_CT)
+            )
+        }
+        val repo = WikipediaImageRepository(HttpClient(engine))
+        assertNull(repo.getImageUrl("Bad_Slug", "No_Results"))
     }
 
     @Test
