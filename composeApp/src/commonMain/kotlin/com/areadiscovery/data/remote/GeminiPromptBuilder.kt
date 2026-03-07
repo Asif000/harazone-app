@@ -37,7 +37,7 @@ After the last bucket, output this delimiter:
 ---POIS---
 
 Then output a JSON array of points of interest:
-[{"n":"Name","t":"type","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"lat":38.7100,"lng":-9.1300}]
+[{"n":"Name","t":"type","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"lat":38.7100,"lng":-9.1300,"wiki":"Wikipedia_Article_Title"}]
 
 Valid vibe values: character, history, whats_on, safety, nearby, cost
 Valid s values: open, busy, closed
@@ -49,6 +49,7 @@ IMPORTANT:
 - Adapt content to the current time of day and day of week
 - NEVER include the strings "---BUCKET---" or "---POIS---" inside JSON field values
 - For each POI, provide decimal GPS coordinates to 4 decimal places. Coordinates are required for map marker placement. Only include a POI if you can provide coordinates with reasonable confidence
+- For each POI, include "wiki" with the exact Wikipedia article title (underscores, e.g. "Igreja_Matriz_Nossa_Senhora_da_Penha"). Only include if you are confident in the article name. Omit "wiki" rather than guessing.
         """.trimIndent()
     }
 

@@ -52,6 +52,10 @@ not valid json either"""
         const val V3_POIS_RESPONSE = """{"type":"SAFETY","highlight":"Safe area","content":"Low crime."}
 ---POIS---
 [{"n":"Time Out Market","t":"food","v":"character","w":"Curated food hall with 24 local restaurants in a converted 1892 iron market hall","h":"Sun-Wed 10am-12am, Thu-Sat 10am-2am","s":"open","r":4.5,"lat":38.7100,"lng":-9.1300},{"n":"Old Church","t":"historic","v":"history","w":"Built in 1200, oldest surviving structure in the district","h":"10a-5p","s":"open","r":4.2,"lat":38.7200,"lng":-9.1400}]"""
+
+        const val V3_POIS_WITH_WIKI_RESPONSE = """{"type":"SAFETY","highlight":"Safe area","content":"Low crime."}
+---POIS---
+[{"n":"Igreja Matriz","t":"historic","v":"history","w":"Built in 1400, oldest church in the district","lat":38.7100,"lng":-9.1300,"wiki":"Igreja_Matriz"},{"n":"Local Market","t":"food","v":"character","w":"Daily produce market running since 1892","lat":38.7200,"lng":-9.1400}]"""
     }
 
     @Test
@@ -344,6 +348,14 @@ not valid json either"""
         val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
         assertTrue(portrait.pois[0].insight.isNotEmpty())
         assertTrue(portrait.pois[0].insight.contains("food hall") || portrait.pois[0].insight.contains("market"))
+    }
+
+    @Test
+    fun parseFullResponse_slimPois_parsesWikiSlug() {
+        val result = parser.parseFullResponse(V3_POIS_WITH_WIKI_RESPONSE)
+        val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
+        assertEquals("Igreja_Matriz", portrait.pois[0].wikiSlug)
+        assertNull(portrait.pois[1].wikiSlug)
     }
 
     @Test

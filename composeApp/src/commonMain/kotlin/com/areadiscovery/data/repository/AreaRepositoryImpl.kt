@@ -7,6 +7,8 @@ import com.areadiscovery.domain.model.BucketContent
 import com.areadiscovery.domain.model.BucketType
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.Confidence
+import com.areadiscovery.BuildKonfig
+import com.areadiscovery.data.remote.WikipediaImageRepository
 import com.areadiscovery.domain.model.ConnectivityState
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Source
@@ -20,6 +22,11 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -36,6 +43,7 @@ class AreaRepositoryImpl(
     private val scope: CoroutineScope,
     private val clock: AppClock = SystemClock(),
     private val connectivityObserver: () -> Flow<ConnectivityState>,
+    private val wikipediaImageRepository: WikipediaImageRepository,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AreaRepository {
 
@@ -111,7 +119,8 @@ class AreaRepositoryImpl(
                         }
                         if (update is BucketUpdate.PortraitComplete && update.pois.isNotEmpty()) {
                             withContext(ioDispatcher) {
-                                writePoisToCache(update.pois, areaName, language)
+                                val enriched = enrichPoisWithImages(update.pois)
+                                writePoisToCache(enriched, areaName, language)
                             }
                         }
                     }
@@ -124,12 +133,13 @@ class AreaRepositoryImpl(
         AppLogger.d { "Cache MISS for '$areaName' — valid=${validParsed.size}, stale=${staleParsed.size}, needed=${BucketType.entries.size}" }
         try {
             aiProvider.streamAreaPortrait(areaName, context).collect { update ->
-                emit(update)
-                if (update is BucketUpdate.BucketComplete) {
-                    writeToCache(update.content, areaName, language)
-                }
-                if (update is BucketUpdate.PortraitComplete && update.pois.isNotEmpty()) {
-                    writePoisToCache(update.pois, areaName, language)
+                if (update is BucketUpdate.PortraitComplete) {
+                    val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                    if (enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
+                    emit(BucketUpdate.PortraitComplete(enriched))
+                } else {
+                    emit(update)
+                    if (update is BucketUpdate.BucketComplete) writeToCache(update.content, areaName, language)
                 }
             }
         } catch (e: CancellationException) {
@@ -149,6 +159,33 @@ class AreaRepositoryImpl(
             emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
         }
     }.flowOn(ioDispatcher)
+
+    private suspend fun enrichPoisWithImages(pois: List<POI>): List<POI> = coroutineScope {
+        AppLogger.d { "enrichPoisWithImages: enriching ${pois.size} POIs" }
+        val semaphore = Semaphore(WikipediaImageRepository.MAX_CONCURRENT_REQUESTS)
+        val result = pois.map { poi ->
+            async {
+                semaphore.withPermit {
+                    val wikiUrl = wikipediaImageRepository.getImageUrl(poi.wikiSlug, poi.name)
+                    val imageUrl = wikiUrl ?: buildSatelliteTileUrl(poi.latitude, poi.longitude)
+                    AppLogger.d { "enrichPoisWithImages: '${poi.name}' -> wiki=${wikiUrl != null}, mapTiler=${imageUrl != null && wikiUrl == null}, final=${imageUrl?.take(60)}" }
+                    poi.copy(imageUrl = imageUrl)
+                }
+            }
+        }.awaitAll()
+        AppLogger.d { "enrichPoisWithImages: done — ${result.count { it.imageUrl != null }}/${result.size} have images" }
+        result
+    }
+
+    private fun buildSatelliteTileUrl(lat: Double?, lng: Double?): String? {
+        if (lat == null || lng == null) return null
+        val z = 17
+        val n = 1 shl z // 2^z
+        val x = ((lng + 180.0) / 360.0 * n).toInt().coerceIn(0, n - 1)
+        val latRad = lat * kotlin.math.PI / 180.0
+        val y = ((1.0 - kotlin.math.ln(kotlin.math.tan(latRad) + 1.0 / kotlin.math.cos(latRad)) / kotlin.math.PI) / 2.0 * n).toInt().coerceIn(0, n - 1)
+        return "https://api.maptiler.com/tiles/satellite-v2/$z/$x/$y.jpg?key=${BuildKonfig.MAPTILER_API_KEY}"
+    }
 
     private fun writePoisToCache(pois: List<POI>, areaName: String, language: String) {
         val now = clock.nowMs()

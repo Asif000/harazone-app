@@ -16,4 +16,6 @@ data class POI(
     val liveStatus: String? = null,
     val rating: Float? = null,
     val vibeInsights: Map<String, String> = emptyMap(),
+    val wikiSlug: String? = null,
+    val imageUrl: String? = null,
 )

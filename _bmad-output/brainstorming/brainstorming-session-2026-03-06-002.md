@@ -88,7 +88,7 @@ continuation_date: '2026-03-07'
 | Bottom nav | Removed — FAB menu | Less chrome, more map |
 | Bottom sheet | Removed | Redundant with POI cards |
 | Header | Removed | Centered top bar instead |
-| Vibe layout | Vertical rail, right side | Thumb-friendly, doesn't obscure map |
+| Vibe layout | Vertical rail, right side — round gradient circles + text labels, dynamic sized (32-48dp) by POI count | Thumb-friendly, readable, size = relevance signal |
 | Pin interaction | Single tap = full card | Faster, less friction |
 | Pin icons | Material Symbols (10 types) | Crisp at small sizes, works in Compose Multiplatform |
 | Pin labels | Always visible | No hunting — see what's where instantly |
@@ -102,7 +102,7 @@ continuation_date: '2026-03-07'
 | List mode | First-class alternate, not fallback | Accessibility, screen readers, offline, trip planning |
 | Map ↔ List toggle | Top bar or FAB menu | Same data, same actions, two renders |
 | Map failure | Auto-fallback to list + banner | Graceful degradation |
-| Mode toggle | Map/List icons, top-right | Always accessible, both modes equal |
+| Mode toggle | Map/List segmented control, next to search bar (bottom-right) | Always visible, discoverable, paired with search action zone |
 
 ## Standalone Prototypes (reference only)
 - `prototype-poi-card-v1.html` — POI card design exploration
@@ -271,3 +271,72 @@ Fields: n=name, t=type, v=vibe, w=why_special, h=hours, s=status, r=rating, lat/
 3. **Quick Spec (Phase A)** — Break Phase A into implementable features
 4. **Implement** — Build in Compose Multiplatform
 5. **Phase B planning** — AI Chat brainstorm after Phase A ships
+
+---
+
+## Session 4: Vibe Rail & Map/List Toggle Redesign (2026-03-07)
+
+### Problems Identified
+
+1. **Vibe rail icons have no labels** — vertical orbs on the right side show only icons (Palette, Shield, Event, etc.) with no text. Users can't tell what each vibe is without tapping.
+2. **Map/List toggle buried in FAB menu** — not discoverable; users don't know they can switch views.
+
+### Decisions
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | Vibe rail position | Keep vertical, right side (unchanged) | Thumb-friendly, established pattern |
+| 2 | Vibe circle style | Round gradient circles with text label below | Instantly readable, familiar IG-stories pattern |
+| 3 | Circle size | Dynamic: min 32dp, max 48dp based on POI count | Size communicates relevance at a glance — no numbers needed |
+| 4 | Size formula | `size = 32 + 16 * (count - min) / (max - min)` | Linear interpolation across the range |
+| 5 | Active state | Bright glow border (vibe color) + white label text | Clear selection indicator |
+| 6 | Inactive state | Dimmed (opacity 0.55) + muted label color | Visible but recessed |
+| 7 | Default state (all pins) | All circles glowing in their vibe color, dynamic sized | Shows area personality before user picks a vibe |
+| 8 | Filtered state (one vibe) | Selected = bright glow, rest dimmed. Only that vibe's pins on map | |
+| 9 | Deselect | Tap active vibe again -> back to all-glow default | Toggle behavior |
+| 10 | Count badges | Removed — dynamic sizing replaces them | Cleaner rail, size IS the signal |
+| 11 | Map/List toggle | Move from FAB menu -> always-visible segmented control next to search bar (bottom) | Discoverable, paired with search = unified action zone |
+| 12 | Toggle style | Two-button segmented (map icon / list icon), active button highlighted | Matches common mobile patterns |
+
+### Sizing Edge Cases
+
+- **All same count** -> all circles = 40dp (midpoint)
+- **0 POIs** -> still show at min (32dp), dimmed further
+- **Outlier (one vibe has 20, rest have 2)** -> consider capping ratio at 1.5x
+
+### Sizing Spec
+
+```
+Min: 32dp (fewest POIs in area)
+Max: 48dp (most POIs in area)
+Emoji scales with circle size
+Text label: constant 9sp, always below circle
+```
+
+### State Machine
+
+```
+DEFAULT (app open / deselect):
+  - All circles: glowing in vibe color, dynamic sized
+  - All pins: multi-color on map
+  - Labels: vibe-colored text
+
+FILTERED (tap a vibe):
+  - Selected circle: bright glow + border, white label
+  - Other circles: dimmed (0.55 opacity), muted labels
+  - Map: only selected vibe's pins visible
+  - Animate: circles resize if counts change (area switch)
+
+DESELECT (tap active vibe again):
+  - Return to DEFAULT state
+```
+
+### Prototypes (reference)
+
+- `/tmp/vibe-rail-mockup.html` — initial 5 options for vibe display
+- `/tmp/vibe-combo-mockup.html` — pill rail + search toggle combo
+- `/tmp/vibe-compact-mockup.html` — space-saving labeled options
+- `/tmp/vibe-round-image-mockup.html` — horizontal round image vibes (rejected: wrong placement)
+- `/tmp/vibe-vertical-labeled-mockup.html` — vertical rail with labels (Option C chosen)
+- `/tmp/vibe-dynamic-size-mockup.html` — dynamic sizing by POI count
+- `/tmp/vibe-all-pins-mockup.html` — default all-pins state (Option A chosen)

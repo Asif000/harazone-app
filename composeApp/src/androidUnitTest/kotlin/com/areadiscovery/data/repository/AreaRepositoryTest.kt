@@ -11,6 +11,13 @@ import com.areadiscovery.domain.model.ConnectivityState
 import com.areadiscovery.domain.model.DomainError
 import com.areadiscovery.domain.model.DomainErrorException
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.data.remote.WikipediaImageRepository
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpHeaders
+import io.ktor.http.HttpStatusCode
+import io.ktor.http.headersOf
 import com.areadiscovery.fakes.FakeAreaIntelligenceProvider
 import com.areadiscovery.fakes.FakeClock
 import com.areadiscovery.fakes.FakeConnectivityMonitor
@@ -24,6 +31,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AreaRepositoryTest {
@@ -55,6 +63,7 @@ class AreaRepositoryTest {
         repository = AreaRepositoryImpl(
             fakeProvider, database, testScope, fakeClock,
             connectivityObserver = { fakeConnectivity.observe() },
+            wikipediaImageRepository = WikipediaImageRepository(HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) })),
             ioDispatcher = testDispatcher
         )
     }
@@ -548,15 +557,19 @@ class AreaRepositoryTest {
             repeat(BucketType.entries.size) { awaitItem() }
             val portrait = awaitItem()
             assertIs<BucketUpdate.PortraitComplete>(portrait)
-            assertEquals(mockPois, portrait.pois)
+            // POIs are enriched with imageUrl (MapTiler fallback since mock Wikipedia returns no thumbnail)
+            assertEquals(mockPois.size, portrait.pois.size)
+            assertEquals(mockPois[0].name, portrait.pois[0].name)
+            assertEquals(mockPois[1].name, portrait.pois[1].name)
             awaitComplete()
         }
 
         // Verify POIs were persisted to cache
         val cached = database.area_poi_cacheQueries.getPois("Test Area", "en").executeAsOneOrNull()
         assertTrue(cached != null, "POI cache entry should exist")
-        val decoded = kotlinx.serialization.json.Json.decodeFromString<List<POI>>(cached!!.pois_json)
-        assertEquals(mockPois, decoded)
+        val decoded = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<List<POI>>(cached!!.pois_json)
+        assertEquals(mockPois.size, decoded.size)
+        assertEquals(mockPois[0].name, decoded[0].name)
     }
 
     @Test
@@ -639,6 +652,47 @@ class AreaRepositoryTest {
             val portrait = awaitItem()
             assertIs<BucketUpdate.PortraitComplete>(portrait)
             assertEquals(mockPois, portrait.pois, "POIs should be served from cache despite AI failure")
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun cacheMissEnrichesPoisWithWikipediaImagesBeforeEmitting() = testScope.runTest {
+        // Create a repository with a WikipediaImageRepository that returns a real thumbnail
+        val wikiMockEngine = MockEngine { _ ->
+            respond(
+                content = """{"title":"Test","thumbnail":{"source":"https://upload.wikimedia.org/enriched.jpg","width":320,"height":240}}""",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, "application/json")
+            )
+        }
+        val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val enrichingRepo = AreaRepositoryImpl(
+            aiProvider = fakeProvider,
+            database = database,
+            scope = testScope,
+            clock = fakeClock,
+            connectivityObserver = { fakeConnectivity.observe() },
+            wikipediaImageRepository = WikipediaImageRepository(HttpClient(wikiMockEngine)),
+            ioDispatcher = testDispatcher,
+        )
+
+        // AI provider emits POIs with wikiSlug set
+        val poisWithWiki = listOf(
+            POI("Castle", "historic", "Old castle", Confidence.HIGH, 40.0, -9.0, wikiSlug = "Castle_Test"),
+        )
+        fakeProvider.emissions = defaultBucketEmissions().map {
+            if (it is BucketUpdate.PortraitComplete) BucketUpdate.PortraitComplete(pois = poisWithWiki)
+            else it
+        }
+
+        enrichingRepo.getAreaPortrait("Test Area", defaultContext).test {
+            repeat(BucketType.entries.size) { awaitItem() }
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(1, portrait.pois.size)
+            assertNotNull(portrait.pois[0].imageUrl, "imageUrl should be populated by Wikipedia enrichment")
+            assertEquals("https://upload.wikimedia.org/enriched.jpg", portrait.pois[0].imageUrl)
             awaitComplete()
         }
     }

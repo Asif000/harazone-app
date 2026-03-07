@@ -103,6 +103,10 @@ kotlin {
             // SQLDelight
             implementation(libs.sqldelight.coroutines)
 
+            // Coil (image loading)
+            implementation(libs.coil3.compose)
+            implementation(libs.coil3.network.ktor3)
+
             // Logging
             implementation(libs.kermit)
         }

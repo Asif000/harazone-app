@@ -58,6 +58,7 @@ internal data class PoiJson(
     val r: Float? = null,
     val lat: Double? = null,
     val lng: Double? = null,
+    val wiki: String? = null,
 )
 
 internal class GeminiResponseParser {
@@ -156,6 +157,7 @@ internal class GeminiResponseParser {
                     liveStatus = poiJson.s,
                     rating = poiJson.r,
                     vibeInsights = emptyMap(),
+                    wikiSlug = poiJson.wiki,
                 )
             }
         } catch (e: Exception) {

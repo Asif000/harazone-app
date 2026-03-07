@@ -48,7 +48,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import coil3.compose.AsyncImage
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.ui.theme.MapSurfaceDark
@@ -79,17 +81,32 @@ fun ExpandablePoiCard(
             .border(1.dp, vibeColor.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
             .verticalScroll(rememberScrollState()),
     ) {
-        // Placeholder photo gradient
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(120.dp)
-                .background(
-                    Brush.horizontalGradient(
-                        colors = listOf(vibeColor.copy(alpha = 0.6f), vibeColor.copy(alpha = 0.2f))
-                    )
-                ),
-        )
+                .height(160.dp)
+                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+        ) {
+            // Gradient always visible as base layer (fallback when no image)
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(vibeColor.copy(alpha = 0.6f), vibeColor.copy(alpha = 0.2f))
+                        )
+                    ),
+            )
+            // Image overlaid on top if URL is available
+            if (poi.imageUrl != null) {
+                AsyncImage(
+                    model = poi.imageUrl,
+                    contentDescription = poi.name,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize(),
+                )
+            }
+        }
 
         Column(modifier = Modifier.padding(16.dp)) {
             // Name + type

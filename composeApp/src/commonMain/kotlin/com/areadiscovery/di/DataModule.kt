@@ -7,6 +7,7 @@ import com.areadiscovery.data.remote.GeminiAreaIntelligenceProvider
 import com.areadiscovery.data.remote.GeminiPromptBuilder
 import com.areadiscovery.data.remote.GeminiResponseParser
 import com.areadiscovery.data.remote.HttpClientFactory
+import com.areadiscovery.data.remote.WikipediaImageRepository
 import com.areadiscovery.data.repository.AreaRepositoryImpl
 import com.areadiscovery.domain.provider.ApiKeyProvider
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
@@ -32,6 +33,7 @@ val dataModule = module {
     // support onClose callbacks; close() will be called via KoinApplication.close()
     // when the app terminates or Koin is stopped.
     single { HttpClientFactory.create() }
+    single { WikipediaImageRepository(get()) }
     single<AreaIntelligenceProvider> { GeminiAreaIntelligenceProvider(get(), get(), get(), get()) }
     single { PrivacyPipeline(get()) }
 
@@ -45,7 +47,8 @@ val dataModule = module {
             database = get(),
             scope = get(named("appScope")),
             clock = get(),
-            connectivityObserver = { get<ConnectivityMonitor>().observe() }
+            connectivityObserver = { get<ConnectivityMonitor>().observe() },
+            wikipediaImageRepository = get(),
         )
     }
     single { GetAreaPortraitUseCase(get()) }
