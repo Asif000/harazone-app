@@ -455,6 +455,26 @@ class MapViewModelTest {
     }
 
     @Test
+    fun closeSearchOverlay_restoresMyLocationWhenPannedAway() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+
+        // Pan away so button appears
+        viewModel.onCameraIdle(50.0, 30.0)
+        testScheduler.advanceUntilIdle()
+        assertTrue((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
+
+        // Open overlay — hides button
+        viewModel.openSearchOverlay()
+        assertFalse((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
+
+        // Close overlay — button should reappear since camera is still far from GPS
+        viewModel.closeSearchOverlay()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.isSearchOverlayOpen)
+        assertTrue(state.showMyLocation, "showMyLocation must restore after closing overlay when panned away")
+    }
+
+    @Test
     fun toggleFab_flipsExpanded() = runTest(testDispatcher) {
         val (viewModel, _) = createReadyViewModel()
         assertFalse((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)
@@ -894,7 +914,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun returnToCurrentLocation_gpsFailure_emitsError() = runTest(testDispatcher) {
+    fun returnToCurrentLocation_gpsFailure_emitsErrorAndRestoresButton() = runTest(testDispatcher) {
         val locationProvider = object : com.areadiscovery.location.LocationProvider {
             private var callCount = 0
             override suspend fun getCurrentLocation(): Result<GpsCoordinates> {
@@ -906,7 +926,12 @@ class MapViewModelTest {
                 Result.success("Manhattan, New York")
         }
         val viewModel = createViewModel(locationProvider = locationProvider)
-        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Pan away so button appears and pendingLat/Lng are set
+        viewModel.onCameraIdle(50.0, 30.0)
+        testScheduler.advanceUntilIdle()
+        assertTrue((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
 
         val errors = mutableListOf<String>()
         val collectJob = launch { viewModel.errorEvents.collect { errors.add(it) } }
@@ -916,9 +941,9 @@ class MapViewModelTest {
 
         assertEquals(1, errors.size)
         assertEquals("Can't find your location. Please try again.", errors[0])
-        // State should be unchanged
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(state1.latitude, state2.latitude, 0.001)
+        // Button must be restored — user is still panned away
+        assertTrue(state2.showMyLocation, "showMyLocation must be restored after GPS failure")
         collectJob.cancel()
     }
 

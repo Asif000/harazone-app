@@ -274,15 +274,15 @@ Add a "return to current location" button (circular dark icon button with MyLoca
 
 ### Acceptance Criteria
 
-- [ ] AC 1: Given the user is viewing the map at their GPS location, when they have not panned, then the MyLocation button is NOT visible.
-- [ ] AC 2: Given the user has panned 100m+ from their GPS location, when the camera settles, then the MyLocation button fades in at Position C (left side, above AI bar).
-- [ ] AC 3: Given the MyLocation button is visible, when the user taps it, then the app re-fetches fresh GPS coordinates, animates the camera to the new position, and hides the button.
-- [ ] AC 4: Given the user panned to a different area name (e.g., Marrickville -> Newtown), when they tap MyLocation, then the app also refetches the area portrait and updates POIs for the GPS area.
-- [ ] AC 5: Given the user panned within the same area (e.g., 200m within Marrickville), when they tap MyLocation, then the camera moves back but POIs are NOT refetched.
-- [ ] AC 6: Given GPS fails when the user taps MyLocation, when the error occurs, then a snackbar shows "Can't find your location. Please try again." and state is unchanged.
-- [ ] AC 7: Given the user pans back to within 100m of GPS without tapping the button, when the camera settles, then the MyLocation button hides automatically.
-- [ ] AC 8: Given a search or area loading is in progress, when `isSearchingArea` or `isSearchOverlayOpen` is true, then the MyLocation button is hidden.
-- [ ] AC 9: Given the MyLocation button styling, then it matches existing dark floating UI (dark circle, white icon, 40dp size, 0.92 alpha).
+- [x] AC 1: Given the user is viewing the map at their GPS location, when they have not panned, then the MyLocation button is NOT visible.
+- [x] AC 2: Given the user has panned 100m+ from their GPS location, when the camera settles, then the MyLocation button fades in at Position C (left side, above AI bar).
+- [x] AC 3: Given the MyLocation button is visible, when the user taps it, then the app re-fetches fresh GPS coordinates, animates the camera to the new position, and hides the button.
+- [x] AC 4: Given the user panned to a different area name (e.g., Marrickville -> Newtown), when they tap MyLocation, then the app also refetches the area portrait and updates POIs for the GPS area.
+- [x] AC 5: Given the user panned within the same area (e.g., 200m within Marrickville), when they tap MyLocation, then the camera moves back but POIs are NOT refetched.
+- [x] AC 6: Given GPS fails when the user taps MyLocation, when the error occurs, then a snackbar shows "Can't find your location. Please try again." and state is unchanged.
+- [x] AC 7: Given the user pans back to within 100m of GPS without tapping the button, when the camera settles, then the MyLocation button hides automatically.
+- [x] AC 8: Given a search or area loading is in progress, when `isSearchingArea` or `isSearchOverlayOpen` is true, then the MyLocation button is hidden.
+- [x] AC 9: Given the MyLocation button styling, then it matches existing dark floating UI (dark circle, white icon, 40dp size, 0.92 alpha).
 
 ## Additional Context
 

@@ -104,9 +104,11 @@ class MapViewModel(
 
     fun closeSearchOverlay() {
         val current = _uiState.value as? MapUiState.Ready ?: return
+        val cameraLat = if (pendingLat != 0.0) pendingLat else current.latitude
+        val cameraLng = if (pendingLng != 0.0) pendingLng else current.longitude
         _uiState.value = current.copy(
             isSearchOverlayOpen = false,
-            showMyLocation = isAwayFromGps(current.latitude, current.longitude, current),
+            showMyLocation = isAwayFromGps(cameraLat, cameraLng, current),
         )
         searchJob?.cancel()
     }
@@ -309,6 +311,12 @@ class MapViewModel(
             try {
                 val locResult = locationProvider.getCurrentLocation()
                 if (locResult.isFailure) {
+                    val s = _uiState.value as? MapUiState.Ready
+                    if (s != null) {
+                        val camLat = if (pendingLat != 0.0) pendingLat else s.latitude
+                        val camLng = if (pendingLng != 0.0) pendingLng else s.longitude
+                        _uiState.value = s.copy(showMyLocation = isAwayFromGps(camLat, camLng, s))
+                    }
                     _errorEvents.tryEmit("Can't find your location. Please try again.")
                     return@launch
                 }
