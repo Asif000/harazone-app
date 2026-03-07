@@ -260,31 +260,29 @@ class MapViewModel(
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             try {
-                val context = areaContextFactory.create()
-                getAreaPortrait(areaName, context)
-                    .catch { e ->
+                collectPortraitWithRetry(
+                    areaName = areaName,
+                    onComplete = { pois, _ ->
+                        val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
+                        val counts = computeVibePoiCounts(pois)
+                        _uiState.value = state.copy(
+                            areaName = areaName,
+                            latitude = lat,
+                            longitude = lng,
+                            pois = pois,
+                            vibePoiCounts = counts,
+                            activeVibe = null,
+                            isSearchingArea = false,
+                            showMyLocation = isAwayFromGps(lat, lng, state),
+                        )
+                    },
+                    onError = { e ->
                         AppLogger.e(e) { "Search this area: portrait fetch failed" }
-                        val s = _uiState.value as? MapUiState.Ready ?: return@catch
-                        _uiState.value = s.copy(isSearchingArea = false)
+                        val s = _uiState.value as? MapUiState.Ready
+                        if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                         _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
-                    }
-                    .collect { update ->
-                        if (update is BucketUpdate.PortraitComplete) {
-                            val pois = update.pois
-                            val state = _uiState.value as? MapUiState.Ready ?: return@collect
-                            val counts = computeVibePoiCounts(pois)
-                            _uiState.value = state.copy(
-                                areaName = areaName,
-                                latitude = lat,
-                                longitude = lng,
-                                pois = pois,
-                                vibePoiCounts = counts,
-                                activeVibe = null,
-                                isSearchingArea = false,
-                                showMyLocation = isAwayFromGps(lat, lng, state),
-                            )
-                        }
-                    }
+                    },
+                )
             } catch (e: CancellationException) {
                 val s = _uiState.value as? MapUiState.Ready
                 if (s != null) _uiState.value = s.copy(isSearchingArea = false)
@@ -358,28 +356,26 @@ class MapViewModel(
                         vibePoiCounts = emptyMap(),
                         activeVibe = null,
                     )
-                    val context = areaContextFactory.create()
-                    getAreaPortrait(gpsAreaName, context)
-                        .catch { e ->
+                    collectPortraitWithRetry(
+                        areaName = gpsAreaName,
+                        onComplete = { pois, _ ->
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
+                            val counts = computeVibePoiCounts(pois)
+                            _uiState.value = s.copy(
+                                areaName = gpsAreaName,
+                                pois = pois,
+                                vibePoiCounts = counts,
+                                activeVibe = null,
+                                isSearchingArea = false,
+                            )
+                        },
+                        onError = { e ->
                             AppLogger.e(e) { "Return to location: portrait fetch failed" }
-                            val s = _uiState.value as? MapUiState.Ready ?: return@catch
-                            _uiState.value = s.copy(isSearchingArea = false)
+                            val s = _uiState.value as? MapUiState.Ready
+                            if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                             _errorEvents.tryEmit("Couldn't load area info. Try again.")
-                        }
-                        .collect { update ->
-                            if (update is BucketUpdate.PortraitComplete) {
-                                val pois = update.pois
-                                val s = _uiState.value as? MapUiState.Ready ?: return@collect
-                                val counts = computeVibePoiCounts(pois)
-                                _uiState.value = s.copy(
-                                    areaName = gpsAreaName,
-                                    pois = pois,
-                                    vibePoiCounts = counts,
-                                    activeVibe = null,
-                                    isSearchingArea = false,
-                                )
-                            }
-                        }
+                        },
+                    )
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -450,28 +446,28 @@ class MapViewModel(
                     }
                 }
 
-                val context = areaContextFactory.create()
-                getAreaPortrait(areaName, context)
-                    .catch { e -> AppLogger.e(e) { "Map: portrait fetch failed" } }
-                    .collect { update ->
-                        if (update is BucketUpdate.PortraitComplete) {
-                            val pois = update.pois
-                            val current = _uiState.value
-                            if (current is MapUiState.Ready) {
-                                val counts = computeVibePoiCounts(pois)
-                                _uiState.value = current.copy(
-                                    pois = pois,
-                                    vibePoiCounts = counts,
-                                    activeVibe = null,
-                                    isSearchingArea = false,
-                                )
-                                analyticsTracker.trackEvent(
-                                    "map_opened",
-                                    mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
-                                )
-                            }
-                        }
-                    }
+                collectPortraitWithRetry(
+                    areaName = areaName,
+                    onComplete = { pois, _ ->
+                        val current = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
+                        val counts = computeVibePoiCounts(pois)
+                        _uiState.value = current.copy(
+                            pois = pois,
+                            vibePoiCounts = counts,
+                            activeVibe = null,
+                            isSearchingArea = false,
+                        )
+                        analyticsTracker.trackEvent(
+                            "map_opened",
+                            mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
+                        )
+                    },
+                    onError = { e ->
+                        AppLogger.e(e) { "Map: portrait fetch failed" }
+                        val s = _uiState.value as? MapUiState.Ready
+                        if (s != null) _uiState.value = s.copy(isSearchingArea = false)
+                    },
+                )
             } catch (e: CancellationException) {
                 val s = _uiState.value as? MapUiState.Ready
                 if (s != null) _uiState.value = s.copy(isSearchingArea = false)
@@ -510,6 +506,53 @@ class MapViewModel(
             q.containsAny("history", "historic", "old", "founded") -> listOf("When was it built?", "Any famous events here?")
             q.containsAny("cost", "price", "expensive", "cheap") -> listOf("Budget tips?", "Free things to do?")
             else -> listOf("Tell me more", "What's nearby?")
+        }
+    }
+
+    private suspend fun collectPortraitWithRetry(
+        areaName: String,
+        onComplete: suspend (pois: List<POI>, finalAreaName: String) -> Unit,
+        onError: suspend (Exception) -> Unit,
+    ) {
+        val context = areaContextFactory.create()
+        try {
+            var pois = emptyList<POI>()
+            var fetchFailed = false
+            getAreaPortrait(areaName, context)
+                .catch { e ->
+                    AppLogger.e(e) { "Portrait fetch failed for '$areaName'" }
+                    fetchFailed = true
+                    onError(e as? Exception ?: RuntimeException(e))
+                }
+                .collect { update ->
+                    if (update is BucketUpdate.PortraitComplete) {
+                        pois = update.pois
+                    }
+                }
+            if (fetchFailed) return
+            if (pois.isNotEmpty()) {
+                onComplete(pois, areaName)
+                return
+            }
+            // Retry with broader query
+            AppLogger.d { "No POIs for '$areaName' — retrying with broader query" }
+            val broadQuery = "$areaName points of interest landmarks restaurants parks"
+            val retryContext = areaContextFactory.create()
+            getAreaPortrait(broadQuery, retryContext)
+                .catch { e -> AppLogger.e(e) { "Retry portrait fetch failed for '$areaName'" } }
+                .collect { update ->
+                    if (update is BucketUpdate.PortraitComplete) {
+                        pois = update.pois
+                    }
+                }
+            if (pois.isEmpty()) {
+                _errorEvents.tryEmit("Nothing to see here — try another area")
+            }
+            onComplete(pois, areaName)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            onError(e)
         }
     }
 

@@ -720,11 +720,10 @@ class MapViewModelTest {
     @Test
     fun onSearchThisAreaTapped_emitsErrorEventOnFetchFailure() = runTest(testDispatcher) {
         val failOnSecondCallRepo = object : AreaRepository {
-            private var callIndex = 0
             override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
-                callIndex++
-                return if (callIndex <= 1) {
-                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(emptyList()))
+                // Initial load area succeeds; any other area fails
+                return if (areaName.contains("Alfama")) {
+                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
                 } else {
                     kotlinx.coroutines.flow.flow { throw RuntimeException("fetch failed") }
                 }
@@ -759,6 +758,56 @@ class MapViewModelTest {
         assertEquals(1, collectedErrors.size)
         assertEquals("Couldn't load area info. Try panning again.", collectedErrors[0])
         assertFalse((viewModel.uiState.value as MapUiState.Ready).isSearchingArea)
+        collectJob.cancel()
+    }
+
+    @Test
+    fun loadLocation_retriesWithBroaderQueryWhenNoPois() = runTest(testDispatcher) {
+        val queriesSeen = mutableListOf<String>()
+        val retryRepo = object : AreaRepository {
+            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
+                queriesSeen.add(areaName)
+                return if (areaName.contains("points of interest")) {
+                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
+                } else {
+                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(emptyList()))
+                }
+            }
+        }
+        val viewModel = createViewModel(areaRepository = retryRepo)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Should have called twice: original + broadened retry
+        assertEquals(2, queriesSeen.size)
+        assertEquals("Alfama, Lisbon", queriesSeen[0])
+        assertTrue(queriesSeen[1].contains("points of interest"))
+        // POIs from retry should be populated
+        val state = viewModel.uiState.value as MapUiState.Ready
+        assertEquals(listOf(samplePoi), state.pois)
+    }
+
+    @Test
+    fun searchThisArea_emitsToastWhenRetryAlsoReturnsNoPois() = runTest(testDispatcher) {
+        val alwaysEmptyRepo = object : AreaRepository {
+            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
+                return kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(emptyList()))
+            }
+        }
+        val viewModel = createViewModel(areaRepository = alwaysEmptyRepo)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        val collectedErrors = mutableListOf<String>()
+        val collectJob = launch {
+            viewModel.errorEvents.collect { collectedErrors.add(it) }
+        }
+
+        // Pan away and search — both initial fetch + retry return empty
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        viewModel.onSearchThisAreaTapped()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(collectedErrors.any { it == "Nothing to see here — try another area" })
         collectJob.cancel()
     }
 
