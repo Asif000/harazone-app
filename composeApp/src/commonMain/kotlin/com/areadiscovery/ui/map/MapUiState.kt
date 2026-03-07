@@ -24,6 +24,7 @@ sealed class MapUiState {
         val followUpChips: List<String> = emptyList(),
         val isFabExpanded: Boolean = false,
         val mapRenderFailed: Boolean = false,
+        val showSearchThisArea: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

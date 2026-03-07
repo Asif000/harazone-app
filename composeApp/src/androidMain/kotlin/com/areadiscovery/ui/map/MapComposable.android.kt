@@ -59,10 +59,12 @@ actual fun MapComposable(
     activeVibe: Vibe,
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
+    onCameraIdle: (lat: Double, lng: Double) -> Unit,
 ) {
     val context = LocalContext.current
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnMapRenderFailed = rememberUpdatedState(onMapRenderFailed)
+    val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
 
     val isDestroyed = remember { booleanArrayOf(false) }
     val styleLoaded = remember { mutableStateOf(false) }
@@ -77,6 +79,7 @@ actual fun MapComposable(
     val pinAnimatorsRef = remember { mutableListOf<ValueAnimator>() }
     val mapRef = remember { arrayOfNulls<MapLibreMap>(1) }
     val styleRef = remember { arrayOfNulls<Style>(1) }
+    val cameraIdleListenerRef = remember { arrayOfNulls<MapLibreMap.OnCameraIdleListener>(1) }
 
     val mapView = remember {
         MapLibre.getInstance(context)
@@ -124,6 +127,13 @@ actual fun MapComposable(
                             currentOnPoiSelected.value(null)
                             true
                         }
+
+                        val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
+                            val target = map.cameraPosition.target ?: return@OnCameraIdleListener
+                            currentOnCameraIdle.value(target.latitude, target.longitude)
+                        }
+                        map.addOnCameraIdleListener(cameraIdleListener)
+                        cameraIdleListenerRef[0] = cameraIdleListener
                     }
                 }
             }
@@ -318,6 +328,7 @@ actual fun MapComposable(
             symbolPoiMap.clear()
             context.unregisterComponentCallbacks(lowMemoryCallback)
             lifecycleOwner.lifecycle.removeObserver(observer)
+            cameraIdleListenerRef[0]?.let { mapRef[0]?.removeOnCameraIdleListener(it) }
             symbolManagerRef[0]?.onDestroy()
             mapView.onPause()
             mapView.onStop()

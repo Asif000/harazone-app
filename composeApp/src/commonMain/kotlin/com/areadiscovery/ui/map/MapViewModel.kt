@@ -13,9 +13,13 @@ import com.areadiscovery.location.LocationProvider
 import com.areadiscovery.util.AnalyticsTracker
 import com.areadiscovery.util.AppLogger
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
@@ -34,8 +38,15 @@ class MapViewModel(
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
     val uiState: StateFlow<MapUiState> = _uiState.asStateFlow()
 
+    private val _errorEvents = MutableSharedFlow<String>(extraBufferCapacity = 2)
+    val errorEvents: SharedFlow<String> = _errorEvents.asSharedFlow()
+
     private var loadJob: Job? = null
     private var searchJob: Job? = null
+    private var cameraIdleJob: Job? = null
+    private var pendingLat: Double = 0.0
+    private var pendingLng: Double = 0.0
+    private var pendingAreaName: String = ""
 
     init {
         loadLocation()
@@ -96,6 +107,7 @@ class MapViewModel(
 
     fun submitSearch(query: String) {
         val current = _uiState.value as? MapUiState.Ready ?: return
+        cameraIdleJob?.cancel()
         searchJob?.cancel()
 
         if (isQuestion(query)) {
@@ -193,6 +205,74 @@ class MapViewModel(
     fun onMapRenderFailed() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = current.copy(mapRenderFailed = true, showListView = true)
+    }
+
+    fun onCameraIdle(lat: Double, lng: Double) {
+        if (lat == 0.0 && lng == 0.0) return
+        if (searchJob?.isActive == true) return
+        if (_uiState.value !is MapUiState.Ready) return
+        cameraIdleJob?.cancel()
+        cameraIdleJob = viewModelScope.launch {
+            delay(500)
+            if (searchJob?.isActive == true) return@launch
+            val geocodeResult = locationProvider.reverseGeocode(lat, lng)
+            if (geocodeResult.isFailure) return@launch
+            val newAreaName = geocodeResult.getOrThrow()
+            val current = _uiState.value as? MapUiState.Ready ?: return@launch
+            val newToken = newAreaName.substringBefore(",").trim()
+            val currentToken = current.areaName.substringBefore(",").trim()
+            if (newToken.equals(currentToken, ignoreCase = true)) {
+                // Panned back to current area — hide the button
+                _uiState.value = current.copy(showSearchThisArea = false)
+                return@launch
+            }
+            // Different area — cache and show button
+            pendingLat = lat
+            pendingLng = lng
+            pendingAreaName = newAreaName
+            _uiState.value = current.copy(showSearchThisArea = true)
+        }
+    }
+
+    fun onSearchThisAreaTapped() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        cameraIdleJob?.cancel()
+        _uiState.value = current.copy(showSearchThisArea = false)
+        val areaName = pendingAreaName.ifBlank { return }
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            try {
+                val context = areaContextFactory.create()
+                getAreaPortrait(areaName, context)
+                    .catch { e ->
+                        AppLogger.e(e) { "Search this area: portrait fetch failed" }
+                        _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
+                    }
+                    .collect { update ->
+                        if (update is BucketUpdate.PortraitComplete) {
+                            val pois = update.pois
+                            val state = _uiState.value as? MapUiState.Ready ?: return@collect
+                            val counts = computeVibePoiCounts(pois)
+                            val newActiveVibe = if ((counts[state.activeVibe] ?: 0) == 0) {
+                                Vibe.entries.maxByOrNull { counts[it] ?: 0 } ?: Vibe.DEFAULT
+                            } else {
+                                state.activeVibe
+                            }
+                            _uiState.value = state.copy(
+                                areaName = areaName,
+                                pois = pois,
+                                vibePoiCounts = counts,
+                                activeVibe = newActiveVibe,
+                            )
+                        }
+                    }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Search this area: unexpected error" }
+                _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
+            }
+        }
     }
 
     fun retry() {

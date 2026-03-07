@@ -17,6 +17,7 @@ import com.areadiscovery.location.GpsCoordinates
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -379,6 +380,252 @@ class MapViewModelTest {
         )
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertNull(state.weather)
+    }
+    // --- Camera idle tests ---
+
+    @Test
+    fun onCameraIdle_debouncesCorrectly() {
+        val stdDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(stdDispatcher)
+        try {
+            runTest(stdDispatcher) {
+                val locationProvider = object : com.areadiscovery.location.LocationProvider {
+                    var geocodeCallCount = 0
+                    override suspend fun getCurrentLocation() =
+                        Result.success(GpsCoordinates(40.0, -74.0))
+                    override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                        geocodeCallCount++
+                        return Result.success("New Area")
+                    }
+                }
+                val viewModel = createViewModel(locationProvider = locationProvider)
+                advanceTimeBy(11_000) // let initial load complete
+                assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+                // Reset count after initial load
+                locationProvider.geocodeCallCount = 0
+
+                viewModel.onCameraIdle(1.0, 2.0)
+                advanceTimeBy(200)
+                viewModel.onCameraIdle(3.0, 4.0)
+                advanceTimeBy(200)
+                viewModel.onCameraIdle(5.0, 6.0)
+                advanceTimeBy(600) // let final debounce settle
+
+                assertEquals(1, locationProvider.geocodeCallCount)
+            }
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
+    }
+
+    @Test
+    fun onSearchThisAreaTapped_fetchesPortraitAndHidesButton() = runTest(testDispatcher) {
+        val newPois = listOf(
+            POI("New Place", "landmark", "desc", Confidence.HIGH, 2.0, 3.0),
+        )
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var callIndex = 0
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(38.7139, -9.1394))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                callIndex++
+                return if (callIndex <= 1) Result.success("Alfama, Lisbon")
+                else Result.success("Bairro Alto, Lisbon")
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(newPois))
+            ),
+        )
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Alfama, Lisbon", state1.areaName)
+
+        // Pan to new area — button appears
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        assertTrue((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
+
+        // Tap button — fetches portrait, hides button
+        viewModel.onSearchThisAreaTapped()
+        testScheduler.advanceUntilIdle()
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Bairro Alto, Lisbon", state2.areaName)
+        assertEquals(newPois, state2.pois)
+        assertFalse(state2.showSearchThisArea)
+    }
+
+    @Test
+    fun onCameraIdle_hidesButtonWhenAreaNameUnchanged() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        assertFalse((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
+    }
+
+    @Test
+    fun onCameraIdle_noopsWhenSearchJobActive() = runTest(testDispatcher) {
+        val neverCompletingRepo = object : AreaRepository {
+            var callCount = 0
+            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
+                callCount++
+                return kotlinx.coroutines.flow.flow { kotlinx.coroutines.awaitCancellation() }
+            }
+        }
+        val geocodeTracker = object : com.areadiscovery.location.LocationProvider {
+            var geocodeCallCount = 0
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(38.7139, -9.1394))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                geocodeCallCount++
+                return Result.success("Alfama, Lisbon")
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = geocodeTracker,
+            areaRepository = neverCompletingRepo,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val geocodeCountAfterLoad = geocodeTracker.geocodeCallCount
+
+        // Start a search that never completes
+        viewModel.submitSearch("some area")
+
+        // Camera idle should be blocked
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        assertEquals(geocodeCountAfterLoad, geocodeTracker.geocodeCallCount)
+    }
+
+    @Test
+    fun onSearchThisAreaTapped_emitsErrorEventOnFetchFailure() = runTest(testDispatcher) {
+        val failOnSecondCallRepo = object : AreaRepository {
+            private var callIndex = 0
+            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
+                callIndex++
+                return if (callIndex <= 1) {
+                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(emptyList()))
+                } else {
+                    kotlinx.coroutines.flow.flow { throw RuntimeException("fetch failed") }
+                }
+            }
+        }
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var callIndex = 0
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(38.7139, -9.1394))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                callIndex++
+                return if (callIndex <= 1) Result.success("Alfama, Lisbon")
+                else Result.success("New Area, Somewhere")
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = failOnSecondCallRepo,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        val collectedErrors = mutableListOf<String>()
+        val collectJob = launch {
+            viewModel.errorEvents.collect { collectedErrors.add(it) }
+        }
+
+        // Pan to new area, then tap search button
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        viewModel.onSearchThisAreaTapped()
+        testScheduler.advanceUntilIdle()
+        assertEquals(1, collectedErrors.size)
+        assertEquals("Couldn't load area info. Try panning again.", collectedErrors[0])
+        collectJob.cancel()
+    }
+
+    @Test
+    fun onCameraIdle_showsSearchButtonWhenAreaChanges() = runTest(testDispatcher) {
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var callIndex = 0
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(38.7139, -9.1394))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                callIndex++
+                return if (callIndex <= 1) Result.success("Alfama, Lisbon")
+                else Result.success("Bairro Alto, Lisbon")
+            }
+        }
+        val viewModel = createViewModel(locationProvider = locationProvider)
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state1.showSearchThisArea)
+
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state2.showSearchThisArea)
+    }
+
+    @Test
+    fun onCameraIdle_hidesSearchButtonWhenPanningBackToSameArea() = runTest(testDispatcher) {
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var callIndex = 0
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(38.7139, -9.1394))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                callIndex++
+                return when {
+                    callIndex <= 1 -> Result.success("Alfama, Lisbon")
+                    callIndex == 2 -> Result.success("Bairro Alto, Lisbon")
+                    else -> Result.success("Alfama, Lisbon")
+                }
+            }
+        }
+        val viewModel = createViewModel(locationProvider = locationProvider)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        assertTrue((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
+
+        viewModel.onCameraIdle(38.7139, -9.1394)
+        testScheduler.advanceUntilIdle()
+        assertFalse((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
+    }
+
+    @Test
+    fun onCameraIdle_keepsExistingPoisWhenButtonShown() = runTest(testDispatcher) {
+        val initialPois = listOf(
+            POI("Old Place", "landmark", "desc", Confidence.HIGH, 1.0, 1.0),
+        )
+        val locationProvider = object : com.areadiscovery.location.LocationProvider {
+            private var callIndex = 0
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(38.7139, -9.1394))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
+                callIndex++
+                return if (callIndex <= 1) Result.success("Alfama, Lisbon")
+                else Result.success("New Area, Somewhere")
+            }
+        }
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(initialPois))
+            ),
+        )
+        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(initialPois, state1.pois)
+
+        viewModel.onCameraIdle(10.0, 20.0)
+        testScheduler.advanceUntilIdle()
+        // Button shows but pois remain unchanged (no auto-fetch)
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(initialPois, state2.pois)
+        assertTrue(state2.showSearchThisArea)
     }
 }
 

@@ -19,6 +19,7 @@ actual fun MapComposable(
     activeVibe: Vibe,
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
+    onCameraIdle: (lat: Double, lng: Double) -> Unit,
 ) {
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Text("Map not yet available on iOS", style = MaterialTheme.typography.bodyMedium)

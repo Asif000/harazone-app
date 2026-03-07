@@ -15,4 +15,5 @@ expect fun MapComposable(
     activeVibe: Vibe,
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
+    onCameraIdle: (lat: Double, lng: Double) -> Unit,
 )
