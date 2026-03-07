@@ -8,7 +8,6 @@ import com.areadiscovery.domain.model.DomainError
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Source
 import com.areadiscovery.util.AppLogger
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
@@ -50,13 +49,13 @@ internal data class SourceJson(
 
 @Serializable
 internal data class PoiJson(
-    @SerialName("n") val n: String = "",
-    @SerialName("t") val t: String = "",
-    @SerialName("v") val v: String = "",
-    @SerialName("w") val w: String = "",
-    @SerialName("h") val h: String? = null,
-    @SerialName("s") val s: String? = null,
-    @SerialName("r") val r: Float? = null,
+    val n: String = "",
+    val t: String = "",
+    val v: String = "",
+    val w: String = "",
+    val h: String? = null,
+    val s: String? = null,
+    val r: Float? = null,
     val lat: Double? = null,
     val lng: Double? = null,
 )
@@ -143,7 +142,7 @@ internal class GeminiResponseParser {
     private fun parsePoisJson(jsonString: String): List<POI> {
         return try {
             val poisJson = json.decodeFromString<List<PoiJson>>(jsonString)
-            poisJson.map { poiJson ->
+            poisJson.filter { it.n.isNotBlank() }.map { poiJson ->
                 POI(
                     name = poiJson.n,
                     type = poiJson.t,

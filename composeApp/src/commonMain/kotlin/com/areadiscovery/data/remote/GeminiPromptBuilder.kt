@@ -37,7 +37,7 @@ After the last bucket, output this delimiter:
 ---POIS---
 
 Then output a JSON array of points of interest:
-[{"n":"Name","t":"type","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"lat":38.71,"lng":-9.13}]
+[{"n":"Name","t":"type","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"lat":38.7100,"lng":-9.1300}]
 
 Valid vibe values: character, history, whats_on, safety, nearby, cost
 Valid s values: open, busy, closed

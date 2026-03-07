@@ -66,10 +66,10 @@ class GeminiPromptBuilderTest {
     @Test
     fun buildAreaPortraitPrompt_poiTemplateHasRealCoordinates() {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
-        // Verify the template shows real coordinates, not null placeholders (C2 fix)
+        // Verify the template shows 4-decimal-place coordinates (LLMs follow examples)
         assertTrue(
-            prompt.contains("\"lat\":38.71") || prompt.contains("\"lat\": 38.71"),
-            "POI template must show example coordinates, not null",
+            prompt.contains("\"lat\":38.7100") || prompt.contains("\"lat\": 38.7100"),
+            "POI template must show 4-decimal-place coordinates",
         )
         assertTrue(
             !prompt.contains("\"lat\":null") && !prompt.contains("\"lat\": null"),

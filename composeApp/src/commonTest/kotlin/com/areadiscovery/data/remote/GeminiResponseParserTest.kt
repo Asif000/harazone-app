@@ -72,6 +72,7 @@ not valid json either"""
         assertEquals(BucketType.SAFETY, bucketCompletes[0].content.type)
         assertEquals("Alfama is generally safe.", bucketCompletes[0].content.highlight)
         assertEquals(Confidence.MEDIUM, bucketCompletes[0].content.confidence)
+        assertTrue(bucketCompletes[0].content.sources.isEmpty())
 
         // Multiple ContentDelta per bucket (word-by-word streaming)
         val safetyDeltas = updates.filterIsInstance<BucketUpdate.ContentDelta>()
@@ -317,6 +318,14 @@ not valid json either"""
         val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
         assertEquals("Time Out Market", portrait.pois[0].name)
         assertEquals("Old Church", portrait.pois[1].name)
+    }
+
+    @Test
+    fun parseFullResponse_slimPois_confidenceDefaultsToMedium() {
+        val result = parser.parseFullResponse(V3_POIS_RESPONSE)
+        val portrait = result.getOrThrow().last() as BucketUpdate.PortraitComplete
+        assertEquals(Confidence.MEDIUM, portrait.pois[0].confidence)
+        assertEquals(Confidence.MEDIUM, portrait.pois[1].confidence)
     }
 
     @Test

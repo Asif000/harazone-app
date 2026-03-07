@@ -2,7 +2,7 @@
 title: 'Gemini Prompt v2'
 slug: 'gemini-prompt-v2'
 created: '2026-03-07'
-status: 'ready-for-dev'
+status: 'done'
 stepsCompleted: [1, 2, 3, 4]
 tech_stack: ['Kotlin Multiplatform', 'kotlinx.serialization', 'Ktor SSE', 'Gemini 2.5 Flash', 'SQLDelight']
 files_to_modify:
@@ -10,6 +10,7 @@ files_to_modify:
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/data/remote/GeminiResponseParser.kt'
   - 'composeApp/src/commonTest/kotlin/com/areadiscovery/data/remote/GeminiResponseParserTest.kt'
   - 'composeApp/src/commonTest/kotlin/com/areadiscovery/data/remote/GeminiPromptBuilderTest.kt'
+  - 'composeApp/src/androidInstrumentedTest/kotlin/com/areadiscovery/PromptComparisonTest.kt'
 code_patterns: ['DTO-to-domain mapping in GeminiResponseParser', 'Streaming SSE parser', 'ignoreUnknownKeys=true on JSON instance']
 test_patterns: ['kotlin.test', 'commonTest', 'companion object fixture strings']
 ---
@@ -84,7 +85,7 @@ Rewrite `buildAreaPortraitPrompt()` with: (1) passionate local persona, (2) uniq
 
 ### Tasks
 
-- [ ] **Task 1: Rewrite prompt in `GeminiPromptBuilder.kt`**
+- [x] **Task 1: Rewrite prompt in `GeminiPromptBuilder.kt`**
   - File: `composeApp/src/commonMain/kotlin/com/areadiscovery/data/remote/GeminiPromptBuilder.kt`
   - Action: Replace the entire `buildAreaPortraitPrompt()` prompt string. Keep the method signature and `trimIndent()` call unchanged. The new prompt must include all of the following sections in order:
     1. **Persona opener**: `You are a passionate local who has lived in "$areaName" for 20 years. You love showing visitors things they would NEVER find on Google Maps. Your mission: surface the genuinely unique, memorable, and local.`
@@ -105,7 +106,7 @@ Rewrite `buildAreaPortraitPrompt()` with: (1) passionate local persona, (2) uniq
     9. **Output rules**: Keep existing rules EXCEPT remove `confidence` and `sources` references. Keep GPS coordinates instruction (4 decimal places, required). Keep delimiter-inside-JSON warning.
   - Notes: Do NOT change `buildAiSearchPrompt()`. The delimiter constants `---BUCKET---` and `---POIS---` remain identical — the streaming parser depends on them.
 
-- [ ] **Task 2: Make `BucketJson.confidence` and `.sources` optional in `GeminiResponseParser.kt`**
+- [x] **Task 2: Make `BucketJson.confidence` and `.sources` optional in `GeminiResponseParser.kt`**
   - File: `composeApp/src/commonMain/kotlin/com/areadiscovery/data/remote/GeminiResponseParser.kt`
   - Action: Change `BucketJson` data class — add default values so fields are optional when missing from JSON:
     ```kotlin
@@ -120,7 +121,7 @@ Rewrite `buildAreaPortraitPrompt()` with: (1) passionate local persona, (2) uniq
     ```
   - Notes: `parseBucketJson()` does NOT need to change — it already reads `bucketJson.confidence` and `bucketJson.sources`. With defaults, missing fields resolve to `"MEDIUM"` and `[]`, which the existing mapper handles correctly. `SourceJson` DTO is unchanged.
 
-- [ ] **Task 3: Replace `PoiJson` DTO with slim-key version in `GeminiResponseParser.kt`**
+- [x] **Task 3: Replace `PoiJson` DTO with slim-key version in `GeminiResponseParser.kt`**
   - File: `composeApp/src/commonMain/kotlin/com/areadiscovery/data/remote/GeminiResponseParser.kt`
   - Action: Delete the existing `PoiJson` data class entirely. Replace with:
     ```kotlin
@@ -139,7 +140,7 @@ Rewrite `buildAreaPortraitPrompt()` with: (1) passionate local persona, (2) uniq
     ```
   - Notes: All fields have defaults so a partially malformed POI won't throw during deserialization. `ignoreUnknownKeys = true` is already set — old-format cached responses with fat keys won't crash.
 
-- [ ] **Task 4: Update `parsePoisJson()` mapper in `GeminiResponseParser.kt`**
+- [x] **Task 4: Update `parsePoisJson()` mapper in `GeminiResponseParser.kt`**
   - File: `composeApp/src/commonMain/kotlin/com/areadiscovery/data/remote/GeminiResponseParser.kt`
   - Action: Inside `parsePoisJson()`, replace the `poisJson.map { poiJson -> POI(...) }` block with:
     ```kotlin
@@ -162,7 +163,7 @@ Rewrite `buildAreaPortraitPrompt()` with: (1) passionate local persona, (2) uniq
     ```
   - Notes: `POI.insight` is the primary text shown on cards — `w` (why_special) maps directly here. `description` and `vibeInsights` are intentionally left empty; existing UI guards (`isNotEmpty()`) handle this gracefully with no UI change needed. `parseConfidence()` is no longer called for POIs; the private method can remain (still used by `parseBucketJson()`).
 
-- [ ] **Task 5: Update test fixtures in `GeminiResponseParserTest.kt`**
+- [x] **Task 5: Update test fixtures in `GeminiResponseParserTest.kt`**
   - File: `composeApp/src/commonTest/kotlin/com/areadiscovery/data/remote/GeminiResponseParserTest.kt`
   - Action: Update all fixture constants in the `companion object` to use slim bucket schema (no `confidence`/`sources`) and slim POI schema (short keys). Specific changes:
     - **`COMPLETE_RESPONSE`**: Update all 6 bucket JSON strings — remove `"confidence":...` and `"sources":[...]` fields. Update POI array: replace `{"name":"Castle of São Jorge","type":"landmark","description":"Medieval castle with panoramic views","confidence":"HIGH","latitude":38.7139,"longitude":-9.1335}` with `{"n":"Castle of São Jorge","t":"historic","v":"history","w":"Medieval castle with panoramic views of Lisbon","h":"9a-9p","s":"open","r":4.7,"lat":38.7139,"lng":-9.1335}` (and similarly for Feira da Ladra).
@@ -188,7 +189,7 @@ Rewrite `buildAreaPortraitPrompt()` with: (1) passionate local persona, (2) uniq
     }
     ```
 
-- [ ] **Task 6: Update and extend `GeminiPromptBuilderTest.kt`**
+- [x] **Task 6: Update and extend `GeminiPromptBuilderTest.kt`**
   - File: `composeApp/src/commonTest/kotlin/com/areadiscovery/data/remote/GeminiPromptBuilderTest.kt`
   - Action — Update existing test:
     - `buildAreaPortraitPrompt_poiTemplateHasRealCoordinates`: Change assertion from `prompt.contains("\"latitude\":38.71")` to `prompt.contains("\"lat\":38.71")`. Update the negative assertion from `"latitude":null` to `"lat\":null"`.
@@ -251,29 +252,29 @@ Rewrite `buildAreaPortraitPrompt()` with: (1) passionate local persona, (2) uniq
 
 ### Acceptance Criteria
 
-- [ ] **AC1 — Prompt persona**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then it contains the phrase "passionate local".
+- [x] **AC1 — Prompt persona**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then it contains the phrase "passionate local".
 
-- [ ] **AC2 — Principle-based uniqueness, no hardcoded brands**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then it does NOT contain "Starbucks" or "McDonald" and instead contains a principle-based uniqueness instruction (e.g. "genuine story" or "UNIQUENESS RULE").
+- [x] **AC2 — Principle-based uniqueness, no hardcoded brands**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then it does NOT contain "Starbucks" or "McDonald" and instead contains a principle-based uniqueness instruction (e.g. "genuine story" or "UNIQUENESS RULE").
 
-- [ ] **AC3 — Light food gate**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then it contains "FOOD GATE" and the instruction welcomes unique/story-worthy food while capping generic restaurant dominance.
+- [x] **AC3 — Light food gate**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then it contains "FOOD GATE" and the instruction welcomes unique/story-worthy food while capping generic restaurant dominance.
 
-- [ ] **AC4 — Slim POI schema in prompt**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then the POI example uses `"n":`, `"w":`, `"lat":` and does NOT contain `"poi":`, `"insight":`, or `"latitude":`.
+- [x] **AC4 — Slim POI schema in prompt**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then the POI example uses `"n":`, `"w":`, `"lat":` and does NOT contain `"poi":`, `"insight":`, or `"latitude":`.
 
-- [ ] **AC5 — No sources/confidence in bucket template**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then the bucket JSON example does NOT contain `"sources"` or `"confidence"`.
+- [x] **AC5 — No sources/confidence in bucket template**: Given `buildAreaPortraitPrompt()` is called, when the returned string is inspected, then the bucket JSON example does NOT contain `"sources"` or `"confidence"`.
 
-- [ ] **AC6 — Slim parser maps `w` → `POI.insight`**: Given a POI JSON string `{"n":"Foo Gallery","t":"arts","v":"character","w":"A unique gallery with 30-year history","h":"10a-6p","s":"open","r":4.5,"lat":38.71,"lng":-9.13}` in the POIs section, when `parseFullResponse()` processes it, then `portrait.pois[0].insight == "A unique gallery with 30-year history"` and `portrait.pois[0].name == "Foo Gallery"`.
+- [x] **AC6 — Slim parser maps `w` → `POI.insight`**: Given a POI JSON string `{"n":"Foo Gallery","t":"arts","v":"character","w":"A unique gallery with 30-year history","h":"10a-6p","s":"open","r":4.5,"lat":38.71,"lng":-9.13}` in the POIs section, when `parseFullResponse()` processes it, then `portrait.pois[0].insight == "A unique gallery with 30-year history"` and `portrait.pois[0].name == "Foo Gallery"`.
 
-- [ ] **AC7 — Slim parser maps lat/lng → `POI.latitude`/`POI.longitude`**: Given a slim POI with `"lat":38.7139,"lng":-9.1335`, when parsed, then `poi.latitude == 38.7139` and `poi.longitude == -9.1335`.
+- [x] **AC7 — Slim parser maps lat/lng → `POI.latitude`/`POI.longitude`**: Given a slim POI with `"lat":38.7139,"lng":-9.1335`, when parsed, then `poi.latitude == 38.7139` and `poi.longitude == -9.1335`.
 
-- [ ] **AC8 — `vibeInsights` defaults to empty**: Given a slim-key POI with no `vibeInsights` field, when parsed, then `poi.vibeInsights.isEmpty() == true`.
+- [x] **AC8 — `vibeInsights` defaults to empty**: Given a slim-key POI with no `vibeInsights` field, when parsed, then `poi.vibeInsights.isEmpty() == true`.
 
-- [ ] **AC9 — Bucket parses without confidence/sources**: Given a bucket JSON string `{"type":"SAFETY","highlight":"Safe area","content":"Low crime."}` (no `confidence`, no `sources`), when `parseFullResponse()` processes it, then result is `Success`, `BucketContent.sources` is empty, and `BucketContent.confidence` is `Confidence.MEDIUM`.
+- [x] **AC9 — Bucket parses without confidence/sources**: Given a bucket JSON string `{"type":"SAFETY","highlight":"Safe area","content":"Low crime."}` (no `confidence`, no `sources`), when `parseFullResponse()` processes it, then result is `Success`, `BucketContent.sources` is empty, and `BucketContent.confidence` is `Confidence.MEDIUM`.
 
-- [ ] **AC10 — All unit tests pass**: Given the updated code, when `./gradlew :composeApp:test` runs, then all tests in `GeminiResponseParserTest` and `GeminiPromptBuilderTest` pass with no failures.
+- [x] **AC10 — All unit tests pass**: Given the updated code, when `./gradlew :composeApp:test` runs, then all tests in `GeminiResponseParserTest` and `GeminiPromptBuilderTest` pass with no failures.
 
-- [ ] **AC11 — Manual: busy/tourist area quality check**: Given prompt v2 is live, when the app loads area portrait for a well-known tourist-heavy area, then results contain no obviously generic or ubiquitous places; at least 2 POIs have culturally or historically significant `why_special` text.
+- [x] **AC11 — Manual: busy/tourist area quality check**: Given prompt v2 is live, when the app loads area portrait for a well-known tourist-heavy area, then results contain no obviously generic or ubiquitous places; at least 2 POIs have culturally or historically significant `why_special` text.
 
-- [ ] **AC12 — Manual: suburban/residential area depth check**: Given prompt v2 is live, when the app loads area portrait for a less-obvious suburban or residential area, then results include locally unique POIs rather than generic nearby businesses; the "dig deeper" effect is visible (parks, landmarks, street art, cultural centers, neighborhood stories).
+- [x] **AC12 — Manual: suburban/residential area depth check**: Given prompt v2 is live, when the app loads area portrait for a less-obvious suburban or residential area, then results include locally unique POIs rather than generic nearby businesses; the "dig deeper" effect is visible (parks, landmarks, street art, cultural centers, neighborhood stories).
 
 ## Additional Context
 
