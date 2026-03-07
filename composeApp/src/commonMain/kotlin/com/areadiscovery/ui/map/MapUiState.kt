@@ -25,6 +25,7 @@ sealed class MapUiState {
         val isFabExpanded: Boolean = false,
         val mapRenderFailed: Boolean = false,
         val showSearchThisArea: Boolean = false,
+        val isNewArea: Boolean = false,
         val isSearchingArea: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()

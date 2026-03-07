@@ -181,7 +181,7 @@ private fun ReadyContent(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        text = "Search this area",
+                        text = if (state.isNewArea) "Search this area" else "Refresh area",
                         style = MaterialTheme.typography.labelMedium,
                         color = Color.White,
                     )

@@ -652,13 +652,15 @@ class MapViewModelTest {
     }
 
     @Test
-    fun onCameraIdle_hidesButtonWhenAreaNameUnchanged() = runTest(testDispatcher) {
+    fun onCameraIdle_showsRefreshButtonWhenAreaNameUnchanged() = runTest(testDispatcher) {
         val viewModel = createViewModel()
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
 
         viewModel.onCameraIdle(10.0, 20.0)
         testScheduler.advanceUntilIdle()
-        assertFalse((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
+        val state = viewModel.uiState.value as MapUiState.Ready
+        assertTrue(state.showSearchThisArea)
+        assertFalse(state.isNewArea)
     }
 
     @Test
@@ -760,10 +762,11 @@ class MapViewModelTest {
         testScheduler.advanceUntilIdle()
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertTrue(state2.showSearchThisArea)
+        assertTrue(state2.isNewArea)
     }
 
     @Test
-    fun onCameraIdle_hidesSearchButtonWhenPanningBackToSameArea() = runTest(testDispatcher) {
+    fun onCameraIdle_showsRefreshButtonWhenPanningBackToSameArea() = runTest(testDispatcher) {
         val locationProvider = object : com.areadiscovery.location.LocationProvider {
             private var callIndex = 0
             override suspend fun getCurrentLocation() =
@@ -786,7 +789,9 @@ class MapViewModelTest {
 
         viewModel.onCameraIdle(38.7139, -9.1394)
         testScheduler.advanceUntilIdle()
-        assertFalse((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
+        val state2 = viewModel.uiState.value as MapUiState.Ready
+        assertTrue(state2.showSearchThisArea)
+        assertFalse(state2.isNewArea)
     }
 
     @Test

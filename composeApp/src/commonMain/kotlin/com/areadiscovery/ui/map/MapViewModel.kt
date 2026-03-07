@@ -217,16 +217,11 @@ class MapViewModel(
             val current = _uiState.value as? MapUiState.Ready ?: return@launch
             val newToken = newAreaName.substringBefore(",").trim()
             val currentToken = current.areaName.substringBefore(",").trim()
-            if (newToken.equals(currentToken, ignoreCase = true)) {
-                // Panned back to current area — hide the button
-                _uiState.value = current.copy(showSearchThisArea = false)
-                return@launch
-            }
-            // Different area — cache and show button
+            val isNew = !newToken.equals(currentToken, ignoreCase = true)
             pendingLat = lat
             pendingLng = lng
-            pendingAreaName = newAreaName
-            _uiState.value = current.copy(showSearchThisArea = true)
+            pendingAreaName = if (isNew) newAreaName else current.areaName
+            _uiState.value = current.copy(showSearchThisArea = true, isNewArea = isNew)
         }
     }
 

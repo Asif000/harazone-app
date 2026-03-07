@@ -43,7 +43,7 @@ fun AISearchBar(
         )
         Spacer(Modifier.width(8.dp))
         Text(
-            text = "Search or ask anything...",
+            text = "Ask anything...",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.White.copy(alpha = 0.5f),
             modifier = Modifier.weight(1f),
