@@ -324,6 +324,7 @@ class MapViewModelTest {
 
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertNull(state2.activeVibe, "activeVibe should reset to null after initial portrait load")
+        assertFalse(state2.isSearchingArea, "isSearchingArea should be false after portrait load")
         assertEquals(2, state2.pois.size)
     }
 

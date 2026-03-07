@@ -271,6 +271,8 @@ class MapViewModel(
                         }
                     }
             } catch (e: CancellationException) {
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Search this area: unexpected error" }
@@ -362,6 +364,8 @@ class MapViewModel(
                         }
                     }
             } catch (e: CancellationException) {
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Map: unexpected error during location resolution" }

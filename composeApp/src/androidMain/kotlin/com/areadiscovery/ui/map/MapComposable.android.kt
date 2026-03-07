@@ -79,6 +79,8 @@ actual fun MapComposable(
     val mapRef = remember { arrayOfNulls<MapLibreMap>(1) }
     val styleRef = remember { arrayOfNulls<Style>(1) }
     val cameraIdleListenerRef = remember { arrayOfNulls<MapLibreMap.OnCameraIdleListener>(1) }
+    val lastFittedPois = remember { mutableStateOf<List<POI>>(emptyList()) }
+    val suppressCameraIdle = remember { booleanArrayOf(false) }
 
     val mapView = remember {
         MapLibre.getInstance(context)
@@ -128,6 +130,10 @@ actual fun MapComposable(
                         }
 
                         val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
+                            if (suppressCameraIdle[0]) {
+                                suppressCameraIdle[0] = false
+                                return@OnCameraIdleListener
+                            }
                             val target = map.cameraPosition.target ?: return@OnCameraIdleListener
                             currentOnCameraIdle.value(target.latitude, target.longitude)
                         }
@@ -204,7 +210,6 @@ actual fun MapComposable(
         }
 
         // Add symbols with stagger (runs inside LaunchedEffect — auto-cancelled on restart)
-        val pinAnimators = mutableListOf<ValueAnimator>()
         for ((i, poi) in filteredPois.withIndex()) {
             if (isDestroyed[0]) return@LaunchedEffect
             delay(50L * i)
@@ -241,27 +246,38 @@ actual fun MapComposable(
                 }
             }
             animator.start()
-            pinAnimators.add(animator)
+            pinAnimatorsRef.add(animator)
         }
 
-        pinAnimatorsRef.addAll(pinAnimators)
-
-        // Fit camera to show all pins
-        if (filteredPois.size >= 2) {
-            val boundsBuilder = LatLngBounds.Builder()
-            for (poi in filteredPois) {
-                boundsBuilder.include(LatLng(poi.latitude!!, poi.longitude!!))
+        // Fit camera to show all pins — only when pois list changed (not on vibe switch)
+        if (pois !== lastFittedPois.value && filteredPois.isNotEmpty()) {
+            lastFittedPois.value = pois
+            suppressCameraIdle[0] = true
+            if (filteredPois.size >= 2) {
+                try {
+                    val boundsBuilder = LatLngBounds.Builder()
+                    for (poi in filteredPois) {
+                        boundsBuilder.include(LatLng(poi.latitude!!, poi.longitude!!))
+                    }
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 100),
+                        600,
+                    )
+                } catch (_: Exception) {
+                    // Identical coordinates — fall back to centering on first POI
+                    val poi = filteredPois[0]
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng(poi.latitude!!, poi.longitude!!), 15.0),
+                        600,
+                    )
+                }
+            } else {
+                val poi = filteredPois[0]
+                map.animateCamera(
+                    CameraUpdateFactory.newLatLngZoom(LatLng(poi.latitude!!, poi.longitude!!), 15.0),
+                    600,
+                )
             }
-            map.animateCamera(
-                CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 100),
-                600,
-            )
-        } else if (filteredPois.size == 1) {
-            val poi = filteredPois[0]
-            map.animateCamera(
-                CameraUpdateFactory.newLatLngZoom(LatLng(poi.latitude!!, poi.longitude!!), 15.0),
-                600,
-            )
         }
 
         // Add glow zones (only when a specific vibe is selected)
@@ -376,12 +392,12 @@ private fun poiTypeEmoji(type: String): String = when {
     type.contains("beach") || type.contains("coast") || type.contains("waterfront") -> "🏖️"
     type.contains("temple") || type.contains("church") || type.contains("mosque") || type.contains("religious") -> "🕌"
     type.contains("hotel") || type.contains("hostel") || type.contains("accommodation") -> "🏨"
+    type.contains("safety") || type.contains("police") || type.contains("security") -> "🛡️"
     type.contains("landmark") || type.contains("attraction") || type.contains("viewpoint") -> "📍"
     type.contains("district") || type.contains("neighborhood") || type.contains("area") -> "🏘️"
     type.contains("sport") || type.contains("stadium") || type.contains("gym") -> "⚽"
     type.contains("library") || type.contains("education") || type.contains("university") -> "📚"
     type.contains("hospital") || type.contains("clinic") || type.contains("health") -> "🏥"
-    type.contains("safety") || type.contains("police") -> "🛡️"
     else -> "📌"
 }
 
