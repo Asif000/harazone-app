@@ -216,6 +216,8 @@ class MapViewModel(
         if (_uiState.value !is MapUiState.Ready) return
         val readyState = _uiState.value as? MapUiState.Ready ?: return
         if (!isAwayFromGps(lat, lng, readyState)) {
+            pendingLat = lat
+            pendingLng = lng
             if (readyState.showMyLocation || readyState.showSearchThisArea) {
                 _uiState.value = readyState.copy(showMyLocation = false, showSearchThisArea = false)
             }

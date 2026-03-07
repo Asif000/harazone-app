@@ -10,8 +10,10 @@ files_to_modify:
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapViewModel.kt'
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt'
   - 'composeApp/src/androidMain/kotlin/com/areadiscovery/ui/map/MapComposable.android.kt'
+  - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapComposable.kt'
+  - 'composeApp/src/iosMain/kotlin/com/areadiscovery/ui/map/MapComposable.ios.kt'
   - 'composeApp/src/commonTest/kotlin/com/areadiscovery/ui/map/MapViewModelTest.kt'
-code_patterns: ['StateFlow + copy()', 'AnimatedVisibility', 'LocationProvider.getCurrentLocation()', 'onCameraIdle debounce', 'suppressCameraIdle flag', 'MapFloatingUiDark pill style']
+code_patterns: ['StateFlow + copy()', 'AnimatedVisibility', 'LocationProvider.getCurrentLocation()', 'onCameraIdle debounce', 'suppressCameraIdle flag', 'MapFloatingUiDark pill style', 'cameraMoveId force-refire for LaunchedEffect when coords unchanged']
 test_patterns: ['UnconfinedTestDispatcher + runTest', 'FakeLocationProvider with configurable results', 'ResettableFakeLocationProvider for async flows', 'assertIs<MapUiState.Ready> pattern']
 ---
 
