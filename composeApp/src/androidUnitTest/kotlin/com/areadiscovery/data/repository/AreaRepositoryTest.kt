@@ -561,9 +561,9 @@ class AreaRepositoryTest {
             assertEquals(mockPois.size, portrait.pois.size)
             assertEquals(mockPois[0].name, portrait.pois[0].name)
             assertEquals(mockPois[1].name, portrait.pois[1].name)
-            // H-4: verify MapTiler fallback actually populates imageUrl
+            // H-4: verify MapTiler fallback actually populates imageUrl (resolved to real URL before emitting)
             assertNotNull(portrait.pois[0].imageUrl, "MapTiler fallback should populate imageUrl")
-            assertTrue(portrait.pois[0].imageUrl!!.startsWith("maptiler-satellite://"), "imageUrl should be a MapTiler satellite tile ref")
+            assertTrue(portrait.pois[0].imageUrl!!.contains("maptiler.com"), "imageUrl should be a resolved MapTiler URL")
             assertNotNull(portrait.pois[1].imageUrl, "MapTiler fallback should populate imageUrl for second POI")
             awaitComplete()
         }
@@ -703,20 +703,19 @@ class AreaRepositoryTest {
 
     @Test
     fun cacheMissMultiPoiMixedWikiResults_failedPoiGetsMapTilerOthersUnaffected() = testScope.runTest {
-        var callCount = 0
-        val wikiMockEngine = MockEngine { _ ->
-            callCount++
-            // Odd calls (slug attempts): first POI slug fails, second POI slug succeeds
-            // Call 1: POI1 wikiSlug -> 404
-            // Call 2: POI1 poiName -> 404
-            // Call 3: POI1 Commons -> 404
-            // Call 4: POI2 wikiSlug -> success
-            if (callCount <= 3) respond("Not found", status = HttpStatusCode.NotFound)
-            else respond(
-                content = """{"title":"Test","thumbnail":{"source":"https://upload.wikimedia.org/good.jpg","width":320,"height":240}}""",
-                status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, "application/json")
-            )
+        // POI with no wiki slug → all wiki lookups 404 → gets MapTiler fallback
+        // POI with valid wiki slug → returns thumbnail
+        val wikiMockEngine = MockEngine { request ->
+            val url = request.url.toString()
+            if (url.contains("Good_Slug") || url.contains("Famous")) {
+                respond(
+                    content = """{"title":"Test","thumbnail":{"source":"https://upload.wikimedia.org/good.jpg","width":320,"height":240}}""",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json")
+                )
+            } else {
+                respond("Not found", status = HttpStatusCode.NotFound)
+            }
         }
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
         val mixedRepo = AreaRepositoryImpl(
@@ -743,8 +742,9 @@ class AreaRepositoryTest {
             val portrait = awaitItem()
             assertIs<BucketUpdate.PortraitComplete>(portrait)
             assertEquals(2, portrait.pois.size)
-            // POI 1: all wiki tiers failed -> MapTiler satellite tile ref
-            assertTrue(portrait.pois[0].imageUrl!!.startsWith("maptiler-satellite://"), "Failed POI should get MapTiler fallback")
+            // POI 1: all wiki tiers failed -> resolved MapTiler URL
+            assertNotNull(portrait.pois[0].imageUrl, "Failed POI should get MapTiler fallback")
+            assertTrue(portrait.pois[0].imageUrl!!.contains("maptiler.com"), "Failed POI imageUrl should be a resolved MapTiler URL")
             // POI 2: wiki succeeded
             assertEquals("https://upload.wikimedia.org/good.jpg", portrait.pois[1].imageUrl)
             awaitComplete()

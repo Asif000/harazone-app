@@ -37,7 +37,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
-class AreaRepositoryImpl(
+internal class AreaRepositoryImpl(
     private val aiProvider: AreaIntelligenceProvider,
     private val database: AreaDiscoveryDatabase,
     private val scope: CoroutineScope,
@@ -55,12 +55,6 @@ class AreaRepositoryImpl(
         const val CACHE_TTL_DYNAMIC_MS = 12 * MS_PER_HOUR
         private val json = Json { ignoreUnknownKeys = true }
 
-        fun resolveTileUrl(ref: String): String? {
-            if (!ref.startsWith("maptiler-satellite://")) return null
-            val parts = ref.removePrefix("maptiler-satellite://").split("/")
-            if (parts.size != 3) return null
-            return "https://api.maptiler.com/tiles/satellite-v2/${parts[0]}/${parts[1]}/${parts[2]}.jpg?key=${BuildKonfig.MAPTILER_API_KEY}"
-        }
     }
 
     private fun getTtlMs(bucketType: BucketType): Long = when (bucketType) {
@@ -89,7 +83,7 @@ class AreaRepositoryImpl(
             // Full cache hit — emit all from cache
             AppLogger.d { "Cache HIT for '$areaName' — ${validParsed.size} buckets" }
             validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
-            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
+            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
             return@flow
         }
 
@@ -104,7 +98,7 @@ class AreaRepositoryImpl(
             } else {
                 emit(BucketUpdate.ContentAvailabilityNote("No content available offline for this area"))
             }
-            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
+            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
             return@flow
         }
 
@@ -132,7 +126,7 @@ class AreaRepositoryImpl(
                         }
                     }
             }
-            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
+            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
             return@flow
         }
 
@@ -143,7 +137,7 @@ class AreaRepositoryImpl(
                 if (update is BucketUpdate.PortraitComplete) {
                     val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
                     if (enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
-                    emit(BucketUpdate.PortraitComplete(enriched))
+                    emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched)))
                 } else {
                     emit(update)
                     if (update is BucketUpdate.BucketComplete) writeToCache(update.content, areaName, language)
@@ -163,7 +157,7 @@ class AreaRepositoryImpl(
             } else {
                 emit(BucketUpdate.ContentAvailabilityNote("Could not load area content — please try again"))
             }
-            emit(BucketUpdate.PortraitComplete(pois = loadPoisFromCache(areaName, language, now)))
+            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
         }
     }.flowOn(ioDispatcher)
 
@@ -184,7 +178,7 @@ class AreaRepositoryImpl(
         result
     }
 
-    internal fun buildSatelliteTileRef(lat: Double?, lng: Double?): String? {
+    private fun buildSatelliteTileRef(lat: Double?, lng: Double?): String? {
         if (lat == null || lng == null) return null
         val z = 17
         val n = 1 shl z // 2^z
@@ -192,6 +186,14 @@ class AreaRepositoryImpl(
         val latRad = lat * kotlin.math.PI / 180.0
         val y = ((1.0 - kotlin.math.ln(kotlin.math.tan(latRad) + 1.0 / kotlin.math.cos(latRad)) / kotlin.math.PI) / 2.0 * n).toInt().coerceIn(0, n - 1)
         return "maptiler-satellite://$z/$x/$y"
+    }
+
+    private fun resolveTileRefs(pois: List<POI>): List<POI> = pois.map { poi ->
+        val url = poi.imageUrl ?: return@map poi
+        if (!url.startsWith("maptiler-satellite://")) return@map poi
+        val parts = url.removePrefix("maptiler-satellite://").split("/")
+        if (parts.size != 3) return@map poi
+        poi.copy(imageUrl = "https://api.maptiler.com/tiles/satellite-v2/${parts[0]}/${parts[1]}/${parts[2]}.jpg?key=${BuildKonfig.MAPTILER_API_KEY}")
     }
 
     private fun writePoisToCache(pois: List<POI>, areaName: String, language: String) {
