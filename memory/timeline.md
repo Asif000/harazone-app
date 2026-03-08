@@ -43,6 +43,7 @@
 
 | Date | Story | Notes |
 |------|-------|-------|
+| 2026-03-08 | Recent Places code review | 2H, 3M fixed (search bar active bug, upsert error handling, DB transaction, spec gap, missing test). 4L deferred to backlog. |
 | 2026-03-04 | Epic 1 complete | All 7 stories done (day 1) |
 | 2026-03-04 | Epic 2 complete | All 5 stories done (day 1) |
 | 2026-03-04 | Story 3.1 done | MapLibre integration (day 1) |

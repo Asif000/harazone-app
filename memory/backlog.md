@@ -38,6 +38,30 @@ Items deferred during code review — to be picked up in relevant future stories
 
 ---
 
+## Bug — No Blue Dot for Current Location on Map
+
+| Severity | Item | File | Fix |
+|----------|------|------|-----|
+| MEDIUM | No blue dot shown at user's GPS position — standard map UX expectation. MapLibre supports this natively via `LocationComponent` (Android) / `MLNUserLocationAnnotationView` (iOS). Should pulse/animate like Google Maps. | `MapComposable.android.kt`, `MapComposable.ios.kt` | Enable MapLibre's built-in location layer: Android — activate `LocationComponent` with `LocationComponentActivationOptions`, request `RenderMode.COMPASS` / `CameraMode.NONE`. iOS — set `mapView.showsUserLocation = true`. Requires location permission already granted (which it is). |
+
+---
+
+## Bug — POI Pins Appear in Water for Coastal Areas
+
+| Severity | Item | Description | Fix options |
+|----------|------|-------------|-------------|
+| HIGH | AI-generated POI coordinates slightly wrong for coastal areas — pins land in the ocean instead of on land. Reproduced in Cayucos, CA (screenshot 2026-03-08). Gemini hallucinating lat/lng with small offsets that push coastal POIs into water. | No coordinate validation or land-snapping after AI response. | (1) Re-geocode each POI name via MapTiler after AI returns them — verified coords replace AI coords. Most accurate, ~N extra calls per portrait. (2) Validate each POI coord is within bounding box of area centroid; re-geocode outliers only. (3) Snap to nearest road/point via API. **Recommended: option 2** — cheap check, only re-geocodes bad ones. |
+
+---
+
+## Bug — POI List View Missing Image Thumbnails
+
+| Severity | Item | File | Fix |
+|----------|------|------|-----|
+| MEDIUM | `PoiListCard` never renders `poi.imageUrl` — field exists on `POI` model but is ignored in the list view. Should show a thumbnail (e.g. 56×56dp rounded image) on the leading edge of each card when `imageUrl != null`. Use `AsyncImage` (Coil KMP) with a placeholder icon fallback. | `POIListView.kt` | Add `AsyncImage` in `PoiListCard` `Row`, leading the text columns, sized ~56×56dp, `RoundedCornerShape(8.dp)`, only shown when `poi.imageUrl != null`. |
+
+---
+
 ## Bug — Weather/Time Stale After Location Search
 
 | Severity | Item | File | Fix |

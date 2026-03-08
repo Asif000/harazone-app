@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,11 +29,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.background
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil3.compose.LocalPlatformContext
+import coil3.compose.SubcomposeAsyncImage
+import coil3.compose.SubcomposeAsyncImageContent
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
+import coil3.request.crossfade
+import coil3.size.Size
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.ui.theme.MapSurfaceDark
@@ -107,60 +119,101 @@ private fun PoiListCard(poi: POI, onClick: () -> Unit) {
         colors = CardDefaults.cardColors(containerColor = MapSurfaceDark),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = poi.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color.White,
-                    )
-                    Text(
-                        text = poi.type.replaceFirstChar { it.uppercaseChar() },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.6f),
-                    )
-                }
-                if (poi.rating != null) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Default.Star,
-                            contentDescription = null,
-                            tint = Color(0xFFFFD700),
-                            modifier = Modifier.size(14.dp),
-                        )
-                        Spacer(Modifier.width(2.dp))
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            if (!poi.imageUrl.isNullOrBlank()) {
+                SubcomposeAsyncImage(
+                    model = ImageRequest.Builder(LocalPlatformContext.current)
+                        .data(poi.imageUrl)
+                        .crossfade(true)
+                        .size(Size(168, 168))
+                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                    loading = { ThumbnailPlaceholder() },
+                    error = { ThumbnailPlaceholder() },
+                    success = { SubcomposeAsyncImageContent() },
+                )
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "${poi.rating}",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = poi.name,
+                            style = MaterialTheme.typography.titleSmall,
                             color = Color.White,
                         )
+                        Text(
+                            text = poi.type.replaceFirstChar { it.uppercaseChar() },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.6f),
+                        )
+                    }
+                    if (poi.rating != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Star,
+                                contentDescription = null,
+                                tint = Color(0xFFFFD700),
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                text = "${poi.rating}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White,
+                            )
+                        }
+                    }
+                    if (poi.liveStatus != null) {
+                        Spacer(Modifier.width(8.dp))
+                        val statusColor = when (poi.liveStatus.lowercase()) {
+                            "open" -> Color(0xFF4CAF50)
+                            "busy" -> Color(0xFFFF9800)
+                            else -> Color(0xFF9E9E9E)
+                        }
+                        Text(
+                            text = poi.liveStatus.replaceFirstChar { it.uppercaseChar() },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = statusColor,
+                        )
                     }
                 }
-                if (poi.liveStatus != null) {
-                    Spacer(Modifier.width(8.dp))
-                    val statusColor = when (poi.liveStatus.lowercase()) {
-                        "open" -> Color(0xFF4CAF50)
-                        "busy" -> Color(0xFFFF9800)
-                        else -> Color(0xFF9E9E9E)
-                    }
+                if (poi.insight.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        text = poi.liveStatus.replaceFirstChar { it.uppercaseChar() },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = statusColor,
+                        text = poi.insight,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
-            if (poi.insight.isNotEmpty()) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = poi.insight,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.7f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
+    }
+}
+
+@Composable
+private fun ThumbnailPlaceholder() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.White.copy(alpha = 0.08f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            Icons.Default.Place,
+            contentDescription = null,
+            tint = Color.White.copy(alpha = 0.3f),
+            modifier = Modifier.size(24.dp),
+        )
     }
 }
