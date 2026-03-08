@@ -1,6 +1,8 @@
 package com.areadiscovery.ui.map
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.areadiscovery.ui.components.AlertBanner
 import com.areadiscovery.ui.components.ContentNoteBanner
+import com.areadiscovery.ui.components.PlatformBackHandler
 import com.areadiscovery.ui.map.components.AISearchBar
 import com.areadiscovery.ui.map.components.ExpandablePoiCard
 import com.areadiscovery.ui.map.components.GeocodingSearchBar
@@ -173,6 +176,9 @@ private fun ReadyContent(
             onSubmitEmpty = { viewModel.onGeocodingSubmitEmpty() },
             onClear = { viewModel.onGeocodingCleared() },
             onCancelLoad = { viewModel.onGeocodingCancelLoad() },
+            recentPlaces = state.recentPlaces,
+            onRecentSelected = { viewModel.onRecentSelected(it) },
+            onClearRecents = { viewModel.onClearRecents() },
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 56.dp)
@@ -188,6 +194,27 @@ private fun ReadyContent(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 8.dp, bottom = navBarPadding + 88.dp),
+            )
+        }
+
+        // Back button: dismiss POI card > search overlay > FAB (priority order)
+        PlatformBackHandler(enabled = state.selectedPoi != null) {
+            viewModel.clearPoiSelection()
+        }
+        PlatformBackHandler(enabled = state.selectedPoi == null && state.isSearchOverlayOpen) {
+            viewModel.closeSearchOverlay()
+        }
+        PlatformBackHandler(enabled = state.selectedPoi == null && !state.isSearchOverlayOpen && state.isFabExpanded) {
+            viewModel.toggleFab()
+        }
+
+        // POI card scrim (tap outside to dismiss)
+        if (state.selectedPoi != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+                    .clickable { viewModel.clearPoiSelection() },
             )
         }
 

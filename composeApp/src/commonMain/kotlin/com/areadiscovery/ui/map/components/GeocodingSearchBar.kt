@@ -49,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.areadiscovery.domain.model.GeocodingSuggestion
+import com.areadiscovery.domain.model.RecentPlace
 import com.areadiscovery.ui.theme.MapFloatingUiDark
 
 @Composable
@@ -64,6 +65,9 @@ fun GeocodingSearchBar(
     onSubmitEmpty: () -> Unit,
     onClear: () -> Unit,
     onCancelLoad: () -> Unit,
+    recentPlaces: List<RecentPlace> = emptyList(),
+    onRecentSelected: (RecentPlace) -> Unit = {},
+    onClearRecents: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val spinning = isSearchingArea
@@ -74,8 +78,8 @@ fun GeocodingSearchBar(
     var isFieldFocused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
-    // Active = focused OR has query/suggestions
-    val active = !spinning && selectedPlace == null && (isFieldFocused || query.isNotBlank() || suggestions.isNotEmpty())
+    // Active = focused OR has query/suggestions/recents
+    val active = !spinning && selectedPlace == null && (isFieldFocused || query.isNotBlank() || suggestions.isNotEmpty() || recentPlaces.isNotEmpty())
 
     Box(modifier = modifier) {
         // Reset focus when transitioning to spinning or selected
@@ -106,6 +110,13 @@ fun GeocodingSearchBar(
                     focusManager.clearFocus()
                     onSubmitEmpty()
                 },
+                recentPlaces = recentPlaces,
+                onRecentSelected = {
+                    isFieldFocused = false
+                    focusManager.clearFocus()
+                    onRecentSelected(it)
+                },
+                onClearRecents = onClearRecents,
                 requestFocus = isFieldFocused && query.isBlank() && suggestions.isEmpty(),
                 onFocusChanged = { isFieldFocused = it },
             )
@@ -153,6 +164,9 @@ private fun ActiveState(
     onSuggestionSelected: (GeocodingSuggestion) -> Unit,
     onClear: () -> Unit,
     onSubmitEmpty: () -> Unit,
+    recentPlaces: List<RecentPlace>,
+    onRecentSelected: (RecentPlace) -> Unit,
+    onClearRecents: () -> Unit,
     requestFocus: Boolean,
     onFocusChanged: (Boolean) -> Unit,
 ) {
@@ -169,9 +183,11 @@ private fun ActiveState(
             .fillMaxWidth()
             .padding(horizontal = 16.dp),
     ) {
-        val hasDropdown = suggestions.isNotEmpty()
+        val hasRecents = query.isBlank() && recentPlaces.isNotEmpty()
+        val hasDropdown = query.isNotBlank() && suggestions.isNotEmpty()
+        val showPanel = hasRecents || hasDropdown
         Surface(
-            shape = if (hasDropdown) {
+            shape = if (showPanel) {
                 RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 0.dp)
             } else {
                 RoundedCornerShape(50)
@@ -240,17 +256,40 @@ private fun ActiveState(
                 }
             }
         }
-        if (hasDropdown) {
+        if (showPanel) {
             Surface(
                 shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp),
                 color = MapFloatingUiDark.copy(alpha = 0.95f),
             ) {
                 Column {
-                    suggestions.forEachIndexed { i, s ->
-                        if (i > 0) {
-                            HorizontalDivider(color = Color.White.copy(alpha = 0.06f), thickness = 0.5.dp)
+                    if (hasRecents) {
+                        recentPlaces.forEachIndexed { i, recent ->
+                            if (i > 0) {
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.06f), thickness = 0.5.dp)
+                            }
+                            RecentPlaceRow(recent, onRecentSelected)
                         }
-                        SuggestionRow(s, query, onSuggestionSelected)
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.10f), thickness = 0.5.dp)
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onClearRecents() }
+                                .padding(horizontal = 14.dp, vertical = 9.dp),
+                        ) {
+                            Text(
+                                text = "Clear history",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.4f),
+                            )
+                        }
+                    } else {
+                        suggestions.forEachIndexed { i, s ->
+                            if (i > 0) {
+                                HorizontalDivider(color = Color.White.copy(alpha = 0.06f), thickness = 0.5.dp)
+                            }
+                            SuggestionRow(s, query, onSuggestionSelected)
+                        }
                     }
                 }
             }
@@ -315,6 +354,35 @@ private fun SuggestionRow(
                 color = Color.White.copy(alpha = 0.4f),
             )
         }
+    }
+}
+
+@Composable
+private fun RecentPlaceRow(
+    recent: RecentPlace,
+    onSelected: (RecentPlace) -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelected(recent) }
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Default.Place,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.error,
+            modifier = Modifier.size(14.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        Text(
+            text = recent.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 

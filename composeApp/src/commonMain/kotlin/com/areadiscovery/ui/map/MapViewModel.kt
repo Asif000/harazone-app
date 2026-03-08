@@ -6,6 +6,8 @@ import com.areadiscovery.data.remote.MapTilerGeocodingProvider
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.GeocodingSuggestion
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.domain.model.RecentPlace
+import com.areadiscovery.domain.repository.RecentPlacesRepository
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.provider.WeatherProvider
@@ -36,6 +38,7 @@ class MapViewModel(
     private val weatherProvider: WeatherProvider,
     private val aiProvider: AreaIntelligenceProvider? = null,
     private val geocodingProvider: MapTilerGeocodingProvider,
+    private val recentPlacesRepository: RecentPlacesRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
@@ -52,9 +55,17 @@ class MapViewModel(
     private var pendingLat: Double = 0.0
     private var pendingLng: Double = 0.0
     private var pendingAreaName: String = ""
+    private var latestRecents: List<RecentPlace> = emptyList()
 
     init {
         loadLocation()
+        viewModelScope.launch {
+            recentPlacesRepository.observeRecent().collect { recents ->
+                latestRecents = recents
+                val current = _uiState.value as? MapUiState.Ready ?: return@collect
+                _uiState.value = current.copy(recentPlaces = recents)
+            }
+        }
     }
 
     fun selectPoi(poi: POI?) {
@@ -308,6 +319,96 @@ class MapViewModel(
                 )
                 _errorEvents.tryEmit("Couldn't load area info. Try again.")
             }
+        }
+        viewModelScope.launch {
+            recentPlacesRepository.upsert(
+                RecentPlace(
+                    name = suggestion.name,
+                    latitude = suggestion.latitude,
+                    longitude = suggestion.longitude,
+                )
+            )
+        }
+    }
+
+    fun onRecentSelected(recent: RecentPlace) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        cameraIdleJob?.cancel()
+        geocodingJob?.cancel()
+        searchJob?.cancel()
+        returnToLocationJob?.cancel()
+        pendingLat = recent.latitude
+        pendingLng = recent.longitude
+        pendingAreaName = recent.name
+        _uiState.value = current.copy(
+            geocodingQuery = "",
+            geocodingSuggestions = emptyList(),
+            isGeocodingLoading = false,
+            geocodingSelectedPlace = recent.name,
+            isGeocodingInitiatedSearch = true,
+            latitude = recent.latitude,
+            longitude = recent.longitude,
+            cameraMoveId = current.cameraMoveId + 1,
+            isSearchingArea = true,
+            showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, current),
+            vibePoiCounts = emptyMap(),
+            pois = emptyList(),
+            activeVibe = null,
+        )
+        searchJob = viewModelScope.launch {
+            try {
+                collectPortraitWithRetry(
+                    areaName = recent.name,
+                    onComplete = { pois, _ ->
+                        val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
+                        val counts = computeVibePoiCounts(pois)
+                        _uiState.value = state.copy(
+                            areaName = recent.name,
+                            pois = pois,
+                            vibePoiCounts = counts,
+                            activeVibe = null,
+                            isSearchingArea = false,
+                            showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, state),
+                        )
+                    },
+                    onError = { e ->
+                        AppLogger.e(e) { "Recent selection: portrait fetch failed" }
+                        val s = _uiState.value as? MapUiState.Ready
+                        if (s != null) _uiState.value = s.copy(
+                            isSearchingArea = false,
+                            showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, s),
+                        )
+                        _errorEvents.tryEmit("Couldn't load area info. Try again.")
+                    },
+                )
+            } catch (e: CancellationException) {
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Recent selection: unexpected error" }
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(
+                    isSearchingArea = false,
+                    showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, s),
+                )
+                _errorEvents.tryEmit("Couldn't load area info. Try again.")
+            }
+        }
+        viewModelScope.launch {
+            recentPlacesRepository.upsert(
+                RecentPlace(
+                    name = recent.name,
+                    latitude = recent.latitude,
+                    longitude = recent.longitude,
+                )
+            )
+        }
+    }
+
+    fun onClearRecents() {
+        viewModelScope.launch {
+            recentPlacesRepository.clearAll()
         }
     }
 
@@ -581,6 +682,7 @@ class MapViewModel(
                     gpsLatitude = coords.latitude,
                     gpsLongitude = coords.longitude,
                     isSearchingArea = true,
+                    recentPlaces = latestRecents,
                 )
 
                 // Fetch weather in parallel

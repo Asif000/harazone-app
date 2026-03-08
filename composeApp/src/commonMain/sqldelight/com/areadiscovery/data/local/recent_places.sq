@@ -1,0 +1,26 @@
+CREATE TABLE IF NOT EXISTS recent_places (
+    place_name TEXT NOT NULL COLLATE NOCASE,
+    lat        REAL NOT NULL,
+    lng        REAL NOT NULL,
+    searched_at INTEGER NOT NULL,
+    PRIMARY KEY (place_name)
+);
+
+observeRecent:
+SELECT place_name, lat, lng
+FROM recent_places
+ORDER BY searched_at DESC
+LIMIT 10;
+
+upsertPlace:
+INSERT OR REPLACE INTO recent_places(place_name, lat, lng, searched_at)
+VALUES (:place_name, :lat, :lng, :searched_at);
+
+pruneOld:
+DELETE FROM recent_places
+WHERE place_name NOT IN (
+    SELECT place_name FROM recent_places ORDER BY searched_at DESC LIMIT 10
+);
+
+clearAll:
+DELETE FROM recent_places;

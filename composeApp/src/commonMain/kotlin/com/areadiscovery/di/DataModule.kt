@@ -10,7 +10,9 @@ import com.areadiscovery.data.remote.HttpClientFactory
 import com.areadiscovery.data.remote.MapTilerGeocodingProvider
 import com.areadiscovery.data.remote.WikipediaImageRepository
 import com.areadiscovery.data.repository.AreaRepositoryImpl
+import com.areadiscovery.data.repository.RecentPlacesRepositoryImpl
 import com.areadiscovery.domain.provider.ApiKeyProvider
+import com.areadiscovery.domain.repository.RecentPlacesRepository
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.service.PrivacyPipeline
@@ -55,4 +57,5 @@ val dataModule = module {
     single { GetAreaPortraitUseCase(get()) }
     single<WeatherProvider> { OpenMeteoWeatherProvider(get()) }
     single { MapTilerGeocodingProvider(get()) }
+    single<RecentPlacesRepository> { RecentPlacesRepositoryImpl(get(), get()) }
 }

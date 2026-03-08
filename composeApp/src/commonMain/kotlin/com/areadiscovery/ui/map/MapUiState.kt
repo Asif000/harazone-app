@@ -2,6 +2,7 @@ package com.areadiscovery.ui.map
 
 import com.areadiscovery.domain.model.GeocodingSuggestion
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.domain.model.RecentPlace
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.domain.model.WeatherState
 
@@ -35,6 +36,7 @@ sealed class MapUiState {
         val isGeocodingLoading: Boolean = false,
         val geocodingSelectedPlace: String? = null,
         val isGeocodingInitiatedSearch: Boolean = false,
+        val recentPlaces: List<RecentPlace> = emptyList(),
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

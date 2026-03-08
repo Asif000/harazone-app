@@ -34,6 +34,21 @@ BMAD provides a structured progression from idea to implementation. The typical 
 
 Use `/bmad-help` to get guidance on what to do next based on current project state.
 
+## Platform Rules
+
+### Android Back Button
+Every dismissible overlay, modal, bottom sheet, or card **must** handle the Android back button via `PlatformBackHandler`. This is an OS-level expectation — pressing back must dismiss the topmost overlay, not exit the app.
+
+- Use `PlatformBackHandler(enabled = <condition>) { <dismiss action> }` in `commonMain`
+- Implementation: `composeApp/src/commonMain/kotlin/com/areadiscovery/ui/components/PlatformBackHandler.kt` (expect/actual)
+  - Android: delegates to `androidx.activity.compose.BackHandler`
+  - iOS: no-op (iOS uses swipe-back gesture from navigation controller)
+- When multiple overlays can be open, use priority ordering — only the topmost enabled handler fires
+- Checklist for any new overlay/modal/card: (1) add scrim with tap-to-dismiss, (2) add X/close button, (3) add `PlatformBackHandler`
+
+### iOS Navigation
+iOS back navigation is handled by the system navigation controller (swipe-back gesture). No additional back button handling is needed in Compose code for iOS.
+
 ## Configuration
 
 - **User**: Asifchauhan

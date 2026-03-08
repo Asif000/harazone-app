@@ -7,5 +7,5 @@ import org.koin.dsl.module
 
 val uiModule = module {
     factory { AreaContextFactory(get()) }
-    viewModel { MapViewModel(get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { MapViewModel(get(), get(), get(), get(), get(), get(), get(), get()) }
 }

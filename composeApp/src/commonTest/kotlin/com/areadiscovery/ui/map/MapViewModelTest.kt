@@ -9,7 +9,9 @@ import com.areadiscovery.domain.provider.WeatherProvider
 import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
 import com.areadiscovery.domain.model.GeocodingSuggestion
+import com.areadiscovery.domain.model.RecentPlace
 import com.areadiscovery.fakes.FakeAnalyticsTracker
+import com.areadiscovery.fakes.FakeRecentPlacesRepository
 import com.areadiscovery.fakes.FakeMapTilerGeocodingProvider
 import com.areadiscovery.fakes.FakeAreaContextFactory
 import com.areadiscovery.fakes.FakeAreaRepository
@@ -60,6 +62,7 @@ class MapViewModelTest {
         analyticsTracker: com.areadiscovery.util.AnalyticsTracker = FakeAnalyticsTracker(),
         weatherProvider: WeatherProvider = FakeWeatherProvider(),
         geocodingProvider: com.areadiscovery.data.remote.MapTilerGeocodingProvider = FakeMapTilerGeocodingProvider(),
+        recentPlacesRepository: com.areadiscovery.domain.repository.RecentPlacesRepository = FakeRecentPlacesRepository(),
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
@@ -67,6 +70,7 @@ class MapViewModelTest {
         analyticsTracker = analyticsTracker,
         weatherProvider = weatherProvider,
         geocodingProvider = geocodingProvider,
+        recentPlacesRepository = recentPlacesRepository,
     )
 
     @Test
@@ -1139,6 +1143,58 @@ class MapViewModelTest {
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertTrue(state.showListView)
         assertEquals(20, state.pois.size, "All 20 POIs must be in state for list view to scroll through them")
+    }
+
+    // --- Recent Places tests ---
+
+    @Test
+    fun recentsFromRepositoryAppearInReadyState() = runTest(testDispatcher) {
+        val fakeRecents = FakeRecentPlacesRepository()
+        val place = RecentPlace("Shibuya", 35.659, 139.700)
+        fakeRecents.setRecents(listOf(place))
+        val viewModel = createViewModel(recentPlacesRepository = fakeRecents)
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(listOf(place), state.recentPlaces)
+    }
+
+    @Test
+    fun selectingGeocodingSuggestionUpsertsToRecents() = runTest(testDispatcher) {
+        val fakeRecents = FakeRecentPlacesRepository()
+        val viewModel = createViewModel(recentPlacesRepository = fakeRecents)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val suggestion = GeocodingSuggestion("Shibuya", "Shibuya, Tokyo", 35.659, 139.700, null)
+        viewModel.onGeocodingSuggestionSelected(suggestion)
+        assertEquals(1, fakeRecents.upsertCalls.size)
+        assertEquals("Shibuya", fakeRecents.upsertCalls.first().name)
+    }
+
+    @Test
+    fun selectingRecentNavigatesAndUpsertsTimestamp() = runTest(testDispatcher) {
+        val fakeRecents = FakeRecentPlacesRepository()
+        val place = RecentPlace("Asakusa", 35.714, 139.796)
+        fakeRecents.setRecents(listOf(place))
+        val viewModel = createViewModel(recentPlacesRepository = fakeRecents)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        viewModel.onRecentSelected(place)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Asakusa", state.geocodingSelectedPlace)
+        assertEquals(1, fakeRecents.upsertCalls.size)
+        assertEquals("Asakusa", fakeRecents.upsertCalls.first().name)
+    }
+
+    @Test
+    fun clearRecentsEmptiesRecentPlacesInState() = runTest(testDispatcher) {
+        val fakeRecents = FakeRecentPlacesRepository()
+        fakeRecents.setRecents(listOf(RecentPlace("Shinjuku", 35.689, 139.700)))
+        val viewModel = createViewModel(recentPlacesRepository = fakeRecents)
+        testScheduler.advanceUntilIdle()
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        viewModel.onClearRecents()
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(emptyList(), state.recentPlaces)
+        assertEquals(1, fakeRecents.clearAllCount)
     }
 }
 
