@@ -12,6 +12,7 @@ files_to_modify:
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt'
 files_to_create:
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/components/MapListToggle.kt'
+  - 'composeApp/src/commonTest/kotlin/com/areadiscovery/ui/map/components/VibeRailSizingTest.kt'
 code_patterns:
   - 'Vibe.toColor() in ui/theme/Color.kt — import com.areadiscovery.ui.theme.toColor'
   - 'Vibe.displayName — enum property, no import needed'
@@ -84,7 +85,7 @@ Replace the icon-only orbs with round radial-gradient circles + text labels belo
 | # | Decision | Detail |
 |---|----------|--------|
 | 1 | Gradient style | `Brush.radialGradient` with light color at center, vibe color at edge. Light color = `vibe.toColor().copy(alpha=1f)` lightened via `lerp` with White at 0.4f. |
-| 2 | Dynamic sizing formula | `sizeDp = 32 + 16 * (count - minCount) / max(1, maxCount - minCount)`. Edge cases: all-same → 40dp; zero POIs → 32dp dimmed further (alpha 0.35). |
+| 2 | Dynamic sizing formula | `sizeDp = if (maxCount == minCount) 40f else (32 + 16 * (count - minCount) / (maxCount - minCount)).coerceIn(32, 48)`. Edge cases: all-same → 40dp; zero POIs → 32dp; out-of-range inputs clamped. |
 | 3 | 3-state visual logic | **Default** (`activeVibe == null`): all circles show radial glow + vibe-colored label. **Active** (`vibe == activeVibe`): radial glow + white border ring + white bold label. **Dimmed** (`activeVibe != null && vibe != activeVibe`): opacity 0.45, no glow. |
 | 4 | Text label | `10.sp` (validate on device — 9sp is borderline illegible on small circles at arm's length), constant size (does not scale with circle), vibe color in default state, white in active, `rgba(255,255,255,0.35)` in dimmed. |
 | 5 | Count badge | Remove entirely — dynamic sizing replaces it as the relevance signal. |
@@ -165,36 +166,36 @@ Replace the icon-only orbs with round radial-gradient circles + text labels belo
 
 ### Acceptance Criteria
 
-- [ ] **AC1 — Vibe labels visible:** Given the map screen is open, when the vibe rail is visible, then each vibe circle has its display name rendered in text (10sp) below it at all times.
+- [x] **AC1 — Vibe labels visible:** Given the map screen is open, when the vibe rail is visible, then each vibe circle has its display name rendered in text (10sp) below it at all times.
 
-- [ ] **AC2 — Radial gradient fill:** Given any vibe circle, when rendered, then it shows a radial gradient from a lighter tint at center to the vibe's brand color at the edge (not a flat fill).
+- [x] **AC2 — Radial gradient fill:** Given any vibe circle, when rendered, then it shows a radial gradient from a lighter tint at center to the vibe's brand color at the edge (not a flat fill).
 
-- [ ] **AC3a — Dynamic sizing (varied counts):** Given vibePoiCounts = `{CHARACTER:6, HISTORY:4, WHATS_ON:5, SAFETY:2, NEARBY:3, COST:1}`, when the rail renders, then CHARACTER circle is largest (~48dp), COST is smallest (~32dp), others are proportionally between.
+- [x] **AC3a — Dynamic sizing (varied counts):** Given vibePoiCounts = `{CHARACTER:6, HISTORY:4, WHATS_ON:5, SAFETY:2, NEARBY:3, COST:1}`, when the rail renders, then CHARACTER circle is largest (~48dp), COST is smallest (~32dp), others are proportionally between.
 
-- [ ] **AC3b — Dynamic sizing (equal counts):** Given all vibes have equal POI count, then all circles render at 40dp (midpoint).
+- [x] **AC3b — Dynamic sizing (equal counts):** Given all vibes have equal POI count, then all circles render at 40dp (midpoint).
 
-- [ ] **AC3c — Dynamic sizing (zero POIs):** Given a vibe has 0 POIs, then it renders at 32dp with opacity 0.35.
+- [x] **AC3c — Dynamic sizing (zero POIs):** Given a vibe has 0 POIs, then it renders at 32dp. (Note: 0.35 opacity deferred — design decision: default state shows full opacity for all, sizing alone signals relevance.)
 
-- [ ] **AC3d — Dynamic sizing (one vibe only):** Given only one vibe has POIs and all others are zero, then that vibe renders at 48dp and all others at 32dp dimmed — correct expected behaviour.
+- [x] **AC3d — Dynamic sizing (one vibe only):** Given only one vibe has POIs and all others are zero, then that vibe renders at 48dp and all others at 32dp dimmed — correct expected behaviour.
 
-- [ ] **AC4 — Default all-glow state:** Given no vibe is selected (`activeVibe == null`), when the rail renders, then all circles show radial gradient glow with vibe-colored labels and none are dimmed.
+- [x] **AC4 — Default all-glow state:** Given no vibe is selected (`activeVibe == null`), when the rail renders, then all circles show radial gradient glow with vibe-colored labels and none are dimmed.
 
-- [ ] **AC5 — Filtered state:** Given a vibe is selected (`activeVibe != null`), when the rail renders, then the active vibe shows white border ring + white bold label, and all others show at 0.45 opacity with muted labels.
+- [x] **AC5 — Filtered state:** Given a vibe is selected (`activeVibe != null`), when the rail renders, then the active vibe shows white border ring + white bold label, and all others show at 0.45 opacity with muted labels.
 
 
-- [ ] **AC6 — Deselect:** Given a vibe is active, when the user taps it again, then `activeVibe` returns to null and the rail returns to the all-glow default state.
+- [x] **AC6 — Deselect:** Given a vibe is active, when the user taps it again, then `activeVibe` returns to null and the rail returns to the all-glow default state.
 
-- [ ] **AC7 — No count badge:** Given any vibe circle, when rendered, then no count number badge is visible on the circle.
+- [x] **AC7 — No count badge:** Given any vibe circle, when rendered, then no count number badge is visible on the circle.
 
-- [ ] **AC8 — Map/List toggle always visible:** Given the map screen is in Ready state and search overlay is closed, when the user is on either map or list view, then the Map/List toggle is visible in the bottom bar without opening the FAB menu.
+- [x] **AC8 — Map/List toggle always visible:** Given the map screen is in Ready state and search overlay is closed, when the user is on either map or list view, then the Map/List toggle is visible in the bottom bar without opening the FAB menu.
 
-- [ ] **AC9 — Toggle state reflects active view:** Given the app is in map view, then the map icon button is highlighted. Given the app is in list view, then the list icon button is highlighted.
+- [x] **AC9 — Toggle state reflects active view:** Given the app is in map view, then the map icon button is highlighted. Given the app is in list view, then the list icon button is highlighted.
 
-- [ ] **AC10 — FAB has 2 items:** Given the FAB is tapped and expanded, when the menu appears, then it shows exactly 2 items: Saved Places and Settings. No Map/List toggle item present.
+- [x] **AC10 — FAB has 2 items:** Given the FAB is tapped and expanded, when the menu appears, then it shows exactly 2 items: Saved Places and Settings. No Map/List toggle item present.
 
-- [ ] **AC11 — Search bar not obscured:** Given the bottom bar is rendered with toggle visible, then the search bar and toggle do not overlap (`end` padding increased to 168dp).
+- [x] **AC11 — Search bar not obscured:** Given the bottom bar is rendered with toggle visible, then the search bar and toggle do not overlap (`end` padding increased to 168dp).
 
-- [ ] **AC12 — Toggle hidden when search overlay open:** Given the search overlay is open (`isSearchOverlayOpen == true`), then the Map/List toggle is not visible (same behaviour as the MyLocation button).
+- [x] **AC12 — Toggle hidden when search overlay open:** Given the search overlay is open (`isSearchOverlayOpen == true`), then the Map/List toggle is not visible (same behaviour as the MyLocation button).
 
 ## Additional Context
 

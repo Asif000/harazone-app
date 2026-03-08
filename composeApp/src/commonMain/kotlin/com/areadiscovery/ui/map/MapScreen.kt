@@ -111,6 +111,8 @@ private fun ReadyContent(
         }
     }
 
+    val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
     Box(Modifier.fillMaxSize()) {
         // Base: map or list
         if (state.showListView) {
@@ -231,7 +233,7 @@ private fun ReadyContent(
             onVibeSelected = { viewModel.switchVibe(it) },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 8.dp, bottom = 88.dp),
+                .padding(end = 8.dp, bottom = navBarPadding + 88.dp),
         )
 
         // Expandable POI card
@@ -274,7 +276,6 @@ private fun ReadyContent(
         )
 
         // FAB menu
-        val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         FabMenu(
             isExpanded = state.isFabExpanded,
             onToggle = { viewModel.toggleFab() },
