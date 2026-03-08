@@ -12,6 +12,7 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.kotlinSerialization)
+    id("org.jetbrains.kotlin.native.cocoapods")
     alias(libs.plugins.sqldelight)
     alias(libs.plugins.buildkonfig)
     alias(libs.plugins.googleServices)
@@ -50,13 +51,20 @@ kotlin {
         }
     }
 
-    listOf(
-        iosArm64(),
-        iosSimulatorArm64()
-    ).forEach { iosTarget ->
-        iosTarget.binaries.framework {
+    iosArm64()
+    iosSimulatorArm64()
+
+    cocoapods {
+        version = "1.0"
+        summary = "AreaDiscovery Compose Multiplatform module"
+        homepage = "https://github.com"
+        ios.deploymentTarget = "16.0"
+        framework {
             baseName = "ComposeApp"
             isStatic = true
+        }
+        pod("MapLibre") {
+            version = "~> 6.8"
         }
     }
 

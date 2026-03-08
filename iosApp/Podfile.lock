@@ -1,0 +1,23 @@
+PODS:
+  - composeApp (1.0):
+    - MapLibre (~> 6.8)
+  - MapLibre (6.20.1)
+
+DEPENDENCIES:
+  - composeApp (from `../composeApp`)
+
+SPEC REPOS:
+  trunk:
+    - MapLibre
+
+EXTERNAL SOURCES:
+  composeApp:
+    :path: "../composeApp"
+
+SPEC CHECKSUMS:
+  composeApp: 4d407efa7b242dcc29289ba963dd198721290d2c
+  MapLibre: 8dfa5fc83b8d56e92edc8fa72b588094139b1713
+
+PODFILE CHECKSUM: 1d58324e015d5299f9bb55cc006b35a67db1335c
+
+COCOAPODS: 1.16.2
