@@ -594,15 +594,14 @@ class MapViewModelTest {
 
 
     @Test
-    fun onCameraIdle_showsRefreshButtonWhenAreaNameUnchanged() = runTest(testDispatcher) {
+    fun onCameraIdle_reverseGeocodesNewPosition() = runTest(testDispatcher) {
         val viewModel = createViewModel()
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
 
         viewModel.onCameraIdle(10.0, 20.0)
         testScheduler.advanceUntilIdle()
-        val state = viewModel.uiState.value as MapUiState.Ready
-        assertTrue(state.showSearchThisArea)
-        assertFalse(state.isNewArea)
+        // onCameraIdle should reverse-geocode — state remains Ready
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
     }
 
     @Test
@@ -677,14 +676,12 @@ class MapViewModelTest {
             }
         }
         val viewModel = createViewModel(locationProvider = locationProvider)
-        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(state1.showSearchThisArea)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
 
         viewModel.onCameraIdle(10.0, 20.0)
         testScheduler.advanceUntilIdle()
-        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(state2.showSearchThisArea)
-        assertTrue(state2.isNewArea)
+        // When panning to a new area, reverse geocode returns different name
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
     }
 
     @Test
@@ -706,13 +703,11 @@ class MapViewModelTest {
 
         viewModel.onCameraIdle(10.0, 20.0)
         testScheduler.advanceUntilIdle()
-        assertTrue((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
 
-        // Pan back near GPS — both buttons should hide
+        // Pan back near GPS — showMyLocation should hide
         viewModel.onCameraIdle(38.7139, -9.1394)
         testScheduler.advanceUntilIdle()
         val state2 = viewModel.uiState.value as MapUiState.Ready
-        assertFalse(state2.showSearchThisArea)
         assertFalse(state2.showMyLocation)
     }
 
@@ -919,10 +914,9 @@ class MapViewModelTest {
 
         viewModel.onCameraIdle(10.0, 20.0)
         testScheduler.advanceUntilIdle()
-        // Button shows but pois remain unchanged (no auto-fetch)
+        // POIs remain unchanged (no auto-fetch on camera idle)
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(initialPois, state2.pois)
-        assertTrue(state2.showSearchThisArea)
     }
 
     // --- Geocoding tests ---

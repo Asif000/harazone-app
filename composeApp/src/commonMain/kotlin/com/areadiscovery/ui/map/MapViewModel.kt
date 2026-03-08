@@ -264,7 +264,6 @@ class MapViewModel(
             longitude = suggestion.longitude,
             cameraMoveId = current.cameraMoveId + 1,
             isSearchingArea = true,
-            showSearchThisArea = false,
             showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, current),
             vibePoiCounts = emptyMap(),
             pois = emptyList(),
@@ -326,7 +325,6 @@ class MapViewModel(
         _uiState.value = current.copy(
             isSearchingArea = true,
             isGeocodingInitiatedSearch = true,
-            showSearchThisArea = false,
             showMyLocation = isAwayFromGps(lat, lng, current),
             vibePoiCounts = emptyMap(),
             pois = emptyList(),
@@ -415,8 +413,8 @@ class MapViewModel(
         if (!isAwayFromGps(lat, lng, readyState)) {
             pendingLat = lat
             pendingLng = lng
-            if (readyState.showMyLocation || readyState.showSearchThisArea) {
-                _uiState.value = readyState.copy(showMyLocation = false, showSearchThisArea = false)
+            if (readyState.showMyLocation) {
+                _uiState.value = readyState.copy(showMyLocation = false)
             }
             return
         }
@@ -435,8 +433,6 @@ class MapViewModel(
             pendingLng = lng
             pendingAreaName = if (isNew) newAreaName else current.areaName
             _uiState.value = current.copy(
-                showSearchThisArea = true,
-                isNewArea = isNew,
                 showMyLocation = isAwayFromGps(lat, lng, current),
             )
         }
@@ -489,8 +485,7 @@ class MapViewModel(
                         gpsLatitude = coords.latitude,
                         gpsLongitude = coords.longitude,
                         showMyLocation = false,
-                        showSearchThisArea = false,
-                        cameraMoveId = state.cameraMoveId + 1,
+                                    cameraMoveId = state.cameraMoveId + 1,
                         geocodingSelectedPlace = null,
                         isGeocodingInitiatedSearch = false,
                     )
@@ -501,8 +496,7 @@ class MapViewModel(
                         gpsLatitude = coords.latitude,
                         gpsLongitude = coords.longitude,
                         showMyLocation = false,
-                        showSearchThisArea = false,
-                        cameraMoveId = state.cameraMoveId + 1,
+                                    cameraMoveId = state.cameraMoveId + 1,
                         isSearchingArea = true,
                         pois = emptyList(),
                         vibePoiCounts = emptyMap(),

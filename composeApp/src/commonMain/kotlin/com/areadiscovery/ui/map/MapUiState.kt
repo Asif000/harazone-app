@@ -25,8 +25,6 @@ sealed class MapUiState {
         val followUpChips: List<String> = emptyList(),
         val isFabExpanded: Boolean = false,
         val mapRenderFailed: Boolean = false,
-        val showSearchThisArea: Boolean = false,
-        val isNewArea: Boolean = false,
         val isSearchingArea: Boolean = false,
         val gpsLatitude: Double = 0.0,
         val gpsLongitude: Double = 0.0,
