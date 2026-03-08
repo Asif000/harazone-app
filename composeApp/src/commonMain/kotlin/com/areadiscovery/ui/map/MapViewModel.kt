@@ -144,6 +144,7 @@ class MapViewModel(
 
             searchJob = viewModelScope.launch {
                 try {
+                    // TODO(BACKLOG-MEDIUM): conversationHistory always empty — follow-up chips produce standalone answers with no context
                     aiProvider?.streamChatResponse(query, current.areaName, emptyList())
                         ?.catch { e ->
                             AppLogger.e(e) { "AI search failed" }
@@ -280,6 +281,7 @@ class MapViewModel(
             pois = emptyList(),
             activeVibe = null,
         )
+        fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
         searchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -335,6 +337,7 @@ class MapViewModel(
         }
     }
 
+    // TODO(BACKLOG-LOW): ~50 lines duplicated between onRecentSelected and onGeocodingSuggestionSelected — extract shared helper
     fun onRecentSelected(recent: RecentPlace) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cameraIdleJob?.cancel()
@@ -359,6 +362,7 @@ class MapViewModel(
             pois = emptyList(),
             activeVibe = null,
         )
+        fetchWeatherForLocation(recent.latitude, recent.longitude)
         searchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -439,6 +443,7 @@ class MapViewModel(
             pois = emptyList(),
             activeVibe = null,
         )
+        fetchWeatherForLocation(lat, lng)
         searchJob?.cancel()
         searchJob = viewModelScope.launch {
             try {
@@ -694,15 +699,7 @@ class MapViewModel(
                 )
 
                 // Fetch weather in parallel
-                launch {
-                    val weatherResult = weatherProvider.getWeather(coords.latitude, coords.longitude)
-                    if (weatherResult.isSuccess) {
-                        val current = _uiState.value as? MapUiState.Ready ?: return@launch
-                        _uiState.value = current.copy(weather = weatherResult.getOrNull())
-                    } else {
-                        AppLogger.e(weatherResult.exceptionOrNull()) { "Map: weather fetch failed" }
-                    }
-                }
+                fetchWeatherForLocation(coords.latitude, coords.longitude)
 
                 collectPortraitWithRetry(
                     areaName = areaName,
@@ -733,6 +730,18 @@ class MapViewModel(
             } catch (e: Exception) {
                 AppLogger.e(e) { "Map: unexpected error during location resolution" }
                 _uiState.value = MapUiState.LocationFailed(LOCATION_FAILURE_MESSAGE)
+            }
+        }
+    }
+
+    private fun fetchWeatherForLocation(lat: Double, lng: Double) {
+        viewModelScope.launch {
+            val weatherResult = weatherProvider.getWeather(lat, lng)
+            if (weatherResult.isSuccess) {
+                val current = _uiState.value as? MapUiState.Ready ?: return@launch
+                _uiState.value = current.copy(weather = weatherResult.getOrNull())
+            } else {
+                AppLogger.e(weatherResult.exceptionOrNull()) { "Weather fetch failed" }
             }
         }
     }
@@ -834,6 +843,7 @@ class MapViewModel(
     private fun String.containsAny(vararg terms: String) = terms.any { this.contains(it) }
 
     companion object {
+        // TODO(BACKLOG-LOW): Generic location error message — detect permission denial vs GPS off and show specific guidance
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."
         internal const val LOCATION_TIMEOUT_MS = 10_000L
     }

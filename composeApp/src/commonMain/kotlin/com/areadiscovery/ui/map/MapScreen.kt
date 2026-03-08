@@ -101,6 +101,7 @@ private fun ReadyContent(
     viewModel: MapViewModel,
     onNavigateToMaps: (Double, Double, String) -> Boolean,
 ) {
+    // TODO(BACKLOG-LOW): snackbarHostState created inside Ready branch — resets on Ready→Failed→Ready retry
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -123,9 +124,11 @@ private fun ReadyContent(
                 onPoiClick = { viewModel.selectPoi(it) },
                 modifier = Modifier
                     .fillMaxSize()
+                    // TODO(BACKLOG-LOW): Magic number 112.dp for POI list top padding — should be named or derived
                     .padding(top = statusBarPadding + 112.dp),
             )
         } else {
+            // TODO(BACKLOG-MEDIUM): Add +/- zoom control buttons as Compose overlays — MapLibre 11.x removed built-in zoom controls
             MapComposable(
                 modifier = Modifier.fillMaxSize(),
                 latitude = state.latitude,
@@ -218,6 +221,7 @@ private fun ReadyContent(
             )
         }
 
+        // TODO(BACKLOG-LOW): Three-stop bottom sheet deferred — V1 uses two stops. Requires anchoredDraggable with custom snap points.
         // Expandable POI card
         if (state.selectedPoi != null) {
             ExpandablePoiCard(

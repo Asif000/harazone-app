@@ -1147,6 +1147,7 @@ class MapViewModelTest {
 
     // --- Recent Places tests ---
 
+    // TODO(BACKLOG-LOW): This test doesn't isolate cold-start seed vs observer path
     @Test
     fun recentsFromRepositoryAppearInReadyState() = runTest(testDispatcher) {
         val fakeRecents = FakeRecentPlacesRepository()
@@ -1195,6 +1196,76 @@ class MapViewModelTest {
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(emptyList(), state.recentPlaces)
         assertEquals(1, fakeRecents.clearAllCount)
+    }
+
+    // --- Weather re-fetch regression tests ---
+
+    @Test
+    fun geocodingSuggestionRefetchesWeather() = runTest(testDispatcher) {
+        val weatherProvider = FakeWeatherProvider()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
+            ),
+            weatherProvider = weatherProvider,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val callsAfterInit = weatherProvider.callCount
+        val suggestion = GeocodingSuggestion("Tokyo", "Tokyo, Japan", 35.6762, 139.6503, null)
+        viewModel.onGeocodingSuggestionSelected(suggestion)
+        testScheduler.advanceUntilIdle()
+        assertTrue(weatherProvider.callCount > callsAfterInit, "Weather should be re-fetched on geocoding selection")
+        assertEquals(35.6762, weatherProvider.lastLatitude, 0.001)
+        assertEquals(139.6503, weatherProvider.lastLongitude, 0.001)
+    }
+
+    @Test
+    fun recentSelectionRefetchesWeather() = runTest(testDispatcher) {
+        val weatherProvider = FakeWeatherProvider()
+        val fakeRecents = FakeRecentPlacesRepository()
+        val place = RecentPlace("Tokyo", 35.6762, 139.6503)
+        fakeRecents.setRecents(listOf(place))
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
+            ),
+            weatherProvider = weatherProvider,
+            recentPlacesRepository = fakeRecents,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val callsAfterInit = weatherProvider.callCount
+        viewModel.onRecentSelected(place)
+        testScheduler.advanceUntilIdle()
+        assertTrue(weatherProvider.callCount > callsAfterInit, "Weather should be re-fetched on recent selection")
+        assertEquals(35.6762, weatherProvider.lastLatitude, 0.001)
+    }
+
+    @Test
+    fun emptySubmitRefetchesWeather() = runTest(testDispatcher) {
+        val weatherProvider = FakeWeatherProvider()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
+            ),
+            weatherProvider = weatherProvider,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val callsAfterInit = weatherProvider.callCount
+        viewModel.onGeocodingSubmitEmpty()
+        testScheduler.advanceUntilIdle()
+        assertTrue(weatherProvider.callCount > callsAfterInit, "Weather should be re-fetched on empty submit")
     }
 
     @Test

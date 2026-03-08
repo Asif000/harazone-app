@@ -127,6 +127,7 @@ fun VibeOrb(
                 imageVector = vibe.toImageVector(),
                 contentDescription = null,
                 tint = Color.White,
+                // TODO(BACKLOG-LOW): Icon size hardcoded at 20dp regardless of dynamic circle size — scale proportionally with sizeDp
                 modifier = Modifier.size(20.dp),
             )
         }

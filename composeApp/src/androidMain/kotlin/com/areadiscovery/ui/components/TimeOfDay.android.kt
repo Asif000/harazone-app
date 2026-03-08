@@ -5,3 +5,5 @@ actual fun currentHour(): Int =
 
 actual fun currentMinute(): Int =
     java.util.Calendar.getInstance().get(java.util.Calendar.MINUTE)
+
+actual fun currentTimeMillis(): Long = System.currentTimeMillis()

@@ -3,6 +3,7 @@ package com.areadiscovery.domain.model
 enum class Vibe(
     val displayName: String,
     val accentColorHex: String,
+    // TODO(BACKLOG-LOW): orbIconName is a dead field — unmapped in UI, overridden by toImageVector()
     val orbIconName: String,
 ) {
     CHARACTER("Character", "#2BBCB3", "palette"),

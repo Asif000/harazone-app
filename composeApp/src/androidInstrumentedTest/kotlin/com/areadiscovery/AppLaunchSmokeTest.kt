@@ -22,6 +22,7 @@ class AppLaunchSmokeTest {
     fun appLaunchesWithoutCrash() {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         scenario.onActivity { activity ->
+            // TODO(BACKLOG-LOW): Weak assertion (assertNotNull only) — doesn't verify UI actually renders
             assertNotNull(activity)
         }
         scenario.close()

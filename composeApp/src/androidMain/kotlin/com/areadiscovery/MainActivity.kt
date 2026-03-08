@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
                     onNavigateToMaps = { lat, lon, name ->
                         val uri = Uri.parse("geo:$lat,$lon?q=${Uri.encode(name)}")
                         val intent = Intent(Intent.ACTION_VIEW, uri)
+                        // TODO(BACKLOG-LOW): resolveActivity deprecated in API 33+ — replace with ResolveInfoFlags variant
                         if (intent.resolveActivity(packageManager) != null) {
                             startActivity(intent)
                             true

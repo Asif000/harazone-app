@@ -18,6 +18,7 @@ fun App(
 ) {
     KoinApplication(application = { platformConfig(); modules(appModule()) }) {
         val httpClient: HttpClient = koinInject()
+        // TODO(BACKLOG-HIGH): Coil disk cache not configured — iOS has no default disk cache, thumbnails re-fetched every session
         setSingletonImageLoaderFactory { context ->
             ImageLoader.Builder(context)
                 .components { add(KtorNetworkFetcherFactory(httpClient)) }

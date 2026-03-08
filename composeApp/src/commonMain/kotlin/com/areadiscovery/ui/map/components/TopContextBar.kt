@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import com.areadiscovery.domain.model.WeatherState
 import com.areadiscovery.ui.components.currentHour
 import com.areadiscovery.ui.components.currentMinute
+import com.areadiscovery.ui.components.currentTimeMillis
 import com.areadiscovery.ui.theme.MapFloatingUiDark
 
 @Composable
@@ -68,7 +69,7 @@ fun TopContextBar(
         }
         BulletSeparator()
         Text(
-            text = formatCurrentTime(),
+            text = formatCurrentTime(weather?.utcOffsetSeconds),
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.6f),
             maxLines = 1,
@@ -103,9 +104,20 @@ private fun ShimmerPlaceholder() {
     )
 }
 
-private fun formatCurrentTime(): String {
-    val hour = currentHour()
-    val minute = currentMinute()
+private fun formatCurrentTime(utcOffsetSeconds: Int?): String {
+    val hour: Int
+    val minute: Int
+    if (utcOffsetSeconds != null) {
+        // Compute location-local time from UTC + offset
+        val nowUtcMs = currentTimeMillis()
+        val localMs = nowUtcMs + (utcOffsetSeconds * 1000L)
+        val totalMinutes = (localMs / 60_000) % (24 * 60)
+        hour = (totalMinutes / 60).toInt()
+        minute = (totalMinutes % 60).toInt()
+    } else {
+        hour = currentHour()
+        minute = currentMinute()
+    }
     val amPm = if (hour < 12) "AM" else "PM"
     val displayHour = when {
         hour == 0 -> 12

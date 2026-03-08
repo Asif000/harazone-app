@@ -23,6 +23,7 @@ class FakeRecentPlacesRepository : RecentPlacesRepository {
 
     override suspend fun upsert(place: RecentPlace) {
         upsertCalls = upsertCalls + place
+        // TODO(BACKLOG-LOW): Dedup is case-sensitive here but real DB uses COLLATE NOCASE — inconsistent test behavior
         val updated = listOf(place) + _recents.value.filterNot { it.name == place.name }
         _recents.value = updated.take(10)
     }

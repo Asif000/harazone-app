@@ -1,183 +1,48 @@
 # Cross-Epic Deferred Backlog
 
-Items deferred during code review — to be picked up in relevant future stories.
+Auto-generated from `TODO(BACKLOG-*)` comments in source code.
+Run `./scripts/generate-backlog.sh` to regenerate.
 
 ---
 
-## Priority Order (2026-03-08)
+**21 open items**
 
-1. 🔴 **Search Bar Dual Mode** — in flight (must commit before anything else touches MapScreen/MapViewModel)
-2. 🔴 **AI Chat v1 (Epic 4a)** — parallel with iOS Map after Search Bar lands
-3. 🔴 **iOS Map (MapLibre)** — parallel with AI Chat after Search Bar lands. ~half a day. App already runs on iOS (SQLite fix done). Just need: Podfile + MapLibre pod, implement MapComposable.ios.kt via UIKitView interop, wire MLNMapViewDelegate callbacks. Unblocks all int'l tester feedback.
-4. 🟡 **Contextual AI Tip** — English first, localise later
-5. 🟡 **Localisation Phase A** — AI locale injection (quick spec in-progress)
-6. 🟡 **Localisation Phase B** — full epic (moko-resources, RTL, MapLibre RTL plugin)
-7. 🟢 **Bugs + Architecture debt** — auto-refresh on pan, SummaryStateMapper, conversationHistory empty, AreaSessionManager, weather/time stale after search
+## HIGH
 
----
+| Severity | Item | Location |
+|----------|------|----------|
+| HIGH | POI pins in water — validate AI coordinates against area bounding box, re-geocode outliers | `commonMain/kotlin/com/areadiscovery/ui/map/MapViewModel.kt:196` |
+| HIGH | Coil disk cache not configured — iOS has no default disk cache, thumbnails re-fetched every session | `commonMain/kotlin/com/areadiscovery/App.kt:21` |
 
-## Story 3.2 — AI-Generated POI Markers
+## MEDIUM
 
-| Severity | Item | File | Deferred To |
-|----------|------|------|-------------|
-| LOW | Custom POI icons per type (landmark, food, culture, nature) using `org.maplibre.gl:android-plugin-annotation-v9` SymbolManager | `MapComposable.android.kt` | Dedicated icon pass |
-| LOW | TalkBack per-marker `contentDescription` — map-mode accessibility enhancement (list view satisfies NFR21; this is for sighted TalkBack users exploring map) | `MapComposable.android.kt` | Future UX polish |
-| LOW | `AppLaunchSmokeTest` assertion is weak (`assertNotNull(activity)`) — doesn't verify UI actually renders | `AppLaunchSmokeTest.kt` | Story 5.2 (onboarding/permission flow) |
-| LOW | Generic "Can't find your location" message shown on permission denial — should detect and show specific guidance | `MapViewModel.kt` | Story 5.2 (permission flow) |
-| INFO | Deprecated MapLibre marker API (`addMarker`, `removeMarker`, `MarkerOptions`) — V1 approach; migrate when adding custom icons | `MapComposable.android.kt` | Dedicated icon pass |
+| Severity | Item | Location |
+|----------|------|----------|
+| MEDIUM | SubcomposeAsyncImage overhead in LazyColumn — switch to AsyncImage with custom Painter for placeholder/error | `commonMain/kotlin/com/areadiscovery/ui/map/POIListView.kt:127` |
+| MEDIUM | conversationHistory always empty — follow-up chips produce standalone answers with no context | `commonMain/kotlin/com/areadiscovery/ui/map/MapViewModel.kt:147` |
+| MEDIUM | Add +/- zoom control buttons as Compose overlays — MapLibre 11.x removed built-in zoom controls | `commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt:131` |
+| MEDIUM | clusterPois uses Manhattan distance in degrees — inconsistent radius at different latitudes. Replace with Haversine. | `androidMain/kotlin/com/areadiscovery/ui/map/MapComposable.android.kt:428` |
 
----
+## LOW
 
-## Story 3.3 — POI Detail Card & Bottom Sheet
-
-| Severity | Item | File | Deferred To |
-|----------|------|------|-------------|
-| LOW | `resolveActivity(packageManager)` deprecated in API 33+ — replace with `resolveActivity(packageManager, PackageManager.ResolveInfoFlags.of(0))` to silence lint | `MainActivity.kt` | Any story touching MainActivity |
-| LOW | Scaffold + snackbar state (`rememberBottomSheetScaffoldState`, `SnackbarHostState`) created inside `is MapUiState.Ready` branch — resets to peek on retry (Ready→Failed→Ready) | `MapScreen.kt` | Future UX polish |
-| INFO | Three-stop bottom sheet (collapsed/half/full) deferred — V1 uses two stops (peek 88dp / expanded). Requires `anchoredDraggable` with custom snap points | `MapScreen.kt` | Future UX polish |
-
----
-
-## Bug — No Blue Dot for Current Location on Map
-
-| Severity | Item | File | Fix |
-|----------|------|------|-----|
-| MEDIUM | No blue dot shown at user's GPS position — standard map UX expectation. MapLibre supports this natively via `LocationComponent` (Android) / `MLNUserLocationAnnotationView` (iOS). Should pulse/animate like Google Maps. | `MapComposable.android.kt`, `MapComposable.ios.kt` | Enable MapLibre's built-in location layer: Android — activate `LocationComponent` with `LocationComponentActivationOptions`, request `RenderMode.COMPASS` / `CameraMode.NONE`. iOS — set `mapView.showsUserLocation = true`. Requires location permission already granted (which it is). |
+| Severity | Item | Location |
+|----------|------|----------|
+| LOW | ThumbnailPlaceholder uses fillMaxSize with no intrinsic size — fragile implicit contract. Should accept modifier param. | `commonMain/kotlin/com/areadiscovery/ui/map/POIListView.kt:202` |
+| LOW | Icon size hardcoded at 20dp regardless of dynamic circle size — scale proportionally with sizeDp | `commonMain/kotlin/com/areadiscovery/ui/map/components/VibeOrb.kt:130` |
+| LOW | ~50 lines duplicated between onRecentSelected and onGeocodingSuggestionSelected — extract shared helper | `commonMain/kotlin/com/areadiscovery/ui/map/MapViewModel.kt:344` |
+| LOW | Generic location error message — detect permission denial vs GPS off and show specific guidance | `commonMain/kotlin/com/areadiscovery/ui/map/MapViewModel.kt:862` |
+| LOW | snackbarHostState created inside Ready branch — resets on Ready→Failed→Ready retry | `commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt:104` |
+| LOW | Magic number 112.dp for POI list top padding — should be named or derived | `commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt:127` |
+| LOW | Three-stop bottom sheet deferred — V1 uses two stops. Requires anchoredDraggable with custom snap points. | `commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt:224` |
+| LOW | orbIconName is a dead field — unmapped in UI, overridden by toImageVector() | `commonMain/kotlin/com/areadiscovery/domain/model/Vibe.kt:6` |
+| LOW | COLLATE NOCASE only covers ASCII — Unicode place names won't deduplicate | `commonMain/sqldelight/com/areadiscovery/data/local/recent_places.sq:2` |
+| LOW | This test doesn't isolate cold-start seed vs observer path | `commonTest/kotlin/com/areadiscovery/ui/map/MapViewModelTest.kt:1150` |
+| LOW | Dedup is case-sensitive here but real DB uses COLLATE NOCASE — inconsistent test behavior | `commonTest/kotlin/com/areadiscovery/fakes/FakeRecentPlacesRepository.kt:26` |
+| LOW | Weak assertion (assertNotNull only) — doesn't verify UI actually renders | `androidInstrumentedTest/kotlin/com/areadiscovery/AppLaunchSmokeTest.kt:25` |
+| LOW | Custom POI icons per type (landmark, food, culture, nature) using annotation plugin SymbolManager | `androidMain/kotlin/com/areadiscovery/ui/map/MapComposable.android.kt:242` |
+| LOW | TalkBack per-marker contentDescription for map-mode accessibility | `androidMain/kotlin/com/areadiscovery/ui/map/MapComposable.android.kt:243` |
+| LOW | resolveActivity deprecated in API 33+ — replace with ResolveInfoFlags variant | `androidMain/kotlin/com/areadiscovery/MainActivity.kt:55` |
 
 ---
 
-## Bug — POI Pins Appear in Water for Coastal Areas
-
-| Severity | Item | Description | Fix options |
-|----------|------|-------------|-------------|
-| HIGH | AI-generated POI coordinates slightly wrong for coastal areas — pins land in the ocean instead of on land. Reproduced in Cayucos, CA (screenshot 2026-03-08). Gemini hallucinating lat/lng with small offsets that push coastal POIs into water. | No coordinate validation or land-snapping after AI response. | (1) Re-geocode each POI name via MapTiler after AI returns them — verified coords replace AI coords. Most accurate, ~N extra calls per portrait. (2) Validate each POI coord is within bounding box of area centroid; re-geocode outliers only. (3) Snap to nearest road/point via API. **Recommended: option 2** — cheap check, only re-geocodes bad ones. |
-
----
-
-## Perf — Coil Disk Cache Not Configured for KMP
-
-| Severity | Item | File | Fix |
-|----------|------|------|-----|
-| HIGH | Coil3 singleton in `App.kt` has no explicit `.diskCache()`. On iOS there's no default disk cache — thumbnails re-fetched every session. | `App.kt` | Add `.diskCache { DiskCache.Builder().directory(platformCacheDir / "image_cache").build() }` via expect/actual for platform cache directory. |
-
----
-
-## Perf — SubcomposeAsyncImage Overhead in LazyColumn
-
-| Severity | Item | File | Fix |
-|----------|------|------|-----|
-| MEDIUM | `SubcomposeAsyncImage` creates a subcomposition per list item per state (~10-20 concurrent during scroll). `ThumbnailPlaceholder` (Box + Icon) could be expressed as a custom `Painter`, allowing the lighter `AsyncImage` variant instead. | `POIListView.kt` | Write `ThumbnailPlaceholderPainter` extending `Painter`, switch back to `AsyncImage` with `placeholder`/`error` painter params. |
-
----
-
-## UX — ThumbnailPlaceholder Composable Has No Intrinsic Size
-
-| Severity | Item | File | Fix |
-|----------|------|------|-----|
-| LOW | `ThumbnailPlaceholder()` uses `fillMaxSize()` with no bounded parent constraint — fragile implicit contract. Safe today (only called inside SubcomposeAsyncImage slots) but breaks if reused elsewhere. | `POIListView.kt` | Accept `modifier: Modifier = Modifier` param, or add comment documenting the precondition. |
-
----
-
-## Bug — Weather/Time Stale After Location Search
-
-| Severity | Item | File | Fix |
-|----------|------|------|-----|
-| MEDIUM | Weather (and timezone-derived time) only fetched once in `loadLocation()` using GPS coords. Searching a new location via geocoding, recents, or empty-submit never re-fetches weather for the new coords — stays stale with user's current location. | `MapViewModel.kt` | Extract `fetchWeatherForLocation(lat, lng)` helper and call it in `onGeocodingSuggestionSelected`, `onRecentSelected`, and `onGeocodingSubmitEmpty` with the searched location's coordinates. |
-
----
-
-## Architecture — Shared Area Session (from device testing, post-Epic 3)
-
-| Severity | Item | Description | Deferred To |
-|----------|------|-------------|-------------|
-| MEDIUM | Shared AreaSessionManager | Summary + Map ViewModels both fetch location + portrait independently. Quick fix done (LocationProvider caching), but proper solution is a shared AreaSessionManager holding current area/name/portrait consumed by both screens. | Future architecture story |
-
----
-
-## SummaryStateMapper — Missing Bucket Handling
-
-| Severity | Item | File | Deferred To |
-|----------|------|------|-------------|
-| MEDIUM | PortraitComplete only marks received buckets as complete — missing buckets stay as loading skeletons forever. Fix: fill all 6 BucketType entries in finalBuckets map, marking missing ones as `isComplete=true` with empty content | `SummaryStateMapper.kt` | Summary screen redesign |
-
----
-
-## Hero Redesign (Timeline & Right Now Cards)
-
-| Severity | Item | File | Deferred To |
-|----------|------|------|-------------|
-| LOW | Hero cards have no click-to-scroll interaction to jump to full bucket content below | `TimelineCard.kt`, `RightNowCard.kt` | Future UX polish |
-| LOW | No tablet/landscape adaptive layout for TimelineCard LazyRow | `TimelineCard.kt` | Phase 2+ responsive layout |
-| LOW | liveRegion on RightNowCard may re-announce on unrelated recomposition — monitor | `RightNowCard.kt` | Manual testing / UX polish |
-
----
-
-## V3 Full-Screen Map — Review Findings
-
-| Severity | Item | File | Deferred To |
-|----------|------|------|-------------|
-| MEDIUM | `clusterPois` uses Manhattan distance in degrees — inconsistent glow zone radius at different latitudes (0.005° = ~550m equator, ~275m at 60°N). Replace with Haversine-based distance. | `MapComposable.android.kt` | Future UX polish |
-| MEDIUM | AI search `conversationHistory` always empty — follow-up chips produce standalone answers with no context from prior questions. Need to store chat turns in state and pass to `streamChatResponse`. | `MapViewModel.kt` | AI search enhancement |
-| **HIGH** | **Auto-refresh area portrait on pan/zoom** — Core UX: when user pans to a new area, detect camera idle, reverse-geocode new center, debounce (500ms), re-fetch portrait if area name changed. Needs `onCameraIdle(lat, lng)` callback through expect/actual MapComposable, ViewModel debounce logic, loading state while keeping old pins visible. **This is essential for the "discover anywhere" experience.** | `MapComposable.kt`, `MapViewModel.kt` | **Next quick spec** |
-| MEDIUM | Add +/- zoom control buttons as Compose overlays on the map. MapLibre 11.x removed built-in zoom controls. Need `onZoomIn`/`onZoomOut` callbacks through expect/actual MapComposable. | `MapComposable.kt`, `MapScreen.kt` | UX polish |
-
----
-
-## Brainstorming — Explore Later
-
-| Priority | Item | Description | Source |
-|----------|------|-------------|--------|
-| MEDIUM | Contextual AI tip on app open | Slim banner below top bar, AI-generated from user context (time, weather, location, first visit vs returning, day of week, saved places). One tip per open, auto-dismiss 5-8s or swipe. Tap → deep-link to mentioned place. Fallback: pre-computed time-of-day tips. Reduce frequency if user consistently dismisses. | Brainstorming session 2026-03-06 party mode |
-| LOW | Offline AI: pre-generated answer packs | When online, have Gemini generate & cache 10-15 common Q&A pairs per area (safety, food, nightlife, budget, etc.) in Room DB. Serve instantly offline — no on-device LLM needed. Future: Gemini Nano as fallback for free-form questions when available on more devices. On-device full LLM (Gemma 2B, Phi-3) not recommended due to app size (+1-2 GB), RAM, battery, and quality trade-offs. | Brainstorming session 2026-03-06 |
-
----
-
-## Localisation Phase B — UI Strings, RTL Layout & Map Labels (Future Epic)
-
-| Priority | Item | Description | Source |
-|----------|------|-------------|--------|
-| MEDIUM | `moko-resources` i18n library | Add `dev.icerock.moko:resources` to KMP. Extract all hardcoded UI strings into `commonMain/MR/base/strings.xml`. Create locale files for `ar`, `es`, `pt`. Replaces any hardcoded string literals in Composables. | Planning 2026-03-06 |
-| MEDIUM | Arabic RTL layout audit | Audit all Composables for RTL breakage: swap `start/end` padding for `absolute` variants, verify `Row` ordering flips correctly with `LocalLayoutDirection.current`. MapScreen vibe rail (right side) and top context bar need special attention. | Planning 2026-03-06 |
-| MEDIUM | MapLibre RTL Text Plugin | Add `com.mapbox.mapboxsdk:mapbox-android-plugin-localization-v9` (MapLibre fork). Required for Arabic text in map tile labels to render correctly (RTL shaping). | Planning 2026-03-06 |
-| LOW | Locale-aware date/time formatting | Time-of-day and date displays should respect locale (Arabic-Indic numerals, locale-specific month names). Use `kotlinx-datetime` with locale-aware formatters. | Planning 2026-03-06 |
-| LOW | App Store / Play Store listings | Translate store description, screenshots, and keywords for Arabic (ar), Spanish (es), Portuguese (pt-BR + pt-PT). Parallel track — not a code change. | Planning 2026-03-06 |
-
-**Recommended timing:** After V3 stabilises. Phase B is a full epic (~3-4 stories). Phase A (AI locale injection) ships first as a quick spec — covers ~80% of user-facing content with minimal effort.
-
----
-
-## Gemini Nano — On-Device Offline Fallback (Future)
-
-| Priority | Item | Description | Source |
-|----------|------|-------------|--------|
-| LOW | Gemini Nano offline fallback for new areas | Use Android AICore / MediaPipe LLM Inference API to run Gemini Nano on-device when network unavailable. Architecture is already ready: add a `NanoAreaIntelligenceProvider` in `androidMain` implementing `AreaIntelligenceProvider`, wire via Koin platform module. A `FallbackAreaIntelligenceProvider` wrapper tries cloud first, falls back to Nano. **Key constraints**: ~2K token context → need stripped-down prompts (1-2 sentences per vibe, not full portrait); Pixel 8+ and select Samsung S24/S25 only — need graceful path for unsupported devices (3 states: cloud → Nano → no AI). **Recommended sequencing**: ship portrait caching first (covers 90% of offline case for revisits); then add Nano for genuinely new areas offline on supported devices. Show "Offline — limited detail" banner when Nano is used. | Discussion 2026-03-06 |
-
----
-
-## Vibe Rail Redesign + Toggle Relocation — Deferred
-
-| Severity | Item | File | Deferred To |
-|----------|------|------|-------------|
-| MEDIUM | Icon size (20dp) is hardcoded in VibeOrb regardless of dynamic circle size (32–48dp) — gradient less visible at 32dp circles. Consider scaling icon proportionally with circle size (e.g. `(sizeDp.value * 0.5f).dp`). | `VibeOrb.kt` | Phase A polish |
-| LOW | `Vibe.orbIconName` and `Vibe.accentColorHex` are dead/duplicated fields on the Vibe enum — `orbIconName` is unmapped in UI (overridden by `toImageVector()`), `accentColorHex` is duplicated by `toColor()`. Clean up when migrating to dynamic vibes (Phase A Room DB). | `Vibe.kt` | Phase A dynamic vibes story |
-
----
-
-## Recent Places — Code Review Deferred (2026-03-08)
-
-| Severity | Item | File | Deferred To |
-|----------|------|------|-------------|
-| LOW | FakeRecentPlacesRepository dedup is case-sensitive; real DB uses COLLATE NOCASE | `FakeRecentPlacesRepository.kt` | Next test improvement pass |
-| LOW | COLLATE NOCASE only covers ASCII — Unicode place names (Japanese, Arabic, Korean) won't deduplicate | `recent_places.sq` | Localisation Phase B |
-| LOW | Magic number `112.dp` for POI list view top padding — should be named or derived | `MapScreen.kt` | UX polish |
-| LOW | `recentsFromRepositoryAppearInReadyState` test doesn't isolate the cold-start seed vs observer path | `MapViewModelTest.kt` | Next test improvement pass |
-| LOW | Duplicated ~50 lines between `onRecentSelected` and `onGeocodingSuggestionSelected` — extract shared helper | `MapViewModel.kt` | Next refactor pass |
-
----
-
-## Resolved Items (for reference)
-
-- ~~POI caching across sessions~~ — Fixed in commit 437ed06 (area_poi_cache table, migration 2)
-- ~~Camera never centres on user location~~ — Fixed in commit 437ed06
-- ~~No POI markers on Map screen~~ — Fixed in commit 437ed06
-- ~~Slow app launch (GPS timeout + cache-hit state dropped)~~ — Fixed in commit e4c8c28 (lastLocation-first, SummaryStateMapper fix)
+_Last generated: 2026-03-08 05:40_

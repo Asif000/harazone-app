@@ -5,9 +5,10 @@ data class WeatherState(
     val weatherCode: Int,
     val conditionLabel: String,
     val emoji: String,
+    val utcOffsetSeconds: Int? = null,
 ) {
     companion object {
-        fun fromCode(code: Int, tempF: Int): WeatherState {
+        fun fromCode(code: Int, tempF: Int, utcOffsetSeconds: Int? = null): WeatherState {
             val (label, emoji) = when (code) {
                 0 -> "Clear" to "\u2600\uFE0F"
                 in 1..3 -> "Partly Cloudy" to "\u26C5"
@@ -23,6 +24,7 @@ data class WeatherState(
                 weatherCode = code,
                 conditionLabel = label,
                 emoji = emoji,
+                utcOffsetSeconds = utcOffsetSeconds,
             )
         }
     }

@@ -1,4 +1,5 @@
 CREATE TABLE IF NOT EXISTS recent_places (
+    -- TODO(BACKLOG-LOW): COLLATE NOCASE only covers ASCII — Unicode place names won't deduplicate
     place_name TEXT NOT NULL COLLATE NOCASE,
     lat        REAL NOT NULL,
     lng        REAL NOT NULL,

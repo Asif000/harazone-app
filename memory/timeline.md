@@ -13,8 +13,9 @@
 | Epic 7: Offline Experience | 0/4 done | Phase 1b | ~5 | — | ⏳ Backlog |
 | Epic 8: Adaptive Intelligence | 0/3 done | Phase 1b | ~4 | — | ⏳ Backlog |
 | Epic 9: Safety, Trust & Engagement | 0/4 done | Phase 1b | ~4 | — | ⏳ Backlog |
-| Epic 10: Voice & Push (Phase 2) | placeholder | Phase 2 | — | — | ⏳ Backlog |
-| Epic 11: Advanced Exploration (Phase 3-4) | placeholder | Phase 3-4 | — | — | ⏳ Backlog |
+| Epic 10: AI Depth (Phase 2) | placeholder | Phase 2 | — | — | ⏳ Backlog |
+| Epic 11: Itinerary Builder (Phase 3) | placeholder | Phase 3 | — | — | ⏳ Backlog |
+| Epic 12: Vibe Evolution (Phase 4) | placeholder | Phase 4 | — | — | ⏳ Backlog |
 
 ## Phase 1a Progress
 
@@ -31,7 +32,7 @@
 | V3 Full-Screen Map | ✅ implementation-complete | 2026-03-06 |
 | Localisation Phase A — AI Locale Injection | 🔧 in-progress | 2026-03-06 |
 | Rebrand: HaraZone + Custom Icon | 🔧 in-progress | 2026-03-06 |
-| Search Bar Dual Mode | 🔧 in-flight (WIP) | 2026-03-08 |
+| Search Bar Dual Mode | ✅ implementation-complete | 2026-03-08 |
 | iOS Map (MapLibre) | ⏳ next — parallel with AI Chat | 2026-03-08 |
 | AI Chat v1 (Epic 4a) | ⏳ next — parallel with iOS Map | 2026-03-08 |
 

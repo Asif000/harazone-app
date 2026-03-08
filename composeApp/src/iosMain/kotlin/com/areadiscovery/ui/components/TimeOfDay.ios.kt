@@ -14,3 +14,6 @@ actual fun currentMinute(): Int {
     val cal = NSCalendar.currentCalendar
     return cal.components(NSCalendarUnitMinute, NSDate()).minute.toInt()
 }
+
+actual fun currentTimeMillis(): Long =
+    (NSDate().timeIntervalSince1970 * 1000).toLong()

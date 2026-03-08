@@ -10,9 +10,15 @@ class FakeWeatherProvider(
 ) : WeatherProvider {
     var callCount = 0
         private set
+    var lastLatitude = 0.0
+        private set
+    var lastLongitude = 0.0
+        private set
 
     override suspend fun getWeather(latitude: Double, longitude: Double): Result<WeatherState> {
         callCount++
+        lastLatitude = latitude
+        lastLongitude = longitude
         return result
     }
 }

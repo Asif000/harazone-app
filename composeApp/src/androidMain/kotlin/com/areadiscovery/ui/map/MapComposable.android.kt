@@ -32,6 +32,9 @@ import org.maplibre.android.MapLibre
 import org.maplibre.android.camera.CameraUpdateFactory
 import org.maplibre.android.geometry.LatLng
 import org.maplibre.android.geometry.LatLngBounds
+import org.maplibre.android.location.LocationComponentActivationOptions
+import org.maplibre.android.location.modes.CameraMode
+import org.maplibre.android.location.modes.RenderMode
 import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
 import org.maplibre.android.maps.Style
@@ -131,6 +134,21 @@ actual fun MapComposable(
                             true
                         }
 
+                        // Enable blue dot for current GPS location
+                        try {
+                            val locationComponent = map.locationComponent
+                            val activationOptions = LocationComponentActivationOptions
+                                .builder(context, style)
+                                .useDefaultLocationEngine(true)
+                                .build()
+                            locationComponent.activateLocationComponent(activationOptions)
+                            locationComponent.isLocationComponentEnabled = true
+                            locationComponent.renderMode = RenderMode.COMPASS
+                            locationComponent.cameraMode = CameraMode.NONE
+                        } catch (_: SecurityException) {
+                            // Location permission not granted — skip blue dot
+                        }
+
                         val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
                             if (suppressCameraIdle[0]) {
                                 suppressCameraIdle[0] = false
@@ -221,6 +239,8 @@ actual fun MapComposable(
             val vibe = activeVibe ?: poiVibe
             val iconKey = ensureIcon(vibe, poi.type)
 
+            // TODO(BACKLOG-LOW): Custom POI icons per type (landmark, food, culture, nature) using annotation plugin SymbolManager
+            // TODO(BACKLOG-LOW): TalkBack per-marker contentDescription for map-mode accessibility
             val symbol = sm.create(
                 SymbolOptions()
                     .withLatLng(LatLng(poi.latitude!!, poi.longitude!!))
@@ -405,6 +425,7 @@ private fun poiTypeEmoji(type: String): String = when {
     else -> "\uD83D\uDCCD" // 📍
 }
 
+// TODO(BACKLOG-MEDIUM): clusterPois uses Manhattan distance in degrees — inconsistent radius at different latitudes. Replace with Haversine.
 /** Clusters POIs within 0.005 degree proximity. Returns list of (centroid, pois). */
 private fun clusterPois(pois: List<POI>): List<Pair<Pair<Double, Double>, List<POI>>> {
     val valid = pois.filter { it.latitude != null && it.longitude != null }

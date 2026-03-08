@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 
 expect fun currentHour(): Int
 expect fun currentMinute(): Int
+expect fun currentTimeMillis(): Long
 
 enum class TimeOfDaySlot { DAWN, DAY, DUSK, NIGHT }
 

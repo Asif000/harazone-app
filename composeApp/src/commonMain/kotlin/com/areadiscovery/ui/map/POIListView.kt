@@ -124,6 +124,7 @@ private fun PoiListCard(poi: POI, onClick: () -> Unit) {
         ) {
             if (!poi.imageUrl.isNullOrBlank()) {
                 val sizePx = with(LocalDensity.current) { 56.dp.toPx().roundToInt() }
+                // TODO(BACKLOG-MEDIUM): SubcomposeAsyncImage overhead in LazyColumn — switch to AsyncImage with custom Painter for placeholder/error
                 SubcomposeAsyncImage(
                     model = ImageRequest.Builder(LocalPlatformContext.current)
                         .data(poi.imageUrl)
@@ -198,6 +199,7 @@ private fun PoiListCard(poi: POI, onClick: () -> Unit) {
     }
 }
 
+// TODO(BACKLOG-LOW): ThumbnailPlaceholder uses fillMaxSize with no intrinsic size — fragile implicit contract. Should accept modifier param.
 @Composable
 private fun ThumbnailPlaceholder() {
     Box(

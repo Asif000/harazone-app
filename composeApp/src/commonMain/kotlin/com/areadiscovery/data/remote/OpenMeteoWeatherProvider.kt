@@ -12,6 +12,7 @@ import kotlinx.serialization.json.Json
 @Serializable
 internal data class OpenMeteoResponse(
     val current: OpenMeteoCurrent,
+    @SerialName("utc_offset_seconds") val utcOffsetSeconds: Int = 0,
 )
 
 @Serializable
@@ -31,12 +32,13 @@ class OpenMeteoWeatherProvider(
             val url = "https://api.open-meteo.com/v1/forecast" +
                 "?latitude=$latitude&longitude=$longitude" +
                 "&current=temperature_2m,weathercode" +
-                "&temperature_unit=fahrenheit"
+                "&temperature_unit=fahrenheit" +
+                "&timezone=auto"
             val responseText = httpClient.get(url).bodyAsText()
             val response = json.decodeFromString<OpenMeteoResponse>(responseText)
             val tempF = response.current.temperatureF.toInt()
             val code = response.current.weathercode
-            Result.success(WeatherState.fromCode(code, tempF))
+            Result.success(WeatherState.fromCode(code, tempF, response.utcOffsetSeconds))
         } catch (e: Exception) {
             Result.failure(e)
         }
