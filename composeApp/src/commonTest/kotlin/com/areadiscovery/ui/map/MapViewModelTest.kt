@@ -446,65 +446,6 @@ class MapViewModelTest {
     }
 
     @Test
-    fun openSearchOverlay_setsFlag() = runTest(testDispatcher) {
-        val (viewModel, _) = createReadyViewModel()
-        viewModel.openSearchOverlay()
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(state.isSearchOverlayOpen)
-    }
-
-    @Test
-    fun closeSearchOverlay_clearsFlag() = runTest(testDispatcher) {
-        val (viewModel, _) = createReadyViewModel()
-        viewModel.openSearchOverlay()
-        viewModel.closeSearchOverlay()
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(state.isSearchOverlayOpen)
-    }
-
-    @Test
-    fun closeSearchOverlay_restoresMyLocationWhenPannedAway() = runTest(testDispatcher) {
-        val (viewModel, _) = createReadyViewModel()
-
-        // Pan away so button appears
-        viewModel.onCameraIdle(50.0, 30.0)
-        testScheduler.advanceUntilIdle()
-        assertTrue((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
-
-        // Open overlay — hides button
-        viewModel.openSearchOverlay()
-        assertFalse((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
-
-        // Close overlay — button should reappear since camera is still far from GPS
-        viewModel.closeSearchOverlay()
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(state.isSearchOverlayOpen)
-        assertTrue(state.showMyLocation, "showMyLocation must restore after closing overlay when panned away")
-    }
-
-    @Test
-    fun closeSearchOverlay_hidesMyLocationWhenPannedBackNearGps() = runTest(testDispatcher) {
-        val (viewModel, _) = createReadyViewModel()
-
-        // Pan far away so button appears + pendingLat is set
-        viewModel.onCameraIdle(50.0, 30.0)
-        testScheduler.advanceUntilIdle()
-        assertTrue((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
-
-        // Pan back near GPS — early-return should reset pendingLat/Lng
-        val state0 = viewModel.uiState.value as MapUiState.Ready
-        viewModel.onCameraIdle(state0.gpsLatitude, state0.gpsLongitude)
-        testScheduler.advanceUntilIdle()
-        assertFalse((viewModel.uiState.value as MapUiState.Ready).showMyLocation)
-
-        // Open + close overlay — button should stay hidden (we're near GPS)
-        viewModel.openSearchOverlay()
-        viewModel.closeSearchOverlay()
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(state.showMyLocation, "showMyLocation must stay hidden when camera is near GPS")
-    }
-
-    @Test
     fun toggleFab_flipsExpanded() = runTest(testDispatcher) {
         val (viewModel, _) = createReadyViewModel()
         assertFalse((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)

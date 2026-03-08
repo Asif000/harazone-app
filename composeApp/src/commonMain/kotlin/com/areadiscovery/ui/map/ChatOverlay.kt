@@ -77,7 +77,8 @@ internal fun ChatOverlay(
     val listState = rememberLazyListState()
 
     // F8: Key on last bubble's content length too, so scroll fires during streaming
-    val scrollKey = chatState.bubbles.size to (chatState.bubbles.lastOrNull()?.content?.length ?: 0)
+    // L1: Key on bubble count + streaming state — not per-token content length
+    val scrollKey = chatState.bubbles.size to chatState.isStreaming
     LaunchedEffect(scrollKey) {
         if (chatState.bubbles.isNotEmpty()) {
             listState.animateScrollToItem(maxOf(0, chatState.bubbles.size - 1))

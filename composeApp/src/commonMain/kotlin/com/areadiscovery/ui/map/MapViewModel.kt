@@ -9,7 +9,6 @@ import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.RecentPlace
 import com.areadiscovery.domain.repository.RecentPlacesRepository
 import com.areadiscovery.domain.model.Vibe
-import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.provider.WeatherProvider
 import com.areadiscovery.domain.service.AreaContextFactory
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
@@ -36,7 +35,6 @@ class MapViewModel(
     private val areaContextFactory: AreaContextFactory,
     private val analyticsTracker: AnalyticsTracker,
     private val weatherProvider: WeatherProvider,
-    private val aiProvider: AreaIntelligenceProvider? = null,
     private val geocodingProvider: MapTilerGeocodingProvider,
     private val recentPlacesRepository: RecentPlacesRepository,
 ) : ViewModel() {
@@ -100,44 +98,12 @@ class MapViewModel(
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.name ?: "all")))
     }
 
-    fun openSearchOverlay() {
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(
-            isSearchOverlayOpen = true,
-            showMyLocation = false,
-            searchQuery = "",
-            aiResponse = "",
-            followUpChips = emptyList(),
-            isAiResponding = false,
-        )
-    }
-
-    fun updateSearchQuery(query: String) {
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(searchQuery = query)
-    }
-
-    fun closeSearchOverlay() {
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        val cameraLat = if (pendingLat != 0.0) pendingLat else current.latitude
-        val cameraLng = if (pendingLng != 0.0) pendingLng else current.longitude
-        _uiState.value = current.copy(
-            isSearchOverlayOpen = false,
-            showMyLocation = isAwayFromGps(cameraLat, cameraLng, current),
-        )
-        searchJob?.cancel()
-    }
-
     fun submitSearch(query: String) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cameraIdleJob?.cancel()
         searchJob?.cancel()
 
         // Questions are routed to ChatOverlay by MapScreen — submitSearch only handles area searches
-        _uiState.value = current.copy(
-            searchQuery = query,
-            isAiResponding = true,
-        )
         analyticsTracker.trackEvent("search_area_submitted", mapOf("query" to query))
 
         searchJob = viewModelScope.launch {
@@ -155,8 +121,6 @@ class MapViewModel(
                                 areaName = query,
                                 vibePoiCounts = counts,
                                 activeVibe = null,
-                                isSearchOverlayOpen = false,
-                                isAiResponding = false,
                             )
                         }
                     }
@@ -164,8 +128,6 @@ class MapViewModel(
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Area search error" }
-                val state = _uiState.value as? MapUiState.Ready ?: return@launch
-                _uiState.value = state.copy(isAiResponding = false)
             }
         }
     }
@@ -710,26 +672,6 @@ class MapViewModel(
         }
     }
 
-    internal fun isQuestion(query: String): Boolean {
-        val q = query.trim().lowercase()
-        if (q.endsWith("?")) return true
-        val words = q.split(" ", limit = 2)
-        if (words.size < 2) return false
-        val questionStarters = setOf("what", "where", "when", "who", "how", "is", "are", "can", "does", "why")
-        return words[0] in questionStarters
-    }
-
-    private fun computeFollowUpChips(query: String): List<String> {
-        val q = query.lowercase()
-        return when {
-            q.containsAny("safe", "crime", "danger") -> listOf("Is it safe at night?", "What areas to avoid?")
-            q.containsAny("food", "eat", "restaurant", "drink") -> listOf("Best time to visit?", "Vegetarian options?")
-            q.containsAny("history", "historic", "old", "founded") -> listOf("When was it built?", "Any famous events here?")
-            q.containsAny("cost", "price", "expensive", "cheap") -> listOf("Budget tips?", "Free things to do?")
-            else -> listOf("Tell me more", "What's nearby?")
-        }
-    }
-
     private suspend fun collectPortraitWithRetry(
         areaName: String,
         onComplete: suspend (pois: List<POI>, finalAreaName: String) -> Unit,
@@ -793,8 +735,6 @@ class MapViewModel(
         return kotlin.math.abs(cameraLat - state.gpsLatitude) > 0.0009 ||
                kotlin.math.abs(cameraLng - state.gpsLongitude) > 0.0009
     }
-
-    private fun String.containsAny(vararg terms: String) = terms.any { this.contains(it) }
 
     companion object {
         // TODO(BACKLOG-LOW): Generic location error message — detect permission denial vs GPS off and show specific guidance

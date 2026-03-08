@@ -238,8 +238,14 @@ private fun ReadyContent(
                 },
                 onAskAiClick = { query ->
                     viewModel.clearPoiSelection()
-                    chatViewModel.openChat(state.areaName, state.pois, state.activeVibe)
-                    chatViewModel.sendMessage(query)
+                    if (chatState.isStreaming) {
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("AI is still responding...")
+                        }
+                    } else {
+                        chatViewModel.openChat(state.areaName, state.pois, state.activeVibe)
+                        chatViewModel.sendMessage(query)
+                    }
                 },
                 onSaveClick = {
                     coroutineScope.launch {
@@ -284,7 +290,7 @@ private fun ReadyContent(
 
         // MyLocation button (Position C — left side, above AI bar)
         AnimatedVisibility(
-            visible = state.showMyLocation && !state.isSearchingArea && !state.isSearchOverlayOpen && !chatState.isOpen,
+            visible = state.showMyLocation && !state.isSearchingArea && !chatState.isOpen,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -310,7 +316,7 @@ private fun ReadyContent(
 
         // Map/List toggle
         AnimatedVisibility(
-            visible = !state.isSearchOverlayOpen,
+            visible = true,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier

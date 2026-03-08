@@ -518,7 +518,7 @@ Add a dedicated `ChatViewModel` and `ChatOverlay` (ModalBottomSheet) accessible 
 - [x] **AC10**: Given an error bubble is visible, when the user taps "Tap to retry", then the last query is re-sent, the error bubble is replaced by a new streaming bubble.
 - [x] **AC11**: Given the chat sheet is open, when the user presses the Android back button, taps the scrim, or taps the X button, then the sheet dismisses and `chatState.isOpen` becomes false.
 - [x] **AC12**: Given `MapUiState` transitions to `Loading` (e.g., location reload), when this happens while the chat sheet is open, then the chat sheet remains open and the conversation is unaffected.
-- [x] **AC13**: Given the chat sheet is open with an active conversation, when the user closes and reopens the sheet, then the conversation history is cleared and the empty state is shown (no persistence across open/close).
+- [x] **AC13**: Given the chat sheet is open with an active conversation, when the user closes and reopens the sheet for the same area, then the conversation history is preserved and the user can continue where they left off; switching to a different area resets the conversation and shows the empty state.
 - [x] **AC14**: Given any conversation state, when the user navigates to `MapUiState.LocationFailed`, then the chat FAB is not visible (it only exists inside `ReadyContent`).
 
 ---

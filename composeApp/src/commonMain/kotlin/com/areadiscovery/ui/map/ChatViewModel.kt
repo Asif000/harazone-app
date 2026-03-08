@@ -36,13 +36,13 @@ internal class ChatViewModel(
     }
 
     fun openChat(areaName: String, pois: List<POI>, activeVibe: Vibe?) {
-        // F7: If chat is already open with bubbles, just reopen without resetting
         val current = _uiState.value
-        if (current.isOpen) return
-        if (current.bubbles.isNotEmpty() && current.areaName == areaName) {
+        // F7/M2: Same area — preserve conversation (whether open or closed)
+        if (current.areaName == areaName && (current.isOpen || current.bubbles.isNotEmpty())) {
             _uiState.value = current.copy(isOpen = true)
             return
         }
+        // M2: Different area while open — fall through to reset and reinitialize
 
         chatJob?.cancel()
         conversationHistory = mutableListOf()
@@ -94,7 +94,9 @@ internal class ChatViewModel(
             inputText = "",
             lastUserQuery = query,
         )
+        // M4: Trim before snapshot so the snapshot reflects the capped history
         // F1: Take snapshot BEFORE adding user msg — provider appends query itself
+        trimHistory()
         val historySnapshot = conversationHistory.toList()
         conversationHistory.add(
             ChatMessage(
@@ -102,8 +104,6 @@ internal class ChatViewModel(
                 timestamp = clock.nowMs(), sources = emptyList(),
             )
         )
-        // F3: Trim history to prevent unbounded growth (keep system context at index 0)
-        trimHistory()
 
         chatJob = viewModelScope.launch {
             var accumulated = ""
