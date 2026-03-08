@@ -6,13 +6,13 @@ Items deferred during code review — to be picked up in relevant future stories
 
 ## Priority Order (2026-03-08)
 
-1. 🔴 **Search Bar Dual Mode** — in flight
-2. 🔴 **AI Chat v1 (Epic 4a)** — in flight next
-3. 🟡 **iOS — get it building + testable** — never attempted; int'l testers have iPhones. Key unknowns: MapLibre iOS expect/actual, location permissions (Info.plist), NativeSQLiteDriver. Firebase plist already in place. Brainstorm first to audit gaps.
+1. 🔴 **Search Bar Dual Mode** — in flight (must commit before anything else touches MapScreen/MapViewModel)
+2. 🔴 **AI Chat v1 (Epic 4a)** — parallel with iOS Map after Search Bar lands
+3. 🔴 **iOS Map (MapLibre)** — parallel with AI Chat after Search Bar lands. ~half a day. App already runs on iOS (SQLite fix done). Just need: Podfile + MapLibre pod, implement MapComposable.ios.kt via UIKitView interop, wire MLNMapViewDelegate callbacks. Unblocks all int'l tester feedback.
 4. 🟡 **Contextual AI Tip** — English first, localise later
 5. 🟡 **Localisation Phase A** — AI locale injection (quick spec in-progress)
 6. 🟡 **Localisation Phase B** — full epic (moko-resources, RTL, MapLibre RTL plugin)
-7. 🟢 **Bugs + Architecture debt** — auto-refresh on pan, SummaryStateMapper, conversationHistory empty, AreaSessionManager
+7. 🟢 **Bugs + Architecture debt** — auto-refresh on pan, SummaryStateMapper, conversationHistory empty, AreaSessionManager, weather/time stale after search
 
 ---
 
@@ -35,6 +35,14 @@ Items deferred during code review — to be picked up in relevant future stories
 | LOW | `resolveActivity(packageManager)` deprecated in API 33+ — replace with `resolveActivity(packageManager, PackageManager.ResolveInfoFlags.of(0))` to silence lint | `MainActivity.kt` | Any story touching MainActivity |
 | LOW | Scaffold + snackbar state (`rememberBottomSheetScaffoldState`, `SnackbarHostState`) created inside `is MapUiState.Ready` branch — resets to peek on retry (Ready→Failed→Ready) | `MapScreen.kt` | Future UX polish |
 | INFO | Three-stop bottom sheet (collapsed/half/full) deferred — V1 uses two stops (peek 88dp / expanded). Requires `anchoredDraggable` with custom snap points | `MapScreen.kt` | Future UX polish |
+
+---
+
+## Bug — Weather/Time Stale After Location Search
+
+| Severity | Item | File | Fix |
+|----------|------|------|-----|
+| MEDIUM | Weather (and timezone-derived time) only fetched once in `loadLocation()` using GPS coords. Searching a new location via geocoding, recents, or empty-submit never re-fetches weather for the new coords — stays stale with user's current location. | `MapViewModel.kt` | Extract `fetchWeatherForLocation(lat, lng)` helper and call it in `onGeocodingSuggestionSelected`, `onRecentSelected`, and `onGeocodingSubmitEmpty` with the searched location's coordinates. |
 
 ---
 

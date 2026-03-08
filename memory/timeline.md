@@ -31,6 +31,9 @@
 | V3 Full-Screen Map | ✅ implementation-complete | 2026-03-06 |
 | Localisation Phase A — AI Locale Injection | 🔧 in-progress | 2026-03-06 |
 | Rebrand: HaraZone + Custom Icon | 🔧 in-progress | 2026-03-06 |
+| Search Bar Dual Mode | 🔧 in-flight (WIP) | 2026-03-08 |
+| iOS Map (MapLibre) | ⏳ next — parallel with AI Chat | 2026-03-08 |
+| AI Chat v1 (Epic 4a) | ⏳ next — parallel with iOS Map | 2026-03-08 |
 
 ## Schedule Status
 
