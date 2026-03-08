@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 class RecentPlacesRepositoryImpl(
     private val database: AreaDiscoveryDatabase,
     private val clock: AppClock,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : RecentPlacesRepository {
 
     override fun observeRecent(): Flow<List<RecentPlace>> =

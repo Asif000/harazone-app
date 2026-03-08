@@ -16,4 +16,4 @@ actual fun currentMinute(): Int {
 }
 
 actual fun currentTimeMillis(): Long =
-    (NSDate().timeIntervalSince1970 * 1000).toLong()
+    (NSDate().timeIntervalSinceReferenceDate * 1000 + 978307200000).toLong()
