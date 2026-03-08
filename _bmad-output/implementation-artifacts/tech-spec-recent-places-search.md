@@ -16,6 +16,7 @@ files_to_modify:
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapUiState.kt (MODIFY)'
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapViewModel.kt (MODIFY)'
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/components/GeocodingSearchBar.kt (MODIFY)'
+  - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/components/ExpandablePoiCard.kt (MODIFY)'
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/ui/map/MapScreen.kt (MODIFY)'
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/di/DataModule.kt (MODIFY)'
   - 'composeApp/src/commonMain/kotlin/com/areadiscovery/di/UiModule.kt (MODIFY)'

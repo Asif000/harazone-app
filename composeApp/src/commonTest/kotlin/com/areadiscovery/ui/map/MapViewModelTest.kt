@@ -1196,6 +1196,23 @@ class MapViewModelTest {
         assertEquals(emptyList(), state.recentPlaces)
         assertEquals(1, fakeRecents.clearAllCount)
     }
+
+    @Test
+    fun selectingRecentResetsSearchingAreaWhenPortraitEmpty() = runTest(testDispatcher) {
+        val emptyRepo = FakeAreaRepository(updates = emptyList())
+        val fakeRecents = FakeRecentPlacesRepository()
+        val place = RecentPlace("EmptyArea", 1.0, 2.0)
+        fakeRecents.setRecents(listOf(place))
+        val viewModel = createViewModel(
+            areaRepository = emptyRepo,
+            recentPlacesRepository = fakeRecents,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        viewModel.onRecentSelected(place)
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.isSearchingArea)
+    }
 }
 
 private class ResettableFakeLocationProvider(

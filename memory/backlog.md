@@ -123,6 +123,18 @@ Items deferred during code review — to be picked up in relevant future stories
 
 ---
 
+## Recent Places — Code Review Deferred (2026-03-08)
+
+| Severity | Item | File | Deferred To |
+|----------|------|------|-------------|
+| LOW | FakeRecentPlacesRepository dedup is case-sensitive; real DB uses COLLATE NOCASE | `FakeRecentPlacesRepository.kt` | Next test improvement pass |
+| LOW | COLLATE NOCASE only covers ASCII — Unicode place names (Japanese, Arabic, Korean) won't deduplicate | `recent_places.sq` | Localisation Phase B |
+| LOW | Magic number `112.dp` for POI list view top padding — should be named or derived | `MapScreen.kt` | UX polish |
+| LOW | `recentsFromRepositoryAppearInReadyState` test doesn't isolate the cold-start seed vs observer path | `MapViewModelTest.kt` | Next test improvement pass |
+| LOW | Duplicated ~50 lines between `onRecentSelected` and `onGeocodingSuggestionSelected` — extract shared helper | `MapViewModel.kt` | Next refactor pass |
+
+---
+
 ## Resolved Items (for reference)
 
 - ~~POI caching across sessions~~ — Fixed in commit 437ed06 (area_poi_cache table, migration 2)

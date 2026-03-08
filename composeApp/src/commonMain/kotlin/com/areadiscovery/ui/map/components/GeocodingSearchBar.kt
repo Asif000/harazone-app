@@ -78,8 +78,8 @@ fun GeocodingSearchBar(
     var isFieldFocused by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
-    // Active = focused OR has query/suggestions/recents
-    val active = !spinning && selectedPlace == null && (isFieldFocused || query.isNotBlank() || suggestions.isNotEmpty() || recentPlaces.isNotEmpty())
+    // Active = focused OR has query/suggestions
+    val active = !spinning && selectedPlace == null && (isFieldFocused || query.isNotBlank() || suggestions.isNotEmpty())
 
     Box(modifier = modifier) {
         // Reset focus when transitioning to spinning or selected

@@ -27,13 +27,15 @@ class RecentPlacesRepositoryImpl(
 
     override suspend fun upsert(place: RecentPlace) {
         withContext(ioDispatcher) {
-            database.recent_placesQueries.upsertPlace(
-                place_name = place.name,
-                lat = place.latitude,
-                lng = place.longitude,
-                searched_at = clock.nowMs(),
-            )
-            database.recent_placesQueries.pruneOld()
+            database.transaction {
+                database.recent_placesQueries.upsertPlace(
+                    place_name = place.name,
+                    lat = place.latitude,
+                    lng = place.longitude,
+                    searched_at = clock.nowMs(),
+                )
+                database.recent_placesQueries.pruneOld()
+            }
         }
     }
 

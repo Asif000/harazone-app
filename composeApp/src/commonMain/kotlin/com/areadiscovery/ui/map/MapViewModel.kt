@@ -321,13 +321,17 @@ class MapViewModel(
             }
         }
         viewModelScope.launch {
-            recentPlacesRepository.upsert(
-                RecentPlace(
-                    name = suggestion.name,
-                    latitude = suggestion.latitude,
-                    longitude = suggestion.longitude,
+            try {
+                recentPlacesRepository.upsert(
+                    RecentPlace(
+                        name = suggestion.name,
+                        latitude = suggestion.latitude,
+                        longitude = suggestion.longitude,
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Failed to upsert recent place" }
+            }
         }
     }
 
@@ -396,13 +400,17 @@ class MapViewModel(
             }
         }
         viewModelScope.launch {
-            recentPlacesRepository.upsert(
-                RecentPlace(
-                    name = recent.name,
-                    latitude = recent.latitude,
-                    longitude = recent.longitude,
+            try {
+                recentPlacesRepository.upsert(
+                    RecentPlace(
+                        name = recent.name,
+                        latitude = recent.latitude,
+                        longitude = recent.longitude,
+                    )
                 )
-            )
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Failed to upsert recent place" }
+            }
         }
     }
 
