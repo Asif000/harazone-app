@@ -33,8 +33,8 @@
 | Localisation Phase A — AI Locale Injection | 🔧 in-progress | 2026-03-06 |
 | Rebrand: HaraZone + Custom Icon | 🔧 in-progress | 2026-03-06 |
 | Search Bar Dual Mode | ✅ implementation-complete | 2026-03-08 |
-| iOS Map (MapLibre) | ⏳ next — parallel with AI Chat | 2026-03-08 |
-| AI Chat v1 (Epic 4a) | ⏳ next — parallel with iOS Map | 2026-03-08 |
+| iOS Map (MapLibre) | ✅ implementation-complete | 2026-03-08 |
+| AI Chat v1 (Epic 4a) | 🔧 in-progress | 2026-03-08 |
 
 ## Schedule Status
 
@@ -59,3 +59,5 @@
 | 2026-03-05 | Sprint reorder | Story 5.1 (Manual Area Search) pulled ahead of Epic 4 (AI Chat) |
 | 2026-03-05 | Story 5.1 ready-for-dev | Manual Area Search — SearchScreen, SearchViewModel, search_history DB, nav wiring |
 | 2026-03-05 | Story 5.1 done | Implemented + code review 2 rounds (3M, 4L fixed: race condition, duplicate analytics, DB on IO, unused import, internal visibility, Turbine test, Loading state doc) |
+| 2026-03-08 | iOS Map (MapLibre) done | Full MapLibre iOS via UIKitView: CocoaPods setup, MLNMapView, blue dot, POI pins, glow zones, camera fly-to, suppressCameraIdle guard, UITapGestureRecognizer deselect, simulator confirmed |
+| 2026-03-08 | AI Chat v1 | ChatViewModel + ChatOverlay in progress (user implementing) |

@@ -25,10 +25,8 @@ import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.Foundation.NSError
 import platform.Foundation.NSExpression
 import platform.Foundation.NSNumber
-import platform.Foundation.NSSelectorFromString
 import platform.Foundation.NSURL
 import platform.UIKit.UIColor
-import platform.UIKit.UITapGestureRecognizer
 import platform.darwin.NSObject
 
 private val MAP_STYLE_URL get() =
@@ -79,14 +77,11 @@ actual fun MapComposable(
                 animated = false,
             )
             this.delegate = delegate
-            // Map-area tap → deselect POI card
-            // TODO(BACKLOG-LOW): requireGestureRecognizerToFail from MLNMapView's own tap recognizer
-            //   so empty-space tap and annotation-tap don't both fire.
-            val tapGesture = UITapGestureRecognizer(
-                target = delegate,
-                action = NSSelectorFromString("mapTapped:"),
-            )
-            addGestureRecognizer(tapGesture)
+            // TODO(BACKLOG-LOW): Tap empty map space to deselect POI card on iOS.
+            //   UITapGestureRecognizer target-action requires @ObjCAction for Kotlin/Native
+            //   to expose the method to the ObjC runtime — without it crashes with
+            //   doesNotRecognizeSelector. Use MLNAnnotationView subclass or a bridging
+            //   NSObject helper class with @ObjCAction once confirmed.
         }
     }
 
@@ -212,13 +207,9 @@ private class MapDelegate(
         onCameraIdle(lat, lng)
     }
 
-    // Set to true inside didSelectAnnotation so mapTapped knows not to clear the selection.
-    private var annotationJustSelected = false
-
-    /** POI pin tapped → select. Fires before our UITapGestureRecognizer action. */
+    /** POI pin tapped → select. */
     override fun mapView(mapView: MLNMapView, didSelectAnnotation: MLNAnnotationProtocol) {
         val annotation = didSelectAnnotation as? MLNPointAnnotation ?: return
-        annotationJustSelected = true
         annotationPoiMap[annotation]?.let { onPoiSelected(it) }
     }
 
@@ -229,21 +220,6 @@ private class MapDelegate(
 
     override fun mapViewDidFailLoadingMap(mapView: MLNMapView, withError: NSError) {
         onRenderFailed()
-    }
-
-    /**
-     * Called by UITapGestureRecognizer added to mapView.
-     * Both annotation taps and empty-space taps reach here. For annotation taps,
-     * [didSelectAnnotation] fires first (same run loop) and sets [annotationJustSelected];
-     * this handler then skips the deselect. For empty-space taps the flag is false → deselect.
-     */
-    @Suppress("unused")
-    fun mapTapped(@Suppress("UNUSED_PARAMETER") recognizer: UITapGestureRecognizer) {
-        if (annotationJustSelected) {
-            annotationJustSelected = false
-            return
-        }
-        onPoiSelected(null)
     }
 }
 
