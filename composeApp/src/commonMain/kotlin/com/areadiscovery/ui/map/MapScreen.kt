@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,6 +108,7 @@ private fun ReadyContent(
     }
 
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     Box(Modifier.fillMaxSize()) {
         // Base: map or list
@@ -116,7 +118,9 @@ private fun ReadyContent(
                 activeVibe = state.activeVibe,
                 onVibeSelected = { viewModel.switchVibe(it) },
                 onPoiClick = { viewModel.selectPoi(it) },
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = statusBarPadding + 112.dp),
             )
         } else {
             MapComposable(
@@ -152,11 +156,11 @@ private fun ReadyContent(
             weather = state.weather,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 8.dp),
+                .padding(top = statusBarPadding + 8.dp),
         )
 
         // Geocoding search bar (always visible, replaces Refresh Area button)
-        // 56dp = TopContextBar height + top inset padding
+        // statusBarPadding + 56dp = status bar + TopContextBar height + top inset padding
         GeocodingSearchBar(
             query = state.geocodingQuery,
             suggestions = state.geocodingSuggestions,
@@ -171,19 +175,21 @@ private fun ReadyContent(
             onCancelLoad = { viewModel.onGeocodingCancelLoad() },
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 56.dp)
+                .padding(top = statusBarPadding + 56.dp)
                 .fillMaxWidth(),
         )
 
-        // Vibe rail (right side, bottom-aligned above FAB)
-        VibeRail(
-            activeVibe = state.activeVibe,
-            vibePoiCounts = state.vibePoiCounts,
-            onVibeSelected = { viewModel.switchVibe(it) },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 8.dp, bottom = navBarPadding + 88.dp),
-        )
+        // Vibe rail (right side, bottom-aligned above FAB) — map mode only
+        if (!state.showListView) {
+            VibeRail(
+                activeVibe = state.activeVibe,
+                vibePoiCounts = state.vibePoiCounts,
+                onVibeSelected = { viewModel.switchVibe(it) },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 8.dp, bottom = navBarPadding + 88.dp),
+            )
+        }
 
         // Expandable POI card
         if (state.selectedPoi != null) {

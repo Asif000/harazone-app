@@ -84,7 +84,7 @@ fun POIListView(
                 )
             }
         } else {
-            LazyColumn {
+            LazyColumn(modifier = Modifier.weight(1f)) {
                 items(filteredPois, key = { "${it.name}_${it.type}" }) { poi ->
                     PoiListCard(poi = poi, onClick = { onPoiClick(poi) })
                 }

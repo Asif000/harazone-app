@@ -1117,6 +1117,29 @@ class MapViewModelTest {
             Dispatchers.setMain(testDispatcher)
         }
     }
+
+    // Regression: list view was non-scrollable because LazyColumn lacked weight(1f) modifier,
+    // causing it to wrap content instead of filling available height. All POIs must be present
+    // in state when list view is active so the full list is available for rendering/scrolling.
+    @Test
+    fun listView_allPoisPresentInStateWhenToggled() = runTest(testDispatcher) {
+        val manyPois = (1..20).map { i ->
+            POI("Place $i", "landmark", "desc $i", Confidence.HIGH, 1.0 + i * 0.01, 2.0, vibe = "CHARACTER")
+        }
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(manyPois))
+            ),
+        )
+        viewModel.toggleListView()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.showListView)
+        assertEquals(20, state.pois.size, "All 20 POIs must be in state for list view to scroll through them")
+    }
 }
 
 private class ResettableFakeLocationProvider(
