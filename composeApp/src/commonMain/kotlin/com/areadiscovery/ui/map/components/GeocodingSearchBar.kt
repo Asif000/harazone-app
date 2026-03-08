@@ -22,11 +22,13 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -76,15 +78,14 @@ fun GeocodingSearchBar(
     val active = !spinning && selectedPlace == null && (isFieldFocused || query.isNotBlank() || suggestions.isNotEmpty())
 
     Box(modifier = modifier) {
+        // Reset focus when transitioning to spinning or selected
+        if (spinning || selected) {
+            SideEffect { isFieldFocused = false }
+        }
+
         when {
-            spinning -> {
-                isFieldFocused = false
-                SpinningState(showCancel, onCancelLoad)
-            }
-            selected -> {
-                isFieldFocused = false
-                SelectedState(selectedPlace ?: "", onClear)
-            }
+            spinning -> SpinningState(showCancel, onCancelLoad)
+            selected -> SelectedState(selectedPlace ?: "", onClear)
             active -> ActiveState(
                 query = query,
                 suggestions = suggestions,
@@ -403,6 +404,6 @@ private fun formatDistance(km: Double): String = when {
     km < 1.0 -> "${(km * 1000).toInt()} m"
     else -> {
         val rounded = kotlin.math.round(km * 10) / 10.0
-        "$rounded km"
+        if (rounded % 1.0 == 0.0) "${rounded.toInt()} km" else "$rounded km"
     }
 }

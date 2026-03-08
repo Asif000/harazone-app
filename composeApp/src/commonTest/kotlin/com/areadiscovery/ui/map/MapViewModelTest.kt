@@ -592,110 +592,6 @@ class MapViewModelTest {
         }
     }
 
-    @Test
-    fun onSearchThisAreaTapped_fetchesPortraitAndHidesButton() = runTest(testDispatcher) {
-        val newPois = listOf(
-            POI("New Place", "landmark", "desc", Confidence.HIGH, 2.0, 3.0),
-        )
-        val locationProvider = object : com.areadiscovery.location.LocationProvider {
-            private var callIndex = 0
-            override suspend fun getCurrentLocation() =
-                Result.success(GpsCoordinates(38.7139, -9.1394))
-            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
-                callIndex++
-                return if (callIndex <= 1) Result.success("Alfama, Lisbon")
-                else Result.success("Bairro Alto, Lisbon")
-            }
-        }
-        val viewModel = createViewModel(
-            locationProvider = locationProvider,
-            areaRepository = FakeAreaRepository(
-                updates = listOf(BucketUpdate.PortraitComplete(newPois))
-            ),
-        )
-        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals("Alfama, Lisbon", state1.areaName)
-        assertEquals(newPois, state1.pois)
-        assertNull(state1.activeVibe)
-        // Counts should be populated (no vibes → total count on each vibe)
-        assertEquals(1, state1.vibePoiCounts[Vibe.CHARACTER])
-
-        // Pan to new area — button appears
-        viewModel.onCameraIdle(10.0, 20.0)
-        testScheduler.advanceUntilIdle()
-        assertTrue((viewModel.uiState.value as MapUiState.Ready).showSearchThisArea)
-
-        // Tap button — fetches portrait, hides button, updates coords
-        viewModel.onSearchThisAreaTapped()
-        testScheduler.advanceUntilIdle()
-        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals("Bairro Alto, Lisbon", state2.areaName)
-        assertEquals(newPois, state2.pois)
-        assertFalse(state2.showSearchThisArea)
-        assertFalse(state2.isSearchingArea)
-        assertEquals(10.0, state2.latitude, 0.001)
-        assertEquals(20.0, state2.longitude, 0.001)
-    }
-
-    @Test
-    fun onSearchThisAreaTapped_clearsOldCountsAndPoisDuringLoading() = runTest(testDispatcher) {
-        val deferredPois = CompletableDeferred<List<POI>>()
-        val callIndex = intArrayOf(0)
-        val delayedOnSecondCallRepo = object : AreaRepository {
-            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
-                callIndex[0]++
-                return if (callIndex[0] <= 1) {
-                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(listOf(
-                        POI("Old Place", "food", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "CHARACTER"),
-                    )))
-                } else {
-                    kotlinx.coroutines.flow.flow {
-                        val pois = deferredPois.await()
-                        emit(BucketUpdate.PortraitComplete(pois))
-                    }
-                }
-            }
-        }
-        val locationProvider = object : com.areadiscovery.location.LocationProvider {
-            private var geocodeIndex = 0
-            override suspend fun getCurrentLocation() =
-                Result.success(GpsCoordinates(38.7139, -9.1394))
-            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
-                geocodeIndex++
-                return if (geocodeIndex <= 1) Result.success("Alfama, Lisbon")
-                else Result.success("Bairro Alto, Lisbon")
-            }
-        }
-        val viewModel = createViewModel(
-            locationProvider = locationProvider,
-            areaRepository = delayedOnSecondCallRepo,
-        )
-        val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(1, state1.pois.size)
-        assertTrue(state1.vibePoiCounts.values.any { it > 0 })
-
-        // Pan + tap search
-        viewModel.onCameraIdle(10.0, 20.0)
-        testScheduler.advanceUntilIdle()
-        viewModel.onSearchThisAreaTapped()
-
-        // During loading: old counts and pois should be cleared
-        val loading = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(loading.isSearchingArea)
-        assertEquals(emptyList(), loading.pois)
-        assertEquals(emptyMap(), loading.vibePoiCounts)
-        assertNull(loading.activeVibe)
-
-        // Complete the search
-        deferredPois.complete(listOf(
-            POI("New Place", "park", "desc", Confidence.HIGH, 2.0, 3.0, vibe = "NEARBY"),
-        ))
-        testScheduler.advanceUntilIdle()
-        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(1, state2.pois.size)
-        assertEquals("New Place", state2.pois[0].name)
-        assertFalse(state2.isSearchingArea)
-    }
 
     @Test
     fun onCameraIdle_showsRefreshButtonWhenAreaNameUnchanged() = runTest(testDispatcher) {
@@ -744,50 +640,6 @@ class MapViewModelTest {
     }
 
     @Test
-    fun onSearchThisAreaTapped_emitsErrorEventOnFetchFailure() = runTest(testDispatcher) {
-        val failOnSecondCallRepo = object : AreaRepository {
-            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
-                // Initial load area succeeds; any other area fails
-                return if (areaName.contains("Alfama")) {
-                    kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
-                } else {
-                    kotlinx.coroutines.flow.flow { throw RuntimeException("fetch failed") }
-                }
-            }
-        }
-        val locationProvider = object : com.areadiscovery.location.LocationProvider {
-            private var callIndex = 0
-            override suspend fun getCurrentLocation() =
-                Result.success(GpsCoordinates(38.7139, -9.1394))
-            override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> {
-                callIndex++
-                return if (callIndex <= 1) Result.success("Alfama, Lisbon")
-                else Result.success("New Area, Somewhere")
-            }
-        }
-        val viewModel = createViewModel(
-            locationProvider = locationProvider,
-            areaRepository = failOnSecondCallRepo,
-        )
-        assertIs<MapUiState.Ready>(viewModel.uiState.value)
-
-        val collectedErrors = mutableListOf<String>()
-        val collectJob = launch {
-            viewModel.errorEvents.collect { collectedErrors.add(it) }
-        }
-
-        // Pan to new area, then tap search button
-        viewModel.onCameraIdle(10.0, 20.0)
-        testScheduler.advanceUntilIdle()
-        viewModel.onSearchThisAreaTapped()
-        testScheduler.advanceUntilIdle()
-        assertEquals(1, collectedErrors.size)
-        assertEquals("Couldn't load area info. Try panning again.", collectedErrors[0])
-        assertFalse((viewModel.uiState.value as MapUiState.Ready).isSearchingArea)
-        collectJob.cancel()
-    }
-
-    @Test
     fun loadLocation_retriesWithBroaderQueryWhenNoPois() = runTest(testDispatcher) {
         val queriesSeen = mutableListOf<String>()
         val retryRepo = object : AreaRepository {
@@ -810,31 +662,6 @@ class MapViewModelTest {
         // POIs from retry should be populated
         val state = viewModel.uiState.value as MapUiState.Ready
         assertEquals(listOf(samplePoi), state.pois)
-    }
-
-    @Test
-    fun searchThisArea_emitsToastWhenRetryAlsoReturnsNoPois() = runTest(testDispatcher) {
-        val alwaysEmptyRepo = object : AreaRepository {
-            override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext): kotlinx.coroutines.flow.Flow<BucketUpdate> {
-                return kotlinx.coroutines.flow.flowOf(BucketUpdate.PortraitComplete(emptyList()))
-            }
-        }
-        val viewModel = createViewModel(areaRepository = alwaysEmptyRepo)
-        assertIs<MapUiState.Ready>(viewModel.uiState.value)
-
-        val collectedErrors = mutableListOf<String>()
-        val collectJob = launch {
-            viewModel.errorEvents.collect { collectedErrors.add(it) }
-        }
-
-        // Pan away and search — both initial fetch + retry return empty
-        viewModel.onCameraIdle(10.0, 20.0)
-        testScheduler.advanceUntilIdle()
-        viewModel.onSearchThisAreaTapped()
-        testScheduler.advanceUntilIdle()
-
-        assertTrue(collectedErrors.any { it == "Nothing to see here — try another area" })
-        collectJob.cancel()
     }
 
     @Test
@@ -1178,7 +1005,8 @@ class MapViewModelTest {
         val areaRepo = FakeAreaRepository(updates = listOf(BucketUpdate.PortraitComplete(pois)))
         val fakeGeocoding = FakeMapTilerGeocodingProvider()
         val viewModel = createViewModel(areaRepository = areaRepo, geocodingProvider = fakeGeocoding)
-        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val initialState = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val initialCameraMoveId = initialState.cameraMoveId
 
         val suggestion = GeocodingSuggestion("Tower", "Tower, Lisbon", 38.6916, -9.2159, null)
         viewModel.onGeocodingSuggestionSelected(suggestion)
@@ -1187,6 +1015,7 @@ class MapViewModelTest {
         assertEquals("Tower", state.areaName)
         assertEquals(38.6916, state.latitude)
         assertEquals(-9.2159, state.longitude)
+        assertEquals(initialCameraMoveId + 1, state.cameraMoveId)
         assertFalse(state.isSearchingArea)
         assertEquals(1, state.pois.size)
     }
@@ -1222,6 +1051,50 @@ class MapViewModelTest {
         assertTrue(state.geocodingSuggestions.isEmpty())
         assertFalse(state.isGeocodingLoading)
         assertNull(state.geocodingSelectedPlace)
+    }
+
+    @Test
+    fun onGeocodingCancelLoad_abortsSearchAndResetsState() {
+        val stdDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(stdDispatcher)
+        try {
+            runTest(stdDispatcher) {
+                // Use a repo that never completes (hangs forever simulating Gemini latency)
+                val hangingRepo = object : AreaRepository {
+                    override fun getAreaPortrait(areaName: String, context: com.areadiscovery.domain.model.AreaContext) =
+                        kotlinx.coroutines.flow.flow<BucketUpdate> {
+                            kotlinx.coroutines.awaitCancellation()
+                        }
+                }
+                val fakeGeocoding = FakeMapTilerGeocodingProvider()
+                val viewModel = createViewModel(areaRepository = hangingRepo, geocodingProvider = fakeGeocoding)
+                advanceTimeBy(11_000)
+                assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+                // Select a suggestion to trigger isSearchingArea
+                val suggestion = GeocodingSuggestion("Tower", "Tower, Lisbon", 38.6916, -9.2159, null)
+                viewModel.onGeocodingSuggestionSelected(suggestion)
+                advanceTimeBy(100)
+
+                val searching = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+                assertTrue(searching.isSearchingArea)
+                assertTrue(searching.isGeocodingInitiatedSearch)
+                assertEquals("Tower", searching.geocodingSelectedPlace)
+
+                // Cancel the load
+                viewModel.onGeocodingCancelLoad()
+
+                val cancelled = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+                assertFalse(cancelled.isSearchingArea)
+                assertFalse(cancelled.isGeocodingInitiatedSearch)
+                assertNull(cancelled.geocodingSelectedPlace)
+                assertEquals("", cancelled.geocodingQuery)
+            }
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
     }
 
     @Test

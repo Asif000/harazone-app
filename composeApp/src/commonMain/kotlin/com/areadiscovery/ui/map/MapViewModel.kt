@@ -442,59 +442,6 @@ class MapViewModel(
         }
     }
 
-    fun onSearchThisAreaTapped() {
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        cameraIdleJob?.cancel()
-        val areaName = pendingAreaName.ifBlank { return }
-        val lat = pendingLat
-        val lng = pendingLng
-        _uiState.value = current.copy(
-            showSearchThisArea = false,
-            showMyLocation = false,
-            isSearchingArea = true,
-            vibePoiCounts = emptyMap(),
-            pois = emptyList(),
-            activeVibe = null,
-        )
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
-            try {
-                collectPortraitWithRetry(
-                    areaName = areaName,
-                    onComplete = { pois, _ ->
-                        val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
-                        val counts = computeVibePoiCounts(pois)
-                        _uiState.value = state.copy(
-                            areaName = areaName,
-                            latitude = lat,
-                            longitude = lng,
-                            pois = pois,
-                            vibePoiCounts = counts,
-                            activeVibe = null,
-                            isSearchingArea = false,
-                            showMyLocation = isAwayFromGps(lat, lng, state),
-                        )
-                    },
-                    onError = { e ->
-                        AppLogger.e(e) { "Search this area: portrait fetch failed" }
-                        val s = _uiState.value as? MapUiState.Ready
-                        if (s != null) _uiState.value = s.copy(isSearchingArea = false)
-                        _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
-                    },
-                )
-            } catch (e: CancellationException) {
-                val s = _uiState.value as? MapUiState.Ready
-                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
-                throw e
-            } catch (e: Exception) {
-                AppLogger.e(e) { "Search this area: unexpected error" }
-                val s = _uiState.value as? MapUiState.Ready
-                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
-                _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
-            }
-        }
-    }
-
     fun returnToCurrentLocation() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cameraIdleJob?.cancel()
