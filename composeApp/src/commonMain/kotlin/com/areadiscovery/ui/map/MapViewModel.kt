@@ -98,6 +98,7 @@ class MapViewModel(
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.name ?: "all")))
     }
 
+    // TODO(BACKLOG-LOW): submitSearch — no current UI caller; preserve for programmatic search
     fun submitSearch(query: String) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cameraIdleJob?.cancel()
