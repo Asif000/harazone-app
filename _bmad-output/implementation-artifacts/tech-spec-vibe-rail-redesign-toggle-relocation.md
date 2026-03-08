@@ -2,7 +2,7 @@
 title: 'Vibe Rail Redesign + Map/List Toggle Relocation'
 slug: 'vibe-rail-redesign-toggle-relocation'
 created: '2026-03-07'
-status: 'implementation-complete'
+status: 'completed'
 stepsCompleted: [1, 2, 3, 4]
 tech_stack: ['Kotlin Multiplatform', 'Compose Multiplatform', 'Koin', 'Compose UI Graphics (Brush/lerp)']
 files_to_modify:
@@ -214,3 +214,11 @@ Replace the icon-only orbs with round radial-gradient circles + text labels belo
 - **Scale animation decision (F10):** Remove `Modifier.scale(scale)` entirely from `VibeOrb`. With dynamic sizing and a text label below the circle, scaling the entire `Column` looks awkward and conflicts with the sizing signal. The white border ring + bold label are sufficient active-state indicators. Delete the `animateFloatAsState` for `scale` and its usage.
 - **VibeRail padding removal (F11):** `VibeRail` is only used in `MapScreen.kt` (confirmed — not in `POIListView` or any other screen). Removing `modifier.padding(bottom = 72.dp)` from the `Column` is safe.
 - `toggleListView()` in VM is already a public function — no VM changes needed.
+
+## Review Notes
+- Adversarial review completed
+- Findings: 12 total, 5 fixed, 3 skipped (noise), 4 deferred (low/pre-existing)
+- Resolution approach: auto-fix
+- Fixed: F1/F3 output clamping `.coerceIn(32f, 48f)`, F2 a11y semantics (`Role.Tab` + `selected`), F8 dual-alpha comment, F9 edge case tests
+- Skipped as noise: F6 (spec says no Compose UI tests), F10 (magic numbers documented in spec), F11 (Row is better than Box), F12 (pre-existing FabScrim)
+- Deferred: F4 (callback guard — low risk), F5 (icon scaling — validate on device), F7 (dead code — pre-existing)
