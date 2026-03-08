@@ -1,5 +1,6 @@
 package com.areadiscovery.ui.map
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,19 +32,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.background
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.LocalPlatformContext
 import coil3.compose.SubcomposeAsyncImage
-import coil3.compose.SubcomposeAsyncImageContent
-import coil3.request.CachePolicy
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import coil3.size.Size
+import kotlin.math.roundToInt
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.ui.theme.MapSurfaceDark
@@ -124,12 +123,11 @@ private fun PoiListCard(poi: POI, onClick: () -> Unit) {
             verticalAlignment = Alignment.Top,
         ) {
             if (!poi.imageUrl.isNullOrBlank()) {
+                val sizePx = with(LocalDensity.current) { 56.dp.toPx().roundToInt() }
                 SubcomposeAsyncImage(
                     model = ImageRequest.Builder(LocalPlatformContext.current)
                         .data(poi.imageUrl)
-                        .crossfade(true)
-                        .size(Size(168, 168))
-                        .memoryCachePolicy(CachePolicy.ENABLED)
+                        .size(Size(sizePx, sizePx))
                         .build(),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
@@ -138,7 +136,6 @@ private fun PoiListCard(poi: POI, onClick: () -> Unit) {
                         .clip(RoundedCornerShape(8.dp)),
                     loading = { ThumbnailPlaceholder() },
                     error = { ThumbnailPlaceholder() },
-                    success = { SubcomposeAsyncImageContent() },
                 )
                 Spacer(Modifier.width(12.dp))
             }

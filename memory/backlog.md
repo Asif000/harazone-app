@@ -54,11 +54,27 @@ Items deferred during code review — to be picked up in relevant future stories
 
 ---
 
-## Bug — POI List View Missing Image Thumbnails
+## Perf — Coil Disk Cache Not Configured for KMP
 
 | Severity | Item | File | Fix |
 |----------|------|------|-----|
-| MEDIUM | `PoiListCard` never renders `poi.imageUrl` — field exists on `POI` model but is ignored in the list view. Should show a thumbnail (e.g. 56×56dp rounded image) on the leading edge of each card when `imageUrl != null`. Use `AsyncImage` (Coil KMP) with a placeholder icon fallback. | `POIListView.kt` | Add `AsyncImage` in `PoiListCard` `Row`, leading the text columns, sized ~56×56dp, `RoundedCornerShape(8.dp)`, only shown when `poi.imageUrl != null`. |
+| HIGH | Coil3 singleton in `App.kt` has no explicit `.diskCache()`. On iOS there's no default disk cache — thumbnails re-fetched every session. | `App.kt` | Add `.diskCache { DiskCache.Builder().directory(platformCacheDir / "image_cache").build() }` via expect/actual for platform cache directory. |
+
+---
+
+## Perf — SubcomposeAsyncImage Overhead in LazyColumn
+
+| Severity | Item | File | Fix |
+|----------|------|------|-----|
+| MEDIUM | `SubcomposeAsyncImage` creates a subcomposition per list item per state (~10-20 concurrent during scroll). `ThumbnailPlaceholder` (Box + Icon) could be expressed as a custom `Painter`, allowing the lighter `AsyncImage` variant instead. | `POIListView.kt` | Write `ThumbnailPlaceholderPainter` extending `Painter`, switch back to `AsyncImage` with `placeholder`/`error` painter params. |
+
+---
+
+## UX — ThumbnailPlaceholder Composable Has No Intrinsic Size
+
+| Severity | Item | File | Fix |
+|----------|------|------|-----|
+| LOW | `ThumbnailPlaceholder()` uses `fillMaxSize()` with no bounded parent constraint — fragile implicit contract. Safe today (only called inside SubcomposeAsyncImage slots) but breaks if reused elsewhere. | `POIListView.kt` | Accept `modifier: Modifier = Modifier` param, or add comment documenting the precondition. |
 
 ---
 
