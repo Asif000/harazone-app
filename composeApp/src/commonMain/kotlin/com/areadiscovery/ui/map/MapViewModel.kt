@@ -2,7 +2,9 @@ package com.areadiscovery.ui.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.areadiscovery.data.remote.MapTilerGeocodingProvider
 import com.areadiscovery.domain.model.BucketUpdate
+import com.areadiscovery.domain.model.GeocodingSuggestion
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
@@ -33,6 +35,7 @@ class MapViewModel(
     private val analyticsTracker: AnalyticsTracker,
     private val weatherProvider: WeatherProvider,
     private val aiProvider: AreaIntelligenceProvider? = null,
+    private val geocodingProvider: MapTilerGeocodingProvider,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
@@ -45,6 +48,7 @@ class MapViewModel(
     private var searchJob: Job? = null
     private var cameraIdleJob: Job? = null
     private var returnToLocationJob: Job? = null
+    private var geocodingJob: Job? = null
     private var pendingLat: Double = 0.0
     private var pendingLng: Double = 0.0
     private var pendingAreaName: String = ""
@@ -205,6 +209,199 @@ class MapViewModel(
         _uiState.value = current.copy(isFabExpanded = !current.isFabExpanded)
     }
 
+    fun onGeocodingQueryChanged(query: String) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        geocodingJob?.cancel()
+        if (query.isBlank()) {
+            _uiState.value = current.copy(
+                geocodingQuery = "",
+                geocodingSuggestions = emptyList(),
+                isGeocodingLoading = false,
+            )
+            return
+        }
+        _uiState.value = current.copy(
+            geocodingQuery = query,
+            isGeocodingLoading = true,
+        )
+        geocodingJob = viewModelScope.launch {
+            delay(300)
+            val result = geocodingProvider.search(query)
+            val updated = _uiState.value as? MapUiState.Ready ?: return@launch
+            if (result.isFailure) {
+                AppLogger.e(result.exceptionOrNull()) { "Geocoding search failed" }
+                _uiState.value = updated.copy(isGeocodingLoading = false)
+                return@launch
+            }
+            val raw = result.getOrThrow()
+            val withDistance = raw.map { s ->
+                if (updated.gpsLatitude == 0.0 && updated.gpsLongitude == 0.0) s
+                else s.copy(distanceKm = haversineKm(updated.gpsLatitude, updated.gpsLongitude, s.latitude, s.longitude))
+            }
+            _uiState.value = updated.copy(
+                geocodingSuggestions = withDistance,
+                isGeocodingLoading = false,
+            )
+        }
+    }
+
+    fun onGeocodingSuggestionSelected(suggestion: GeocodingSuggestion) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        cameraIdleJob?.cancel()
+        geocodingJob?.cancel()
+        searchJob?.cancel()
+        returnToLocationJob?.cancel()
+        pendingLat = suggestion.latitude
+        pendingLng = suggestion.longitude
+        pendingAreaName = suggestion.name
+        _uiState.value = current.copy(
+            geocodingQuery = "",
+            geocodingSuggestions = emptyList(),
+            isGeocodingLoading = false,
+            geocodingSelectedPlace = suggestion.name,
+            isGeocodingInitiatedSearch = true,
+            latitude = suggestion.latitude,
+            longitude = suggestion.longitude,
+            cameraMoveId = current.cameraMoveId + 1,
+            isSearchingArea = true,
+            showSearchThisArea = false,
+            showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, current),
+            vibePoiCounts = emptyMap(),
+            pois = emptyList(),
+            activeVibe = null,
+        )
+        searchJob = viewModelScope.launch {
+            try {
+                collectPortraitWithRetry(
+                    areaName = suggestion.name,
+                    onComplete = { pois, _ ->
+                        val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
+                        val counts = computeVibePoiCounts(pois)
+                        _uiState.value = state.copy(
+                            areaName = suggestion.name,
+                            pois = pois,
+                            vibePoiCounts = counts,
+                            activeVibe = null,
+                            isSearchingArea = false,
+                            showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, state),
+                        )
+                    },
+                    onError = { e ->
+                        AppLogger.e(e) { "Geocoding selection: portrait fetch failed" }
+                        val s = _uiState.value as? MapUiState.Ready
+                        if (s != null) _uiState.value = s.copy(
+                            isSearchingArea = false,
+                            showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, s),
+                        )
+                        _errorEvents.tryEmit("Couldn't load area info. Try again.")
+                    },
+                )
+            } catch (e: CancellationException) {
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Geocoding selection: unexpected error" }
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(
+                    isSearchingArea = false,
+                    showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, s),
+                )
+                _errorEvents.tryEmit("Couldn't load area info. Try again.")
+            }
+        }
+    }
+
+    fun onGeocodingSubmitEmpty() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        cameraIdleJob?.cancel()
+        geocodingJob?.cancel()
+        returnToLocationJob?.cancel()
+        val areaName = pendingAreaName.ifBlank { current.areaName }
+        val lat = if (pendingLat != 0.0) pendingLat else current.latitude
+        val lng = if (pendingLng != 0.0) pendingLng else current.longitude
+        pendingAreaName = areaName
+        pendingLat = lat
+        pendingLng = lng
+        _uiState.value = current.copy(
+            isSearchingArea = true,
+            isGeocodingInitiatedSearch = true,
+            showSearchThisArea = false,
+            showMyLocation = isAwayFromGps(lat, lng, current),
+            vibePoiCounts = emptyMap(),
+            pois = emptyList(),
+            activeVibe = null,
+        )
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            try {
+                collectPortraitWithRetry(
+                    areaName = areaName,
+                    onComplete = { pois, _ ->
+                        val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
+                        val counts = computeVibePoiCounts(pois)
+                        _uiState.value = state.copy(
+                            areaName = areaName,
+                            latitude = lat,
+                            longitude = lng,
+                            pois = pois,
+                            vibePoiCounts = counts,
+                            activeVibe = null,
+                            isSearchingArea = false,
+                            showMyLocation = isAwayFromGps(lat, lng, state),
+                        )
+                    },
+                    onError = { e ->
+                        AppLogger.e(e) { "Empty submit: portrait fetch failed" }
+                        val s = _uiState.value as? MapUiState.Ready
+                        if (s != null) _uiState.value = s.copy(
+                            isSearchingArea = false,
+                            showMyLocation = isAwayFromGps(lat, lng, s),
+                        )
+                        _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
+                    },
+                )
+            } catch (e: CancellationException) {
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Empty submit: unexpected error" }
+                val s = _uiState.value as? MapUiState.Ready
+                if (s != null) _uiState.value = s.copy(
+                    isSearchingArea = false,
+                    showMyLocation = isAwayFromGps(lat, lng, s),
+                )
+                _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
+            }
+        }
+    }
+
+    fun onGeocodingCleared() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        geocodingJob?.cancel()
+        _uiState.value = current.copy(
+            geocodingQuery = "",
+            geocodingSuggestions = emptyList(),
+            isGeocodingLoading = false,
+            geocodingSelectedPlace = null,
+            isGeocodingInitiatedSearch = false,
+        )
+    }
+
+    fun onGeocodingCancelLoad() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        searchJob?.cancel()
+        _uiState.value = current.copy(
+            isSearchingArea = false,
+            isGeocodingInitiatedSearch = false,
+            isGeocodingLoading = false,
+            geocodingQuery = "",
+            geocodingSuggestions = emptyList(),
+            geocodingSelectedPlace = null,
+        )
+    }
+
     fun onMapRenderFailed() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = current.copy(mapRenderFailed = true, showListView = true)
@@ -334,6 +531,10 @@ class MapViewModel(
                     mapOf("same_area" to isSameArea.toString()),
                 )
 
+                pendingLat = coords.latitude
+                pendingLng = coords.longitude
+                pendingAreaName = gpsAreaName
+
                 if (isSameArea) {
                     _uiState.value = state.copy(
                         latitude = coords.latitude,
@@ -343,6 +544,8 @@ class MapViewModel(
                         showMyLocation = false,
                         showSearchThisArea = false,
                         cameraMoveId = state.cameraMoveId + 1,
+                        geocodingSelectedPlace = null,
+                        isGeocodingInitiatedSearch = false,
                     )
                 } else {
                     _uiState.value = state.copy(
@@ -357,6 +560,8 @@ class MapViewModel(
                         pois = emptyList(),
                         vibePoiCounts = emptyMap(),
                         activeVibe = null,
+                        geocodingSelectedPlace = null,
+                        isGeocodingInitiatedSearch = false,
                     )
                     collectPortraitWithRetry(
                         areaName = gpsAreaName,
@@ -556,6 +761,18 @@ class MapViewModel(
         } catch (e: Exception) {
             onError(e)
         }
+    }
+
+    private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+        val r = 6371.0
+        val dLat = (lat2 - lat1) * kotlin.math.PI / 180.0
+        val dLon = (lon2 - lon1) * kotlin.math.PI / 180.0
+        val rLat1 = lat1 * kotlin.math.PI / 180.0
+        val rLat2 = lat2 * kotlin.math.PI / 180.0
+        val a = kotlin.math.sin(dLat / 2).let { it * it } +
+            kotlin.math.cos(rLat1) * kotlin.math.cos(rLat2) *
+            kotlin.math.sin(dLon / 2).let { it * it }
+        return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
     }
 
     private fun isAwayFromGps(cameraLat: Double, cameraLng: Double, state: MapUiState.Ready): Boolean {

@@ -8,7 +8,7 @@ techniques_used: ['Cross-Pollination', 'Sensory Exploration', 'Chaos Engineering
 ideas_generated: ['Breathing Orbits', 'Reactive Radius', 'Living Canvas Background', 'Breathing Text Not Labels', 'Map Integration', 'Galaxy-Map Fusion', 'Split Horizon Orbs', 'Full-Screen Map with Category Rail', 'Rich POI Cards', 'Contextual Lens', 'Area Search with Weather/Time', 'Map Pan Auto-Populate', 'Material Symbols Pin Icons', 'Smart AI Search Bar', 'Glow Zones', 'Expandable POI Card', 'Save with Pin Badge']
 context_file: ''
 session_continued: true
-continuation_date: '2026-03-07'
+continuation_date: '2026-03-08'
 ---
 
 # Brainstorming Session Results
@@ -340,3 +340,177 @@ DESELECT (tap active vibe again):
 - `/tmp/vibe-vertical-labeled-mockup.html` — vertical rail with labels (Option C chosen)
 - `/tmp/vibe-dynamic-size-mockup.html` — dynamic sizing by POI count
 - `/tmp/vibe-all-pins-mockup.html` — default all-pins state (Option A chosen)
+
+---
+
+## Session 5: AI Chat — Epic 4a First Iteration (2026-03-08)
+
+### Core Question
+
+What makes a great first single-turn AI interaction on a map-first discovery app?
+
+### User Personas × First Queries
+
+| Persona | First Query | What they REALLY want |
+|---------|------------|----------------------|
+| Tourist just landed | "what should I do tonight" | Curated evening plan, not a list of 50 bars |
+| Local rediscovering home | "anything cool I don't know about near me" | Surprise — hidden gems they've walked past |
+| Anxious parent | "is this area safe to walk at night" | Reassurance + specific advice, not a crime stat |
+| Foodie | "best food that's not on Google Maps" | Insider knowledge, not Yelp top 10 |
+
+**Key insight:** Nobody types a precise address. They ask vague, emotional questions. The AI's job is to turn vague intent into a satisfying, map-anchored answer.
+
+### Taste Model
+
+Two signal types that supplement each other:
+
+- **Silent signals** (no questions needed): vibe taps, time of day, day of week, weather
+- **Spoken signal**: one clarifier question when silent signals aren't enough
+
+**Rules:**
+1. Safety/urgent queries → answer instantly, no clarifier
+2. Discovery queries → one quick taste question, max 1 follow-up
+3. Never a form — it's a conversation, not onboarding
+4. The more silent signals we have, the fewer questions we ask
+
+| Context (silent) | Clarifier (spoken) | Response flavor |
+|------------------|--------------------|-----------------|
+| Browsed Character, History | "Chill or high energy?" | Historic jazz bar, not a nightclub |
+| Browsed What's On, Safety | "With kids?" | Family-friendly events in safe zones |
+| No vibe activity yet | "What are you into?" | Broader question since no signal |
+| Heavy Safety vibe | (skip — answer directly) | Safety-first framing on everything |
+
+### Time-of-Day Awareness (free signal)
+
+| Time window | How it shifts responses |
+|-------------|----------------------|
+| Morning (6-11a) | Cafés, parks, markets, breakfast spots |
+| Midday (11a-2p) | Lunch spots, indoor escapes (hot climate), museums |
+| Afternoon (2-5p) | Activities, shopping, sightseeing, golden hour tips |
+| Evening (5-9p) | Dinner, live music, sunset spots, happy hours |
+| Night (9p+) | Nightlife, safe routes, late-night eats. Safety framing automatic |
+
+### Response Anatomy (stolen from the best)
+
+| Source | What they nail | Stolen for us |
+|--------|---------------|-------------|
+| Perplexity | Sourced, structured, scannable | Bulleted answer with POI names as tappable links |
+| Hotel concierge | Opinionated, warm, 3 picks not 30 | "I'd personally go to..." tone, max 3-5 POIs |
+| Instagram stories | Visual, quick, swipeable | Response card with POI photos inline |
+| Google Maps "nearby" | Pins light up on map | Mentioned POIs pulse on the map behind the overlay |
+
+**Response structure:**
+1. **One-liner opinion** — "This area comes alive at night. Here's what I'd do:"
+2. **3-5 POI cards** — name, why_special, photo, tappable → pin pulses on map
+3. **Follow-up chips** — "More like this" / "Different vibe" / "Plan my evening"
+
+### v1 Scope (MVP Line)
+
+**IN (10 components):**
+
+| # | Component | Rationale |
+|---|-----------|-----------|
+| 1 | One-liner opinion | Sets tone, easy to build |
+| 2 | 3-5 POI cards with photos | Core value — map-anchored answers. Image pipeline already working |
+| 3 | POIs pulse on map behind overlay | Connects chat to map — the differentiator |
+| 4 | Time-of-day awareness | Free signal, already have time data |
+| 5 | Vibe behavior as context | Already tracking taps, just pass to prompt |
+| 6 | One clarifier question (when needed) | Simple conditional logic |
+| 7 | Follow-up chips | Already exist in overlay |
+| 8 | "More like this" chip | Re-query with same filters |
+| 9 | "Different vibe" chip | Re-query with opposite vibe |
+| 10 | Tappable POI → dismiss overlay, zoom to pin | Connects response to map |
+
+**DEFERRED:**
+
+| Component | When | Why defer |
+|-----------|------|-----------|
+| Multi-turn memory | Phase B iter 2 | Needs conversation state management, token accumulation, "new conversation" UX |
+| "Plan my evening" chip | Phase C (Itinerary) | Itinerary feature |
+| Day-of-week weighting | Phase B | Nice-to-have, time-of-day is enough for v1 |
+| Weather-aware responses | Phase B | Have data but adds prompt complexity |
+| Cross-session taste memory | Phase D (Vibe Evolution) | Needs persistence layer, taste profile schema, decay strategy |
+
+### Definitions
+
+- **Multi-turn memory**: AI remembers what you said earlier in the same conversation. Without it, each query is standalone. With it, "what about food nearby" knows you just asked about nightlife and suggests restaurants near those bars.
+- **Cross-session memory**: AI remembers your taste across separate app opens. Builds a taste profile over time — you train your concierge by using the app. Vibe tap behavior is a crude version of this already.
+
+### Key Decisions
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | First interaction model | Single-turn with smart context | Multi-turn adds scope, single-turn with silent signals is already better than most apps |
+| 2 | Taste signals | Silent (vibes, time) + spoken (clarifier) supplementing each other | More signals = fewer questions over time |
+| 3 | Safety queries | Answer immediately, no clarifier | Urgency > personalization |
+| 4 | Response length | 3-5 POIs max | Concierge, not search engine |
+| 5 | Response tone | Opinionated local, not neutral assistant | Matches Gemini prompt v2 persona |
+| 6 | POI photos in chat | v1 (already working) | Image pipeline shipped |
+| 7 | Map connection | POIs pulse on map behind overlay | Core differentiator vs ChatGPT/Perplexity |
+| 8 | Party mode for this topic | Skipped | Converging on decisions, not diverging — decision velocity > creative conflict |
+
+### Next Steps
+
+1. **Quick Spec** — formalize v1 AI Chat into implementable spec
+2. **Implement** — build in Compose Multiplatform
+3. **Test on device** — validate response feel with real Gemini calls
+4. **Iterate** — back to brainstorm if response quality needs rethinking
+
+---
+
+### Session 5b: Search Bar Dual Mode — Place Jump + Refresh (2026-03-08)
+
+**Scope: TOP search bar ONLY.** Bottom bar (AI chat), vibe rail, FAB, and all other UI elements are out of scope. No changes to anything below the top search area.
+
+#### Problem
+
+Currently the top bar has "Refresh area" — useful for reloading POIs, but no way to jump to a different city/neighborhood/landmark without manually zooming and panning.
+
+#### Solution
+
+Replace "Refresh area" button with a dual-purpose search bar that handles both place search and area refresh.
+
+**Placeholder text:** "Jump to..."
+
+#### Behavior
+
+| User action | Result |
+|-------------|--------|
+| Tap bar, type nothing, hit enter | Refresh current area (same as today) |
+| Tap bar, type a place name | Autocomplete suggestions appear (3-5 results via MapTiler geocoding) |
+| Tap an autocomplete suggestion | Fly to location, update top bar city name, load POIs |
+| Hit enter with text | Select first autocomplete match |
+| Tap ✕ clear button | Clear text, return to idle state |
+| Hit Escape | Clear and dismiss |
+
+#### Visual States
+
+| State | Search bar | Autocomplete | ↻ icon | ✕ icon |
+|-------|-----------|-------------|--------|--------|
+| **Idle** | Rounded pill, placeholder text | Hidden | Visible | Hidden |
+| **Active/Typing** | Flat top corners (connected to dropdown) | Visible with results | Hidden | Visible |
+| **Place selected** | Shows selected place name | Hidden | Hidden | Visible |
+| **Empty submit** | Stays idle | Hidden | Spins (refresh) | Hidden |
+
+#### Autocomplete Item
+
+Each suggestion shows:
+- 📍 Pin icon
+- Place name (with typed portion bolded)
+- Detail line (type + region)
+- Distance from current location
+
+#### Key Decisions
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | What replaces "Refresh area" | Dual-purpose "Jump to..." bar | One control, two jobs — cleaner UI. "Jump to" = navigation, "Ask anything" = AI — no confusion |
+| 2 | Refresh behavior | Empty submit = refresh | Preserves existing functionality, no extra button |
+| 3 | Autocomplete source | MapTiler geocoding API | Already in the app for reverse geocoding |
+| 4 | Max suggestions | 3-5 | Fast to scan, no scrolling |
+| 5 | After fly-to | Update top bar city name + load POIs for new area | Same as manual pan + refresh |
+| 6 | Placeholder text | "Jump to..." | Navigation verb, no overlap with bottom "Ask anything..." (AI). Playful, implies speed |
+
+#### Prototype
+
+- `/tmp/search-bar-dual-mode.html` — interactive mockup with 4 states (idle, typing, selected, refresh). **Note:** bottom bar in mockup is placeholder only — not part of this spec.

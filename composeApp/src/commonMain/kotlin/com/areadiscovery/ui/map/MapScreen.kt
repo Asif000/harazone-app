@@ -3,13 +3,9 @@ package com.areadiscovery.ui.map
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
@@ -19,11 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -46,6 +40,7 @@ import com.areadiscovery.ui.components.AlertBanner
 import com.areadiscovery.ui.components.ContentNoteBanner
 import com.areadiscovery.ui.map.components.AISearchBar
 import com.areadiscovery.ui.map.components.ExpandablePoiCard
+import com.areadiscovery.ui.map.components.GeocodingSearchBar
 import com.areadiscovery.ui.map.components.FabMenu
 import com.areadiscovery.ui.map.components.MapListToggle
 import com.areadiscovery.ui.map.components.FabScrim
@@ -160,71 +155,25 @@ private fun ReadyContent(
                 .padding(top = 8.dp),
         )
 
-        // "Search this area" button
-        AnimatedVisibility(
-            visible = state.showSearchThisArea,
-            enter = slideInVertically { -it } + fadeIn(),
-            exit = slideOutVertically { -it } + fadeOut(),
+        // Geocoding search bar (always visible, replaces Refresh Area button)
+        // 56dp = TopContextBar height + top inset padding
+        GeocodingSearchBar(
+            query = state.geocodingQuery,
+            suggestions = state.geocodingSuggestions,
+            isGeocodingLoading = state.isGeocodingLoading,
+            selectedPlace = state.geocodingSelectedPlace,
+            isSearchingArea = state.isSearchingArea,
+            isGeocodingInitiatedSearch = state.isGeocodingInitiatedSearch,
+            onQueryChanged = { viewModel.onGeocodingQueryChanged(it) },
+            onSuggestionSelected = { viewModel.onGeocodingSuggestionSelected(it) },
+            onSubmitEmpty = { viewModel.onGeocodingSubmitEmpty() },
+            onClear = { viewModel.onGeocodingCleared() },
+            onCancelLoad = { viewModel.onGeocodingCancelLoad() },
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 56.dp),
-        ) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MapFloatingUiDark.copy(alpha = 0.90f),
-                modifier = Modifier.clickable { viewModel.onSearchThisAreaTapped() },
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = if (state.isNewArea) "Search this area" else "Refresh area",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White,
-                    )
-                }
-            }
-        }
-
-        // Loading indicator for "Search this area"
-        AnimatedVisibility(
-            visible = state.isSearchingArea,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 56.dp),
-        ) {
-            Surface(
-                shape = RoundedCornerShape(50),
-                color = MapFloatingUiDark.copy(alpha = 0.90f),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(14.dp),
-                        color = Color.White,
-                        strokeWidth = 2.dp,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "Loading area\u2026",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White,
-                    )
-                }
-            }
-        }
+                .padding(top = 56.dp)
+                .fillMaxWidth(),
+        )
 
         // Vibe rail (right side, bottom-aligned above FAB)
         VibeRail(

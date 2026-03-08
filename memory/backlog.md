@@ -4,6 +4,18 @@ Items deferred during code review — to be picked up in relevant future stories
 
 ---
 
+## Priority Order (2026-03-08)
+
+1. 🔴 **Search Bar Dual Mode** — in flight
+2. 🔴 **AI Chat v1 (Epic 4a)** — in flight next
+3. 🟡 **iOS — get it building + testable** — never attempted; int'l testers have iPhones. Key unknowns: MapLibre iOS expect/actual, location permissions (Info.plist), NativeSQLiteDriver. Firebase plist already in place. Brainstorm first to audit gaps.
+4. 🟡 **Contextual AI Tip** — English first, localise later
+5. 🟡 **Localisation Phase A** — AI locale injection (quick spec in-progress)
+6. 🟡 **Localisation Phase B** — full epic (moko-resources, RTL, MapLibre RTL plugin)
+7. 🟢 **Bugs + Architecture debt** — auto-refresh on pan, SummaryStateMapper, conversationHistory empty, AreaSessionManager
+
+---
+
 ## Story 3.2 — AI-Generated POI Markers
 
 | Severity | Item | File | Deferred To |

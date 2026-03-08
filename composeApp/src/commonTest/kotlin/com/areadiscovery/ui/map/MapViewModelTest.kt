@@ -8,7 +8,9 @@ import com.areadiscovery.domain.model.WeatherState
 import com.areadiscovery.domain.provider.WeatherProvider
 import com.areadiscovery.domain.repository.AreaRepository
 import com.areadiscovery.domain.usecase.GetAreaPortraitUseCase
+import com.areadiscovery.domain.model.GeocodingSuggestion
 import com.areadiscovery.fakes.FakeAnalyticsTracker
+import com.areadiscovery.fakes.FakeMapTilerGeocodingProvider
 import com.areadiscovery.fakes.FakeAreaContextFactory
 import com.areadiscovery.fakes.FakeAreaRepository
 import com.areadiscovery.fakes.FakeLocationProvider
@@ -57,12 +59,14 @@ class MapViewModelTest {
         areaContextFactory: com.areadiscovery.domain.service.AreaContextFactory = FakeAreaContextFactory(),
         analyticsTracker: com.areadiscovery.util.AnalyticsTracker = FakeAnalyticsTracker(),
         weatherProvider: WeatherProvider = FakeWeatherProvider(),
+        geocodingProvider: com.areadiscovery.data.remote.MapTilerGeocodingProvider = FakeMapTilerGeocodingProvider(),
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
         areaContextFactory = areaContextFactory,
         analyticsTracker = analyticsTracker,
         weatherProvider = weatherProvider,
+        geocodingProvider = geocodingProvider,
     )
 
     @Test
@@ -1092,6 +1096,159 @@ class MapViewModelTest {
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(initialPois, state2.pois)
         assertTrue(state2.showSearchThisArea)
+    }
+
+    // --- Geocoding tests ---
+
+    private val testSuggestions = listOf(
+        GeocodingSuggestion("Tower", "Tower, Lisbon, Portugal", 38.6916, -9.2159, null),
+        GeocodingSuggestion("Castle", "Castle, Lisbon, Portugal", 38.7139, -9.1332, null),
+    )
+
+    @Test
+    fun onGeocodingQueryChanged_blank_clearsSuggestions() = runTest(testDispatcher) {
+        val fakeGeocoding = FakeMapTilerGeocodingProvider(result = Result.success(testSuggestions))
+        val viewModel = createViewModel(geocodingProvider = fakeGeocoding)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        viewModel.onGeocodingQueryChanged("")
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("", state.geocodingQuery)
+        assertTrue(state.geocodingSuggestions.isEmpty())
+        assertFalse(state.isGeocodingLoading)
+    }
+
+    @Test
+    fun onGeocodingQueryChanged_withQuery_setsLoadingThenSuggestions() {
+        val stdDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(stdDispatcher)
+        try {
+            runTest(stdDispatcher) {
+                val fakeGeocoding = FakeMapTilerGeocodingProvider(result = Result.success(testSuggestions))
+                val viewModel = createViewModel(geocodingProvider = fakeGeocoding)
+                advanceTimeBy(11_000)
+                assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+                viewModel.onGeocodingQueryChanged("Tower")
+                val loadingState = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+                assertTrue(loadingState.isGeocodingLoading)
+
+                advanceTimeBy(400)
+                val resultState = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+                assertFalse(resultState.isGeocodingLoading)
+                assertEquals(2, resultState.geocodingSuggestions.size)
+                assertEquals("Tower", resultState.geocodingSuggestions[0].name)
+            }
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
+    }
+
+    @Test
+    fun onGeocodingQueryChanged_debounce_cancelsQuickKeystrokes() {
+        val stdDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(stdDispatcher)
+        try {
+            runTest(stdDispatcher) {
+                val fakeGeocoding = FakeMapTilerGeocodingProvider(result = Result.success(testSuggestions))
+                val viewModel = createViewModel(geocodingProvider = fakeGeocoding)
+                advanceTimeBy(11_000)
+                assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+                viewModel.onGeocodingQueryChanged("T")
+                advanceTimeBy(100)
+                viewModel.onGeocodingQueryChanged("To")
+                advanceTimeBy(400)
+
+                assertEquals(1, fakeGeocoding.callCount)
+                assertEquals("To", fakeGeocoding.lastQuery)
+            }
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
+    }
+
+    @Test
+    fun onGeocodingSuggestionSelected_updatesCameraAndLoadsPortrait() = runTest(testDispatcher) {
+        val pois = listOf(POI("Place", "landmark", "desc", Confidence.HIGH, 38.69, -9.21))
+        val areaRepo = FakeAreaRepository(updates = listOf(BucketUpdate.PortraitComplete(pois)))
+        val fakeGeocoding = FakeMapTilerGeocodingProvider()
+        val viewModel = createViewModel(areaRepository = areaRepo, geocodingProvider = fakeGeocoding)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        val suggestion = GeocodingSuggestion("Tower", "Tower, Lisbon", 38.6916, -9.2159, null)
+        viewModel.onGeocodingSuggestionSelected(suggestion)
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Tower", state.areaName)
+        assertEquals(38.6916, state.latitude)
+        assertEquals(-9.2159, state.longitude)
+        assertFalse(state.isSearchingArea)
+        assertEquals(1, state.pois.size)
+    }
+
+    @Test
+    fun onGeocodingSubmitEmpty_withNoPending_usesCurrentAreaName() = runTest(testDispatcher) {
+        val pois = listOf(POI("Spot", "café", "desc", Confidence.MEDIUM, 38.71, -9.13))
+        val areaRepo = FakeAreaRepository(updates = listOf(BucketUpdate.PortraitComplete(pois)))
+        val viewModel = createViewModel(areaRepository = areaRepo)
+        val readyState = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val originalAreaName = readyState.areaName
+
+        viewModel.onGeocodingSubmitEmpty()
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(originalAreaName, state.areaName)
+        assertFalse(state.isSearchingArea)
+    }
+
+    @Test
+    fun onGeocodingCleared_resetsAllGeocodingState() = runTest(testDispatcher) {
+        val fakeGeocoding = FakeMapTilerGeocodingProvider()
+        val viewModel = createViewModel(geocodingProvider = fakeGeocoding)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Select a place first
+        val suggestion = GeocodingSuggestion("Tower", "Tower, Lisbon", 38.6916, -9.2159, null)
+        viewModel.onGeocodingSuggestionSelected(suggestion)
+
+        viewModel.onGeocodingCleared()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("", state.geocodingQuery)
+        assertTrue(state.geocodingSuggestions.isEmpty())
+        assertFalse(state.isGeocodingLoading)
+        assertNull(state.geocodingSelectedPlace)
+    }
+
+    @Test
+    fun onGeocodingQueryChanged_apiFailure_isGeocodingLoadingResetsFalse() {
+        val stdDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(stdDispatcher)
+        try {
+            runTest(stdDispatcher) {
+                val fakeGeocoding = FakeMapTilerGeocodingProvider(
+                    result = Result.failure(RuntimeException("Network error"))
+                )
+                val viewModel = createViewModel(geocodingProvider = fakeGeocoding)
+                advanceTimeBy(11_000)
+                assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+                viewModel.onGeocodingQueryChanged("bad query")
+                advanceTimeBy(400)
+
+                val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+                assertFalse(state.isGeocodingLoading)
+                assertTrue(state.geocodingSuggestions.isEmpty())
+            }
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
     }
 }
 

@@ -7,6 +7,7 @@ import com.areadiscovery.data.remote.GeminiAreaIntelligenceProvider
 import com.areadiscovery.data.remote.GeminiPromptBuilder
 import com.areadiscovery.data.remote.GeminiResponseParser
 import com.areadiscovery.data.remote.HttpClientFactory
+import com.areadiscovery.data.remote.MapTilerGeocodingProvider
 import com.areadiscovery.data.remote.WikipediaImageRepository
 import com.areadiscovery.data.repository.AreaRepositoryImpl
 import com.areadiscovery.domain.provider.ApiKeyProvider
@@ -53,4 +54,5 @@ val dataModule = module {
     }
     single { GetAreaPortraitUseCase(get()) }
     single<WeatherProvider> { OpenMeteoWeatherProvider(get()) }
+    single { MapTilerGeocodingProvider(get()) }
 }
