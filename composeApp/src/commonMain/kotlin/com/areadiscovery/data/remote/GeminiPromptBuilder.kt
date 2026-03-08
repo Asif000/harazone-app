@@ -56,4 +56,10 @@ IMPORTANT:
     fun buildAiSearchPrompt(query: String, areaName: String): String {
         return """You are a knowledgeable local guide for $areaName. Answer the following question concisely as if you are a local expert: "$query". Keep your response under 120 words. Be specific and practical. Do not use bullet points."""
     }
+
+    fun buildChatSystemContext(areaName: String, poiNames: List<String>, vibeName: String?): String {
+        val poisLine = if (poiNames.isNotEmpty()) " Key places: ${poiNames.joinToString(", ")}." else ""
+        val vibeLine = if (vibeName != null) " Current vibe focus: $vibeName." else ""
+        return "You are a knowledgeable local guide for $areaName.$poisLine$vibeLine Answer conversationally, under 150 words per reply. Be specific and practical."
+    }
 }

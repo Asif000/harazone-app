@@ -32,11 +32,23 @@ class FakeAreaIntelligenceProvider : AreaIntelligenceProvider {
         }
     }
 
+    var chatTokens: List<ChatToken> = emptyList()
+    var shouldThrowChat: Boolean = false
+    var chatCallCount = 0
+    var lastChatHistory: List<ChatMessage> = emptyList()
+
     override fun streamChatResponse(
         query: String,
         areaName: String,
         conversationHistory: List<ChatMessage>,
-    ): Flow<ChatToken> = emptyFlow()
+    ): Flow<ChatToken> {
+        chatCallCount++
+        lastChatHistory = conversationHistory
+        return flow {
+            if (shouldThrowChat) throw RuntimeException("Chat test error")
+            chatTokens.forEach { emit(it) }
+        }
+    }
 }
 
 fun defaultBucketEmissions(): List<BucketUpdate> = buildList {

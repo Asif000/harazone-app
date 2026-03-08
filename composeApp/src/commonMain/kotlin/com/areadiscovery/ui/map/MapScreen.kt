@@ -48,7 +48,6 @@ import com.areadiscovery.ui.map.components.GeocodingSearchBar
 import com.areadiscovery.ui.map.components.FabMenu
 import com.areadiscovery.ui.map.components.MapListToggle
 import com.areadiscovery.ui.map.components.FabScrim
-import com.areadiscovery.ui.map.components.SearchOverlay
 import com.areadiscovery.ui.map.components.TopContextBar
 import com.areadiscovery.ui.map.components.VibeRail
 import com.areadiscovery.ui.theme.MapFloatingUiDark
@@ -90,7 +89,9 @@ fun MapScreen(
         }
 
         is MapUiState.Ready -> {
-            ReadyContent(state, viewModel, onNavigateToMaps)
+            val chatViewModel: ChatViewModel = koinViewModel()
+            val chatState by chatViewModel.uiState.collectAsStateWithLifecycle()
+            ReadyContent(state, viewModel, chatViewModel, chatState, onNavigateToMaps)
         }
     }
 }
@@ -99,6 +100,8 @@ fun MapScreen(
 private fun ReadyContent(
     state: MapUiState.Ready,
     viewModel: MapViewModel,
+    chatViewModel: ChatViewModel,
+    chatState: ChatUiState,
     onNavigateToMaps: (Double, Double, String) -> Boolean,
 ) {
     // TODO(BACKLOG-LOW): snackbarHostState created inside Ready branch — resets on Ready→Failed→Ready retry
@@ -200,14 +203,11 @@ private fun ReadyContent(
             )
         }
 
-        // Back button: dismiss POI card > search overlay > FAB (priority order)
+        // Back button: dismiss POI card > FAB (priority order)
         PlatformBackHandler(enabled = state.selectedPoi != null) {
             viewModel.clearPoiSelection()
         }
-        PlatformBackHandler(enabled = state.selectedPoi == null && state.isSearchOverlayOpen) {
-            viewModel.closeSearchOverlay()
-        }
-        PlatformBackHandler(enabled = state.selectedPoi == null && !state.isSearchOverlayOpen && state.isFabExpanded) {
+        PlatformBackHandler(enabled = state.selectedPoi == null && state.isFabExpanded) {
             viewModel.toggleFab()
         }
 
@@ -238,8 +238,8 @@ private fun ReadyContent(
                 },
                 onAskAiClick = { query ->
                     viewModel.clearPoiSelection()
-                    viewModel.openSearchOverlay()
-                    viewModel.submitSearch(query)
+                    chatViewModel.openChat(state.areaName, state.pois, state.activeVibe)
+                    chatViewModel.sendMessage(query)
                 },
                 onSaveClick = {
                     coroutineScope.launch {
@@ -284,7 +284,7 @@ private fun ReadyContent(
 
         // MyLocation button (Position C — left side, above AI bar)
         AnimatedVisibility(
-            visible = state.showMyLocation && !state.isSearchingArea && !state.isSearchOverlayOpen,
+            visible = state.showMyLocation && !state.isSearchingArea && !state.isSearchOverlayOpen && !chatState.isOpen,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -323,25 +323,26 @@ private fun ReadyContent(
             )
         }
 
-        // AI search bar
+        // AI search bar — tapping opens the ChatOverlay directly
         AISearchBar(
-            onTap = { viewModel.openSearchOverlay() },
+            onTap = { chatViewModel.openChat(state.areaName, state.pois, state.activeVibe) },
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp),
         )
 
-        // Search overlay
-        if (state.isSearchOverlayOpen) {
-            SearchOverlay(
-                query = state.searchQuery,
-                aiResponse = state.aiResponse,
-                isAiResponding = state.isAiResponding,
-                followUpChips = state.followUpChips,
-                onQueryChange = { viewModel.updateSearchQuery(it) },
-                onSubmit = { viewModel.submitSearch(it) },
-                onDismiss = { viewModel.closeSearchOverlay() },
+        // Chat overlay
+        if (chatState.isOpen) {
+            ChatOverlay(
+                viewModel = chatViewModel,
+                chatState = chatState,
+                onDismiss = { chatViewModel.closeChat() },
             )
+        }
+
+        // Must be LAST PlatformBackHandler in ReadyContent — last-composed = highest priority
+        PlatformBackHandler(enabled = chatState.isOpen) {
+            chatViewModel.closeChat()
         }
 
         // Snackbar host

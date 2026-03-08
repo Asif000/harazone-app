@@ -4,6 +4,7 @@ import com.areadiscovery.domain.model.AreaContext
 import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.ChatMessage
 import com.areadiscovery.domain.model.ChatToken
+import com.areadiscovery.domain.model.MessageRole
 import com.areadiscovery.domain.model.DomainError
 import com.areadiscovery.domain.model.DomainErrorException
 import com.areadiscovery.domain.provider.ApiKeyProvider
@@ -29,11 +30,19 @@ import kotlinx.serialization.json.Json
 
 @Serializable
 private data class GeminiRequest(
-    val contents: List<GeminiRequestContent>
+    val contents: List<GeminiRequestContent>,
+    @kotlinx.serialization.SerialName("system_instruction")
+    val systemInstruction: GeminiSystemInstruction? = null,
+)
+
+@Serializable
+private data class GeminiSystemInstruction(
+    val parts: List<GeminiRequestPart>
 )
 
 @Serializable
 private data class GeminiRequestContent(
+    val role: String = "user",
     val parts: List<GeminiRequestPart>
 )
 
@@ -137,15 +146,23 @@ internal class GeminiAreaIntelligenceProvider(
 
         AppLogger.d { "GeminiAreaIntelligenceProvider: streaming chat for '$query' in '$areaName'" }
 
-        val prompt = promptBuilder.buildAiSearchPrompt(query, areaName)
-        val requestBody = json.encodeToString(
-            GeminiRequest(
-                contents = listOf(
-                    GeminiRequestContent(
-                        parts = listOf(GeminiRequestPart(text = prompt))
-                    )
-                )
+        // Extract system context (first USER message before any real conversation) as systemInstruction
+        val systemInstruction = conversationHistory.firstOrNull()?.let { first ->
+            GeminiSystemInstruction(parts = listOf(GeminiRequestPart(text = first.content)))
+        }
+        val actualHistory = if (systemInstruction != null) conversationHistory.drop(1) else conversationHistory
+
+        val contents = actualHistory.map { msg ->
+            GeminiRequestContent(
+                role = if (msg.role == MessageRole.USER) "user" else "model",
+                parts = listOf(GeminiRequestPart(text = msg.content))
             )
+        } + GeminiRequestContent(
+            role = "user",
+            parts = listOf(GeminiRequestPart(text = query))
+        )
+        val requestBody = json.encodeToString(
+            GeminiRequest(contents = contents, systemInstruction = systemInstruction)
         )
 
         var hasEmitted = false

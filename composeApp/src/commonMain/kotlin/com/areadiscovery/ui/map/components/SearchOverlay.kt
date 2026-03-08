@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import com.areadiscovery.ui.components.StreamingTextContent
@@ -81,7 +82,8 @@ fun SearchOverlay(
                     onValueChange = onQueryChange,
                     modifier = Modifier
                         .weight(1f)
-                        .focusRequester(focusRequester),
+                        .focusRequester(focusRequester)
+                        .testTag("search_overlay_input"),
                     placeholder = { Text("Ask anything...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                     singleLine = true,

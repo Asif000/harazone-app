@@ -103,6 +103,8 @@ turbine = { module = "app.cash.turbine:turbine", version.ref = "turbine" }
 androidx-test-core = { module = "androidx.test:core", version = "1.6.1" }
 androidx-test-rules = { module = "androidx.test:rules", version = "1.6.1" }
 androidx-test-runner = { module = "androidx.test:runner", version = "1.6.2" }
+compose-ui-test-junit4 = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "composeMultiplatform" }
+compose-ui-test-manifest = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "composeMultiplatform" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

@@ -139,6 +139,8 @@ kotlin {
                 implementation(libs.androidx.test.core)
                 implementation(libs.androidx.test.rules)
                 implementation(libs.androidx.test.runner)
+                implementation(libs.compose.ui.test.junit4)
+                implementation(libs.compose.ui.test.manifest)
             }
         }
     }

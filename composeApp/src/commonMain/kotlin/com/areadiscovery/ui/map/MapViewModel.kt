@@ -133,85 +133,39 @@ class MapViewModel(
         cameraIdleJob?.cancel()
         searchJob?.cancel()
 
-        if (isQuestion(query)) {
-            _uiState.value = current.copy(
-                searchQuery = query,
-                aiResponse = "",
-                isAiResponding = true,
-                followUpChips = emptyList(),
-            )
-            analyticsTracker.trackEvent("search_question_submitted", mapOf("query" to query))
+        // Questions are routed to ChatOverlay by MapScreen — submitSearch only handles area searches
+        _uiState.value = current.copy(
+            searchQuery = query,
+            isAiResponding = true,
+        )
+        analyticsTracker.trackEvent("search_area_submitted", mapOf("query" to query))
 
-            searchJob = viewModelScope.launch {
-                try {
-                    // TODO(BACKLOG-MEDIUM): conversationHistory always empty — follow-up chips produce standalone answers with no context
-                    aiProvider?.streamChatResponse(query, current.areaName, emptyList())
-                        ?.catch { e ->
-                            AppLogger.e(e) { "AI search failed" }
-                            val s = _uiState.value as? MapUiState.Ready ?: return@catch
-                            _uiState.value = s.copy(
-                                aiResponse = "Something went wrong. Please try again.",
+        searchJob = viewModelScope.launch {
+            try {
+                val context = areaContextFactory.create()
+                getAreaPortrait(query, context)
+                    .catch { e -> AppLogger.e(e) { "Area search failed" } }
+                    .collect { update ->
+                        if (update is BucketUpdate.PortraitComplete) {
+                            val pois = update.pois
+                            val state = _uiState.value as? MapUiState.Ready ?: return@collect
+                            val counts = computeVibePoiCounts(pois)
+                            _uiState.value = state.copy(
+                                pois = pois,
+                                areaName = query,
+                                vibePoiCounts = counts,
+                                activeVibe = null,
+                                isSearchOverlayOpen = false,
                                 isAiResponding = false,
                             )
                         }
-                        ?.collect { token ->
-                            val state = _uiState.value as? MapUiState.Ready ?: return@collect
-                            if (token.isComplete) {
-                                _uiState.value = state.copy(
-                                    isAiResponding = false,
-                                    followUpChips = computeFollowUpChips(query),
-                                )
-                            } else {
-                                _uiState.value = state.copy(
-                                    aiResponse = state.aiResponse + token.text,
-                                )
-                            }
-                        }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    AppLogger.e(e) { "AI search error" }
-                    val state = _uiState.value as? MapUiState.Ready ?: return@launch
-                    _uiState.value = state.copy(
-                        aiResponse = "Something went wrong. Please try again.",
-                        isAiResponding = false,
-                    )
-                }
-            }
-        } else {
-            _uiState.value = current.copy(
-                searchQuery = query,
-                isAiResponding = true,
-            )
-            analyticsTracker.trackEvent("search_area_submitted", mapOf("query" to query))
-
-            searchJob = viewModelScope.launch {
-                try {
-                    val context = areaContextFactory.create()
-                    getAreaPortrait(query, context)
-                        .catch { e -> AppLogger.e(e) { "Area search failed" } }
-                        .collect { update ->
-                            if (update is BucketUpdate.PortraitComplete) {
-                                val pois = update.pois
-                                val state = _uiState.value as? MapUiState.Ready ?: return@collect
-                                val counts = computeVibePoiCounts(pois)
-                                _uiState.value = state.copy(
-                                    pois = pois,
-                                    areaName = query,
-                                    vibePoiCounts = counts,
-                                    activeVibe = null,
-                                    isSearchOverlayOpen = false,
-                                    isAiResponding = false,
-                                )
-                            }
-                        }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    AppLogger.e(e) { "Area search error" }
-                    val state = _uiState.value as? MapUiState.Ready ?: return@launch
-                    _uiState.value = state.copy(isAiResponding = false)
-                }
+                    }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Area search error" }
+                val state = _uiState.value as? MapUiState.Ready ?: return@launch
+                _uiState.value = state.copy(isAiResponding = false)
             }
         }
     }
@@ -756,7 +710,7 @@ class MapViewModel(
         }
     }
 
-    private fun isQuestion(query: String): Boolean {
+    internal fun isQuestion(query: String): Boolean {
         val q = query.trim().lowercase()
         if (q.endsWith("?")) return true
         val words = q.split(" ", limit = 2)
