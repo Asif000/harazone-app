@@ -8,6 +8,7 @@ import com.areadiscovery.domain.model.GeocodingSuggestion
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.RecentPlace
 import com.areadiscovery.domain.repository.RecentPlacesRepository
+import com.areadiscovery.domain.repository.SavedPoiRepository
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.domain.provider.WeatherProvider
 import com.areadiscovery.domain.service.AreaContextFactory
@@ -37,6 +38,7 @@ class MapViewModel(
     private val weatherProvider: WeatherProvider,
     private val geocodingProvider: MapTilerGeocodingProvider,
     private val recentPlacesRepository: RecentPlacesRepository,
+    private val savedPoiRepository: SavedPoiRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
@@ -62,6 +64,12 @@ class MapViewModel(
                 latestRecents = recents
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
                 _uiState.value = current.copy(recentPlaces = recents)
+            }
+        }
+        viewModelScope.launch {
+            savedPoiRepository.observeAll().collect { pois ->
+                val current = _uiState.value as? MapUiState.Ready ?: return@collect
+                _uiState.value = current.copy(savedPois = pois, savedPoiCount = pois.size)
             }
         }
     }
@@ -136,6 +144,16 @@ class MapViewModel(
     fun toggleFab() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = current.copy(isFabExpanded = !current.isFabExpanded)
+    }
+
+    fun openSavesSheet() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(showSavesSheet = true)
+    }
+
+    fun closeSavesSheet() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(showSavesSheet = false)
     }
 
     fun onGeocodingQueryChanged(query: String) {

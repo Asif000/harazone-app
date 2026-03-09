@@ -7,6 +7,7 @@ import com.areadiscovery.domain.model.MessageRole
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.fakes.FakeAreaIntelligenceProvider
 import com.areadiscovery.fakes.FakeClock
+import com.areadiscovery.fakes.FakeSavedPoiRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -27,6 +28,7 @@ class ChatViewModelTest {
     private val fakeAiProvider = FakeAreaIntelligenceProvider()
     private val fakeClock = FakeClock()
     private val promptBuilder = GeminiPromptBuilder()
+    private val fakeSavedPoiRepository = FakeSavedPoiRepository()
 
     @BeforeTest
     fun setUp() {
@@ -42,6 +44,7 @@ class ChatViewModelTest {
         aiProvider = fakeAiProvider,
         promptBuilder = promptBuilder,
         clock = fakeClock,
+        savedPoiRepository = fakeSavedPoiRepository,
     )
 
     @Test
@@ -268,5 +271,166 @@ class ChatViewModelTest {
         vm.openChat("Test Area", emptyList(), null)
         assertTrue(vm.uiState.value.isOpen)
         assertEquals(2, vm.uiState.value.bubbles.size) // conversation preserved
+    }
+
+    // --- v1.1 tests: POI parser, skeletons, save/unsave ---
+
+    @Test
+    fun `parsePoiCards extracts valid POI from text`() = runTest {
+        val vm = createViewModel()
+        val text = """Here is a great place:
+{"n":"Cafe Roma","t":"food","lat":41.8902,"lng":12.4922,"w":"Best espresso in the neighborhood"}
+Check it out!"""
+        val results = vm.parsePoiCards(text)
+        assertEquals(1, results.size)
+        assertEquals("Cafe Roma", results[0].first.name)
+        assertEquals("food", results[0].first.type)
+        assertEquals(41.8902, results[0].first.lat)
+        assertEquals(12.4922, results[0].first.lng)
+    }
+
+    @Test
+    fun `parsePoiCards handles malformed JSON silently`() = runTest {
+        val vm = createViewModel()
+        val text = """{"n":"Good","t":"food","lat":1.0,"lng":2.0,"w":"nice"} and {"broken json"""
+        val results = vm.parsePoiCards(text)
+        assertEquals(1, results.size)
+        assertEquals("Good", results[0].first.name)
+    }
+
+    @Test
+    fun `parsePoiCards extracts multiple POIs`() = runTest {
+        val vm = createViewModel()
+        val text = """{"n":"A","t":"food","lat":1.0,"lng":2.0,"w":"a"} text {"n":"B","t":"park","lat":3.0,"lng":4.0,"w":"b"}"""
+        val results = vm.parsePoiCards(text)
+        assertEquals(2, results.size)
+        assertEquals("A", results[0].first.name)
+        assertEquals("B", results[1].first.name)
+    }
+
+    @Test
+    fun `parsePoiCards handles braces inside string values`() = runTest {
+        val vm = createViewModel()
+        val text = """{"n":"Cafe {Seasonal}","t":"food","lat":1.0,"lng":2.0,"w":"Open {April-Oct} only"}"""
+        val results = vm.parsePoiCards(text)
+        assertEquals(1, results.size)
+        assertEquals("Cafe {Seasonal}", results[0].first.name)
+        assertEquals("Open {April-Oct} only", results[0].first.whySpecial)
+    }
+
+    @Test
+    fun `showSkeletons true on stream start, false on complete`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Some text", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        vm.uiState.test {
+            awaitItem() // initial
+
+            vm.sendMessage("Show me cafes")
+
+            val final_ = expectMostRecentItem()
+            // After completion, showSkeletons should be false
+            assertFalse(final_.showSkeletons)
+            assertFalse(final_.isStreaming)
+        }
+    }
+
+    @Test
+    fun `savePoi optimistically updates savedPoiIds`() = runTest {
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        val card = ChatPoiCard(
+            name = "Test Cafe",
+            type = "food",
+            lat = 1.0,
+            lng = 2.0,
+            whySpecial = "Great coffee",
+        )
+
+        vm.savePoi(card, "Test Area")
+
+        assertTrue(vm.uiState.value.savedPoiIds.contains(card.id))
+    }
+
+    @Test
+    fun `savePoi reverts on repository failure`() = runTest {
+        fakeSavedPoiRepository.shouldThrow = true
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        val card = ChatPoiCard(
+            name = "Test Cafe",
+            type = "food",
+            lat = 1.0,
+            lng = 2.0,
+            whySpecial = "Great coffee",
+        )
+
+        vm.savePoi(card, "Test Area")
+
+        // With UnconfinedTestDispatcher, the coroutine runs eagerly
+        // The save throws, so savedPoiIds should NOT contain the id
+        assertFalse(vm.uiState.value.savedPoiIds.contains(card.id))
+    }
+
+    @Test
+    fun `unsavePoi removes from savedPoiIds`() = runTest {
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        val card = ChatPoiCard(
+            name = "Test Cafe",
+            type = "food",
+            lat = 1.0,
+            lng = 2.0,
+            whySpecial = "Great coffee",
+        )
+
+        vm.savePoi(card, "Test Area")
+        assertTrue(vm.uiState.value.savedPoiIds.contains(card.id))
+
+        vm.unsavePoi(card.id)
+        assertFalse(vm.uiState.value.savedPoiIds.contains(card.id))
+    }
+
+    @Test
+    fun `error during stream resets showSkeletons`() = runTest {
+        fakeAiProvider.shouldThrowChat = true
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        vm.sendMessage("Hello")
+
+        val state = vm.uiState.value
+        assertFalse(state.showSkeletons)
+    }
+
+    @Test
+    fun `stripPoiJson removes JSON and keeps prose`() = runTest {
+        val vm = createViewModel()
+        val text = """Here are some spots:
+{"n":"Cafe Roma","t":"food","lat":41.89,"lng":12.49,"w":"Best espresso"}
+And also check out:
+{"n":"Central Park","t":"park","lat":40.78,"lng":-73.97,"w":"Iconic green space"}
+Enjoy!"""
+        val stripped = vm.stripPoiJson(text)
+        assertTrue(stripped.contains("Here are some spots:"))
+        assertTrue(stripped.contains("And also check out:"))
+        assertTrue(stripped.contains("Enjoy!"))
+        assertFalse(stripped.contains("Cafe Roma"))
+        assertFalse(stripped.contains("Central Park"))
+        assertFalse(stripped.contains("{"))
+    }
+
+    @Test
+    fun `stripPoiJson returns text unchanged when no POI JSON`() = runTest {
+        val vm = createViewModel()
+        val text = "Just a plain response with no POI cards."
+        assertEquals(text, vm.stripPoiJson(text))
     }
 }

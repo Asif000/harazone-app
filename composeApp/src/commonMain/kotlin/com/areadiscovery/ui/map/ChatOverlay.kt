@@ -1,6 +1,7 @@
 package com.areadiscovery.ui.map
 
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -30,7 +31,10 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,8 +60,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import com.areadiscovery.BuildKonfig
 import com.areadiscovery.domain.model.MessageRole
 
 private val IndigoGradient = Brush.linearGradient(
@@ -72,6 +80,8 @@ internal fun ChatOverlay(
     viewModel: ChatViewModel,
     chatState: ChatUiState,
     onDismiss: () -> Unit,
+    onNavigateToMaps: (Double, Double, String) -> Boolean = { _, _, _ -> false },
+    onDirectionsFailed: () -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
@@ -172,6 +182,32 @@ internal fun ChatOverlay(
                             onRetry = { viewModel.retryLastMessage() },
                         )
                     }
+
+                    // Skeleton shimmer section
+                    if (chatState.showSkeletons) {
+                        val remainingSkeletons = (3 - chatState.poiCards.size).coerceAtLeast(0)
+                        if (remainingSkeletons > 0) {
+                            item(key = "skeletons") {
+                                SkeletonSection(remainingSkeletons)
+                            }
+                        }
+                    }
+
+                    // POI mini-cards section
+                    if (chatState.poiCards.isNotEmpty()) {
+                        items(chatState.poiCards, key = { it.id }) { card ->
+                            ChatPoiMiniCard(
+                                card = card,
+                                isSaved = card.id in chatState.savedPoiIds,
+                                onSave = { viewModel.savePoi(card, chatState.areaName) },
+                                onUnsave = { viewModel.unsavePoi(card.id) },
+                                onDirections = {
+                                    val handled = onNavigateToMaps(card.lat, card.lng, card.name)
+                                    if (!handled) onDirectionsFailed()
+                                },
+                            )
+                        }
+                    }
                 }
             }
 
@@ -235,6 +271,13 @@ private fun EmptyState(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Try asking what's nearby, what's safe, or what's on tonight",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
         Spacer(Modifier.height(20.dp))
         @OptIn(ExperimentalLayoutApi::class)
         FlowRow(
@@ -253,6 +296,173 @@ private fun EmptyState(
             }
         }
     }
+}
+
+@Composable
+private fun SkeletonSection(count: Int) {
+    val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
+    val shimmerAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 0.7f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(800),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "shimmerAlpha",
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        repeat(count) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = shimmerAlpha)
+                    ),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ChatPoiMiniCard(
+    card: ChatPoiCard,
+    isSaved: Boolean,
+    onSave: () -> Unit,
+    onUnsave: () -> Unit,
+    onDirections: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp)),
+    ) {
+        // Background satellite image
+        AsyncImage(
+            model = poiThumbnailUrl(card.lat, card.lng),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.matchParentSize(),
+        )
+        // Gradient scrim for text readability
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Black.copy(alpha = 0.35f),
+                        0.3f to Color.Black.copy(alpha = 0.7f),
+                        1f to Color.Black.copy(alpha = 0.85f),
+                    )
+                ),
+        )
+        // Content
+        Column(modifier = Modifier.padding(10.dp, 10.dp, 10.dp, 8.dp)) {
+            // Row 1: Type badge + Name
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(poiTypeEmoji(card.type), fontSize = 14.sp)
+                Spacer(Modifier.width(6.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        card.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        card.type.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.7f),
+                    )
+                }
+            }
+
+            // Row 2: Why special
+            Text(
+                card.whySpecial,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.85f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+
+            // Row 3: Action chips
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 8.dp),
+            ) {
+                SuggestionChip(
+                    onClick = { if (isSaved) onUnsave() else onSave() },
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = Color.White,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(if (isSaved) "Saved" else "Save", fontSize = 12.sp, color = Color.White)
+                        }
+                    },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = if (isSaved)
+                            Color.White.copy(alpha = 0.25f)
+                        else
+                            Color.White.copy(alpha = 0.15f),
+                    ),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                )
+                SuggestionChip(
+                    onClick = onDirections,
+                    label = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Directions,
+                                contentDescription = null,
+                                modifier = Modifier.size(14.dp),
+                                tint = Color.White,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text("Directions", fontSize = 12.sp, color = Color.White)
+                        }
+                    },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = Color.White.copy(alpha = 0.15f),
+                    ),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                )
+            }
+        }
+    }
+}
+
+private fun poiThumbnailUrl(lat: Double, lng: Double): String {
+    // Convert lat/lng to satellite tile coords (zoom 15) — same approach as AreaRepositoryImpl
+    val z = 15
+    val n = 1 shl z
+    val x = ((lng + 180.0) / 360.0 * n).toInt().coerceIn(0, n - 1)
+    val latRad = lat * kotlin.math.PI / 180.0
+    val y = ((1.0 - kotlin.math.ln(kotlin.math.tan(latRad) + 1.0 / kotlin.math.cos(latRad)) / kotlin.math.PI) / 2.0 * n).toInt().coerceIn(0, n - 1)
+    return "https://api.maptiler.com/tiles/satellite-v2/$z/$x/$y.jpg?key=${BuildKonfig.MAPTILER_API_KEY}"
+}
+
+private fun poiTypeEmoji(type: String): String = when (type.lowercase()) {
+    "food" -> "\uD83C\uDF5C"          // 🍜
+    "entertainment" -> "\uD83C\uDFAD"  // 🎭
+    "park" -> "\uD83C\uDF33"           // 🌳
+    "historic" -> "\uD83C\uDFDB\uFE0F" // 🏛️
+    "shopping" -> "\uD83D\uDECD\uFE0F" // 🛍️
+    "arts" -> "\uD83C\uDFA8"           // 🎨
+    "transit" -> "\uD83D\uDE8C"        // 🚌
+    "safety" -> "\uD83D\uDEE1\uFE0F"  // 🛡️
+    "beach" -> "\uD83C\uDFD6\uFE0F"   // 🏖️
+    "district" -> "\uD83C\uDFD8\uFE0F" // 🏘️
+    else -> "\uD83D\uDCCD"             // 📍
 }
 
 @Composable

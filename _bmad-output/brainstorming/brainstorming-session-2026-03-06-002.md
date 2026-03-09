@@ -514,3 +514,106 @@ Each suggestion shows:
 #### Prototype
 
 - `/tmp/search-bar-dual-mode.html` — interactive mockup with 4 states (idle, typing, selected, refresh). **Note:** bottom bar in mockup is placeholder only — not part of this spec.
+
+---
+
+## Session 6: AI Chat Reward Loop & Progressive Display (2026-03-08)
+
+### Party Mode — Making Chat Rewarding Beyond Wow Factor
+
+**Context:** v1 AI Chat is working and wowing. Now deepen the reward — create the urge to save places and plan itineraries.
+
+### Two Chat Contexts (Resolved)
+
+| | Search Bar Chat | POI "Ask AI" |
+|---|---|---|
+| Entry point | Bottom search bar | POI card "Ask AI" chip |
+| Context to Gemini | Full area: all POIs, active vibe, time-of-day, weather, engagement history, saves | Single POI: name, type, vibe, why_special, hours, coordinates |
+| System persona | Passionate local who knows the whole area | Knowledgeable guide about this specific place |
+| Response format | Rich POI mini-cards with photos, save chips, urgency flags | Text + inline photos (food, drinks, interiors) — no discovery cards |
+| Follow-up chips | "Save all", "Best order?", "Different vibe" (planning intent) | "How to get there?", "Similar places?", "What to bring?" |
+| Discovery counter | Yes (grows as you save) | No (investigating, not discovering) |
+| Map pulsing | Yes (POIs pulse behind overlay) | No (already zoomed to pin) |
+| Voice input | Yes (mic button) | Yes (mic button) |
+| Conversation memory | Full session (up to 20 turns) | Lighter (up to 10 turns) |
+| Photos | Yes — POI cards with thumbnails | Yes — inline photo strips (food, interiors, views) |
+
+**Key decision:** Both chats show photos for attraction. The difference is structure (discovery cards vs attraction photos), not richness.
+
+### Reward Loop Elements
+
+| Element | Purpose | Trigger |
+|---------|---------|---------|
+| POI mini-cards in chat | Emotional hook (photo + story) | Every AI response with place mentions |
+| Inline save chip | Zero-friction capture | Every POI card |
+| "Save all N" chip | Batch dopamine spike | When 2+ POIs in response |
+| Discovery counter | Accumulation reward | Header, increments on save |
+| Urgency flag | Scarcity = must save | Time-sensitive or day-specific POIs |
+| Planning-intent chips | Shift mindset to "plan this trip" | After 2+ saves |
+| Voice input | Natural, hands-free, conversational | Mic button always visible |
+
+### Saves → Itinerary Bridge
+
+**Flow:** Discover (chat) → Save (inline) → Accumulate (counter) → Nudge (proximity trigger) → Plan (AI itinerary in chat) → Refine (swap/add chips)
+
+- After 3+ saves in same area, AI nudges: "These N places are all within walking distance. Want me to plan your evening?"
+- AI builds time-ordered itinerary factoring opening hours, walking time, best-time-to-visit
+- Itinerary lives INSIDE chat — no separate screen
+- Post-plan chips: "Save this plan", "Swap a stop", "Add dinner", "Share"
+- Plans auto-persist when user leaves area, auto-restore on return
+
+### Plans Persistence (Phase C — validated direction, deferred)
+
+- **FAB → My Plans** — grouped by area, current area first
+- **Map route overlay** — numbered pins + route banner when returning to area with plan
+- **Area indicators** — purple dot (has plan) vs amber dot (has saves only) in Jump To search
+- **Unsorted saves** — dashed amber cards with "Ask AI to plan these" CTA
+- **Edit always through chat** — "Edit in chat" reopens conversation with full history
+- **Zero manual organization** — plans persist and restore automatically
+
+### Progressive Display (Response Time Fix)
+
+**Problem:** Area discovery Gemini call returns everything at once — perceived slow.
+
+**Solution (for this iteration):**
+1. Skeleton shimmer on POI cards while loading (quick win, pure UI)
+2. Streaming JSON parser — emit each POI as its JSON object completes
+3. Cards fade in progressively as data arrives
+
+### Contextual Education (First-Time User)
+
+**Problem:** First-time users don't know what the app does or what to ask.
+
+**Solution:**
+- Ghost text pulse in bottom search bar — placeholder cycles through example queries:
+  - "Ask: is it safe at night?"
+  - "Ask: best food here?"
+  - "Ask: hidden gems nearby?"
+  - "Try: plan my evening"
+- Chat empty state hint line above starter chips: "I know this area. Ask me anything, save what you like, and I'll help you plan."
+- No modals, no tutorials — features explain themselves (principle #7)
+
+### v1.1 Iteration Scope (Quick Spec)
+
+1. **Progressive POI display** — skeleton shimmer + streaming parse
+2. **Inline save chips** in chat POI cards
+3. **Contextual education** — ghost text cycling + empty state hint
+
+### Prototypes
+
+- `/tmp/chat-reward-loop-mockup.html` — rich chat with POI cards, save chips, photo strips, mic button
+- `/tmp/chat-plans-persistence-mockup.html` — My Plans, map route overlay, area indicators, full flow diagram
+
+### Key Decisions
+
+| # | Decision | Choice | Rationale |
+|---|----------|--------|-----------|
+| 1 | Both chats show photos | Yes | Attraction is visual — food/drink/interior photos in both flows |
+| 2 | Chat context tiers | Search bar = full area, POI = scoped | Different jobs, different depth |
+| 3 | Voice input | Mic button in both chats | Natural, hands-free |
+| 4 | Itinerary surface | Inside chat, not separate screen | Chat IS the planning tool |
+| 5 | Plans persistence | Auto-persist/restore per area | Zero manual organization |
+| 6 | Edit plans | Through chat conversation | No settings screen |
+| 7 | Response time fix | Progressive display (skeleton + stream) | First impression retention |
+| 8 | First-time education | Ghost text cycling + empty state hint | Contextual, no modals (principle #7) |
+| 9 | Plans persistence scope | Validated direction, defer to Phase C | Ship speed + save chip first |

@@ -63,6 +63,7 @@ class MapViewModelTest {
         weatherProvider: WeatherProvider = FakeWeatherProvider(),
         geocodingProvider: com.areadiscovery.data.remote.MapTilerGeocodingProvider = FakeMapTilerGeocodingProvider(),
         recentPlacesRepository: com.areadiscovery.domain.repository.RecentPlacesRepository = FakeRecentPlacesRepository(),
+        savedPoiRepository: com.areadiscovery.domain.repository.SavedPoiRepository = com.areadiscovery.fakes.FakeSavedPoiRepository(),
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
@@ -71,6 +72,7 @@ class MapViewModelTest {
         weatherProvider = weatherProvider,
         geocodingProvider = geocodingProvider,
         recentPlacesRepository = recentPlacesRepository,
+        savedPoiRepository = savedPoiRepository,
     )
 
     @Test

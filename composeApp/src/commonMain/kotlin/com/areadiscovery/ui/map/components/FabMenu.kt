@@ -44,6 +44,7 @@ fun FabMenu(
     onToggle: () -> Unit,
     onSavedPlaces: () -> Unit,
     onSettings: () -> Unit,
+    savedCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -61,7 +62,7 @@ fun FabMenu(
                 modifier = Modifier.padding(bottom = 8.dp),
             ) {
                 FabMenuItem(
-                    label = "Saved Places",
+                    label = if (savedCount > 0) "Saved Places ($savedCount)" else "Saved Places",
                     icon = Icons.Default.Bookmark,
                     onClick = onSavedPlaces,
                 )

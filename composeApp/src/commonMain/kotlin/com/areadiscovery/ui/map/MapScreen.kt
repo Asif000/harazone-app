@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.WindowInsets
@@ -39,6 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import com.areadiscovery.domain.model.SavedPoi
 import com.areadiscovery.ui.components.AlertBanner
 import com.areadiscovery.ui.components.ContentNoteBanner
 import com.areadiscovery.ui.components.PlatformBackHandler
@@ -273,10 +280,9 @@ private fun ReadyContent(
             onToggle = { viewModel.toggleFab() },
             onSavedPlaces = {
                 viewModel.toggleFab()
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Coming soon")
-                }
+                viewModel.openSavesSheet()
             },
+            savedCount = state.savedPoiCount,
             onSettings = {
                 viewModel.toggleFab()
                 coroutineScope.launch {
@@ -332,6 +338,7 @@ private fun ReadyContent(
         // AI search bar — tapping opens the ChatOverlay directly
         AISearchBar(
             onTap = { chatViewModel.openChat(state.areaName, state.pois, state.activeVibe) },
+            chatIsOpen = chatState.isOpen,
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp),
@@ -343,7 +350,26 @@ private fun ReadyContent(
                 viewModel = chatViewModel,
                 chatState = chatState,
                 onDismiss = { chatViewModel.closeChat() },
+                onNavigateToMaps = onNavigateToMaps,
+                onDirectionsFailed = {
+                    coroutineScope.launch {
+                        snackbarHostState.showSnackbar("No maps app available")
+                    }
+                },
             )
+        }
+
+        // Saves bottom sheet
+        if (state.showSavesSheet) {
+            SavesBottomSheet(
+                savedPois = state.savedPois,
+                onDismiss = { viewModel.closeSavesSheet() },
+            )
+        }
+
+        // Back handler for saves sheet — before chat handler (lower priority)
+        PlatformBackHandler(enabled = state.showSavesSheet) {
+            viewModel.closeSavesSheet()
         }
 
         // Must be LAST PlatformBackHandler in ReadyContent — last-composed = highest priority
@@ -358,5 +384,61 @@ private fun ReadyContent(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 80.dp),
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SavesBottomSheet(
+    savedPois: List<SavedPoi>,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Text(
+            "Saved Places",
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+        )
+        if (savedPois.isEmpty()) {
+            Text(
+                "No saved places yet",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+            )
+        } else {
+            LazyColumn(modifier = Modifier.weight(1f, fill = false)) {
+                items(savedPois, key = { it.id }) { poi ->
+                    SavedPoiRow(poi)
+                }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun SavedPoiRow(poi: SavedPoi) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                poi.name,
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                "${poi.areaName} · ${poi.type}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }

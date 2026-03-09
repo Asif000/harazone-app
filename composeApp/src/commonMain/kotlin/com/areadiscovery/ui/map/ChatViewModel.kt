@@ -6,8 +6,10 @@ import com.areadiscovery.data.remote.GeminiPromptBuilder
 import com.areadiscovery.domain.model.ChatMessage
 import com.areadiscovery.domain.model.MessageRole
 import com.areadiscovery.domain.model.POI
+import com.areadiscovery.domain.model.SavedPoi
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
+import com.areadiscovery.domain.repository.SavedPoiRepository
 import com.areadiscovery.util.AppClock
 import com.areadiscovery.util.AppLogger
 import kotlinx.coroutines.Job
@@ -16,11 +18,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 
 internal class ChatViewModel(
     private val aiProvider: AreaIntelligenceProvider,
     private val promptBuilder: GeminiPromptBuilder,
     private val clock: AppClock,
+    private val savedPoiRepository: SavedPoiRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -31,8 +35,24 @@ internal class ChatViewModel(
     private var nextId = 0L
     private fun nextId() = (nextId++).toString()
 
+    private val json = Json { ignoreUnknownKeys = true }
+    private var lastParseOffset = 0
+    private var parsedCards = mutableListOf<ChatPoiCard>()
+    private var pendingSaveIds = setOf<String>()
+    private var pendingUnsaveIds = setOf<String>()
+
     companion object {
         private const val MAX_HISTORY_TURNS = 20 // 20 messages = ~10 back-and-forth turns
+    }
+
+    init {
+        viewModelScope.launch {
+            savedPoiRepository.observeSavedIds().collect { ids ->
+                // Merge DB state with pending optimistic updates to prevent flicker
+                val merged = (ids + pendingSaveIds) - pendingUnsaveIds
+                _uiState.value = _uiState.value.copy(savedPoiIds = merged)
+            }
+        }
     }
 
     fun openChat(areaName: String, pois: List<POI>, activeVibe: Vibe?) {
@@ -67,6 +87,9 @@ internal class ChatViewModel(
             vibeName = vibeName,
             bubbles = emptyList(),
             followUpChips = computeStarterChips(activeVibe),
+            poiCards = emptyList(),
+            showSkeletons = false,
+            savedPoiIds = _uiState.value.savedPoiIds,
         )
     }
 
@@ -93,7 +116,11 @@ internal class ChatViewModel(
             followUpChips = emptyList(),
             inputText = "",
             lastUserQuery = query,
+            showSkeletons = true,
+            poiCards = emptyList(),
         )
+        lastParseOffset = 0
+        parsedCards = mutableListOf()
         // M4: Trim before snapshot so the snapshot reflects the capped history
         // F1: Take snapshot BEFORE adding user msg — provider appends query itself
         trimHistory()
@@ -122,19 +149,24 @@ internal class ChatViewModel(
                         },
                         isStreaming = false,
                         followUpChips = emptyList(),
+                        showSkeletons = false,
                     )
                 }
                 .collect { token ->
                     if (token.isComplete) {
+                        parsePoiCardsIncremental(accumulated)
+                        val displayText = stripPoiJson(accumulated)
                         val s = _uiState.value
                         _uiState.value = s.copy(
                             bubbles = s.bubbles.map {
                                 if (it.id == aiBubbleId) ChatBubble(
-                                    id = aiBubbleId, role = MessageRole.AI, content = accumulated
+                                    id = aiBubbleId, role = MessageRole.AI, content = displayText
                                 ) else it
                             },
                             isStreaming = false,
                             followUpChips = computeFollowUpChips(query),
+                            showSkeletons = false,
+                            poiCards = parsedCards.toList(),
                         )
                         conversationHistory.add(
                             ChatMessage(
@@ -144,17 +176,68 @@ internal class ChatViewModel(
                         )
                     } else {
                         accumulated += token.text
+                        parsePoiCardsIncremental(accumulated)
+                        val displayText = stripPoiJson(accumulated)
                         val s = _uiState.value
                         _uiState.value = s.copy(
                             bubbles = s.bubbles.map {
                                 if (it.id == aiBubbleId) ChatBubble(
                                     id = aiBubbleId, role = MessageRole.AI,
-                                    content = accumulated, isStreaming = true,
+                                    content = displayText, isStreaming = true,
                                 ) else it
                             },
+                            poiCards = parsedCards.toList(),
+                            showSkeletons = parsedCards.size < 3,
                         )
                     }
                 }
+        }
+    }
+
+    fun savePoi(card: ChatPoiCard, areaName: String) {
+        pendingSaveIds = pendingSaveIds + card.id
+        pendingUnsaveIds = pendingUnsaveIds - card.id
+        val s = _uiState.value
+        _uiState.value = s.copy(savedPoiIds = s.savedPoiIds + card.id)
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.save(
+                    SavedPoi(
+                        id = card.id,
+                        name = card.name,
+                        type = card.type,
+                        areaName = areaName,
+                        lat = card.lat,
+                        lng = card.lng,
+                        whySpecial = card.whySpecial,
+                        savedAt = 0L, // Repository sets the actual timestamp
+                    )
+                )
+            } catch (e: Exception) {
+                AppLogger.e(e) { "ChatViewModel: save POI failed" }
+                val current = _uiState.value
+                _uiState.value = current.copy(savedPoiIds = current.savedPoiIds - card.id)
+            } finally {
+                pendingSaveIds = pendingSaveIds - card.id
+            }
+        }
+    }
+
+    fun unsavePoi(id: String) {
+        pendingUnsaveIds = pendingUnsaveIds + id
+        pendingSaveIds = pendingSaveIds - id
+        val s = _uiState.value
+        _uiState.value = s.copy(savedPoiIds = s.savedPoiIds - id)
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.unsave(id)
+            } catch (e: Exception) {
+                AppLogger.e(e) { "ChatViewModel: unsave POI failed" }
+                val current = _uiState.value
+                _uiState.value = current.copy(savedPoiIds = current.savedPoiIds + id)
+            } finally {
+                pendingUnsaveIds = pendingUnsaveIds - id
+            }
         }
     }
 
@@ -183,6 +266,95 @@ internal class ChatViewModel(
             val trimmed = conversationHistory.takeLast(MAX_HISTORY_TURNS)
             conversationHistory = (mutableListOf(system) + trimmed).toMutableList()
         }
+    }
+
+    internal fun stripPoiJson(text: String): String {
+        // Use the same brace-counting parser to find JSON block ranges, then remove them
+        val ranges = mutableListOf<IntRange>()
+        var i = 0
+        while (i < text.length) {
+            if (text[i] == '{') {
+                var depth = 0
+                val start = i
+                var insideString = false
+                var escaped = false
+                var j = i
+                while (j < text.length) {
+                    val c = text[j]
+                    if (escaped) { escaped = false; j++; continue }
+                    when {
+                        c == '\\' && insideString -> escaped = true
+                        c == '"' -> insideString = !insideString
+                        !insideString && c == '{' -> depth++
+                        !insideString && c == '}' -> {
+                            depth--
+                            if (depth == 0) {
+                                val block = text.substring(start, j + 1)
+                                try {
+                                    json.decodeFromString<ChatPoiCard>(block)
+                                    ranges.add(start..j)
+                                } catch (_: Exception) { /* not a POI card */ }
+                                i = j
+                                break
+                            }
+                        }
+                    }
+                    j++
+                }
+            }
+            i++
+        }
+        if (ranges.isEmpty()) return text
+        val sb = StringBuilder(text)
+        for (range in ranges.asReversed()) sb.deleteRange(range.first, range.last + 1)
+        return sb.toString().replace(Regex("\n{3,}"), "\n\n").trim()
+    }
+
+    private fun parsePoiCardsIncremental(text: String) {
+        val newCards = parsePoiCards(text, lastParseOffset)
+        if (newCards.isNotEmpty()) {
+            parsedCards.addAll(newCards.map { it.first })
+            lastParseOffset = newCards.last().second
+        }
+    }
+
+    internal fun parsePoiCards(text: String, startOffset: Int = 0): List<Pair<ChatPoiCard, Int>> {
+        val results = mutableListOf<Pair<ChatPoiCard, Int>>()
+        var i = startOffset
+        while (i < text.length) {
+            if (text[i] == '{') {
+                var depth = 0
+                val start = i
+                var insideString = false
+                var escaped = false
+                while (i < text.length) {
+                    val c = text[i]
+                    if (escaped) {
+                        escaped = false
+                    } else when {
+                        c == '\\' && insideString -> escaped = true
+                        c == '"' -> insideString = !insideString
+                        !insideString && c == '{' -> depth++
+                        !insideString && c == '}' -> {
+                            depth--
+                            if (depth == 0) {
+                                val block = text.substring(start, i + 1)
+                                try {
+                                    val card = json.decodeFromString<ChatPoiCard>(block)
+                                    results.add(card to (i + 1))
+                                } catch (_: Exception) {
+                                    // Silently ignore malformed JSON
+                                }
+                                break
+                            }
+                        }
+                    }
+                    i++
+                }
+            }
+            i++
+        }
+        return results
     }
 
     private fun computeStarterChips(vibe: Vibe?): List<String> = when (vibe) {

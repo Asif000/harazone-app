@@ -1,6 +1,19 @@
 package com.areadiscovery.ui.map
 
 import com.areadiscovery.domain.model.MessageRole
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
+@Serializable
+data class ChatPoiCard(
+    @SerialName("n") val name: String,
+    @SerialName("t") val type: String,
+    val lat: Double,
+    val lng: Double,
+    @SerialName("w") val whySpecial: String,
+) {
+    val id: String get() = "$name|$lat|$lng"
+}
 
 data class ChatBubble(
     val id: String,
@@ -19,4 +32,7 @@ data class ChatUiState(
     val followUpChips: List<String> = emptyList(),
     val inputText: String = "",
     val lastUserQuery: String = "",
+    val poiCards: List<ChatPoiCard> = emptyList(),
+    val showSkeletons: Boolean = false,
+    val savedPoiIds: Set<String> = emptySet(),
 )
