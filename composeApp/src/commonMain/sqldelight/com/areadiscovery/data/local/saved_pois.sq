@@ -21,6 +21,3 @@ VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at);
 
 deleteById:
 DELETE FROM saved_pois WHERE poi_id = :poi_id;
-
-countAll:
-SELECT COUNT(*) FROM saved_pois;

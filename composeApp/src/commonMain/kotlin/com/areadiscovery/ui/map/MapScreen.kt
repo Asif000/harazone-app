@@ -254,6 +254,7 @@ private fun ReadyContent(
                         chatViewModel.sendMessage(query)
                     }
                 },
+                // TODO(BACKLOG-MEDIUM): Wire ExpandablePoiCard save to SavedPoiRepository (same as chat POI cards)
                 onSaveClick = {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar("Bookmarks coming soon")
@@ -387,6 +388,7 @@ private fun ReadyContent(
     }
 }
 
+// TODO(BACKLOG-MEDIUM): Add swipe-to-delete or unsave button for each row in SavesBottomSheet
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun SavesBottomSheet(

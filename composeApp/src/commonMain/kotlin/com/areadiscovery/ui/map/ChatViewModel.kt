@@ -269,44 +269,13 @@ internal class ChatViewModel(
     }
 
     internal fun stripPoiJson(text: String): String {
-        // Use the same brace-counting parser to find JSON block ranges, then remove them
-        val ranges = mutableListOf<IntRange>()
-        var i = 0
-        while (i < text.length) {
-            if (text[i] == '{') {
-                var depth = 0
-                val start = i
-                var insideString = false
-                var escaped = false
-                var j = i
-                while (j < text.length) {
-                    val c = text[j]
-                    if (escaped) { escaped = false; j++; continue }
-                    when {
-                        c == '\\' && insideString -> escaped = true
-                        c == '"' -> insideString = !insideString
-                        !insideString && c == '{' -> depth++
-                        !insideString && c == '}' -> {
-                            depth--
-                            if (depth == 0) {
-                                val block = text.substring(start, j + 1)
-                                try {
-                                    json.decodeFromString<ChatPoiCard>(block)
-                                    ranges.add(start..j)
-                                } catch (_: Exception) { /* not a POI card */ }
-                                i = j
-                                break
-                            }
-                        }
-                    }
-                    j++
-                }
-            }
-            i++
-        }
-        if (ranges.isEmpty()) return text
+        // Reuse parsePoiCards to find JSON block ranges, then remove them
+        val parsed = parsePoiCards(text, 0)
+        if (parsed.isEmpty()) return text
         val sb = StringBuilder(text)
-        for (range in ranges.asReversed()) sb.deleteRange(range.first, range.last + 1)
+        for ((_, startOff, endOff) in parsed.asReversed()) {
+            sb.deleteRange(startOff, endOff)
+        }
         return sb.toString().replace(Regex("\n{3,}"), "\n\n").trim()
     }
 
@@ -314,12 +283,13 @@ internal class ChatViewModel(
         val newCards = parsePoiCards(text, lastParseOffset)
         if (newCards.isNotEmpty()) {
             parsedCards.addAll(newCards.map { it.first })
-            lastParseOffset = newCards.last().second
+            lastParseOffset = newCards.last().third // endOffset
         }
     }
 
-    internal fun parsePoiCards(text: String, startOffset: Int = 0): List<Pair<ChatPoiCard, Int>> {
-        val results = mutableListOf<Pair<ChatPoiCard, Int>>()
+    // Returns (card, jsonStartOffset, jsonEndOffset) triples
+    internal fun parsePoiCards(text: String, startOffset: Int = 0): List<Triple<ChatPoiCard, Int, Int>> {
+        val results = mutableListOf<Triple<ChatPoiCard, Int, Int>>()
         var i = startOffset
         while (i < text.length) {
             if (text[i] == '{') {
@@ -341,7 +311,7 @@ internal class ChatViewModel(
                                 val block = text.substring(start, i + 1)
                                 try {
                                     val card = json.decodeFromString<ChatPoiCard>(block)
-                                    results.add(card to (i + 1))
+                                    results.add(Triple(card, start, i + 1))
                                 } catch (_: Exception) {
                                     // Silently ignore malformed JSON
                                 }
@@ -380,6 +350,7 @@ internal class ChatViewModel(
         }
     }
 
+    // TODO(BACKLOG-LOW): \b word boundaries may break with non-Latin scripts — revisit for Localisation Phase A
     private fun String.containsAnyWord(vararg terms: String) = terms.any { term ->
         this.contains("\\b${Regex.escape(term)}\\b".toRegex())
     }

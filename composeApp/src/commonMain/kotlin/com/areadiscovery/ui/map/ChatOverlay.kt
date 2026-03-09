@@ -86,12 +86,14 @@ internal fun ChatOverlay(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
 
-    // F8: Key on last bubble's content length too, so scroll fires during streaming
-    // L1: Key on bubble count + streaming state — not per-token content length
-    val scrollKey = chatState.bubbles.size to chatState.isStreaming
+    // Scroll to last item: bubbles + skeleton (1 item if shown) + POI cards
+    val totalItems = chatState.bubbles.size +
+        (if (chatState.showSkeletons) 1 else 0) +
+        chatState.poiCards.size
+    val scrollKey = Triple(chatState.bubbles.size, chatState.poiCards.size, chatState.isStreaming)
     LaunchedEffect(scrollKey) {
-        if (chatState.bubbles.isNotEmpty()) {
-            listState.animateScrollToItem(maxOf(0, chatState.bubbles.size - 1))
+        if (totalItems > 0) {
+            listState.animateScrollToItem(maxOf(0, totalItems - 1))
         }
     }
 
