@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galaxy Saves View — Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #050510; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; overflow: hidden; }
+
+  /* Nav tabs */
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(5,5,16,0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #1a1a2a; padding: 12px 20px; display: flex; gap: 12px; }
+  .nav button { background: #111; border: 1px solid #2a2a3a; color: #888; padding: 8px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.3s; }
+  .nav button.active { background: #1a1a3a; border-color: #4a4a8a; color: #aaf; }
+  .nav button:hover { border-color: #555; color: #fff; }
+
+  .scene { display: none; padding: 60px 0 0; height: 100vh; }
+  .scene.active { display: block; }
+
+  /* ===== SCENE 1: Galaxy Overview ===== */
+  .galaxy-container { position: relative; width: 100%; height: calc(100vh - 60px); overflow: hidden; }
+
+  /* Starfield background */
+  .starfield { position: absolute; inset: 0; }
+  .star { position: absolute; width: 2px; height: 2px; background: #fff; border-radius: 50%; }
+
+  /* Cluster */
+  .cluster { position: absolute; cursor: pointer; transition: all 0.4s ease; }
+  .cluster:hover { transform: scale(1.08); }
+  .cluster-zone { position: absolute; border-radius: 50%; opacity: 0.06; filter: blur(30px); }
+  .cluster-label { position: absolute; font-size: 11px; color: rgba(200,200,255,0.5); text-transform: uppercase; letter-spacing: 1.5px; white-space: nowrap; text-align: center; }
+  .cluster-count { font-size: 9px; color: rgba(200,200,255,0.3); display: block; margin-top: 2px; letter-spacing: 0; text-transform: none; }
+
+  /* POI orb */
+  .orb { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; box-shadow: 0 0 15px 3px var(--glow); }
+  .orb:hover { transform: scale(1.2); box-shadow: 0 0 25px 8px var(--glow); }
+  .orb-emoji { font-size: var(--emoji-size, 16px); }
+  .orb-name { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); font-size: 9px; color: rgba(255,255,255,0.6); white-space: nowrap; background: rgba(0,0,0,0.5); padding: 1px 6px; border-radius: 4px; }
+
+  /* Connection lines */
+  .connection-line { position: absolute; pointer-events: none; }
+  .connection-line line { stroke: rgba(255,255,255,0.08); stroke-width: 1; stroke-dasharray: 4 4; }
+
+  /* Distance labels between clusters */
+  .distance-label { position: absolute; font-size: 9px; color: rgba(150,150,200,0.3); background: rgba(5,5,16,0.8); padding: 2px 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; }
+
+  /* Galaxy header */
+  .galaxy-header { position: absolute; top: 16px; left: 0; right: 0; z-index: 20; text-align: center; }
+  .galaxy-title { font-size: 16px; color: rgba(200,200,255,0.7); font-weight: 300; letter-spacing: 2px; }
+  .galaxy-subtitle { font-size: 11px; color: rgba(150,150,200,0.4); margin-top: 4px; }
+
+  /* Galaxy/List toggle */
+  .view-toggle { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 20; display: flex; background: rgba(20,20,40,0.9); border: 1px solid #2a2a4a; border-radius: 20px; overflow: hidden; }
+  .view-toggle button { background: none; border: none; color: #666; padding: 8px 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; }
+  .view-toggle button.active { background: rgba(100,100,200,0.2); color: #aaf; }
+
+  /* Plan CTA */
+  .plan-cta { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 20; background: linear-gradient(135deg, rgba(100,60,200,0.3), rgba(60,100,200,0.3)); border: 1px solid rgba(130,100,255,0.3); border-radius: 24px; padding: 10px 24px; font-size: 13px; color: #c8b4ff; cursor: pointer; transition: all 0.3s; white-space: nowrap; }
+  .plan-cta:hover { background: linear-gradient(135deg, rgba(100,60,200,0.5), rgba(60,100,200,0.5)); border-color: rgba(130,100,255,0.6); transform: translateX(-50%) scale(1.05); }
+
+  /* Vibe legend */
+  .vibe-legend { position: absolute; bottom: 30px; right: 20px; z-index: 20; display: flex; flex-direction: column; gap: 4px; }
+  .vibe-legend-item { display: flex; align-items: center; gap: 6px; font-size: 9px; color: rgba(200,200,255,0.4); }
+  .vibe-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ===== SCENE 2: Zoomed Cluster ===== */
+  .cluster-detail { position: relative; width: 100%; height: calc(100vh - 60px); overflow: hidden; }
+  .cluster-detail-header { position: absolute; top: 16px; left: 0; right: 0; z-index: 20; text-align: center; }
+  .cluster-detail-title { font-size: 20px; color: rgba(200,200,255,0.8); font-weight: 300; letter-spacing: 2px; }
+  .cluster-detail-meta { font-size: 11px; color: rgba(150,150,200,0.4); margin-top: 4px; }
+  .back-btn { position: absolute; top: 16px; left: 20px; z-index: 20; background: rgba(20,20,40,0.8); border: 1px solid #2a2a4a; border-radius: 12px; padding: 6px 14px; font-size: 12px; color: #aaf; cursor: pointer; }
+
+  /* Detail orbs (larger) */
+  .detail-orb { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; box-shadow: 0 0 20px 5px var(--glow); }
+  .detail-orb:hover { transform: scale(1.15); }
+  .detail-orb-info { position: absolute; bottom: -40px; left: 50%; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+  .detail-orb-name { font-size: 12px; color: rgba(255,255,255,0.8); font-weight: 500; }
+  .detail-orb-type { font-size: 9px; color: rgba(200,200,255,0.4); margin-top: 2px; }
+
+  /* Walking route line */
+  .route-svg { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+  .route-path { fill: none; stroke: rgba(200,180,255,0.2); stroke-width: 2; stroke-dasharray: 6 4; }
+  .route-time { position: absolute; font-size: 9px; color: rgba(200,180,255,0.4); background: rgba(5,5,16,0.8); padding: 2px 6px; border-radius: 4px; }
+
+  /* ===== SCENE 3: List View ===== */
+  .list-view { padding: 80px 20px 40px; height: calc(100vh - 60px); overflow-y: auto; }
+  .list-area-group { margin-bottom: 24px; }
+  .list-area-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid #1a1a2a; }
+  .list-area-name { font-size: 15px; color: rgba(200,200,255,0.7); font-weight: 500; }
+  .list-area-distance { font-size: 11px; color: rgba(150,150,200,0.4); }
+  .list-area-plan { background: rgba(100,60,200,0.2); border: 1px solid rgba(130,100,255,0.3); border-radius: 14px; padding: 4px 12px; font-size: 11px; color: #c8b4ff; cursor: pointer; }
+  .list-poi { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; margin-bottom: 6px; background: rgba(20,20,40,0.4); border: 1px solid rgba(30,30,50,0.6); cursor: pointer; transition: all 0.2s; }
+  .list-poi:hover { background: rgba(30,30,60,0.6); border-color: rgba(50,50,80,0.8); }
+  .list-poi-icon { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+  .list-poi-info { flex: 1; }
+  .list-poi-name { font-size: 14px; color: #ddd; font-weight: 500; }
+  .list-poi-why { font-size: 11px; color: #777; margin-top: 2px; line-height: 1.3; }
+  .list-poi-meta { display: flex; gap: 8px; font-size: 10px; color: #555; margin-top: 4px; }
+  .list-poi-meta .open { color: #6a6; }
+  .list-poi-actions { display: flex; gap: 6px; flex-shrink: 0; }
+  .list-poi-actions button { background: rgba(40,40,60,0.6); border: 1px solid rgba(60,60,80,0.4); border-radius: 8px; padding: 6px 10px; font-size: 10px; color: #aaa; cursor: pointer; }
+
+  /* ===== SCENE 4: Itinerary Galaxy ===== */
+  .itin-route-badge { position: absolute; font-size: 16px; width: 28px; height: 28px; border-radius: 50%; background: rgba(100,60,200,0.4); border: 2px solid rgba(200,180,255,0.5); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; z-index: 15; }
+  .itin-route-line { stroke: rgba(200,180,255,0.35); stroke-width: 2.5; }
+  .itin-time-badge { position: absolute; background: rgba(20,10,40,0.9); border: 1px solid rgba(130,100,255,0.3); border-radius: 10px; padding: 3px 10px; font-size: 10px; color: #c8b4ff; z-index: 15; white-space: nowrap; }
+  .itin-header-bar { position: absolute; top: 16px; left: 20px; right: 20px; z-index: 20; display: flex; align-items: center; justify-content: space-between; }
+  .itin-title { font-size: 14px; color: rgba(200,180,255,0.8); font-weight: 500; }
+  .itin-total { font-size: 11px; color: rgba(150,140,200,0.5); }
+  .itin-share-btn { background: rgba(100,60,200,0.3); border: 1px solid rgba(130,100,255,0.3); border-radius: 14px; padding: 6px 14px; font-size: 11px; color: #c8b4ff; cursor: pointer; }
+
+  /* Pulse animation for orbs */
+  @keyframes breathe { 0%,100% { opacity: 0.06; } 50% { opacity: 0.12; } }
+  .cluster-zone { animation: breathe 4s ease-in-out infinite; }
+
+  @keyframes twinkle { 0%,100% { opacity: 0.2; } 50% { opacity: 0.8; } }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <button class="active" onclick="showScene('galaxy')">Galaxy View</button>
+  <button onclick="showScene('cluster')">Cluster Zoom</button>
+  <button onclick="showScene('list')">List View</button>
+  <button onclick="showScene('itinerary')">Itinerary Galaxy</button>
+</div>
+
+<!-- SCENE 1: Galaxy Overview -->
+<div class="scene active" id="scene-galaxy">
+  <div class="galaxy-container">
+    <!-- Starfield -->
+    <div class="starfield" id="starfield1"></div>
+
+    <div class="galaxy-header">
+      <div class="galaxy-title">MY SAVED PLACES</div>
+      <div class="galaxy-subtitle">12 places across 3 areas</div>
+    </div>
+
+    <!-- CLUSTER 1: Wynwood (top-left, close = big) -->
+    <div class="cluster" style="left: 80px; top: 140px;" onclick="showScene('cluster')">
+      <div class="cluster-zone" style="width: 280px; height: 240px; left: -40px; top: -30px; background: radial-gradient(circle, #e88 0%, transparent 70%);"></div>
+      <div class="cluster-label" style="top: -25px; left: 50px;">
+        Wynwood
+        <span class="cluster-count">5 places · 0.3 mi away</span>
+      </div>
+
+      <!-- Connection lines SVG -->
+      <svg class="connection-line" style="width: 250px; height: 200px; left: -20px; top: 0;">
+        <line x1="60" y1="50" x2="140" y2="80"/>
+        <line x1="140" y1="80" x2="100" y2="150"/>
+        <line x1="100" y1="150" x2="180" y2="130"/>
+        <line x1="60" y1="50" x2="30" y2="130"/>
+      </svg>
+
+      <div class="orb" style="width: 44px; height: 44px; left: 40px; top: 30px; background: radial-gradient(circle at 30% 30%, #f99, #c55); --glow: rgba(200,80,80,0.3); --emoji-size: 20px;">
+        <span class="orb-emoji">🎨</span>
+        <span class="orb-name">Wynwood Walls</span>
+      </div>
+      <div class="orb" style="width: 36px; height: 36px; left: 120px; top: 60px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.3); --emoji-size: 16px;">
+        <span class="orb-emoji">🍜</span>
+        <span class="orb-name">Zak the Baker</span>
+      </div>
+      <div class="orb" style="width: 32px; height: 32px; left: 80px; top: 130px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.25); --emoji-size: 14px;">
+        <span class="orb-emoji">☕</span>
+        <span class="orb-name">Panther Coffee</span>
+      </div>
+      <div class="orb" style="width: 30px; height: 30px; left: 160px; top: 110px; background: radial-gradient(circle at 30% 30%, #99f, #558); --glow: rgba(100,100,220,0.25); --emoji-size: 14px;">
+        <span class="orb-emoji">🏛</span>
+        <span class="orb-name">Margulies</span>
+      </div>
+      <div class="orb" style="width: 28px; height: 28px; left: 10px; top: 110px; background: radial-gradient(circle at 30% 30%, #f9f, #a5a); --glow: rgba(200,80,200,0.2); --emoji-size: 12px;">
+        <span class="orb-emoji">🎵</span>
+        <span class="orb-name">Gramps</span>
+      </div>
+    </div>
+
+    <!-- CLUSTER 2: Little Havana (center-right, medium distance) -->
+    <div class="cluster" style="left: 420px; top: 300px;">
+      <div class="cluster-zone" style="width: 220px; height: 200px; left: -30px; top: -20px; background: radial-gradient(circle, #fa8 0%, transparent 70%);"></div>
+      <div class="cluster-label" style="top: -25px; left: 30px;">
+        Little Havana
+        <span class="cluster-count">4 places · 3.2 mi away</span>
+      </div>
+
+      <svg class="connection-line" style="width: 180px; height: 160px; left: -10px; top: 0;">
+        <line x1="50" y1="40" x2="120" y2="60"/>
+        <line x1="120" y1="60" x2="80" y2="120"/>
+        <line x1="50" y1="40" x2="80" y2="120"/>
+      </svg>
+
+      <div class="orb" style="width: 40px; height: 40px; left: 30px; top: 20px; background: radial-gradient(circle at 30% 30%, #fa8, #c75); --glow: rgba(200,150,60,0.3); --emoji-size: 18px;">
+        <span class="orb-emoji">🎭</span>
+        <span class="orb-name">Calle Ocho</span>
+      </div>
+      <div class="orb" style="width: 36px; height: 36px; left: 100px; top: 40px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.25); --emoji-size: 16px;">
+        <span class="orb-emoji">🍦</span>
+        <span class="orb-name">Azucar Ice Cream</span>
+      </div>
+      <div class="orb" style="width: 34px; height: 34px; left: 60px; top: 100px; background: radial-gradient(circle at 30% 30%, #f99, #c55); --glow: rgba(200,80,80,0.25); --emoji-size: 15px;">
+        <span class="orb-emoji">🎺</span>
+        <span class="orb-name">Ball & Chain</span>
+      </div>
+      <div class="orb" style="width: 26px; height: 26px; left: 140px; top: 110px; background: radial-gradient(circle at 30% 30%, #99f, #558); --glow: rgba(100,100,220,0.2); --emoji-size: 12px;">
+        <span class="orb-emoji">🏛</span>
+        <span class="orb-name">Tower Theater</span>
+      </div>
+    </div>
+
+    <!-- CLUSTER 3: South Beach (bottom-right, furthest) -->
+    <div class="cluster" style="left: 550px; top: 550px;">
+      <div class="cluster-zone" style="width: 200px; height: 160px; left: -20px; top: -10px; background: radial-gradient(circle, #8cf 0%, transparent 70%);"></div>
+      <div class="cluster-label" style="top: -25px; left: 20px;">
+        South Beach
+        <span class="cluster-count">3 places · 8.1 mi away</span>
+      </div>
+
+      <svg class="connection-line" style="width: 160px; height: 120px; left: 0; top: 0;">
+        <line x1="40" y1="30" x2="110" y2="50"/>
+        <line x1="110" y1="50" x2="70" y2="90"/>
+      </svg>
+
+      <div class="orb" style="width: 38px; height: 38px; left: 20px; top: 10px; background: radial-gradient(circle at 30% 30%, #8cf, #58a); --glow: rgba(80,150,220,0.3); --emoji-size: 17px;">
+        <span class="orb-emoji">🏖</span>
+        <span class="orb-name">Lummus Park</span>
+      </div>
+      <div class="orb" style="width: 32px; height: 32px; left: 90px; top: 30px; background: radial-gradient(circle at 30% 30%, #fc8, #a85); --glow: rgba(200,160,80,0.25); --emoji-size: 14px;">
+        <span class="orb-emoji">🌴</span>
+        <span class="orb-name">Ocean Drive</span>
+      </div>
+      <div class="orb" style="width: 28px; height: 28px; left: 50px; top: 70px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.2); --emoji-size: 12px;">
+        <span class="orb-emoji">🍹</span>
+        <span class="orb-name">Mango's</span>
+      </div>
+    </div>
+
+    <!-- Distance labels between clusters -->
+    <div class="distance-label" style="left: 320px; top: 240px;">3.2 mi · 12 min drive</div>
+    <div class="distance-label" style="left: 480px; top: 470px;">5.4 mi · 18 min drive</div>
+    <div class="distance-label" style="left: 280px; top: 430px;">8.1 mi · 25 min drive</div>
+
+    <div class="plan-cta" onclick="showScene('itinerary')">✦ Plan my day across these areas</div>
+
+    <div class="view-toggle">
+      <button class="active">✦ Galaxy</button>
+      <button onclick="showScene('list')">☰ List</button>
+    </div>
+
+    <div class="vibe-legend">
+      <div class="vibe-legend-item"><div class="vibe-legend-dot" style="background: #e88;"></div>Character</div>
+      <div class="vibe-legend-item"><div class="vibe-legend-dot" style="background: #88c;"></div>History</div>
+      <div class="vibe-legend-item"><div class="vibe-legend-dot" style="background: #8c8;"></div>Food</div>
+      <div class="vibe-legend-item"><div class="vibe-legend-dot" style="background: #8cf;"></div>Beach</div>
+      <div class="vibe-legend-item"><div class="vibe-legend-dot" style="background: #f9f;"></div>Nightlife</div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 2: Cluster Zoom (Wynwood) -->
+<div class="scene" id="scene-cluster">
+  <div class="cluster-detail">
+    <div class="starfield" id="starfield2"></div>
+
+    <div class="back-btn" onclick="showScene('galaxy')">← All areas</div>
+
+    <div class="cluster-detail-header">
+      <div class="cluster-detail-title">WYNWOOD</div>
+      <div class="cluster-detail-meta">5 saved places · all within 0.4 mi walking</div>
+    </div>
+
+    <!-- Walking route -->
+    <svg class="route-svg">
+      <path class="route-path" d="M 200,200 C 250,220 300,250 380,280 S 420,350 340,420 S 260,450 180,480 S 120,400 140,350"/>
+    </svg>
+
+    <div class="route-time" style="left: 310px; top: 230px;">3 min walk</div>
+    <div class="route-time" style="left: 400px; top: 350px;">5 min walk</div>
+    <div class="route-time" style="left: 260px; top: 460px;">4 min walk</div>
+    <div class="route-time" style="left: 120px; top: 380px;">6 min walk</div>
+
+    <!-- Expanded orbs -->
+    <div class="detail-orb" style="width: 70px; height: 70px; left: 165px; top: 170px; background: radial-gradient(circle at 30% 30%, #f99, #c55); --glow: rgba(200,80,80,0.4);">
+      <span style="font-size: 30px;">🎨</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Wynwood Walls</div>
+        <div class="detail-orb-type">Street Art · Free · Open now</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 56px; height: 56px; left: 350px; top: 255px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.35);">
+      <span style="font-size: 24px;">🍜</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Zak the Baker</div>
+        <div class="detail-orb-type">Bakery · $$ · Open til 9 PM</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 50px; height: 50px; left: 310px; top: 395px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.3);">
+      <span style="font-size: 22px;">☕</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Panther Coffee</div>
+        <div class="detail-orb-type">Coffee · $ · Open now</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 48px; height: 48px; left: 155px; top: 450px; background: radial-gradient(circle at 30% 30%, #99f, #558); --glow: rgba(100,100,220,0.3);">
+      <span style="font-size: 20px;">🏛</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Margulies Collection</div>
+        <div class="detail-orb-type">Gallery · $10 · Open til 6 PM</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 42px; height: 42px; left: 110px; top: 330px; background: radial-gradient(circle at 30% 30%, #f9f, #a5a); --glow: rgba(200,80,200,0.25);">
+      <span style="font-size: 18px;">🎵</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Gramps Bar</div>
+        <div class="detail-orb-type">Bar · $$ · Opens 5 PM</div>
+      </div>
+    </div>
+
+    <!-- Cluster glow -->
+    <div style="position: absolute; width: 400px; height: 400px; left: 100px; top: 180px; background: radial-gradient(circle, rgba(200,100,100,0.04) 0%, transparent 70%); pointer-events: none;"></div>
+
+    <div class="plan-cta" onclick="showScene('itinerary')" style="bottom: 50px;">✦ Plan my Wynwood walk</div>
+
+    <div class="view-toggle" style="bottom: 100px;">
+      <button class="active">✦ Galaxy</button>
+      <button onclick="showScene('list')">☰ List</button>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 3: List View -->
+<div class="scene" id="scene-list">
+  <div class="list-view">
+    <div style="text-align: center; margin-bottom: 24px;">
+      <div style="font-size: 16px; color: rgba(200,200,255,0.7); font-weight: 300; letter-spacing: 2px;">MY SAVED PLACES</div>
+      <div style="font-size: 11px; color: rgba(150,150,200,0.4); margin-top: 4px;">12 places across 3 areas</div>
+    </div>
+
+    <!-- Wynwood -->
+    <div class="list-area-group">
+      <div class="list-area-header">
+        <div>
+          <div class="list-area-name">Wynwood</div>
+          <div style="font-size: 10px; color: rgba(150,150,200,0.3);">5 places · 0.3 mi away</div>
+        </div>
+        <button class="list-area-plan">✦ Plan route</button>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #f99, #c55); box-shadow: 0 0 10px rgba(200,80,80,0.3);">🎨</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Wynwood Walls</div>
+          <div class="list-poi-why">World-famous outdoor street art museum</div>
+          <div class="list-poi-meta"><span class="open">Open now</span><span>⭐ 4.7</span><span>Free</span></div>
+        </div>
+        <div class="list-poi-actions">
+          <button>↗</button>
+          <button>↑</button>
+        </div>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #9d9, #5a5); box-shadow: 0 0 10px rgba(80,180,80,0.3);">🍜</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Zak the Baker</div>
+          <div class="list-poi-why">Artisan sourdough in a converted warehouse</div>
+          <div class="list-poi-meta"><span class="open">Open til 9</span><span>⭐ 4.8</span><span>$$</span></div>
+        </div>
+        <div class="list-poi-actions">
+          <button>↗</button>
+          <button>↑</button>
+        </div>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #9d9, #5a5); box-shadow: 0 0 10px rgba(80,180,80,0.25);">☕</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Panther Coffee</div>
+          <div class="list-poi-why">Miami's original third-wave coffee roaster</div>
+          <div class="list-poi-meta"><span class="open">Open now</span><span>⭐ 4.6</span><span>$</span></div>
+        </div>
+        <div class="list-poi-actions">
+          <button>↗</button>
+          <button>↑</button>
+        </div>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #99f, #558); box-shadow: 0 0 10px rgba(100,100,220,0.25);">🏛</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Margulies Collection</div>
+          <div class="list-poi-why">Private warehouse gallery with huge installations</div>
+          <div class="list-poi-meta"><span class="open">Open til 6</span><span>⭐ 4.5</span><span>$10</span></div>
+        </div>
+        <div class="list-poi-actions">
+          <button>↗</button>
+          <button>↑</button>
+        </div>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #f9f, #a5a); box-shadow: 0 0 10px rgba(200,80,200,0.2);">🎵</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Gramps Bar</div>
+          <div class="list-poi-why">Dive bar with a backyard, live music, pizza window</div>
+          <div class="list-poi-meta"><span>Opens 5 PM</span><span>⭐ 4.4</span><span>$$</span></div>
+        </div>
+        <div class="list-poi-actions">
+          <button>↗</button>
+          <button>↑</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Little Havana -->
+    <div class="list-area-group">
+      <div class="list-area-header">
+        <div>
+          <div class="list-area-name">Little Havana</div>
+          <div style="font-size: 10px; color: rgba(150,150,200,0.3);">4 places · 3.2 mi away</div>
+        </div>
+        <button class="list-area-plan">✦ Plan route</button>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #fa8, #c75); box-shadow: 0 0 10px rgba(200,150,60,0.3);">🎭</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Calle Ocho Walk of Fame</div>
+          <div class="list-poi-why">Latin Walk of Fame — stars embedded in the sidewalk</div>
+          <div class="list-poi-meta"><span class="open">Always open</span><span>Free</span></div>
+        </div>
+        <div class="list-poi-actions"><button>↗</button><button>↑</button></div>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #9d9, #5a5); box-shadow: 0 0 10px rgba(80,180,80,0.25);">🍦</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Azucar Ice Cream</div>
+          <div class="list-poi-why">Cuban-inspired flavors — guava, cafe con leche, flan</div>
+          <div class="list-poi-meta"><span class="open">Open now</span><span>⭐ 4.6</span><span>$</span></div>
+        </div>
+        <div class="list-poi-actions"><button>↗</button><button>↑</button></div>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #f99, #c55); box-shadow: 0 0 10px rgba(200,80,80,0.25);">🎺</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Ball & Chain</div>
+          <div class="list-poi-why">1935 jazz club reborn — live salsa nightly in a historic building</div>
+          <div class="list-poi-meta"><span>Opens 12 PM</span><span>⭐ 4.5</span><span>$$</span></div>
+        </div>
+        <div class="list-poi-actions"><button>↗</button><button>↑</button></div>
+      </div>
+    </div>
+
+    <!-- South Beach -->
+    <div class="list-area-group">
+      <div class="list-area-header">
+        <div>
+          <div class="list-area-name">South Beach</div>
+          <div style="font-size: 10px; color: rgba(150,150,200,0.3);">3 places · 8.1 mi away</div>
+        </div>
+        <button class="list-area-plan">✦ Plan route</button>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #8cf, #58a); box-shadow: 0 0 10px rgba(80,150,220,0.3);">🏖</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Lummus Park Beach</div>
+          <div class="list-poi-why">Iconic palm-lined beach between Ocean Drive and the Atlantic</div>
+          <div class="list-poi-meta"><span class="open">Always open</span><span>Free</span></div>
+        </div>
+        <div class="list-poi-actions"><button>↗</button><button>↑</button></div>
+      </div>
+
+      <div class="list-poi">
+        <div class="list-poi-icon" style="background: radial-gradient(circle, #fc8, #a85); box-shadow: 0 0 10px rgba(200,160,80,0.25);">🌴</div>
+        <div class="list-poi-info">
+          <div class="list-poi-name">Ocean Drive Art Deco</div>
+          <div class="list-poi-why">Pastel 1930s Art Deco buildings — best at sunset with neon lights</div>
+          <div class="list-poi-meta"><span class="open">Always open</span><span>Free</span></div>
+        </div>
+        <div class="list-poi-actions"><button>↗</button><button>↑</button></div>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px;">
+      <div class="view-toggle" style="position: static; transform: none; display: inline-flex;">
+        <button onclick="showScene('galaxy')">✦ Galaxy</button>
+        <button class="active">☰ List</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 4: Itinerary Galaxy -->
+<div class="scene" id="scene-itinerary">
+  <div class="galaxy-container">
+    <div class="starfield" id="starfield4"></div>
+
+    <div class="itin-header-bar">
+      <div class="back-btn" onclick="showScene('galaxy')" style="position: static;">← My saves</div>
+      <div style="text-align: center;">
+        <div class="itin-title">MY WYNWOOD AFTERNOON</div>
+        <div class="itin-total">5 stops · ~2.5 hrs · 0.8 mi walking</div>
+      </div>
+      <button class="itin-share-btn">↑ Share plan</button>
+    </div>
+
+    <!-- Route lines -->
+    <svg style="position: absolute; inset: 0; z-index: 10; pointer-events: none;">
+      <line class="itin-route-line" x1="230" y1="215" x2="420" y2="310"/>
+      <line class="itin-route-line" x1="420" y1="310" x2="350" y2="445"/>
+      <line class="itin-route-line" x1="350" y1="445" x2="185" y2="510"/>
+      <line class="itin-route-line" x1="185" y1="510" x2="140" y2="620"/>
+    </svg>
+
+    <!-- Route number badges -->
+    <div class="itin-route-badge" style="left: 195px; top: 170px;">1</div>
+    <div class="itin-route-badge" style="left: 398px; top: 265px;">2</div>
+    <div class="itin-route-badge" style="left: 328px; top: 400px;">3</div>
+    <div class="itin-route-badge" style="left: 158px; top: 470px;">4</div>
+    <div class="itin-route-badge" style="left: 118px; top: 580px;">5</div>
+
+    <!-- Time badges between stops -->
+    <div class="itin-time-badge" style="left: 310px; top: 245px;">3 min walk → 2:15 PM</div>
+    <div class="itin-time-badge" style="left: 390px; top: 380px;">5 min walk → 3:00 PM</div>
+    <div class="itin-time-badge" style="left: 230px; top: 470px;">4 min walk → 3:30 PM</div>
+    <div class="itin-time-badge" style="left: 100px; top: 555px;">6 min walk → 4:15 PM</div>
+
+    <!-- Itinerary orbs -->
+    <div class="detail-orb" style="width: 65px; height: 65px; left: 198px; top: 185px; background: radial-gradient(circle at 30% 30%, #f99, #c55); --glow: rgba(200,80,80,0.4);">
+      <span style="font-size: 28px;">🎨</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Wynwood Walls</div>
+        <div class="detail-orb-type">2:00 PM · 45 min · Free</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 52px; height: 52px; left: 395px; top: 285px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.35);">
+      <span style="font-size: 22px;">☕</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Panther Coffee</div>
+        <div class="detail-orb-type">2:50 PM · 20 min · $</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 50px; height: 50px; left: 325px; top: 420px; background: radial-gradient(circle at 30% 30%, #99f, #558); --glow: rgba(100,100,220,0.3);">
+      <span style="font-size: 20px;">🏛</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Margulies Collection</div>
+        <div class="detail-orb-type">3:15 PM · 45 min · $10</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 48px; height: 48px; left: 162px; top: 488px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); --glow: rgba(80,180,80,0.3);">
+      <span style="font-size: 20px;">🍜</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Zak the Baker</div>
+        <div class="detail-orb-type">4:05 PM · 30 min · $$</div>
+      </div>
+    </div>
+
+    <div class="detail-orb" style="width: 44px; height: 44px; left: 120px; top: 598px; background: radial-gradient(circle at 30% 30%, #f9f, #a5a); --glow: rgba(200,80,200,0.3);">
+      <span style="font-size: 18px;">🎵</span>
+      <div class="detail-orb-info">
+        <div class="detail-orb-name">Gramps Bar</div>
+        <div class="detail-orb-type">4:40 PM · Open end · $$</div>
+      </div>
+    </div>
+
+    <!-- Area glow -->
+    <div style="position: absolute; width: 500px; height: 500px; left: 100px; top: 180px; background: radial-gradient(circle, rgba(150,100,200,0.04) 0%, transparent 70%); pointer-events: none;"></div>
+
+    <div class="view-toggle">
+      <button class="active">✦ Galaxy</button>
+      <button onclick="showScene('list')">☰ List</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Generate starfield
+function generateStars(containerId, count) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  for (let i = 0; i < count; i++) {
+    const star = document.createElement('div');
+    star.className = 'star';
+    star.style.left = Math.random() * 100 + '%';
+    star.style.top = Math.random() * 100 + '%';
+    star.style.opacity = Math.random() * 0.5 + 0.1;
+    star.style.width = star.style.height = (Math.random() * 2 + 1) + 'px';
+    if (Math.random() > 0.7) {
+      star.style.animation = `twinkle ${2 + Math.random() * 4}s ease-in-out ${Math.random() * 3}s infinite`;
+    }
+    container.appendChild(star);
+  }
+}
+
+generateStars('starfield1', 200);
+generateStars('starfield2', 150);
+generateStars('starfield4', 180);
+
+function showScene(id) {
+  document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('scene-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MVP Launch Readiness — Session 7 Mockups</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; }
+
+  /* Navigation */
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(10,10,10,0.95); backdrop-filter: blur(20px); border-bottom: 1px solid #222; padding: 12px 20px; display: flex; gap: 12px; overflow-x: auto; }
+  .nav button { background: #1a1a1a; border: 1px solid #333; color: #aaa; padding: 8px 16px; border-radius: 20px; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all 0.3s; }
+  .nav button.active { background: #2a5a2a; border-color: #4a8a4a; color: #8f8; }
+  .nav button:hover { border-color: #555; color: #fff; }
+
+  /* Scenes */
+  .scene { display: none; padding: 70px 20px 40px; max-width: 420px; margin: 0 auto; }
+  .scene.active { display: block; }
+  .scene-title { font-size: 18px; color: #8f8; margin-bottom: 6px; }
+  .scene-desc { font-size: 13px; color: #777; margin-bottom: 20px; line-height: 1.5; }
+
+  /* Phone Frame */
+  .phone { width: 380px; height: 780px; background: #111; border-radius: 40px; border: 2px solid #333; position: relative; overflow: hidden; margin: 0 auto; }
+  .phone-notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 150px; height: 30px; background: #000; border-radius: 0 0 20px 20px; z-index: 50; }
+  .phone-home { position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%); width: 130px; height: 4px; background: #444; border-radius: 3px; z-index: 50; }
+
+  /* Map background */
+  .map-bg { position: absolute; inset: 0; background: linear-gradient(145deg, #1a2a1a 0%, #0d1a2d 40%, #1a1a0d 70%, #0d2a2a 100%); }
+  .map-bg::after { content: ''; position: absolute; inset: 0; background: url("data:image/svg+xml,%3Csvg width='400' height='400' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 50h400M0 100h400M0 150h400M0 200h400M0 250h400M0 300h400M0 350h400M50 0v400M100 0v400M150 0v400M200 0v400M250 0v400M300 0v400M350 0v400' stroke='%23ffffff08' stroke-width='0.5'/%3E%3C/svg%3E"); opacity: 0.5; }
+
+  /* Top bar */
+  .top-bar { position: absolute; top: 36px; left: 16px; right: 16px; z-index: 30; }
+  .location-strip { background: rgba(0,0,0,0.75); backdrop-filter: blur(12px); border-radius: 12px; padding: 8px 14px; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; color: #ccc; }
+  .location-strip .city { color: #fff; font-weight: 600; font-size: 14px; }
+  .location-strip .tag { color: #8f8; font-size: 11px; }
+  .location-strip .weather { color: #ffb; }
+
+  /* Search bar (bottom) */
+  .search-bar { position: absolute; bottom: 30px; left: 16px; right: 70px; z-index: 30; background: rgba(20,20,20,0.9); backdrop-filter: blur(12px); border-radius: 28px; padding: 12px 18px; display: flex; align-items: center; gap: 10px; border: 1px solid #333; }
+  .search-bar .search-icon { color: #8f8; font-size: 18px; }
+  .search-bar .search-text { color: #666; font-size: 14px; flex: 1; }
+  .search-bar .mic-icon { color: #888; font-size: 16px; }
+
+  /* Vibe rail */
+  .vibe-rail { position: absolute; right: 10px; top: 50%; transform: translateY(-60%); z-index: 25; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .vibe-orb { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: all 0.3s; position: relative; }
+  .vibe-orb.active { box-shadow: 0 0 12px 3px var(--glow); transform: scale(1.15); }
+  .vibe-orb.dim { opacity: 0.4; }
+  .vibe-label { font-size: 8px; color: #999; margin-top: -4px; text-align: center; }
+
+  /* POI pins */
+  .pin { position: absolute; z-index: 20; display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: all 0.3s; }
+  .pin-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+  .pin-name { font-size: 9px; color: #ddd; background: rgba(0,0,0,0.6); padding: 2px 6px; border-radius: 4px; margin-top: 2px; white-space: nowrap; }
+  .pin.saved .pin-dot { border: 2px solid #ffd700; box-shadow: 0 0 10px rgba(255,215,0,0.4); }
+  .pin.saved .save-badge { position: absolute; top: -4px; right: -4px; width: 14px; height: 14px; background: #ffd700; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #000; }
+  .pin.pulse .pin-dot { animation: pulse 1.5s ease-in-out infinite; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 2px 8px rgba(0,0,0,0.5); } 50% { box-shadow: 0 0 20px 8px var(--glow); } }
+
+  /* Concierge Card */
+  .concierge-card { position: absolute; bottom: 80px; left: 14px; right: 14px; z-index: 40; background: rgba(15,15,15,0.95); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid #2a2a2a; overflow: hidden; animation: slideUp 0.5s ease-out; }
+  @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .concierge-header { padding: 16px 18px 8px; display: flex; align-items: center; justify-content: space-between; }
+  .concierge-greeting { font-size: 15px; color: #8f8; }
+  .concierge-dismiss { color: #555; font-size: 20px; cursor: pointer; }
+  .concierge-subtitle { padding: 0 18px 12px; font-size: 13px; color: #aaa; line-height: 1.4; }
+  .concierge-poi { padding: 10px 18px; display: flex; gap: 12px; align-items: flex-start; border-top: 1px solid #1a1a1a; }
+  .concierge-poi-img { width: 60px; height: 60px; border-radius: 10px; background: linear-gradient(135deg, #2a3a2a, #1a2a3a); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+  .concierge-poi-info { flex: 1; }
+  .concierge-poi-name { font-size: 14px; color: #fff; font-weight: 600; }
+  .concierge-poi-why { font-size: 12px; color: #999; margin-top: 3px; line-height: 1.4; }
+  .concierge-poi-meta { display: flex; gap: 8px; margin-top: 6px; font-size: 11px; }
+  .concierge-poi-meta span { color: #777; }
+  .concierge-poi-meta .open { color: #6c6; }
+  .concierge-poi-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .chip { padding: 6px 12px; border-radius: 16px; font-size: 11px; cursor: pointer; transition: all 0.2s; border: none; }
+  .chip-save { background: rgba(255,215,0,0.15); color: #ffd700; border: 1px solid rgba(255,215,0,0.3); }
+  .chip-save:hover { background: rgba(255,215,0,0.3); }
+  .chip-save.saved { background: rgba(255,215,0,0.25); color: #ffd700; }
+  .chip-directions { background: rgba(100,180,255,0.15); color: #64b4ff; border: 1px solid rgba(100,180,255,0.3); }
+  .chip-directions:hover { background: rgba(100,180,255,0.3); }
+  .chip-share { background: rgba(180,130,255,0.15); color: #b482ff; border: 1px solid rgba(180,130,255,0.3); }
+  .chip-share:hover { background: rgba(180,130,255,0.3); }
+  .chip-ask { background: rgba(100,255,200,0.15); color: #6fc; border: 1px solid rgba(100,255,200,0.3); }
+
+  /* Saves Nearby Nudge */
+  .saves-nudge { position: absolute; top: 80px; left: 16px; right: 16px; z-index: 35; background: rgba(40,35,10,0.9); backdrop-filter: blur(12px); border: 1px solid rgba(255,215,0,0.3); border-radius: 14px; padding: 10px 14px; display: flex; align-items: center; gap: 10px; animation: fadeDown 0.4s ease-out; cursor: pointer; }
+  @keyframes fadeDown { from { transform: translateY(-20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .saves-nudge-icon { font-size: 20px; }
+  .saves-nudge-text { flex: 1; }
+  .saves-nudge-title { font-size: 13px; color: #ffd700; font-weight: 600; }
+  .saves-nudge-sub { font-size: 11px; color: #aa9944; margin-top: 2px; }
+  .saves-nudge-arrow { color: #aa9944; font-size: 16px; }
+
+  /* POI Card (enriched) */
+  .poi-card { position: absolute; bottom: 80px; left: 14px; right: 14px; z-index: 40; background: rgba(15,15,15,0.95); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid #2a2a2a; overflow: hidden; }
+  .poi-card-photo { width: 100%; height: 160px; background: linear-gradient(135deg, #2a1a3a, #1a3a2a); display: flex; align-items: center; justify-content: center; font-size: 60px; position: relative; }
+  .poi-card-photo .vibe-tag { position: absolute; top: 12px; left: 12px; padding: 4px 10px; border-radius: 12px; font-size: 11px; background: rgba(0,0,0,0.6); color: #8f8; }
+  .poi-card-body { padding: 16px 18px; }
+  .poi-card-name { font-size: 18px; color: #fff; font-weight: 700; }
+  .poi-card-type { font-size: 12px; color: #888; margin-top: 2px; }
+  .poi-card-why { font-size: 13px; color: #bbb; margin-top: 8px; line-height: 1.5; }
+  .poi-card-meta-row { display: flex; gap: 12px; margin-top: 10px; font-size: 12px; color: #888; }
+  .poi-card-meta-row .open { color: #6c6; }
+  .poi-card-meta-row .rating { color: #ffa; }
+  .poi-card-actions { display: flex; gap: 8px; padding: 12px 18px 16px; flex-wrap: wrap; }
+
+  /* Share Sheet */
+  .share-sheet { position: absolute; bottom: 0; left: 0; right: 0; z-index: 50; background: rgba(20,20,20,0.98); border-radius: 20px 20px 0 0; border-top: 1px solid #333; padding: 20px; animation: slideUp 0.3s ease-out; }
+  .share-preview { background: #1a1a1a; border-radius: 12px; padding: 14px; margin-bottom: 16px; border: 1px solid #2a2a2a; }
+  .share-preview-text { font-size: 13px; color: #ccc; line-height: 1.5; }
+  .share-preview-text .highlight { color: #8f8; }
+  .share-apps { display: flex; gap: 16px; justify-content: center; margin-bottom: 12px; }
+  .share-app { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+  .share-app-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; }
+  .share-app-name { font-size: 10px; color: #888; }
+  .share-cancel { width: 100%; padding: 12px; background: #222; border: none; color: #aaa; border-radius: 12px; font-size: 14px; cursor: pointer; margin-top: 8px; }
+
+  /* AI Save Acknowledgment */
+  .ai-ack { position: absolute; bottom: 80px; left: 14px; right: 14px; z-index: 40; background: rgba(15,15,15,0.95); backdrop-filter: blur(20px); border-radius: 20px; border: 1px solid #2a3a2a; overflow: hidden; animation: slideUp 0.4s ease-out; }
+  .ai-ack-header { padding: 14px 18px 6px; display: flex; align-items: center; gap: 8px; }
+  .ai-ack-avatar { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #2a5a2a, #4a8a4a); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+  .ai-ack-name { font-size: 13px; color: #8f8; font-weight: 600; }
+  .ai-ack-body { padding: 6px 18px 12px; font-size: 13px; color: #ccc; line-height: 1.5; }
+  .ai-ack-body .bold { color: #fff; font-weight: 600; }
+  .ai-ack-suggestions { padding: 0 18px 14px; }
+  .ai-ack-label { font-size: 11px; color: #666; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Decision Table */
+  .decision-table { margin: 20px 0; width: 100%; max-width: 100vw; overflow-x: auto; }
+  .decision-table table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 900px; }
+  .decision-table th { background: #1a2a1a; color: #8f8; padding: 10px 12px; text-align: left; border-bottom: 2px solid #333; white-space: nowrap; }
+  .decision-table td { padding: 10px 12px; border-bottom: 1px solid #1a1a1a; vertical-align: top; color: #ccc; line-height: 1.4; }
+  .decision-table tr:hover td { background: rgba(40,60,40,0.2); }
+  .tier-label { padding: 8px 12px; font-size: 13px; font-weight: 700; }
+  .tier-1 { color: #f66; background: rgba(255,100,100,0.08); }
+  .tier-2 { color: #fa4; background: rgba(255,170,60,0.08); }
+  .tier-d { color: #888; background: rgba(100,100,100,0.05); }
+  .rec { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 10px; font-weight: 600; }
+  .rec-must { background: rgba(255,80,80,0.2); color: #f88; }
+  .rec-should { background: rgba(255,170,60,0.2); color: #fa4; }
+  .rec-defer { background: rgba(100,100,100,0.2); color: #888; }
+  .effort-badge { display: inline-block; padding: 2px 8px; border-radius: 8px; font-size: 10px; }
+  .effort-low { background: rgba(100,200,100,0.15); color: #6c6; }
+  .effort-med { background: rgba(255,200,60,0.15); color: #fa4; }
+  .effort-high { background: rgba(255,100,100,0.15); color: #f88; }
+
+  /* Legend */
+  .legend { margin-top: 30px; padding: 16px; background: #111; border-radius: 12px; border: 1px solid #222; }
+  .legend h3 { font-size: 13px; color: #8f8; margin-bottom: 10px; }
+  .legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: 11px; color: #888; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <button class="active" onclick="showScene('concierge')">1. Concierge Card</button>
+  <button onclick="showScene('saves-nudge')">2. Saves Nearby</button>
+  <button onclick="showScene('poi-enriched')">3. POI Card</button>
+  <button onclick="showScene('share')">4. Share Flow</button>
+  <button onclick="showScene('ai-ack')">5. AI Save Ack</button>
+  <button onclick="showScene('saved-pins')">6. Saved Pins</button>
+  <button onclick="showScene('decisions')">7. Decision Table</button>
+</div>
+
+<!-- SCENE 1: Concierge Card (First-time aha moment) -->
+<div class="scene active" id="scene-concierge">
+  <div class="scene-title">1. First-Time Concierge Card</div>
+  <div class="scene-desc">Auto-appears on first app open. Pre-fetched during splash. Sets the tone: "I already know something useful about where you are." Goal: user saves one POI = retention loop seeded.</div>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="map-bg"></div>
+
+    <div class="top-bar">
+      <div class="location-strip">
+        <span class="city">Wynwood, Miami</span>
+        <span class="tag">First visit</span>
+        <span class="weather">☀️ 82°F</span>
+        <span>7:14 PM</span>
+      </div>
+    </div>
+
+    <!-- Pins behind card -->
+    <div class="pin pulse" style="left: 80px; top: 200px; --glow: rgba(255,150,50,0.4);">
+      <div class="pin-dot" style="background: #c74;">🎨</div>
+      <div class="pin-name">Wynwood Walls</div>
+    </div>
+    <div class="pin pulse" style="left: 200px; top: 280px; --glow: rgba(100,200,100,0.4);">
+      <div class="pin-dot" style="background: #4a7;">🍜</div>
+      <div class="pin-name">Zak the Baker</div>
+    </div>
+
+    <div class="concierge-card">
+      <div class="concierge-header">
+        <span class="concierge-greeting">Welcome to Wynwood ✨</span>
+        <span class="concierge-dismiss">×</span>
+      </div>
+      <div class="concierge-subtitle">It's evening and this neighborhood is about to come alive. If I were you right now, I'd check out:</div>
+
+      <div class="concierge-poi">
+        <div class="concierge-poi-img">🎨</div>
+        <div class="concierge-poi-info">
+          <div class="concierge-poi-name">Wynwood Walls</div>
+          <div class="concierge-poi-why">World-famous outdoor street art museum — the murals glow differently at golden hour</div>
+          <div class="concierge-poi-meta">
+            <span class="open">Open now</span>
+            <span>⭐ 4.7</span>
+            <span>Free</span>
+          </div>
+          <div class="concierge-poi-actions">
+            <button class="chip chip-save" onclick="this.textContent='✓ Saved'; this.classList.add('saved');">♡ Save</button>
+            <button class="chip chip-directions">↗ Directions</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="concierge-poi">
+        <div class="concierge-poi-img">🍜</div>
+        <div class="concierge-poi-info">
+          <div class="concierge-poi-name">Zak the Baker</div>
+          <div class="concierge-poi-why">Neighborhood institution — artisan sourdough and pastries in a converted warehouse</div>
+          <div class="concierge-poi-meta">
+            <span class="open">Open til 9 PM</span>
+            <span>⭐ 4.8</span>
+            <span>$$</span>
+          </div>
+          <div class="concierge-poi-actions">
+            <button class="chip chip-save" onclick="this.textContent='✓ Saved'; this.classList.add('saved');">♡ Save</button>
+            <button class="chip chip-directions">↗ Directions</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">✦</span>
+      <span class="search-text">Ask: what's special about this area?</span>
+      <span class="mic-icon">🎙</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 2: Saves Nearby Nudge -->
+<div class="scene" id="scene-saves-nudge">
+  <div class="scene-title">2. Saves Nearby Nudge</div>
+  <div class="scene-desc">User returns to an area where they have saved places. Subtle gold banner appears on app open. Tapping highlights saved pins on map. The retention hook: "your unfinished plans are waiting."</div>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="map-bg"></div>
+
+    <div class="top-bar">
+      <div class="location-strip">
+        <span class="city">Wynwood, Miami</span>
+        <span class="weather">☀️ 78°F</span>
+        <span>2:30 PM</span>
+      </div>
+    </div>
+
+    <div class="saves-nudge">
+      <span class="saves-nudge-icon">📌</span>
+      <div class="saves-nudge-text">
+        <div class="saves-nudge-title">3 saved places nearby</div>
+        <div class="saves-nudge-sub">Wynwood Walls · Zak the Baker · Panther Coffee</div>
+      </div>
+      <span class="saves-nudge-arrow">›</span>
+    </div>
+
+    <!-- Saved pins with gold badges -->
+    <div class="pin saved" style="left: 80px; top: 220px;">
+      <div class="pin-dot" style="background: #c74;">🎨</div>
+      <div class="save-badge">✓</div>
+      <div class="pin-name">Wynwood Walls</div>
+    </div>
+    <div class="pin saved" style="left: 200px; top: 310px;">
+      <div class="pin-dot" style="background: #4a7;">🍜</div>
+      <div class="save-badge">✓</div>
+      <div class="pin-name">Zak the Baker</div>
+    </div>
+    <div class="pin saved" style="left: 160px; top: 420px;">
+      <div class="pin-dot" style="background: #7a4;">☕</div>
+      <div class="save-badge">✓</div>
+      <div class="pin-name">Panther Coffee</div>
+    </div>
+
+    <!-- Regular pins -->
+    <div class="pin" style="left: 260px; top: 250px;">
+      <div class="pin-dot" style="background: #447;">🎵</div>
+      <div class="pin-name">Gramps Bar</div>
+    </div>
+    <div class="pin" style="left: 100px; top: 500px;">
+      <div class="pin-dot" style="background: #744;">🏛</div>
+      <div class="pin-name">Margulies</div>
+    </div>
+
+    <div class="vibe-rail">
+      <div class="vibe-orb active" style="background: linear-gradient(135deg, #e88, #c55); --glow: rgba(200,80,80,0.4);"><span>🎭</span></div>
+      <div class="vibe-label">Character</div>
+      <div class="vibe-orb" style="background: linear-gradient(135deg, #88c, #558); opacity: 0.6;"><span>📜</span></div>
+      <div class="vibe-label">History</div>
+      <div class="vibe-orb" style="background: linear-gradient(135deg, #8c8, #585); opacity: 0.6;"><span>🎪</span></div>
+      <div class="vibe-label">What's On</div>
+      <div class="vibe-orb" style="background: linear-gradient(135deg, #cc8, #885); opacity: 0.6;"><span>🛡</span></div>
+      <div class="vibe-label">Safety</div>
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">✦</span>
+      <span class="search-text">Ask anything...</span>
+      <span class="mic-icon">🎙</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 3: Enriched POI Card -->
+<div class="scene" id="scene-poi-enriched">
+  <div class="scene-title">3. Enriched POI Card</div>
+  <div class="scene-desc">POI card with new action chips: Directions (deep links to Maps app), Share (plain text), Save, Ask AI. All four close the "now what?" gap.</div>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="map-bg"></div>
+
+    <div class="top-bar">
+      <div class="location-strip">
+        <span class="city">Wynwood, Miami</span>
+        <span class="weather">☀️ 82°F</span>
+        <span>7:14 PM</span>
+      </div>
+    </div>
+
+    <div class="poi-card">
+      <div class="poi-card-photo">
+        🎨
+        <div class="vibe-tag">Character</div>
+      </div>
+      <div class="poi-card-body">
+        <div class="poi-card-name">Wynwood Walls</div>
+        <div class="poi-card-type">Street Art Museum · Outdoor</div>
+        <div class="poi-card-why">World-famous outdoor gallery spanning an entire city block — murals by international artists rotate seasonally. The golden hour light makes the colors pop differently every evening.</div>
+        <div class="poi-card-meta-row">
+          <span class="open">● Open now</span>
+          <span class="rating">⭐ 4.7</span>
+          <span>Free entry</span>
+          <span>📍 0.3 mi</span>
+        </div>
+      </div>
+      <div class="poi-card-actions">
+        <button class="chip chip-save" onclick="this.textContent='✓ Saved'; this.classList.add('saved');" style="font-size: 13px; padding: 8px 16px;">♡ Save</button>
+        <button class="chip chip-directions" style="font-size: 13px; padding: 8px 16px;">↗ Directions</button>
+        <button class="chip chip-share" style="font-size: 13px; padding: 8px 16px;">↑ Share</button>
+        <button class="chip chip-ask" style="font-size: 13px; padding: 8px 16px;">✦ Ask AI</button>
+      </div>
+    </div>
+
+    <div class="search-bar" style="bottom: 30px;">
+      <span class="search-icon">✦</span>
+      <span class="search-text">Ask anything...</span>
+      <span class="mic-icon">🎙</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 4: Share Flow -->
+<div class="scene" id="scene-share">
+  <div class="scene-title">4. Share Flow</div>
+  <div class="scene-desc">Plain text share — no deep links, no web page needed. The MESSAGE is the share. Recipients get value even without the app. "Check out this place" + why it's special.</div>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="map-bg"></div>
+
+    <div class="top-bar">
+      <div class="location-strip">
+        <span class="city">Wynwood, Miami</span>
+      </div>
+    </div>
+
+    <div class="share-sheet">
+      <div style="text-align: center; margin-bottom: 14px;">
+        <div style="width: 40px; height: 4px; background: #444; border-radius: 2px; margin: 0 auto;"></div>
+      </div>
+      <div style="font-size: 15px; color: #fff; font-weight: 600; margin-bottom: 14px; text-align: center;">Share this place</div>
+
+      <div class="share-preview">
+        <div class="share-preview-text">
+          Check out <span class="highlight">Wynwood Walls</span> in Wynwood, Miami — world-famous outdoor street art museum with rotating murals by international artists. The golden hour light is unreal.
+          <br><br>
+          📍 maps.google.com/?q=25.7012,-80.1998
+          <br><br>
+          <span style="color: #666;">Found on HaraZone</span>
+        </div>
+      </div>
+
+      <div class="share-apps">
+        <div class="share-app">
+          <div class="share-app-icon" style="background: #25d366;">💬</div>
+          <div class="share-app-name">WhatsApp</div>
+        </div>
+        <div class="share-app">
+          <div class="share-app-icon" style="background: #007aff;">✉️</div>
+          <div class="share-app-name">Messages</div>
+        </div>
+        <div class="share-app">
+          <div class="share-app-icon" style="background: #1da1f2;">🐦</div>
+          <div class="share-app-name">Twitter</div>
+        </div>
+        <div class="share-app">
+          <div class="share-app-icon" style="background: #555;">📋</div>
+          <div class="share-app-name">Copy</div>
+        </div>
+        <div class="share-app">
+          <div class="share-app-icon" style="background: #333;">⋯</div>
+          <div class="share-app-name">More</div>
+        </div>
+      </div>
+
+      <button class="share-cancel">Cancel</button>
+    </div>
+
+    <div class="search-bar" style="bottom: 30px;">
+      <span class="search-icon">✦</span>
+      <span class="search-text">Ask anything...</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 5: AI Save Acknowledgment -->
+<div class="scene" id="scene-ai-ack">
+  <div class="scene-title">5. AI Save Acknowledgment</div>
+  <div class="scene-desc">When user saves a place, AI responds with context + 1-2 related suggestions. One save becomes three. The save isn't a dead end — it's a branching path.</div>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="map-bg"></div>
+
+    <div class="top-bar">
+      <div class="location-strip">
+        <span class="city">Wynwood, Miami</span>
+        <span class="weather">☀️ 82°F</span>
+        <span>7:20 PM</span>
+      </div>
+    </div>
+
+    <div class="ai-ack">
+      <div class="ai-ack-header">
+        <div class="ai-ack-avatar">✦</div>
+        <div class="ai-ack-name">HaraZone</div>
+      </div>
+      <div class="ai-ack-body">
+        Great pick! <span class="bold">Wynwood Walls</span> is one of the best things about this neighborhood — especially right now at golden hour.
+        <br><br>
+        Since you're into street art, you might also love:
+      </div>
+
+      <div class="ai-ack-suggestions">
+        <div class="concierge-poi" style="border: 1px solid #2a2a2a; border-radius: 12px; margin-bottom: 8px;">
+          <div class="concierge-poi-img" style="width: 48px; height: 48px; font-size: 20px;">🖌</div>
+          <div class="concierge-poi-info">
+            <div class="concierge-poi-name">The Margulies Collection</div>
+            <div class="concierge-poi-why">Private warehouse gallery — huge installations you won't see anywhere else</div>
+            <div class="concierge-poi-actions">
+              <button class="chip chip-save" onclick="this.textContent='✓ Saved'; this.classList.add('saved');">♡ Save</button>
+              <button class="chip chip-directions">↗ Directions</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="concierge-poi" style="border: 1px solid #2a2a2a; border-radius: 12px;">
+          <div class="concierge-poi-img" style="width: 48px; height: 48px; font-size: 20px;">🎨</div>
+          <div class="concierge-poi-info">
+            <div class="concierge-poi-name">Museum of Graffiti</div>
+            <div class="concierge-poi-why">World's first museum dedicated to graffiti — 5 min walk from Wynwood Walls</div>
+            <div class="concierge-poi-actions">
+              <button class="chip chip-save" onclick="this.textContent='✓ Saved'; this.classList.add('saved');">♡ Save</button>
+              <button class="chip chip-directions">↗ Directions</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">✦</span>
+      <span class="search-text">Ask anything...</span>
+      <span class="mic-icon">🎙</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 6: Saved Pins on Map -->
+<div class="scene" id="scene-saved-pins">
+  <div class="scene-title">6. Saved Pins — Visual Distinction</div>
+  <div class="scene-desc">Saved places have a gold border glow + checkmark badge. Immediately visible on the map. Your history is spatial — you SEE where you've been interested.</div>
+
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-home"></div>
+    <div class="map-bg"></div>
+
+    <div class="top-bar">
+      <div class="location-strip">
+        <span class="city">Wynwood, Miami</span>
+        <span class="weather">☀️ 78°F</span>
+        <span>3:15 PM</span>
+      </div>
+    </div>
+
+    <!-- Saved pins -->
+    <div class="pin saved" style="left: 70px; top: 200px;">
+      <div class="pin-dot" style="background: #c74;">🎨</div>
+      <div class="save-badge">✓</div>
+      <div class="pin-name">Wynwood Walls</div>
+    </div>
+    <div class="pin saved" style="left: 220px; top: 350px;">
+      <div class="pin-dot" style="background: #4a7;">🍜</div>
+      <div class="save-badge">✓</div>
+      <div class="pin-name">Zak the Baker</div>
+    </div>
+    <div class="pin saved" style="left: 140px; top: 480px;">
+      <div class="pin-dot" style="background: #7a4;">☕</div>
+      <div class="save-badge">✓</div>
+      <div class="pin-name">Panther Coffee</div>
+    </div>
+
+    <!-- Regular pins (no badge, no gold border) -->
+    <div class="pin" style="left: 250px; top: 220px;">
+      <div class="pin-dot" style="background: #447;">🎵</div>
+      <div class="pin-name">Gramps Bar</div>
+    </div>
+    <div class="pin" style="left: 180px; top: 160px;">
+      <div class="pin-dot" style="background: #744;">🏛</div>
+      <div class="pin-name">Margulies</div>
+    </div>
+    <div class="pin" style="left: 60px; top: 380px;">
+      <div class="pin-dot" style="background: #474;">🌴</div>
+      <div class="pin-name">Roberto Park</div>
+    </div>
+    <div class="pin" style="left: 270px; top: 450px;">
+      <div class="pin-dot" style="background: #c74;">🛍</div>
+      <div class="pin-name">Nomad Tribe</div>
+    </div>
+
+    <div class="vibe-rail">
+      <div class="vibe-orb active" style="background: linear-gradient(135deg, #e88, #c55); --glow: rgba(200,80,80,0.4); width: 46px; height: 46px;"><span>🎭</span></div>
+      <div class="vibe-label">Character</div>
+      <div class="vibe-orb" style="background: linear-gradient(135deg, #88c, #558); opacity: 0.5; width: 36px; height: 36px;"><span>📜</span></div>
+      <div class="vibe-label">History</div>
+      <div class="vibe-orb" style="background: linear-gradient(135deg, #8c8, #585); opacity: 0.5; width: 42px; height: 42px;"><span>🎪</span></div>
+      <div class="vibe-label">What's On</div>
+      <div class="vibe-orb" style="background: linear-gradient(135deg, #cc8, #885); opacity: 0.5; width: 34px; height: 34px;"><span>🛡</span></div>
+      <div class="vibe-label">Safety</div>
+    </div>
+
+    <div style="position: absolute; bottom: 75px; left: 16px; background: rgba(40,35,10,0.8); border: 1px solid rgba(255,215,0,0.2); border-radius: 10px; padding: 6px 12px; z-index: 30; font-size: 11px; color: #ffd700;">
+      📌 3 saved places in view
+    </div>
+
+    <div class="search-bar">
+      <span class="search-icon">✦</span>
+      <span class="search-text">Ask anything...</span>
+      <span class="mic-icon">🎙</span>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 7: Decision Table -->
+<div class="scene" id="scene-decisions">
+  <div class="scene-title">7. MVP Launch Readiness — Decision Table</div>
+  <div class="scene-desc">Full decision matrix with tiers, effort, impact, implementation approach, and recommendations.</div>
+
+  <div class="decision-table">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Tier</th>
+          <th>Feature</th>
+          <th>What It Does</th>
+          <th>Why It Matters</th>
+          <th>Implementation</th>
+          <th>Effort</th>
+          <th>Impact</th>
+          <th>Rec</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td class="tier-label tier-1">MUST SHIP</td>
+          <td style="color:#fff; font-weight:600;">Saves in AI prompt</td>
+          <td>Query saved places from Room, inject into Gemini system prompt as context list</td>
+          <td>AI transforms from generic guide to "it KNOWS me" — first personalization moment</td>
+          <td>SavedPlaceRepository query → append to GeminiPromptBuilder system context</td>
+          <td><span class="effort-badge effort-low">1-2 hrs</span></td>
+          <td style="color:#8f8;">Very High</td>
+          <td><span class="rec rec-must">DO FIRST</span></td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td class="tier-label tier-1">MUST SHIP</td>
+          <td style="color:#fff; font-weight:600;">Saved pins distinct on map</td>
+          <td>Gold border glow + checkmark badge on saved POI pins</td>
+          <td>See your history spatially — "I've been interested here before"</td>
+          <td>Pin composable checks save state, applies gold border + badge overlay</td>
+          <td><span class="effort-badge effort-low">2-3 hrs</span></td>
+          <td style="color:#8f8;">High</td>
+          <td><span class="rec rec-must">MUST</span></td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td class="tier-label tier-1">MUST SHIP</td>
+          <td style="color:#fff; font-weight:600;">"N saves here" indicator</td>
+          <td>Subtle gold pill showing count of saved places in current viewport</td>
+          <td>Awareness of unfinished business — the retention pull</td>
+          <td>Viewport bounds query against saves table, show/hide pill composable</td>
+          <td><span class="effort-badge effort-low">1 hr</span></td>
+          <td style="color:#cc8;">Medium</td>
+          <td><span class="rec rec-must">MUST</span></td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td class="tier-label tier-1">MUST SHIP</td>
+          <td style="color:#fff; font-weight:600;">Directions button</td>
+          <td>"Directions" chip on POI card — opens Google Maps (Android) or Apple Maps (iOS) with coordinates</td>
+          <td>Closes biggest usability gap: found a place, can't get there. Without it = beautiful brochure</td>
+          <td>Platform expect/actual: Android Intent with geo: URI, iOS MKMapItem openInMaps</td>
+          <td><span class="effort-badge effort-low">2-3 hrs</span></td>
+          <td style="color:#f88;">Critical</td>
+          <td><span class="rec rec-must">MUST</span></td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td class="tier-label tier-1">MUST SHIP</td>
+          <td style="color:#fff; font-weight:600;">Share place</td>
+          <td>System share sheet with plain text: place name + why_special + Google Maps link</td>
+          <td>Only organic growth channel. "Show it to a friend" literally requires this button</td>
+          <td>Platform share intent/activity controller. Text template. Zero backend</td>
+          <td><span class="effort-badge effort-med">3-4 hrs</span></td>
+          <td style="color:#8f8;">Very High</td>
+          <td><span class="rec rec-must">MUST</span></td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td class="tier-label tier-1">MUST SHIP</td>
+          <td style="color:#fff; font-weight:600;">Concierge card (first open)</td>
+          <td>Auto AI insight on first app open: "If I were you right now..." with 2 POI cards + save chips</td>
+          <td>TRIGGERS the aha moment instead of waiting. Seeds first save. Sets concierge persona</td>
+          <td>SharedPreferences flag + lightweight Gemini call during splash. Dismissable card composable</td>
+          <td><span class="effort-badge effort-med">3-4 hrs</span></td>
+          <td style="color:#8f8;">Very High</td>
+          <td><span class="rec rec-must">AHA MOMENT</span></td>
+        </tr>
+        <tr style="background: rgba(0,0,0,0.3);">
+          <td colspan="9" style="padding: 4px 12px; color: #555; font-size: 10px;">── TIER 2: Ship within first week post-launch ──</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td class="tier-label tier-2">WEEK 1</td>
+          <td style="color:#ddd;">Vibe taps in AI prompt</td>
+          <td>Track which vibes user browses in session, inject into Gemini prompt as interest signal</td>
+          <td>Responses skew toward what user actually cares about — silent personalization</td>
+          <td>ViewModel tracks vibe selection events, passes to prompt builder as browsing context</td>
+          <td><span class="effort-badge effort-med">Half day</span></td>
+          <td style="color:#cc8;">High</td>
+          <td><span class="rec rec-should">SHOULD</span></td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td class="tier-label tier-2">WEEK 1</td>
+          <td style="color:#ddd;">AI save acknowledgment</td>
+          <td>On save, AI responds: "Great pick! Since you're into X, also try..." with 1-2 related POI cards</td>
+          <td>One save becomes 2-3 suggestions. Save loop grows organically. Dead end → branching path</td>
+          <td>Save action triggers lightweight Gemini call with POI context. Response card composable</td>
+          <td><span class="effort-badge effort-med">3-4 hrs</span></td>
+          <td style="color:#8f8;">Very High</td>
+          <td><span class="rec rec-should">HIGH VALUE</span></td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td class="tier-label tier-2">WEEK 1</td>
+          <td style="color:#ddd;">Saves nearby nudge</td>
+          <td>On app open with saves in viewport: gold banner "N saved places nearby" with names. Tap to highlight</td>
+          <td>Retention — unfinished business pull. "Your plans are waiting." No push notifications needed</td>
+          <td>App open → Room query (saves within viewport bounds) → show/hide nudge banner</td>
+          <td><span class="effort-badge effort-med">Half day</span></td>
+          <td style="color:#8f8;">High</td>
+          <td><span class="rec rec-should">RETENTION</span></td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td class="tier-label tier-2">WEEK 1</td>
+          <td style="color:#ddd;">Grouped saves view</td>
+          <td>Saves organized by area (not flat list). Each group shows area name, count, "Plan these" CTA</td>
+          <td>Saves feel organized without manual effort. Sets up itinerary bridge (Phase C)</td>
+          <td>Group saved POIs by reverse-geocoded area name. LazyColumn with grouped headers</td>
+          <td><span class="effort-badge effort-high">1-2 days</span></td>
+          <td style="color:#cc8;">High</td>
+          <td><span class="rec rec-should">SHOULD</span></td>
+        </tr>
+        <tr>
+          <td>11</td>
+          <td class="tier-label tier-2">WEEK 1</td>
+          <td style="color:#ddd;">Settings / profile</td>
+          <td>Basic screen: name, preferred units (mi/km), clear saves, about/version</td>
+          <td>App doesn't feel anonymous. "Someone built this." Also needed for store review</td>
+          <td>Simple settings screen, DataStore for prefs, FAB menu entry</td>
+          <td><span class="effort-badge effort-med">Half day</span></td>
+          <td style="color:#cc8;">Medium</td>
+          <td><span class="rec rec-should">POLISH</span></td>
+        </tr>
+        <tr style="background: rgba(0,0,0,0.3);">
+          <td colspan="9" style="padding: 4px 12px; color: #555; font-size: 10px;">── DEFERRED: Post-launch iterations ──</td>
+        </tr>
+        <tr>
+          <td>12</td>
+          <td class="tier-label tier-d">DEFER</td>
+          <td style="color:#888;">Engagement engine</td>
+          <td>Full interaction logging, 30-day scoring, vibe rail reordering</td>
+          <td>True personalization loop — vibes adapt to behavior</td>
+          <td>New Room tables (interaction_log, vibe_engagement), SQL aggregation, rail sort</td>
+          <td><span class="effort-badge effort-high">2+ weeks</span></td>
+          <td style="color:#8f8;">Very High</td>
+          <td><span class="rec rec-defer">PHASE A</span></td>
+        </tr>
+        <tr>
+          <td>13</td>
+          <td class="tier-label tier-d">DEFER</td>
+          <td style="color:#888;">Ghost vibes</td>
+          <td>AI detects behavioral patterns → suggests new vibes user didn't know they had</td>
+          <td>Delight + personalization depth. "The app knows me better than I know myself"</td>
+          <td>Pattern detection on interaction_log, Gemini call to name/style new vibe</td>
+          <td><span class="effort-badge effort-high">1-2 weeks</span></td>
+          <td style="color:#8f8;">High</td>
+          <td><span class="rec rec-defer">PHASE A</span></td>
+        </tr>
+        <tr>
+          <td>14</td>
+          <td class="tier-label tier-d">DEFER</td>
+          <td style="color:#888;">Route planning from saves</td>
+          <td>AI organizes saved places into time-ordered walking/driving itinerary</td>
+          <td>"Vibes → AI → Itinerary" — the full product vision outcome</td>
+          <td>Gemini call with saves + hours + distances, route overlay on map</td>
+          <td><span class="effort-badge effort-high">3 weeks</span></td>
+          <td style="color:#8f8;">Very High</td>
+          <td><span class="rec rec-defer">PHASE C</span></td>
+        </tr>
+        <tr>
+          <td>15</td>
+          <td class="tier-label tier-d">DEFER</td>
+          <td style="color:#888;">Cross-session AI memory</td>
+          <td>AI remembers your taste across app opens. Builds persistent taste profile</td>
+          <td>"My AI concierge" — long-term relationship, not one-night stand</td>
+          <td>Taste profile schema, conversation persistence, decay strategy</td>
+          <td><span class="effort-badge effort-high">1 week</span></td>
+          <td style="color:#8f8;">High</td>
+          <td><span class="rec rec-defer">PHASE D</span></td>
+        </tr>
+        <tr>
+          <td>16</td>
+          <td class="tier-label tier-d">DEFER</td>
+          <td style="color:#888;">Push notifications</td>
+          <td>"Your saved place is open now and 10 min away"</td>
+          <td>Pull users back when app is closed — strongest retention for dormant users</td>
+          <td>Needs backend (FCM/APNS), permission flow, timing logic, geofencing</td>
+          <td><span class="effort-badge effort-high">2+ weeks</span></td>
+          <td style="color:#cc8;">High</td>
+          <td><span class="rec rec-defer">NEEDS BACKEND</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="legend">
+    <h3>Legend</h3>
+    <div class="legend-grid">
+      <div><span class="rec rec-must">MUST</span> Ship before launch — app feels broken without it</div>
+      <div><span class="rec rec-should">SHOULD</span> Ship within first week — meaningful improvement</div>
+      <div><span class="rec rec-defer">DEFER</span> Post-launch — high value but high effort</div>
+      <div><span class="effort-badge effort-low">Low</span> 1-3 hours &nbsp; <span class="effort-badge effort-med">Med</span> half day &nbsp; <span class="effort-badge effort-high">High</span> days/weeks</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showScene(id) {
+  document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('scene-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+
+</body>
+</html>

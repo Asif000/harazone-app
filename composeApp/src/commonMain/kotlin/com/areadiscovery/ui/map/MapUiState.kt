@@ -35,6 +35,7 @@ sealed class MapUiState {
         val recentPlaces: List<RecentPlace> = emptyList(),
         val savedPois: List<SavedPoi> = emptyList(),
         val savedPoiCount: Int = 0,
+        val savedPoiIds: Set<String> = emptySet(),
         val showSavesSheet: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()

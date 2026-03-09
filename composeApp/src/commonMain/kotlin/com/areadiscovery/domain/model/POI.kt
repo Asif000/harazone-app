@@ -18,4 +18,6 @@ data class POI(
     val vibeInsights: Map<String, String> = emptyMap(),
     val wikiSlug: String? = null,
     val imageUrl: String? = null,
-)
+) {
+    val savedId: String get() = "$name|$latitude|$longitude"
+}

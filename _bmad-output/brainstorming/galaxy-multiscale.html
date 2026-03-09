@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Galaxy Saves — Multi-Scale Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #030308; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; overflow: hidden; height: 100vh; }
+
+  /* Starfield */
+  .starfield { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .star { position: absolute; background: #fff; border-radius: 50%; }
+  @keyframes twinkle { 0%,100% { opacity: 0.15; } 50% { opacity: 0.7; } }
+
+  /* Zoom levels */
+  .zoom-level { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.6s ease, transform 0.6s ease; transform: scale(0.8); z-index: 10; }
+  .zoom-level.active { opacity: 1; pointer-events: auto; transform: scale(1); }
+  .zoom-level.zoom-out { opacity: 0; transform: scale(2); }
+
+  /* Breadcrumb */
+  .breadcrumb { position: fixed; top: 14px; left: 20px; z-index: 50; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .breadcrumb-item { color: rgba(180,180,255,0.4); cursor: pointer; transition: color 0.2s; }
+  .breadcrumb-item:hover { color: rgba(180,180,255,0.8); }
+  .breadcrumb-item.current { color: rgba(180,180,255,0.8); cursor: default; }
+  .breadcrumb-sep { color: rgba(100,100,150,0.3); font-size: 10px; }
+
+  /* Header */
+  .level-header { position: fixed; top: 14px; left: 0; right: 0; text-align: center; z-index: 40; pointer-events: none; }
+  .level-title { font-size: 14px; color: rgba(200,200,255,0.6); font-weight: 300; letter-spacing: 3px; text-transform: uppercase; }
+  .level-subtitle { font-size: 11px; color: rgba(150,150,200,0.35); margin-top: 3px; }
+
+  /* You Are Here pulse */
+  .here-pulse { position: absolute; width: 12px; height: 12px; border-radius: 50%; background: rgba(100,200,255,0.8); box-shadow: 0 0 12px rgba(100,200,255,0.6); z-index: 15; }
+  .here-pulse::after { content: ''; position: absolute; inset: -6px; border-radius: 50%; border: 1px solid rgba(100,200,255,0.3); animation: herePing 2s ease-out infinite; }
+  @keyframes herePing { 0% { transform: scale(1); opacity: 0.6; } 100% { transform: scale(3); opacity: 0; } }
+  .here-label { position: absolute; font-size: 9px; color: rgba(100,200,255,0.6); white-space: nowrap; top: -16px; left: 50%; transform: translateX(-50%); }
+
+  /* Cluster node (used at all levels) */
+  .node { position: absolute; cursor: pointer; transition: all 0.3s ease; }
+  .node:hover { transform: scale(1.12); }
+  .node-orb { border-radius: 50%; display: flex; align-items: center; justify-content: center; position: relative; transition: all 0.3s; }
+  .node-glow { position: absolute; border-radius: 50%; filter: blur(25px); opacity: 0.15; pointer-events: none; animation: breathe 5s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { opacity: 0.1; transform: scale(1); } 50% { opacity: 0.2; transform: scale(1.1); } }
+  .node-label { text-align: center; margin-top: 8px; }
+  .node-name { font-size: 12px; color: rgba(220,220,255,0.7); font-weight: 500; white-space: nowrap; }
+  .node-count { font-size: 9px; color: rgba(150,150,200,0.4); margin-top: 1px; }
+  .node-emoji { font-size: var(--emoji, 28px); }
+
+  /* Connection lines */
+  .connections { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+  .conn { stroke: rgba(255,255,255,0.04); stroke-width: 1; stroke-dasharray: 6 8; }
+
+  /* Distance label on connections */
+  .dist-label { position: absolute; font-size: 9px; color: rgba(130,130,180,0.25); background: rgba(3,3,8,0.8); padding: 1px 6px; border-radius: 3px; pointer-events: none; white-space: nowrap; }
+
+  /* POI orb (neighborhood level) */
+  .poi-orb { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.3s; }
+  .poi-orb:hover { transform: scale(1.2); }
+  .poi-info { position: absolute; bottom: -36px; left: 50%; transform: translateX(-50%); text-align: center; white-space: nowrap; }
+  .poi-name { font-size: 11px; color: rgba(255,255,255,0.7); }
+  .poi-meta { font-size: 9px; color: rgba(180,180,220,0.35); margin-top: 1px; }
+
+  /* Route lines (neighborhood) */
+  .route-line { stroke: rgba(200,180,255,0.15); stroke-width: 1.5; stroke-dasharray: 4 4; }
+  .walk-time { position: absolute; font-size: 8px; color: rgba(200,180,255,0.3); background: rgba(3,3,8,0.8); padding: 1px 5px; border-radius: 3px; }
+
+  /* Bottom bar */
+  .bottom-bar { position: fixed; bottom: 24px; left: 0; right: 0; z-index: 50; display: flex; justify-content: center; gap: 12px; align-items: center; }
+  .toggle-btn { background: rgba(15,15,30,0.9); border: 1px solid rgba(50,50,80,0.5); border-radius: 20px; padding: 8px 18px; font-size: 12px; color: rgba(180,180,255,0.5); cursor: pointer; transition: all 0.2s; }
+  .toggle-btn.active { border-color: rgba(100,100,200,0.5); color: rgba(180,180,255,0.9); background: rgba(30,30,60,0.9); }
+  .plan-btn { background: linear-gradient(135deg, rgba(100,60,200,0.3), rgba(60,100,200,0.3)); border: 1px solid rgba(130,100,255,0.3); border-radius: 24px; padding: 10px 22px; font-size: 12px; color: #c8b4ff; cursor: pointer; transition: all 0.2s; }
+  .plan-btn:hover { border-color: rgba(130,100,255,0.6); }
+
+  /* Hint text */
+  .hint { position: fixed; bottom: 70px; left: 0; right: 0; text-align: center; font-size: 11px; color: rgba(150,150,200,0.25); z-index: 50; pointer-events: none; }
+
+  /* Vibe legend */
+  .vibe-legend { position: fixed; bottom: 24px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 3px; }
+  .vibe-legend-item { display: flex; align-items: center; gap: 5px; font-size: 9px; color: rgba(180,180,220,0.3); }
+  .vibe-dot { width: 6px; height: 6px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div class="starfield" id="stars"></div>
+
+<!-- Breadcrumb -->
+<div class="breadcrumb" id="breadcrumb">
+  <span class="breadcrumb-item current" data-level="world">My Universe</span>
+</div>
+
+<!-- Level header -->
+<div class="level-header">
+  <div class="level-title" id="levelTitle">MY UNIVERSE</div>
+  <div class="level-subtitle" id="levelSubtitle">25 saved places across 4 countries</div>
+</div>
+
+<!-- ===== LEVEL 1: WORLD ===== -->
+<div class="zoom-level active" id="level-world">
+  <svg class="connections" viewBox="0 0 1000 700">
+    <line class="conn" x1="250" y1="280" x2="550" y2="200"/>
+    <line class="conn" x1="550" y1="200" x2="680" y2="350"/>
+    <line class="conn" x1="250" y1="280" x2="680" y2="350"/>
+  </svg>
+
+  <!-- North America -->
+  <div class="node" style="left: 160px; top: 220px;" onclick="zoomTo('continent-na')">
+    <div class="node-glow" style="width: 160px; height: 160px; left: -40px; top: -40px; background: radial-gradient(circle, #6af, transparent);"></div>
+    <div class="node-orb" style="width: 80px; height: 80px; background: radial-gradient(circle at 30% 30%, #4a8aff, #2255aa); box-shadow: 0 0 30px rgba(70,130,255,0.3);">
+      <span class="node-emoji" style="--emoji: 32px;">🌎</span>
+    </div>
+    <div class="here-pulse" style="right: -5px; top: 5px;">
+      <span class="here-label">You</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">North America</div>
+      <div class="node-count">14 places · 2 cities</div>
+    </div>
+  </div>
+
+  <!-- Europe -->
+  <div class="node" style="left: 480px; top: 140px;" onclick="zoomTo('continent-eu')">
+    <div class="node-glow" style="width: 130px; height: 130px; left: -30px; top: -30px; background: radial-gradient(circle, #fa8, transparent);"></div>
+    <div class="node-orb" style="width: 65px; height: 65px; background: radial-gradient(circle at 30% 30%, #ffaa55, #aa6622); box-shadow: 0 0 25px rgba(255,170,80,0.25);">
+      <span class="node-emoji" style="--emoji: 26px;">🌍</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Europe</div>
+      <div class="node-count">8 places · 2 cities</div>
+    </div>
+  </div>
+
+  <!-- Asia -->
+  <div class="node" style="left: 620px; top: 290px;" onclick="zoomTo('continent-as')">
+    <div class="node-glow" style="width: 100px; height: 100px; left: -20px; top: -20px; background: radial-gradient(circle, #f88, transparent);"></div>
+    <div class="node-orb" style="width: 50px; height: 50px; background: radial-gradient(circle at 30% 30%, #ff7777, #aa3333); box-shadow: 0 0 20px rgba(255,100,100,0.2);">
+      <span class="node-emoji" style="--emoji: 22px;">🌏</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Asia</div>
+      <div class="node-count">3 places · 1 city</div>
+    </div>
+  </div>
+
+  <!-- Distance labels -->
+  <div class="dist-label" style="left: 380px; top: 200px;">4,400 mi</div>
+  <div class="dist-label" style="left: 600px; top: 240px;">5,600 mi</div>
+  <div class="dist-label" style="left: 400px; top: 340px;">8,500 mi</div>
+</div>
+
+<!-- ===== LEVEL 2: CONTINENT (North America) ===== -->
+<div class="zoom-level" id="level-continent-na">
+  <svg class="connections" viewBox="0 0 1000 700">
+    <line class="conn" x1="300" y1="300" x2="600" y2="250"/>
+  </svg>
+
+  <!-- Miami -->
+  <div class="node" style="left: 200px; top: 230px;" onclick="zoomTo('city-miami')">
+    <div class="node-glow" style="width: 180px; height: 180px; left: -50px; top: -50px; background: radial-gradient(circle, #6af, transparent);"></div>
+    <div class="node-orb" style="width: 85px; height: 85px; background: radial-gradient(circle at 30% 30%, #55bbff, #2266aa); box-shadow: 0 0 35px rgba(80,170,255,0.35);">
+      <span class="node-emoji" style="--emoji: 34px;">🌴</span>
+    </div>
+    <div class="here-pulse" style="right: -5px; top: 5px;">
+      <span class="here-label">You</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Miami</div>
+      <div class="node-count">12 places · 3 areas</div>
+    </div>
+  </div>
+
+  <!-- Austin -->
+  <div class="node" style="left: 520px; top: 200px;" onclick="zoomTo('city-austin')">
+    <div class="node-glow" style="width: 110px; height: 110px; left: -25px; top: -25px; background: radial-gradient(circle, #8d8, transparent);"></div>
+    <div class="node-orb" style="width: 55px; height: 55px; background: radial-gradient(circle at 30% 30%, #77cc77, #338833); box-shadow: 0 0 22px rgba(100,200,100,0.25);">
+      <span class="node-emoji" style="--emoji: 24px;">🎸</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Austin</div>
+      <div class="node-count">2 places · 1 area</div>
+    </div>
+  </div>
+
+  <div class="dist-label" style="left: 400px; top: 240px;">1,300 mi · 3h flight</div>
+</div>
+
+<!-- ===== LEVEL 2: CONTINENT (Europe) ===== -->
+<div class="zoom-level" id="level-continent-eu">
+  <svg class="connections" viewBox="0 0 1000 700">
+    <line class="conn" x1="300" y1="280" x2="580" y2="300"/>
+  </svg>
+
+  <!-- Paris -->
+  <div class="node" style="left: 210px; top: 220px;" onclick="zoomTo('city-paris')">
+    <div class="node-glow" style="width: 150px; height: 150px; left: -40px; top: -40px; background: radial-gradient(circle, #fa8, transparent);"></div>
+    <div class="node-orb" style="width: 70px; height: 70px; background: radial-gradient(circle at 30% 30%, #ffbb77, #aa7733); box-shadow: 0 0 28px rgba(255,180,100,0.3);">
+      <span class="node-emoji" style="--emoji: 28px;">🗼</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Paris</div>
+      <div class="node-count">5 places · 2 areas</div>
+    </div>
+  </div>
+
+  <!-- Lisbon -->
+  <div class="node" style="left: 500px; top: 250px;">
+    <div class="node-glow" style="width: 110px; height: 110px; left: -25px; top: -25px; background: radial-gradient(circle, #fc8, transparent);"></div>
+    <div class="node-orb" style="width: 50px; height: 50px; background: radial-gradient(circle at 30% 30%, #ffcc66, #aa8833); box-shadow: 0 0 20px rgba(255,200,80,0.2);">
+      <span class="node-emoji" style="--emoji: 22px;">🎻</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Lisbon</div>
+      <div class="node-count">3 places · 1 area</div>
+    </div>
+  </div>
+
+  <div class="dist-label" style="left: 380px; top: 260px;">900 mi · 2.5h flight</div>
+</div>
+
+<!-- ===== LEVEL 2: CONTINENT (Asia) ===== -->
+<div class="zoom-level" id="level-continent-as">
+  <!-- Tokyo (single city = auto-zoom to city, but show for demo) -->
+  <div class="node" style="left: 350px; top: 250px;" onclick="zoomTo('city-tokyo')">
+    <div class="node-glow" style="width: 130px; height: 130px; left: -30px; top: -30px; background: radial-gradient(circle, #f88, transparent);"></div>
+    <div class="node-orb" style="width: 60px; height: 60px; background: radial-gradient(circle at 30% 30%, #ff8888, #aa4444); box-shadow: 0 0 25px rgba(255,100,100,0.3);">
+      <span class="node-emoji" style="--emoji: 26px;">⛩</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Tokyo</div>
+      <div class="node-count">3 places · 1 area</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LEVEL 3: CITY (Miami) ===== -->
+<div class="zoom-level" id="level-city-miami">
+  <svg class="connections" viewBox="0 0 1000 700">
+    <line class="conn" x1="250" y1="250" x2="500" y2="310"/>
+    <line class="conn" x1="500" y1="310" x2="650" y2="420"/>
+    <line class="conn" x1="250" y1="250" x2="650" y2="420"/>
+  </svg>
+
+  <!-- Wynwood -->
+  <div class="node" style="left: 150px; top: 180px;" onclick="zoomTo('hood-wynwood')">
+    <div class="node-glow" style="width: 160px; height: 160px; left: -40px; top: -40px; background: radial-gradient(circle, #e88, transparent);"></div>
+    <div class="node-orb" style="width: 80px; height: 80px; background: radial-gradient(circle at 30% 30%, #ff9988, #cc5544); box-shadow: 0 0 30px rgba(200,80,80,0.35);">
+      <span class="node-emoji" style="--emoji: 32px;">🎨</span>
+    </div>
+    <div class="here-pulse" style="right: -2px; top: 2px;">
+      <span class="here-label">You</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Wynwood</div>
+      <div class="node-count">5 places · 0.3 mi</div>
+    </div>
+  </div>
+
+  <!-- Little Havana -->
+  <div class="node" style="left: 410px; top: 250px;">
+    <div class="node-glow" style="width: 130px; height: 130px; left: -30px; top: -30px; background: radial-gradient(circle, #fa8, transparent);"></div>
+    <div class="node-orb" style="width: 65px; height: 65px; background: radial-gradient(circle at 30% 30%, #ffaa88, #cc7744); box-shadow: 0 0 25px rgba(200,130,60,0.3);">
+      <span class="node-emoji" style="--emoji: 26px;">🎭</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">Little Havana</div>
+      <div class="node-count">4 places · 3.2 mi</div>
+    </div>
+  </div>
+
+  <!-- South Beach -->
+  <div class="node" style="left: 570px; top: 360px;">
+    <div class="node-glow" style="width: 110px; height: 110px; left: -25px; top: -25px; background: radial-gradient(circle, #8cf, transparent);"></div>
+    <div class="node-orb" style="width: 52px; height: 52px; background: radial-gradient(circle at 30% 30%, #88ccff, #5588aa); box-shadow: 0 0 22px rgba(80,160,255,0.25);">
+      <span class="node-emoji" style="--emoji: 22px;">🏖</span>
+    </div>
+    <div class="node-label">
+      <div class="node-name">South Beach</div>
+      <div class="node-count">3 places · 8.1 mi</div>
+    </div>
+  </div>
+
+  <div class="dist-label" style="left: 310px; top: 230px;">3.2 mi · 12 min</div>
+  <div class="dist-label" style="left: 550px; top: 340px;">5.4 mi · 18 min</div>
+  <div class="dist-label" style="left: 360px; top: 380px;">8.1 mi · 25 min</div>
+</div>
+
+<!-- ===== LEVEL 4: NEIGHBORHOOD (Wynwood) ===== -->
+<div class="zoom-level" id="level-hood-wynwood">
+  <svg class="connections" viewBox="0 0 1000 700">
+    <line class="route-line" x1="280" y1="200" x2="480" y2="260"/>
+    <line class="route-line" x1="480" y1="260" x2="420" y2="400"/>
+    <line class="route-line" x1="420" y1="400" x2="260" y2="440"/>
+    <line class="route-line" x1="260" y1="440" x2="200" y2="540"/>
+  </svg>
+
+  <div class="poi-orb" style="width: 60px; height: 60px; left: 250px; top: 170px; background: radial-gradient(circle at 30% 30%, #f99, #c55); box-shadow: 0 0 20px rgba(200,80,80,0.4);">
+    <span style="font-size: 26px;">🎨</span>
+    <div class="poi-info">
+      <div class="poi-name">Wynwood Walls</div>
+      <div class="poi-meta">Street Art · Free · Open now</div>
+    </div>
+  </div>
+
+  <div class="poi-orb" style="width: 48px; height: 48px; left: 458px; top: 238px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); box-shadow: 0 0 16px rgba(80,180,80,0.35);">
+    <span style="font-size: 20px;">🍜</span>
+    <div class="poi-info">
+      <div class="poi-name">Zak the Baker</div>
+      <div class="poi-meta">Bakery · $$ · Open til 9</div>
+    </div>
+  </div>
+
+  <div class="poi-orb" style="width: 44px; height: 44px; left: 400px; top: 380px; background: radial-gradient(circle at 30% 30%, #9d9, #5a5); box-shadow: 0 0 14px rgba(80,180,80,0.3);">
+    <span style="font-size: 18px;">☕</span>
+    <div class="poi-info">
+      <div class="poi-name">Panther Coffee</div>
+      <div class="poi-meta">Coffee · $ · Open now</div>
+    </div>
+  </div>
+
+  <div class="poi-orb" style="width: 42px; height: 42px; left: 240px; top: 420px; background: radial-gradient(circle at 30% 30%, #99f, #558); box-shadow: 0 0 14px rgba(100,100,220,0.3);">
+    <span style="font-size: 17px;">🏛</span>
+    <div class="poi-info">
+      <div class="poi-name">Margulies Collection</div>
+      <div class="poi-meta">Gallery · $10 · Open til 6</div>
+    </div>
+  </div>
+
+  <div class="poi-orb" style="width: 38px; height: 38px; left: 182px; top: 522px; background: radial-gradient(circle at 30% 30%, #f9f, #a5a); box-shadow: 0 0 12px rgba(200,80,200,0.25);">
+    <span style="font-size: 16px;">🎵</span>
+    <div class="poi-info">
+      <div class="poi-name">Gramps Bar</div>
+      <div class="poi-meta">Bar · $$ · Opens 5 PM</div>
+    </div>
+  </div>
+
+  <div class="walk-time" style="left: 380px; top: 218px;">3 min</div>
+  <div class="walk-time" style="left: 470px; top: 330px;">5 min</div>
+  <div class="walk-time" style="left: 330px; top: 420px;">4 min</div>
+  <div class="walk-time" style="left: 210px; top: 495px;">6 min</div>
+
+  <!-- Area glow -->
+  <div style="position: absolute; width: 400px; height: 400px; left: 180px; top: 200px; background: radial-gradient(circle, rgba(200,100,100,0.04) 0%, transparent 70%); pointer-events: none;"></div>
+</div>
+
+<!-- Bottom bar -->
+<div class="bottom-bar">
+  <button class="toggle-btn active">✦ Galaxy</button>
+  <button class="toggle-btn">☰ List</button>
+  <button class="plan-btn" id="planBtn">✦ Plan my day</button>
+</div>
+
+<div class="hint" id="hint">Tap a cluster to zoom in</div>
+
+<!-- Vibe legend -->
+<div class="vibe-legend">
+  <div class="vibe-legend-item"><div class="vibe-dot" style="background: #e88;"></div>Character</div>
+  <div class="vibe-legend-item"><div class="vibe-dot" style="background: #88c;"></div>History</div>
+  <div class="vibe-legend-item"><div class="vibe-dot" style="background: #8c8;"></div>Food</div>
+  <div class="vibe-legend-item"><div class="vibe-dot" style="background: #8cf;"></div>Beach</div>
+  <div class="vibe-legend-item"><div class="vibe-dot" style="background: #f9f;"></div>Nightlife</div>
+</div>
+
+<script>
+// Stars
+const starfield = document.getElementById('stars');
+for (let i = 0; i < 300; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  s.style.left = Math.random()*100+'%';
+  s.style.top = Math.random()*100+'%';
+  s.style.width = s.style.height = (Math.random()*2+0.5)+'px';
+  s.style.opacity = Math.random()*0.4+0.05;
+  if (Math.random()>0.75) s.style.animation = `twinkle ${2+Math.random()*4}s ease-in-out ${Math.random()*3}s infinite`;
+  starfield.appendChild(s);
+}
+
+// Navigation state
+const hierarchy = {
+  'world': { title: 'MY UNIVERSE', subtitle: '25 saved places across 4 countries', parent: null, label: 'My Universe', plan: 'Plan across continents' },
+  'continent-na': { title: 'NORTH AMERICA', subtitle: '14 places across 2 cities', parent: 'world', label: 'North America', plan: 'Plan my US trip' },
+  'continent-eu': { title: 'EUROPE', subtitle: '8 places across 2 cities', parent: 'world', label: 'Europe', plan: 'Plan my Europe trip' },
+  'continent-as': { title: 'ASIA', subtitle: '3 places in Tokyo', parent: 'world', label: 'Asia', plan: 'Plan my Tokyo day' },
+  'city-miami': { title: 'MIAMI', subtitle: '12 places across 3 areas', parent: 'continent-na', label: 'Miami', plan: 'Plan my Miami day' },
+  'city-austin': { title: 'AUSTIN', subtitle: '2 places in South Congress', parent: 'continent-na', label: 'Austin', plan: 'Plan my Austin walk' },
+  'city-paris': { title: 'PARIS', subtitle: '5 places across 2 arrondissements', parent: 'continent-eu', label: 'Paris', plan: 'Plan my Paris day' },
+  'city-tokyo': { title: 'TOKYO', subtitle: '3 places in Shibuya', parent: 'continent-as', label: 'Tokyo', plan: 'Plan my Tokyo walk' },
+  'hood-wynwood': { title: 'WYNWOOD', subtitle: '5 places · all within 0.4 mi', parent: 'city-miami', label: 'Wynwood', plan: 'Plan my Wynwood walk' },
+};
+
+let currentLevel = 'world';
+
+function getPath(level) {
+  const path = [];
+  let l = level;
+  while (l) {
+    path.unshift(l);
+    l = hierarchy[l].parent;
+  }
+  return path;
+}
+
+function updateBreadcrumb(level) {
+  const path = getPath(level);
+  const bc = document.getElementById('breadcrumb');
+  bc.innerHTML = path.map((p, i) => {
+    const isLast = i === path.length - 1;
+    const sep = i < path.length - 1 ? '<span class="breadcrumb-sep">›</span>' : '';
+    return `<span class="breadcrumb-item ${isLast ? 'current' : ''}" onclick="${isLast ? '' : "zoomTo('"+p+"')"}">${hierarchy[p].label}</span>${sep}`;
+  }).join('');
+}
+
+function zoomTo(level) {
+  if (level === currentLevel) return;
+
+  const prev = document.getElementById('level-' + currentLevel);
+  const next = document.getElementById('level-' + level);
+
+  if (!next) return;
+
+  // Determine zoom direction
+  const prevPath = getPath(currentLevel);
+  const nextPath = getPath(level);
+  const zoomingIn = nextPath.length > prevPath.length;
+
+  prev.classList.remove('active');
+  prev.classList.add(zoomingIn ? 'zoom-out' : '');
+
+  setTimeout(() => {
+    prev.classList.remove('zoom-out');
+    prev.style.transform = '';
+  }, 600);
+
+  next.classList.add('active');
+
+  currentLevel = level;
+
+  // Update UI
+  document.getElementById('levelTitle').textContent = hierarchy[level].title;
+  document.getElementById('levelSubtitle').textContent = hierarchy[level].subtitle;
+  document.getElementById('planBtn').textContent = '✦ ' + hierarchy[level].plan;
+  updateBreadcrumb(level);
+
+  // Update hint
+  const hint = document.getElementById('hint');
+  if (level.startsWith('hood-')) {
+    hint.textContent = 'Tap a place for details';
+  } else if (level === 'world') {
+    hint.textContent = 'Tap a continent to zoom in';
+  } else if (level.startsWith('continent-')) {
+    hint.textContent = 'Tap a city to zoom in';
+  } else {
+    hint.textContent = 'Tap an area to zoom in';
+  }
+}
+</script>
+
+</body>
+</html>

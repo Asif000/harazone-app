@@ -68,12 +68,13 @@ fun ExpandablePoiCard(
     onDismiss: () -> Unit,
     onDirectionsClick: (Double, Double, String) -> Unit,
     onAskAiClick: (String) -> Unit,
-    onSaveClick: () -> Unit,
+    isSaved: Boolean,
+    onSave: () -> Unit,
+    onUnsave: () -> Unit,
     onShareClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var saved by remember { mutableStateOf(false) }
     val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
     val vibeColor = (activeVibe ?: poiVibe ?: Vibe.DEFAULT).toColor()
 
@@ -191,11 +192,11 @@ fun ExpandablePoiCard(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 AssistChip(
-                    onClick = { saved = !saved; onSaveClick() },
-                    label = { Text(if (saved) "Saved" else "Save") },
+                    onClick = { if (isSaved) onUnsave() else onSave() },
+                    label = { Text(if (isSaved) "Saved" else "Save") },
                     leadingIcon = {
                         Icon(
-                            if (saved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                             contentDescription = null,
                             modifier = Modifier.size(18.dp),
                         )

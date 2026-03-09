@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Universe — You Are The Center</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #030308; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; overflow: hidden; height: 100vh; width: 100vw; }
+
+  .universe { position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+
+  /* Starfield */
+  .star { position: absolute; background: #fff; border-radius: 50%; pointer-events: none; }
+  @keyframes twinkle { 0%,100% { opacity: 0.1; } 50% { opacity: 0.6; } }
+
+  /* Orbit rings (subtle distance guides) */
+  .orbit-ring { position: absolute; border-radius: 50%; border: 1px solid rgba(100,100,180,0.04); pointer-events: none; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  .orbit-label { position: absolute; font-size: 8px; color: rgba(120,120,180,0.15); letter-spacing: 1px; text-transform: uppercase; pointer-events: none; }
+
+  /* Center — YOU */
+  .center-you { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 30; pointer-events: none; }
+  .center-core { width: 20px; height: 20px; border-radius: 50%; background: radial-gradient(circle at 40% 40%, #8df, #4af); box-shadow: 0 0 20px rgba(100,180,255,0.5), 0 0 60px rgba(100,180,255,0.15); }
+  .center-pulse { position: absolute; inset: -8px; border-radius: 50%; border: 1px solid rgba(100,180,255,0.2); animation: centerPing 3s ease-out infinite; }
+  .center-pulse2 { position: absolute; inset: -8px; border-radius: 50%; border: 1px solid rgba(100,180,255,0.15); animation: centerPing 3s ease-out 1.5s infinite; }
+  @keyframes centerPing { 0% { transform: scale(1); opacity: 0.5; } 100% { transform: scale(4); opacity: 0; } }
+  .center-label { position: absolute; top: 28px; left: 50%; transform: translateX(-50%); font-size: 10px; color: rgba(130,200,255,0.6); white-space: nowrap; letter-spacing: 1px; }
+
+  /* Radial connection lines from center */
+  .radial-line { position: absolute; left: 50%; top: 50%; transform-origin: 0 0; height: 1px; pointer-events: none; z-index: 5; }
+  .radial-line-inner { width: 100%; height: 100%; background: linear-gradient(90deg, rgba(100,180,255,0.15) 0%, var(--line-color) 100%); }
+
+  /* Save orb */
+  .save-orb { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.35s ease; z-index: 20; }
+  .save-orb:hover { transform: translate(-50%, -50%) scale(1.25); z-index: 25; }
+  .save-orb .orb-tooltip { position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%); background: rgba(10,10,25,0.95); border: 1px solid rgba(100,100,180,0.3); border-radius: 10px; padding: 8px 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; text-align: center; min-width: 120px; }
+  .save-orb:hover .orb-tooltip { opacity: 1; }
+  .tooltip-name { font-size: 12px; color: #fff; font-weight: 500; }
+  .tooltip-area { font-size: 9px; color: rgba(180,180,220,0.5); margin-top: 2px; }
+  .tooltip-dist { font-size: 9px; color: rgba(130,200,255,0.5); margin-top: 2px; }
+  .tooltip-when { font-size: 8px; color: rgba(255,200,100,0.4); margin-top: 3px; }
+
+  /* Area cluster label */
+  .area-label { position: absolute; transform: translate(-50%, -50%); pointer-events: none; z-index: 15; text-align: center; }
+  .area-label-text { font-size: 10px; color: rgba(200,200,255,0.25); letter-spacing: 1.5px; text-transform: uppercase; }
+  .area-label-count { font-size: 8px; color: rgba(150,150,200,0.15); margin-top: 1px; }
+
+  /* Cluster glow */
+  .cluster-glow { position: absolute; border-radius: 50%; pointer-events: none; z-index: 2; filter: blur(40px); animation: clusterBreathe 6s ease-in-out infinite; }
+  @keyframes clusterBreathe { 0%,100% { opacity: 0.06; } 50% { opacity: 0.12; } }
+
+  /* Recently saved shimmer */
+  @keyframes recentGlow { 0%,100% { box-shadow: 0 0 15px 3px var(--glow); } 50% { box-shadow: 0 0 25px 8px var(--glow); } }
+  .save-orb.recent { animation: recentGlow 2.5s ease-in-out infinite; }
+
+  /* Header */
+  .header { position: fixed; top: 16px; left: 0; right: 0; text-align: center; z-index: 40; pointer-events: none; }
+  .header-title { font-size: 13px; color: rgba(200,200,255,0.5); font-weight: 300; letter-spacing: 3px; }
+  .header-sub { font-size: 10px; color: rgba(150,150,200,0.25); margin-top: 3px; }
+
+  /* Bottom bar */
+  .bottom-bar { position: fixed; bottom: 24px; left: 0; right: 0; z-index: 50; display: flex; justify-content: center; gap: 12px; }
+  .btn { background: rgba(15,15,30,0.9); border: 1px solid rgba(50,50,80,0.5); border-radius: 20px; padding: 8px 18px; font-size: 12px; color: rgba(180,180,255,0.5); cursor: pointer; transition: all 0.2s; }
+  .btn.active { border-color: rgba(100,100,200,0.5); color: rgba(180,180,255,0.9); }
+  .btn-plan { background: linear-gradient(135deg, rgba(100,60,200,0.3), rgba(60,100,200,0.3)); border: 1px solid rgba(130,100,255,0.3); color: #c8b4ff; }
+
+  /* Time filter */
+  .time-filter { position: fixed; top: 16px; right: 20px; z-index: 50; display: flex; gap: 6px; }
+  .time-btn { background: rgba(15,15,30,0.8); border: 1px solid rgba(50,50,80,0.3); border-radius: 14px; padding: 5px 12px; font-size: 10px; color: rgba(180,180,255,0.3); cursor: pointer; transition: all 0.2s; }
+  .time-btn.active { border-color: rgba(255,200,100,0.4); color: rgba(255,200,100,0.7); }
+
+  /* Stats */
+  .stats { position: fixed; top: 16px; left: 20px; z-index: 50; }
+  .stat-row { font-size: 10px; color: rgba(150,150,200,0.3); margin-bottom: 3px; }
+  .stat-val { color: rgba(200,200,255,0.5); }
+
+  /* Vibe legend */
+  .legend { position: fixed; bottom: 24px; right: 20px; z-index: 50; display: flex; flex-direction: column; gap: 3px; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 8px; color: rgba(180,180,220,0.25); }
+  .legend-dot { width: 6px; height: 6px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div class="universe" id="universe">
+
+  <!-- Orbit rings (distance guides) -->
+  <div class="orbit-ring" style="width: 200px; height: 200px;"></div>
+  <div class="orbit-ring" style="width: 400px; height: 400px;"></div>
+  <div class="orbit-ring" style="width: 650px; height: 650px;"></div>
+  <div class="orbit-ring" style="width: 950px; height: 950px;"></div>
+
+  <!-- Orbit distance labels -->
+  <div class="orbit-label" style="left: calc(50% + 105px); top: calc(50% - 8px);">walking</div>
+  <div class="orbit-label" style="left: calc(50% + 205px); top: calc(50% - 8px);">driving</div>
+  <div class="orbit-label" style="left: calc(50% + 330px); top: calc(50% - 8px);">flight</div>
+  <div class="orbit-label" style="left: calc(50% + 480px); top: calc(50% - 8px);">far</div>
+
+  <!-- CENTER: YOU -->
+  <div class="center-you">
+    <div class="center-core"></div>
+    <div class="center-pulse"></div>
+    <div class="center-pulse2"></div>
+    <div class="center-label">YOU</div>
+  </div>
+
+</div>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-title">MY UNIVERSE</div>
+  <div class="header-sub">25 places saved · 4 countries · your world, your map</div>
+</div>
+
+<!-- Stats -->
+<div class="stats">
+  <div class="stat-row">Closest: <span class="stat-val">Wynwood Walls · 0.3 mi</span></div>
+  <div class="stat-row">Furthest: <span class="stat-val">Shibuya Crossing · 7,500 mi</span></div>
+  <div class="stat-row">Last saved: <span class="stat-val">2 hours ago</span></div>
+</div>
+
+<!-- Time filter -->
+<div class="time-filter">
+  <button class="time-btn active" onclick="filterTime(this, 'all')">All time</button>
+  <button class="time-btn" onclick="filterTime(this, 'week')">This week</button>
+  <button class="time-btn" onclick="filterTime(this, 'trip')">This trip</button>
+</div>
+
+<!-- Bottom bar -->
+<div class="bottom-bar">
+  <button class="btn active">✦ Galaxy</button>
+  <button class="btn">☰ List</button>
+  <button class="btn btn-plan">✦ Plan nearest cluster</button>
+</div>
+
+<!-- Vibe legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background: #e88;"></div>Character</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #88c;"></div>History</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #8c8;"></div>Food</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #8cf;"></div>Beach</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #f9f;"></div>Nightlife</div>
+  <div class="legend-item"><div class="legend-dot" style="background: #fc8;"></div>Culture</div>
+</div>
+
+<script>
+const universe = document.getElementById('universe');
+const cx = window.innerWidth / 2;
+const cy = window.innerHeight / 2;
+
+// Stars
+for (let i = 0; i < 350; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  s.style.left = Math.random()*100+'%';
+  s.style.top = Math.random()*100+'%';
+  s.style.width = s.style.height = (Math.random()*1.8+0.4)+'px';
+  s.style.opacity = Math.random()*0.3+0.05;
+  if (Math.random()>0.8) s.style.animation = `twinkle ${2+Math.random()*5}s ease-in-out ${Math.random()*3}s infinite`;
+  universe.appendChild(s);
+}
+
+// Save data: angle (degrees from top), distance (px from center), size, emoji, color, glow, name, area, dist text, when, recent
+const saves = [
+  // WYNWOOD cluster (very close, ~80-120px, north-northwest)
+  { angle: -30, dist: 70, size: 52, emoji: '🎨', bg: '#f99,#c55', glow: 'rgba(200,80,80,0.35)', name: 'Wynwood Walls', area: 'Wynwood, Miami', distText: '0.3 mi', when: '2h ago', recent: true },
+  { angle: -15, dist: 90, size: 40, emoji: '🍜', bg: '#9d9,#5a5', glow: 'rgba(80,180,80,0.3)', name: 'Zak the Baker', area: 'Wynwood, Miami', distText: '0.4 mi', when: '2h ago', recent: true },
+  { angle: -45, dist: 85, size: 36, emoji: '☕', bg: '#9d9,#5a5', glow: 'rgba(80,180,80,0.25)', name: 'Panther Coffee', area: 'Wynwood, Miami', distText: '0.5 mi', when: 'Yesterday' },
+  { angle: -55, dist: 100, size: 34, emoji: '🏛', bg: '#99f,#558', glow: 'rgba(100,100,220,0.25)', name: 'Margulies Collection', area: 'Wynwood, Miami', distText: '0.6 mi', when: 'Yesterday' },
+  { angle: -5, dist: 110, size: 30, emoji: '🎵', bg: '#f9f,#a5a', glow: 'rgba(200,80,200,0.2)', name: 'Gramps Bar', area: 'Wynwood, Miami', distText: '0.7 mi', when: '3 days ago' },
+
+  // LITTLE HAVANA cluster (close, ~150-180px, southwest)
+  { angle: 210, dist: 155, size: 44, emoji: '🎭', bg: '#fa8,#c75', glow: 'rgba(200,150,60,0.3)', name: 'Calle Ocho', area: 'Little Havana, Miami', distText: '3.2 mi', when: '3 days ago' },
+  { angle: 225, dist: 170, size: 38, emoji: '🍦', bg: '#9d9,#5a5', glow: 'rgba(80,180,80,0.25)', name: 'Azucar Ice Cream', area: 'Little Havana, Miami', distText: '3.5 mi', when: '3 days ago' },
+  { angle: 195, dist: 165, size: 36, emoji: '🎺', bg: '#f99,#c55', glow: 'rgba(200,80,80,0.25)', name: 'Ball & Chain', area: 'Little Havana, Miami', distText: '3.4 mi', when: '4 days ago' },
+  { angle: 240, dist: 180, size: 28, emoji: '🏛', bg: '#99f,#558', glow: 'rgba(100,100,220,0.2)', name: 'Tower Theater', area: 'Little Havana, Miami', distText: '3.6 mi', when: '4 days ago' },
+
+  // SOUTH BEACH cluster (medium, ~200-230px, east)
+  { angle: 100, dist: 210, size: 42, emoji: '🏖', bg: '#8cf,#58a', glow: 'rgba(80,170,255,0.3)', name: 'Lummus Park', area: 'South Beach, Miami', distText: '8.1 mi', when: 'Last week' },
+  { angle: 115, dist: 225, size: 34, emoji: '🌴', bg: '#fc8,#a85', glow: 'rgba(200,160,80,0.25)', name: 'Ocean Drive', area: 'South Beach, Miami', distText: '8.3 mi', when: 'Last week' },
+  { angle: 90, dist: 235, size: 30, emoji: '🍹', bg: '#f9f,#a5a', glow: 'rgba(200,80,200,0.2)', name: "Mango's", area: 'South Beach, Miami', distText: '8.5 mi', when: 'Last week' },
+
+  // AUSTIN cluster (far, ~320px, northwest)
+  { angle: -70, dist: 320, size: 36, emoji: '🎸', bg: '#8d8,#383', glow: 'rgba(100,200,100,0.25)', name: 'Continental Club', area: 'Austin, TX', distText: '1,300 mi', when: '2 weeks ago' },
+  { angle: -80, dist: 340, size: 30, emoji: '🌮', bg: '#fc8,#a85', glow: 'rgba(200,160,80,0.2)', name: 'Torchy\'s Tacos', area: 'Austin, TX', distText: '1,300 mi', when: '2 weeks ago' },
+
+  // PARIS cluster (very far, ~420px, northeast)
+  { angle: 40, dist: 400, size: 48, emoji: '🗼', bg: '#fa8,#a75', glow: 'rgba(255,170,80,0.3)', name: 'Sacre-Coeur', area: 'Montmartre, Paris', distText: '4,400 mi', when: 'Last month' },
+  { angle: 50, dist: 420, size: 38, emoji: '🥐', bg: '#fc8,#a85', glow: 'rgba(200,160,80,0.25)', name: 'Du Pain et des Idees', area: 'Canal St-Martin, Paris', distText: '4,400 mi', when: 'Last month' },
+  { angle: 30, dist: 430, size: 34, emoji: '🎨', bg: '#f99,#c55', glow: 'rgba(200,80,80,0.25)', name: "Musee d'Orsay", area: 'St-Germain, Paris', distText: '4,400 mi', when: 'Last month' },
+  { angle: 55, dist: 445, size: 30, emoji: '📚', bg: '#99f,#558', glow: 'rgba(100,100,220,0.2)', name: 'Shakespeare & Co', area: 'Latin Quarter, Paris', distText: '4,400 mi', when: 'Last month' },
+  { angle: 38, dist: 460, size: 28, emoji: '🍷', bg: '#f9f,#a5a', glow: 'rgba(200,80,200,0.2)', name: 'Le Baron Rouge', area: 'Bastille, Paris', distText: '4,400 mi', when: 'Last month' },
+
+  // LISBON cluster (very far, ~380px, east-northeast)
+  { angle: 65, dist: 380, size: 40, emoji: '🎻', bg: '#fc8,#a85', glow: 'rgba(200,160,80,0.28)', name: 'Alfama Fado House', area: 'Alfama, Lisbon', distText: '4,100 mi', when: '6 weeks ago' },
+  { angle: 75, dist: 395, size: 32, emoji: '🏰', bg: '#99f,#558', glow: 'rgba(100,100,220,0.22)', name: 'Castelo de Sao Jorge', area: 'Alfama, Lisbon', distText: '4,100 mi', when: '6 weeks ago' },
+  { angle: 70, dist: 410, size: 28, emoji: '🥘', bg: '#9d9,#5a5', glow: 'rgba(80,180,80,0.2)', name: 'Time Out Market', area: 'Cais do Sodre, Lisbon', distText: '4,100 mi', when: '6 weeks ago' },
+
+  // TOKYO cluster (furthest, ~480px, far east)
+  { angle: 130, dist: 470, size: 44, emoji: '⛩', bg: '#f88,#a44', glow: 'rgba(255,100,100,0.3)', name: 'Meiji Shrine', area: 'Shibuya, Tokyo', distText: '7,500 mi', when: '3 months ago' },
+  { angle: 140, dist: 490, size: 36, emoji: '🍜', bg: '#9d9,#5a5', glow: 'rgba(80,180,80,0.25)', name: 'Fuunji Ramen', area: 'Shinjuku, Tokyo', distText: '7,500 mi', when: '3 months ago' },
+  { angle: 120, dist: 485, size: 30, emoji: '🌸', bg: '#f9f,#a5a', glow: 'rgba(200,80,200,0.2)', name: 'Yoyogi Park', area: 'Shibuya, Tokyo', distText: '7,500 mi', when: '3 months ago' },
+];
+
+// Area cluster labels
+const areaLabels = [
+  { angle: -35, dist: 55, name: 'Wynwood', count: 5 },
+  { angle: 220, dist: 140, name: 'Little Havana', count: 4 },
+  { angle: 105, dist: 195, name: 'South Beach', count: 3 },
+  { angle: -75, dist: 300, name: 'Austin', count: 2 },
+  { angle: 42, dist: 380, name: 'Paris', count: 5 },
+  { angle: 72, dist: 365, name: 'Lisbon', count: 3 },
+  { angle: 130, dist: 450, name: 'Tokyo', count: 3 },
+];
+
+// Cluster glows
+const clusterGlows = [
+  { angle: -30, dist: 90, size: 160, color: 'rgba(200,80,80,0.08)' },   // Wynwood
+  { angle: 215, dist: 165, size: 130, color: 'rgba(200,150,60,0.06)' },  // Little Havana
+  { angle: 100, dist: 220, size: 120, color: 'rgba(80,170,255,0.06)' },  // South Beach
+  { angle: -75, dist: 330, size: 90, color: 'rgba(100,200,100,0.05)' },  // Austin
+  { angle: 42, dist: 425, size: 150, color: 'rgba(255,170,80,0.06)' },   // Paris
+  { angle: 70, dist: 395, size: 110, color: 'rgba(200,160,80,0.05)' },   // Lisbon
+  { angle: 130, dist: 480, size: 120, color: 'rgba(255,100,100,0.05)' }, // Tokyo
+];
+
+function angleToXY(angleDeg, dist) {
+  const rad = (angleDeg - 90) * Math.PI / 180;
+  return { x: cx + Math.cos(rad) * dist, y: cy + Math.sin(rad) * dist };
+}
+
+// Render cluster glows
+clusterGlows.forEach(g => {
+  const pos = angleToXY(g.angle, g.dist);
+  const el = document.createElement('div');
+  el.className = 'cluster-glow';
+  el.style.width = el.style.height = g.size + 'px';
+  el.style.left = (pos.x - g.size/2) + 'px';
+  el.style.top = (pos.y - g.size/2) + 'px';
+  el.style.background = `radial-gradient(circle, ${g.color}, transparent)`;
+  el.style.animationDelay = Math.random() * 3 + 's';
+  universe.appendChild(el);
+});
+
+// Render radial lines from center to each save
+saves.forEach(s => {
+  const pos = angleToXY(s.angle, s.dist);
+  const dx = pos.x - cx;
+  const dy = pos.y - cy;
+  const length = Math.sqrt(dx*dx + dy*dy);
+  const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+
+  const line = document.createElement('div');
+  line.className = 'radial-line';
+  line.style.width = length + 'px';
+  line.style.transform = `rotate(${angle}deg)`;
+
+  const colors = s.bg.split(',');
+  const lineColor = s.glow.replace('0.', '0.0');
+
+  const inner = document.createElement('div');
+  inner.className = 'radial-line-inner';
+  inner.style.setProperty('--line-color', lineColor);
+  line.appendChild(inner);
+
+  universe.appendChild(line);
+});
+
+// Render area labels
+areaLabels.forEach(a => {
+  const pos = angleToXY(a.angle, a.dist);
+  const el = document.createElement('div');
+  el.className = 'area-label';
+  el.style.left = pos.x + 'px';
+  el.style.top = pos.y + 'px';
+  el.innerHTML = `<div class="area-label-text">${a.name}</div><div class="area-label-count">${a.count} places</div>`;
+  universe.appendChild(el);
+});
+
+// Render save orbs
+saves.forEach(s => {
+  const pos = angleToXY(s.angle, s.dist);
+
+  const orb = document.createElement('div');
+  orb.className = 'save-orb' + (s.recent ? ' recent' : '');
+  orb.style.width = s.size + 'px';
+  orb.style.height = s.size + 'px';
+  orb.style.left = pos.x + 'px';
+  orb.style.top = pos.y + 'px';
+  orb.style.transform = 'translate(-50%, -50%)';
+  orb.style.background = `radial-gradient(circle at 30% 30%, ${s.bg})`;
+  orb.style.boxShadow = `0 0 ${s.size/3}px ${s.size/8}px ${s.glow}`;
+  orb.style.setProperty('--glow', s.glow);
+  orb.style.fontSize = (s.size * 0.5) + 'px';
+
+  // Older saves are slightly dimmer
+  if (s.when.includes('month')) orb.style.opacity = '0.6';
+  else if (s.when.includes('week') && !s.when.includes('Last week')) orb.style.opacity = '0.7';
+
+  orb.innerHTML = `
+    <span>${s.emoji}</span>
+    <div class="orb-tooltip">
+      <div class="tooltip-name">${s.name}</div>
+      <div class="tooltip-area">${s.area}</div>
+      <div class="tooltip-dist">${s.distText} from you</div>
+      <div class="tooltip-when">Saved ${s.when}</div>
+    </div>
+  `;
+
+  universe.appendChild(orb);
+});
+
+// Time filter
+function filterTime(btn, period) {
+  document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const orbs = document.querySelectorAll('.save-orb');
+  orbs.forEach((orb, i) => {
+    const s = saves[i];
+    let show = true;
+    if (period === 'week') {
+      show = s.when.includes('ago') && (s.when.includes('h ') || s.when.includes('Yesterday') || s.when.includes('3 day'));
+    } else if (period === 'trip') {
+      show = s.when.includes('h ') || s.when.includes('Yesterday');
+    }
+    orb.style.opacity = show ? (s.when.includes('month') ? '0.6' : '1') : '0.08';
+    orb.style.pointerEvents = show ? 'auto' : 'none';
+  });
+
+  // Also dim lines
+  const lines = document.querySelectorAll('.radial-line');
+  lines.forEach((line, i) => {
+    const s = saves[i];
+    let show = true;
+    if (period === 'week') {
+      show = s.when.includes('ago') && (s.when.includes('h ') || s.when.includes('Yesterday') || s.when.includes('3 day'));
+    } else if (period === 'trip') {
+      show = s.when.includes('h ') || s.when.includes('Yesterday');
+    }
+    line.style.opacity = show ? '1' : '0.1';
+  });
+}
+</script>
+
+</body>
+</html>

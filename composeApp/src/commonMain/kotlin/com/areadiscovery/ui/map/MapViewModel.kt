@@ -7,6 +7,7 @@ import com.areadiscovery.domain.model.BucketUpdate
 import com.areadiscovery.domain.model.GeocodingSuggestion
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.RecentPlace
+import com.areadiscovery.domain.model.SavedPoi
 import com.areadiscovery.domain.repository.RecentPlacesRepository
 import com.areadiscovery.domain.repository.SavedPoiRepository
 import com.areadiscovery.domain.model.Vibe
@@ -70,6 +71,12 @@ class MapViewModel(
             savedPoiRepository.observeAll().collect { pois ->
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
                 _uiState.value = current.copy(savedPois = pois, savedPoiCount = pois.size)
+            }
+        }
+        viewModelScope.launch {
+            savedPoiRepository.observeSavedIds().collect { ids ->
+                val current = _uiState.value as? MapUiState.Ready ?: return@collect
+                _uiState.value = current.copy(savedPoiIds = ids)
             }
         }
     }
@@ -137,6 +144,47 @@ class MapViewModel(
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Area search error" }
+            }
+        }
+    }
+
+    fun savePoi(poi: POI, areaName: String) {
+        val poiId = poi.savedId
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(savedPoiIds = current.savedPoiIds + poiId)
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.save(
+                    SavedPoi(
+                        id = poiId,
+                        name = poi.name,
+                        type = poi.type,
+                        areaName = areaName,
+                        lat = poi.latitude ?: 0.0,
+                        lng = poi.longitude ?: 0.0,
+                        whySpecial = poi.insight,
+                        savedAt = 0L,
+                    )
+                )
+            } catch (e: Exception) {
+                AppLogger.e(e) { "MapViewModel: save POI failed" }
+                val s = _uiState.value as? MapUiState.Ready ?: return@launch
+                _uiState.value = s.copy(savedPoiIds = s.savedPoiIds - poiId)
+            }
+        }
+    }
+
+    fun unsavePoi(poi: POI) {
+        val poiId = poi.savedId
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(savedPoiIds = current.savedPoiIds - poiId)
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.unsave(poiId)
+            } catch (e: Exception) {
+                AppLogger.e(e) { "MapViewModel: unsave POI failed" }
+                val s = _uiState.value as? MapUiState.Ready ?: return@launch
+                _uiState.value = s.copy(savedPoiIds = s.savedPoiIds + poiId)
             }
         }
     }

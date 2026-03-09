@@ -126,6 +126,9 @@ private fun ReadyContent(
 
     Box(Modifier.fillMaxSize()) {
         // Base: map or list
+        // TODO(BACKLOG-MEDIUM): POIListView needs polish pass — list rows lack save CTAs, tap opens
+        //   ExpandablePoiCard but save state isn't visible inline. Should show save icon per row,
+        //   wire isSaved/onSave/onUnsave same as map pin card.
         if (state.showListView) {
             POIListView(
                 pois = state.pois,
@@ -254,12 +257,9 @@ private fun ReadyContent(
                         chatViewModel.sendMessage(query)
                     }
                 },
-                // TODO(BACKLOG-MEDIUM): Wire ExpandablePoiCard save to SavedPoiRepository (same as chat POI cards)
-                onSaveClick = {
-                    coroutineScope.launch {
-                        snackbarHostState.showSnackbar("Bookmarks coming soon")
-                    }
-                },
+                isSaved = state.selectedPoi.savedId in state.savedPoiIds,
+                onSave = { viewModel.savePoi(state.selectedPoi, state.areaName) },
+                onUnsave = { viewModel.unsavePoi(state.selectedPoi) },
                 onShareClick = {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar("Sharing coming soon")
