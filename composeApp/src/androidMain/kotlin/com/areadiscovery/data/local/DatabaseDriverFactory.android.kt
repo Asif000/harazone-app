@@ -17,6 +17,7 @@ actual class DatabaseDriverFactory(private val context: Context) {
                 AfterVersion(2) { it.ensureSavedPoisTable() },
                 AfterVersion(3) { it.ensureSavedPoisTable() },
                 AfterVersion(4) { it.ensureSavedPoisTable() },
+                AfterVersion(5) { it.ensureSavedPoisTable() },
             ),
         )
         // Safety net: ensure table exists even if migrations didn't fire

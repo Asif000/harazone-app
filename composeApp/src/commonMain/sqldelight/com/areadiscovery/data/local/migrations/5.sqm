@@ -1,0 +1,10 @@
+CREATE TABLE IF NOT EXISTS saved_pois (
+    poi_id      TEXT NOT NULL PRIMARY KEY,
+    name        TEXT NOT NULL,
+    type        TEXT NOT NULL,
+    area_name   TEXT NOT NULL,
+    lat         REAL NOT NULL,
+    lng         REAL NOT NULL,
+    why_special TEXT NOT NULL,
+    saved_at    INTEGER NOT NULL
+);

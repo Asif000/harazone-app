@@ -14,6 +14,7 @@ actual class DatabaseDriverFactory {
                 AfterVersion(2) { it.ensureSavedPoisTable() },
                 AfterVersion(3) { it.ensureSavedPoisTable() },
                 AfterVersion(4) { it.ensureSavedPoisTable() },
+                AfterVersion(5) { it.ensureSavedPoisTable() },
             ),
         )
         driver.ensureSavedPoisTable()

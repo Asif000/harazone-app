@@ -410,6 +410,8 @@ Check it out!"""
         assertFalse(state.showSkeletons)
     }
 
+    // Regression: stripPoiJson originally used StringBuilder.delete() which is JVM-only.
+    // Fixed to use deleteRange() which is available in commonMain. This test must pass on all platforms.
     @Test
     fun `stripPoiJson removes JSON and keeps prose`() = runTest {
         val vm = createViewModel()
