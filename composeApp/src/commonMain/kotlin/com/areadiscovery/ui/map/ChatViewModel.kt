@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 
@@ -40,6 +41,7 @@ internal class ChatViewModel(
     private var parsedCards = mutableListOf<ChatPoiCard>()
     private var pendingSaveIds = setOf<String>()
     private var pendingUnsaveIds = setOf<String>()
+    private var latestSavedPois: List<SavedPoi> = emptyList()
 
     companion object {
         private const val MAX_HISTORY_TURNS = 20 // 20 messages = ~10 back-and-forth turns
@@ -53,9 +55,17 @@ internal class ChatViewModel(
                 _uiState.value = _uiState.value.copy(savedPoiIds = merged)
             }
         }
+        viewModelScope.launch {
+            savedPoiRepository.observeAll().collect { latestSavedPois = it }
+        }
     }
 
-    fun openChat(areaName: String, pois: List<POI>, activeVibe: Vibe?) {
+    fun openChat(
+        areaName: String,
+        pois: List<POI>,
+        activeVibe: Vibe?,
+        entryPoint: ChatEntryPoint = ChatEntryPoint.Default,
+    ) {
         val current = _uiState.value
         // F7/M2: Same area — preserve conversation (whether open or closed)
         if (current.areaName == areaName && (current.isOpen || current.bubbles.isNotEmpty())) {
@@ -69,7 +79,24 @@ internal class ChatViewModel(
         nextId = 0L
         val vibeName = activeVibe?.name
         val poiNames = pois.take(5).map { it.name }
-        val systemContext = promptBuilder.buildChatSystemContext(areaName, poiNames, vibeName)
+
+        // Filter saves: current area only, cap at 10, most recent first
+        val areaSaves = latestSavedPois
+            .filter { it.areaName == areaName }
+            .sortedByDescending { it.savedAt }
+            .take(10)
+            .map { it.name }
+
+        // Map ChatEntryPoint to plain String — keeps data.remote free of ui.map imports
+        val framingHint: String? = when (entryPoint) {
+            is ChatEntryPoint.SavesSheet ->
+                "The user is currently reviewing their saved places — lead with suggestions based on those first."
+            is ChatEntryPoint.PoiCard ->
+                "The user is currently looking at ${entryPoint.poi.name} — lead with context about that place."
+            is ChatEntryPoint.Default -> null
+        }
+
+        val systemContext = promptBuilder.buildChatSystemContext(areaName, poiNames, vibeName, areaSaves, framingHint)
         // F2: Store system context separately — don't add as "model" role in history
         // (Gemini requires first turn to be "user", not "model")
         conversationHistory.add(
@@ -92,6 +119,10 @@ internal class ChatViewModel(
             savedPoiIds = _uiState.value.savedPoiIds,
         )
     }
+
+    // Test-only accessor — allows ChatViewModelTest to verify system context injection
+    internal val systemContextForTest: String
+        get() = conversationHistory.firstOrNull()?.content.orEmpty()
 
     fun closeChat() {
         chatJob?.cancel()

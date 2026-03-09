@@ -435,4 +435,94 @@ Enjoy!"""
         val text = "Just a plain response with no POI cards."
         assertEquals(text, vm.stripPoiJson(text))
     }
+
+    // --- Saves injection tests ---
+
+    @Test
+    fun `openChat_withAreaSaves_injectsThemIntoSystemContext`() = runTest {
+        fakeSavedPoiRepository.save(
+            com.areadiscovery.domain.model.SavedPoi(
+                id = "Cafe Roma|41.89|12.49",
+                name = "Cafe Roma",
+                type = "food",
+                areaName = "Test Area",
+                lat = 41.89,
+                lng = 12.49,
+                whySpecial = "Best espresso",
+                savedAt = 1000L,
+            )
+        )
+        fakeSavedPoiRepository.save(
+            com.areadiscovery.domain.model.SavedPoi(
+                id = "Park Verde|41.90|12.50",
+                name = "Park Verde",
+                type = "park",
+                areaName = "Test Area",
+                lat = 41.90,
+                lng = 12.50,
+                whySpecial = "Peaceful park",
+                savedAt = 2000L,
+            )
+        )
+
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        val context = vm.systemContextForTest
+        assertTrue(context.contains("Cafe Roma"), "System context should contain saved POI name 'Cafe Roma'")
+        assertTrue(context.contains("Park Verde"), "System context should contain saved POI name 'Park Verde'")
+        assertTrue(context.contains("The user has saved"), "System context should contain saves line")
+    }
+
+    @Test
+    fun `openChat_withSavesInOtherArea_doesNotInjectThem`() = runTest {
+        fakeSavedPoiRepository.save(
+            com.areadiscovery.domain.model.SavedPoi(
+                id = "Other Cafe|10.0|20.0",
+                name = "Other Cafe",
+                type = "food",
+                areaName = "Other Area",
+                lat = 10.0,
+                lng = 20.0,
+                whySpecial = "Far away",
+                savedAt = 1000L,
+            )
+        )
+
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        val context = vm.systemContextForTest
+        assertFalse(context.contains("Other Cafe"), "System context should NOT contain saves from other areas")
+        assertFalse(context.contains("The user has saved"), "System context should NOT contain saves line when no area matches")
+    }
+
+    @Test
+    fun `openChat_moreThanTenSaves_capsAtTen`() = runTest {
+        // Populate with 15 saves for "Test Area"
+        for (i in 1..15) {
+            fakeSavedPoiRepository.save(
+                com.areadiscovery.domain.model.SavedPoi(
+                    id = "Place$i|${i.toDouble()}|${i.toDouble()}",
+                    name = "Place$i",
+                    type = "food",
+                    areaName = "Test Area",
+                    lat = i.toDouble(),
+                    lng = i.toDouble(),
+                    whySpecial = "Place $i",
+                    savedAt = i.toLong(),
+                )
+            )
+        }
+
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        val context = vm.systemContextForTest
+        assertTrue(context.contains("The user has saved"), "System context should contain saves line")
+        // Count commas in the "The user has saved: X, Y, Z in this area." segment
+        val savesSegment = context.substringAfter("The user has saved: ").substringBefore(" in this area.")
+        val nameCount = savesSegment.split(", ").size
+        assertEquals(10, nameCount, "Should cap saves at 10, found $nameCount")
+    }
 }

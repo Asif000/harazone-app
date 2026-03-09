@@ -18,6 +18,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Card
@@ -56,6 +58,7 @@ fun POIListView(
     onVibeSelected: (Vibe) -> Unit,
     onPoiClick: (POI) -> Unit,
     modifier: Modifier = Modifier,
+    savedPoiIds: Set<String> = emptySet(),
 ) {
     val filteredPois = if (activeVibe != null) {
         pois.filter { it.vibe.contains(activeVibe.name, ignoreCase = true) }
@@ -97,7 +100,11 @@ fun POIListView(
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(filteredPois, key = { "${it.name}_${it.type}" }) { poi ->
-                    PoiListCard(poi = poi, onClick = { onPoiClick(poi) })
+                    PoiListCard(
+                        poi = poi,
+                        onClick = { onPoiClick(poi) },
+                        isSaved = poi.savedId in savedPoiIds,
+                    )
                 }
                 item { Spacer(Modifier.height(MaterialTheme.spacing.sm)) }
             }
@@ -106,7 +113,7 @@ fun POIListView(
 }
 
 @Composable
-private fun PoiListCard(poi: POI, onClick: () -> Unit) {
+private fun PoiListCard(poi: POI, onClick: () -> Unit, isSaved: Boolean = false) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -117,6 +124,7 @@ private fun PoiListCard(poi: POI, onClick: () -> Unit) {
             },
         colors = CardDefaults.cardColors(containerColor = MapSurfaceDark),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        border = if (isSaved) BorderStroke(3.dp, Color(0xFFFFD700)) else null,
     ) {
         Row(
             modifier = Modifier.padding(12.dp),
@@ -181,6 +189,15 @@ private fun PoiListCard(poi: POI, onClick: () -> Unit) {
                             text = poi.liveStatus.replaceFirstChar { it.uppercaseChar() },
                             style = MaterialTheme.typography.labelSmall,
                             color = statusColor,
+                        )
+                    }
+                    if (isSaved) {
+                        Spacer(Modifier.width(8.dp))
+                        Icon(
+                            Icons.Filled.Bookmark,
+                            contentDescription = "Saved",
+                            tint = Color(0xFFFFD700),
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }

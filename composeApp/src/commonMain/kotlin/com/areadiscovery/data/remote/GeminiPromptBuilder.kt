@@ -57,9 +57,18 @@ IMPORTANT:
         return """You are a knowledgeable local guide for $areaName. Answer the following question concisely as if you are a local expert: "$query". Keep your response under 120 words. Be specific and practical. Do not use bullet points."""
     }
 
-    fun buildChatSystemContext(areaName: String, poiNames: List<String>, vibeName: String?): String {
+    fun buildChatSystemContext(
+        areaName: String,
+        poiNames: List<String>,
+        vibeName: String?,
+        savedPoiNames: List<String> = emptyList(),
+        framingHint: String? = null,
+    ): String {
         val poisLine = if (poiNames.isNotEmpty()) " Key places: ${poiNames.joinToString(", ")}." else ""
         val vibeLine = if (vibeName != null) " Current vibe focus: $vibeName." else ""
-        return "You are a knowledgeable local guide for $areaName.$poisLine$vibeLine Answer conversationally, under 150 words of prose per reply. Be specific and practical. CRITICAL RULE: Every time you mention a specific place, venue, landmark, park, restaurant, or attraction by name, you MUST emit it as a JSON object on its own line using EXACTLY this format: {\"n\":\"Name\",\"t\":\"type\",\"lat\":0.0,\"lng\":0.0,\"w\":\"one sentence on why it is special\"}. Valid t values: food, entertainment, park, historic, shopping, arts, transit, safety, beach, district. NEVER mention a place name in plain text without the JSON line. Write a brief conversational sentence, then the JSON line, then continue. Example: 'For great Venezuelan food, check out\n{\"n\":\"Arepas La Dinastia\",\"t\":\"food\",\"lat\":25.7905,\"lng\":-80.3384,\"w\":\"Beloved local spot for authentic arepas and cachapas\"}\nFor outdoor fun, head to\n{\"n\":\"Doral Central Park\",\"t\":\"park\",\"lat\":25.8124,\"lng\":-80.3553,\"w\":\"Expansive green space with trails and a lake\"}'"
+        val savesLine = if (savedPoiNames.isNotEmpty())
+            " The user has saved: ${savedPoiNames.joinToString(", ")} in this area." else ""
+        val framingLine = if (!framingHint.isNullOrBlank()) " $framingHint" else ""
+        return "You are a knowledgeable local guide for $areaName.$poisLine$vibeLine$savesLine$framingLine Answer conversationally, under 150 words of prose per reply. Be specific and practical. CRITICAL RULE: Every time you mention a specific place, venue, landmark, park, restaurant, or attraction by name, you MUST emit it as a JSON object on its own line using EXACTLY this format: {\"n\":\"Name\",\"t\":\"type\",\"lat\":0.0,\"lng\":0.0,\"w\":\"one sentence on why it is special\"}. Valid t values: food, entertainment, park, historic, shopping, arts, transit, safety, beach, district. NEVER mention a place name in plain text without the JSON line. Write a brief conversational sentence, then the JSON line, then continue. Example: 'For great Venezuelan food, check out\n{\"n\":\"Arepas La Dinastia\",\"t\":\"food\",\"lat\":25.7905,\"lng\":-80.3384,\"w\":\"Beloved local spot for authentic arepas and cachapas\"}\nFor outdoor fun, head to\n{\"n\":\"Doral Central Park\",\"t\":\"park\",\"lat\":25.8124,\"lng\":-80.3553,\"w\":\"Expansive green space with trails and a lake\"}'"
     }
 }

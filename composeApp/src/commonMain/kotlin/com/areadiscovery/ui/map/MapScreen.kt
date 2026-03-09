@@ -2,6 +2,7 @@ package com.areadiscovery.ui.map
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
@@ -37,6 +40,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -139,6 +143,7 @@ private fun ReadyContent(
                     .fillMaxSize()
                     // TODO(BACKLOG-LOW): Magic number 112.dp for POI list top padding — should be named or derived
                     .padding(top = statusBarPadding + 112.dp),
+                savedPoiIds = state.savedPoiIds,
             )
         } else {
             // TODO(BACKLOG-MEDIUM): Add +/- zoom control buttons as Compose overlays — MapLibre 11.x removed built-in zoom controls
@@ -153,6 +158,7 @@ private fun ReadyContent(
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
                 onCameraIdle = { lat, lng -> viewModel.onCameraIdle(lat, lng) },
+                savedPoiIds = state.savedPoiIds,
             )
         }
 
@@ -253,7 +259,10 @@ private fun ReadyContent(
                             snackbarHostState.showSnackbar("AI is still responding...")
                         }
                     } else {
-                        chatViewModel.openChat(state.areaName, state.pois, state.activeVibe)
+                        chatViewModel.openChat(
+                            state.areaName, state.pois, state.activeVibe,
+                            entryPoint = ChatEntryPoint.PoiCard(state.selectedPoi!!),
+                        )
                         chatViewModel.sendMessage(query)
                     }
                 },
@@ -267,6 +276,23 @@ private fun ReadyContent(
                 },
                 modifier = Modifier.align(Alignment.Center),
             )
+        }
+
+        // Saves nearby pill
+        // Cross-reference current-area POIs against savedPoiIds for accurate nearby count.
+        // NOTE: state.savedPois contains ALL saves across all areas; the .count filter IS the area-scoping
+        // — do not simplify to savedPoiIds.size (that would count saves from every area ever visited).
+        val savedNearbyCount = state.pois.count { it.savedId in state.savedPoiIds }
+        AnimatedVisibility(
+            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = navBarPadding + 72.dp),
+        ) {
+            // TODO(BACKLOG-LOW): upgrade saves nearby to haversine radius — areaName match misses saves when geocoding drifts
+            SavesNearbyPill(count = savedNearbyCount)
         }
 
         // FAB scrim
@@ -442,5 +468,29 @@ private fun SavedPoiRow(poi: SavedPoi) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+@Composable
+private fun SavesNearbyPill(count: Int, modifier: Modifier = Modifier) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color(0xFF1A1A2A).copy(alpha = 0.92f))
+            .border(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f), RoundedCornerShape(20.dp))
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .background(Color(0xFFFFD700), CircleShape)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "$count saved place${if (count == 1) "" else "s"} nearby",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFFE0E0E0),
+        )
     }
 }

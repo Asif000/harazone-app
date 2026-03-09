@@ -63,6 +63,7 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
+    savedPoiIds: Set<String>,
 ) {
     val context = LocalContext.current
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
@@ -165,8 +166,8 @@ actual fun MapComposable(
         }
     }
 
-    // POI pins + glow zones — react to pois + activeVibe + style loaded changes
-    LaunchedEffect(pois, activeVibe, styleLoaded.value) {
+    // POI pins + glow zones — react to pois + activeVibe + savedPoiIds + style loaded changes
+    LaunchedEffect(pois, activeVibe, savedPoiIds, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val map = mapRef[0] ?: return@LaunchedEffect
         val style = styleRef[0] ?: return@LaunchedEffect
@@ -200,10 +201,10 @@ actual fun MapComposable(
             pois
         }.filter { it.latitude != null && it.longitude != null }
 
-        // Ensure icon bitmap exists for a given vibe + POI type combo
-        fun ensureIcon(vibe: Vibe, poiType: String): String {
+        // Ensure icon bitmap exists for a given vibe + POI type + saved state combo
+        fun ensureIcon(vibe: Vibe, poiType: String, isSaved: Boolean): String {
             val typeKey = poiType.lowercase().trim()
-            val iconKey = "poi_${vibe.name}_$typeKey"
+            val iconKey = "poi_${vibe.name}_${typeKey}${if (isSaved) "_saved" else ""}"
             if (style.getImage(iconKey) == null) {
                 val vibeColorArgb = vibe.toColor().toArgb()
                 val emoji = poiTypeEmoji(typeKey)
@@ -224,6 +225,28 @@ actual fun MapComposable(
                 }
                 val textY = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
                 canvas.drawText(emoji, size / 2f, textY, textPaint)
+                // Gold ring + checkmark badge for saved POIs
+                if (isSaved) {
+                    val strokeWidth = 5f
+                    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.parseColor("#FFD700")
+                        this.style = Paint.Style.STROKE
+                        this.strokeWidth = strokeWidth
+                    }
+                    canvas.drawCircle(size / 2f, size / 2f, size / 2f - strokeWidth / 2f - 1f, ringPaint)
+                    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.parseColor("#FFD700")
+                        this.style = Paint.Style.FILL
+                    }
+                    canvas.drawCircle(size - 10f, size - 10f, 10f, badgePaint)
+                    val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.parseColor("#1A1A1A")
+                        textSize = 12f
+                        textAlign = Paint.Align.CENTER
+                        typeface = Typeface.DEFAULT_BOLD
+                    }
+                    canvas.drawText("\u2713", size - 10f, size - 6f, checkPaint)
+                }
                 style.addImage(iconKey, bitmap)
             }
             return iconKey
@@ -237,7 +260,8 @@ actual fun MapComposable(
             val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
                 ?: Vibe.DEFAULT
             val vibe = activeVibe ?: poiVibe
-            val iconKey = ensureIcon(vibe, poi.type)
+            val isSaved = poi.savedId in savedPoiIds
+            val iconKey = ensureIcon(vibe, poi.type, isSaved)
 
             // TODO(BACKLOG-LOW): Custom POI icons per type (landmark, food, culture, nature) using annotation plugin SymbolManager
             // TODO(BACKLOG-LOW): TalkBack per-marker contentDescription for map-mode accessibility

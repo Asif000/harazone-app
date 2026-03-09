@@ -138,4 +138,63 @@ class GeminiPromptBuilderTest {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
         assertFalse(prompt.contains("\"sources\""))
     }
+
+    // --- Saves injection tests ---
+
+    @Test
+    fun buildChatSystemContext_includesSavedPlaces() {
+        val result = builder.buildChatSystemContext(
+            areaName = "Test Area",
+            poiNames = listOf("Place A"),
+            vibeName = "CHARACTER",
+            savedPoiNames = listOf("Blue Note", "Wynwood Walls"),
+        )
+        assertTrue(result.contains("Blue Note"))
+        assertTrue(result.contains("Wynwood Walls"))
+        assertTrue(result.contains("The user has saved"))
+    }
+
+    @Test
+    fun buildChatSystemContext_noSavesLine_whenSavesEmpty() {
+        val result = builder.buildChatSystemContext(
+            areaName = "Test Area",
+            poiNames = listOf("Place A"),
+            vibeName = "CHARACTER",
+            savedPoiNames = emptyList(),
+        )
+        assertFalse(result.contains("The user has saved"))
+    }
+
+    @Test
+    fun buildChatSystemContext_savesSheetFramingLine() {
+        val result = builder.buildChatSystemContext(
+            areaName = "Test Area",
+            poiNames = listOf("Place A"),
+            vibeName = null,
+            framingHint = "The user is currently reviewing their saved places — lead with suggestions based on those first.",
+        )
+        assertTrue(result.contains("reviewing their saved places"))
+    }
+
+    @Test
+    fun buildChatSystemContext_poiCardFramingLine() {
+        val result = builder.buildChatSystemContext(
+            areaName = "Test Area",
+            poiNames = listOf("Place A"),
+            vibeName = null,
+            framingHint = "The user is currently looking at Blue Note Jazz — lead with context about that place.",
+        )
+        assertTrue(result.contains("Blue Note Jazz"))
+    }
+
+    @Test
+    fun buildChatSystemContext_nullFramingHint_noFramingLine() {
+        val result = builder.buildChatSystemContext(
+            areaName = "Test Area",
+            poiNames = listOf("Place A"),
+            vibeName = null,
+            framingHint = null,
+        )
+        assertFalse(result.contains("currently"))
+    }
 }

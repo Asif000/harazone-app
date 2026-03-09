@@ -32,6 +32,7 @@ import platform.darwin.NSObject
 private val MAP_STYLE_URL get() =
     "https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${BuildKonfig.MAPTILER_API_KEY}"
 
+// TODO(BACKLOG-LOW): iOS gold saved pins — implement MLNAnnotationView subclass with gold border when MLNAnnotationView ObjC bridging is resolved
 @OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun MapComposable(
@@ -45,6 +46,7 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
+    savedPoiIds: Set<String>,
 ) {
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)

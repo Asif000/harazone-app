@@ -17,4 +17,5 @@ expect fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
+    savedPoiIds: Set<String> = emptySet(),
 )
