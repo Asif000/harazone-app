@@ -394,10 +394,10 @@ internal class ChatViewModel(
     private fun computeFollowUpChips(query: String, intent: ChatIntent?, level: EngagementLevel): List<String> {
         if (level == EngagementLevel.FRESH) {
             return when (intent) {
-                ChatIntent.TONIGHT -> listOf("Solo or with company?")
-                ChatIntent.DISCOVER -> listOf("On foot or do you have wheels?")
-                ChatIntent.HUNGRY -> listOf("Any food preferences?")
-                ChatIntent.OUTSIDE -> listOf("Leisurely stroll or proper adventure?")
+                ChatIntent.TONIGHT -> listOf("Just me tonight", "With friends")
+                ChatIntent.DISCOVER -> listOf("On foot, no rush")
+                ChatIntent.HUNGRY -> listOf("I'll eat anything", "Something quick")
+                ChatIntent.OUTSIDE -> listOf("Just a casual walk")
                 ChatIntent.SURPRISE, null -> emptyList()
             }
         }
