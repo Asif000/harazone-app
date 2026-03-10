@@ -57,6 +57,8 @@ class MapViewModel(
     private var pendingLng: Double = 0.0
     private var pendingAreaName: String = ""
     private var latestRecents: List<RecentPlace> = emptyList()
+    private var latestSavedPois: List<SavedPoi> = emptyList()
+    private var latestSavedPoiIds: Set<String> = emptySet()
 
     init {
         loadLocation()
@@ -69,12 +71,14 @@ class MapViewModel(
         }
         viewModelScope.launch {
             savedPoiRepository.observeAll().collect { pois ->
+                latestSavedPois = pois
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
                 _uiState.value = current.copy(savedPois = pois, savedPoiCount = pois.size)
             }
         }
         viewModelScope.launch {
             savedPoiRepository.observeSavedIds().collect { ids ->
+                latestSavedPoiIds = ids
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
                 _uiState.value = current.copy(savedPoiIds = ids)
             }
@@ -679,6 +683,9 @@ class MapViewModel(
                     gpsLongitude = coords.longitude,
                     isSearchingArea = true,
                     recentPlaces = latestRecents,
+                    savedPois = latestSavedPois,
+                    savedPoiIds = latestSavedPoiIds,
+                    savedPoiCount = latestSavedPois.size,
                 )
 
                 // Fetch weather in parallel

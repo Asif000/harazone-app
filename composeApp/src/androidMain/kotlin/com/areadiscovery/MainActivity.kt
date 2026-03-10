@@ -16,6 +16,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
+import com.areadiscovery.data.local.AreaDiscoveryDatabase
+import com.areadiscovery.data.local.DatabaseDriverFactory
+import com.areadiscovery.debug.DevSeeder
 import com.google.firebase.Firebase
 import com.google.firebase.crashlytics.crashlytics
 import org.koin.android.ext.koin.androidContext
@@ -45,6 +48,15 @@ class MainActivity : ComponentActivity() {
             permissionLauncher.launch(LOCATION_PERMISSIONS)
         }
 
+        // Debug-only: compute seed params before setContent
+        // Override via ADB: adb shell am force-stop com.areadiscovery.debug && adb shell am start -n com.areadiscovery.debug/com.areadiscovery.MainActivity --es seed_persona "LIGHT"
+        val seedPersona = if (isDebug) {
+            intent.getStringExtra("seed_persona")?.let {
+                DevSeeder.Persona.valueOf(it.uppercase())
+            } ?: DevSeeder.Persona.POWER
+        } else null
+        val forceSeed = isDebug && intent.hasExtra("seed_persona")
+
         setContent {
             if (permissionResolved) {
                 App(
@@ -60,6 +72,8 @@ class MainActivity : ComponentActivity() {
                             false
                         }
                     },
+                    seedPersona = seedPersona,
+                    forceSeed = forceSeed,
                 )
             }
         }

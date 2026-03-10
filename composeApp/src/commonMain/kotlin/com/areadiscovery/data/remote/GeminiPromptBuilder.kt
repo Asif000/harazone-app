@@ -4,6 +4,7 @@ import com.areadiscovery.domain.model.AreaContext
 
 internal class GeminiPromptBuilder {
 
+    // TODO(BACKLOG-HIGH): Area portrait call takes 15+ seconds — investigate streaming response or output token reduction. Current output: 6 JSON buckets + full POI array (~1000+ output tokens). Options: stream portrait like chat, tune POI count cap, or split into two cheaper calls.
     fun buildAreaPortraitPrompt(areaName: String, context: AreaContext): String {
         return """
 You are a passionate local who has lived in "$areaName" for 20 years. You love showing visitors things they would NEVER find on Google Maps. Your mission: surface the genuinely unique, memorable, and local.

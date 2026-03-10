@@ -35,6 +35,8 @@
 | Search Bar Dual Mode | ✅ implementation-complete | 2026-03-08 |
 | iOS Map (MapLibre) | ✅ implementation-complete | 2026-03-08 |
 | AI Chat v1 (Epic 4a) | 🔧 in-progress | 2026-03-08 |
+| AI Chat v1.1 + Save Foundation | ✅ implementation-complete | 2026-03-08 |
+| Saves Awareness (gold pins, pill, AI injection) | 🔧 ready-for-dev | 2026-03-08 |
 
 ## Schedule Status
 
@@ -61,3 +63,5 @@
 | 2026-03-05 | Story 5.1 done | Implemented + code review 2 rounds (3M, 4L fixed: race condition, duplicate analytics, DB on IO, unused import, internal visibility, Turbine test, Loading state doc) |
 | 2026-03-08 | iOS Map (MapLibre) done | Full MapLibre iOS via UIKitView: CocoaPods setup, MLNMapView, blue dot, POI pins, glow zones, camera fly-to, suppressCameraIdle guard, UITapGestureRecognizer deselect, simulator confirmed |
 | 2026-03-08 | AI Chat v1 | ChatViewModel + ChatOverlay in progress (user implementing) |
+| 2026-03-08 | AI Chat v1.1 + Save Foundation | Progressive POI cards, save foundation, satellite card backgrounds — complete |
+| 2026-03-08 | Saves Awareness spec | Quick spec complete (18 tasks, 16 ACs, adversarial review 11 findings applied). Ready for Opus implement. Galaxy saves view backlogged (MEDIUM). |
