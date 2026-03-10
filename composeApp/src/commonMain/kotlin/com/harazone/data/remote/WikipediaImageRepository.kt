@@ -19,7 +19,7 @@ import kotlinx.serialization.json.jsonObject
 internal class WikipediaImageRepository(private val httpClient: HttpClient) {
 
     companion object {
-        private const val USER_AGENT = "AreaDiscovery/1.0 (https://github.com/areadiscovery; contact@areadiscovery.com)"
+        private const val USER_AGENT = "HaraZone/1.0 (https://github.com/harazone; contact@harazone.com)"
         internal const val MAX_CONCURRENT_REQUESTS = 5
         private val json = Json { ignoreUnknownKeys = true }
     }

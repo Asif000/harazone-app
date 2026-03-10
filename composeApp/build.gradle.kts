@@ -56,7 +56,7 @@ kotlin {
 
     cocoapods {
         version = "1.0"
-        summary = "AreaDiscovery Compose Multiplatform module"
+        summary = "HaraZone Compose Multiplatform module"
         homepage = "https://github.com"
         ios.deploymentTarget = "16.0"
         framework {
@@ -166,11 +166,11 @@ android {
     buildTypes {
         getByName("debug") {
             applicationIdSuffix = ".debug"
-            resValue("string", "app_name", "AreaDiscovery DEBUG")
+            resValue("string", "app_name", "HaraZone DEBUG")
         }
         getByName("release") {
             isMinifyEnabled = false
-            resValue("string", "app_name", "AreaDiscovery")
+            resValue("string", "app_name", "HaraZone")
         }
     }
     compileOptions {

@@ -11,7 +11,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		440C774857BF819A0E1CD68F /* AreaDiscovery.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AreaDiscovery.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		440C774857BF819A0E1CD68F /* HaraZone.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HaraZone.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		54086C5DAC31185623B74C08 /* Pods-iosApp.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.release.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.release.xcconfig"; sourceTree = "<group>"; };
 		800415E08240369CB0151ECE /* Pods-iosApp.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-iosApp.debug.xcconfig"; path = "Target Support Files/Pods-iosApp/Pods-iosApp.debug.xcconfig"; sourceTree = "<group>"; };
 		EAAED911B0C6811B3B9CDB59 /* Pods_iosApp.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_iosApp.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -60,7 +60,7 @@
 		11110334B772C93166218696 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				440C774857BF819A0E1CD68F /* AreaDiscovery.app */,
+				440C774857BF819A0E1CD68F /* HaraZone.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -118,7 +118,7 @@
 			);
 			name = iosApp;
 			productName = iosApp;
-			productReference = 440C774857BF819A0E1CD68F /* AreaDiscovery.app */;
+			productReference = 440C774857BF819A0E1CD68F /* HaraZone.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
