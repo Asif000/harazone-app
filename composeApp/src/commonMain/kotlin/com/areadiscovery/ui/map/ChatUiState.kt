@@ -1,5 +1,6 @@
 package com.areadiscovery.ui.map
 
+import com.areadiscovery.domain.model.ChatIntent
 import com.areadiscovery.domain.model.MessageRole
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -35,4 +36,5 @@ data class ChatUiState(
     val poiCards: List<ChatPoiCard> = emptyList(),
     val showSkeletons: Boolean = false,
     val savedPoiIds: Set<String> = emptySet(),
+    val intentPills: List<ChatIntent> = emptyList(),
 )

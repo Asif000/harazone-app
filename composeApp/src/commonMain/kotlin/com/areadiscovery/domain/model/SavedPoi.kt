@@ -9,4 +9,5 @@ data class SavedPoi(
     val lng: Double,
     val whySpecial: String,
     val savedAt: Long,
+    val userNote: String? = null,
 )

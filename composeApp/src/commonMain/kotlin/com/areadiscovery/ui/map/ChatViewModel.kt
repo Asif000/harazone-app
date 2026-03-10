@@ -3,10 +3,13 @@ package com.areadiscovery.ui.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.areadiscovery.data.remote.GeminiPromptBuilder
+import com.areadiscovery.domain.model.ChatIntent
 import com.areadiscovery.domain.model.ChatMessage
+import com.areadiscovery.domain.model.EngagementLevel
 import com.areadiscovery.domain.model.MessageRole
 import com.areadiscovery.domain.model.POI
 import com.areadiscovery.domain.model.SavedPoi
+import com.areadiscovery.domain.model.TasteProfileBuilder
 import com.areadiscovery.domain.model.Vibe
 import com.areadiscovery.domain.provider.AreaIntelligenceProvider
 import com.areadiscovery.domain.repository.SavedPoiRepository
@@ -42,6 +45,11 @@ internal class ChatViewModel(
     private var pendingSaveIds = setOf<String>()
     private var pendingUnsaveIds = setOf<String>()
     private var latestSavedPois: List<SavedPoi> = emptyList()
+    private var sessionPois: List<POI> = emptyList()
+    private var selectedIntent: ChatIntent? = null
+    private var currentEngagementLevel: EngagementLevel = EngagementLevel.FRESH
+    private var pendingFramingHint: String? = null
+    private var isIntentSelected: Boolean = false
 
     companion object {
         private const val MAX_HISTORY_TURNS = 20 // 20 messages = ~10 back-and-forth turns
@@ -69,7 +77,13 @@ internal class ChatViewModel(
         val current = _uiState.value
         // F7/M2: Same area — preserve conversation (whether open or closed)
         if (current.areaName == areaName && (current.isOpen || current.bubbles.isNotEmpty())) {
-            _uiState.value = current.copy(isOpen = true)
+            if (conversationHistory.isNotEmpty() && current.bubbles.isNotEmpty()) {
+                // A pill was already tapped — clear pills
+                _uiState.value = current.copy(isOpen = true, intentPills = emptyList())
+            } else {
+                // No pill tapped yet — preserve pills
+                _uiState.value = current.copy(isOpen = true)
+            }
             return
         }
         // M2: Different area while open — fall through to reset and reinitialize
@@ -77,18 +91,13 @@ internal class ChatViewModel(
         chatJob?.cancel()
         conversationHistory = mutableListOf()
         nextId = 0L
+        isIntentSelected = false
+        selectedIntent = null
         val vibeName = activeVibe?.name
-        val poiNames = pois.take(5).map { it.name }
-
-        // Filter saves: current area only, cap at 10, most recent first
-        val areaSaves = latestSavedPois
-            .filter { it.areaName == areaName }
-            .sortedByDescending { it.savedAt }
-            .take(10)
-            .map { it.name }
+        sessionPois = pois
 
         // Map ChatEntryPoint to plain String — keeps data.remote free of ui.map imports
-        val framingHint: String? = when (entryPoint) {
+        pendingFramingHint = when (entryPoint) {
             is ChatEntryPoint.SavesSheet ->
                 "The user is currently reviewing their saved places — lead with suggestions based on those first."
             is ChatEntryPoint.PoiCard ->
@@ -96,9 +105,32 @@ internal class ChatViewModel(
             is ChatEntryPoint.Default -> null
         }
 
-        val systemContext = promptBuilder.buildChatSystemContext(areaName, poiNames, vibeName, areaSaves, framingHint)
-        // F2: Store system context separately — don't add as "model" role in history
-        // (Gemini requires first turn to be "user", not "model")
+        _uiState.value = ChatUiState(
+            isOpen = true,
+            areaName = areaName,
+            vibeName = vibeName,
+            bubbles = emptyList(),
+            followUpChips = emptyList(),
+            poiCards = emptyList(),
+            showSkeletons = false,
+            savedPoiIds = _uiState.value.savedPoiIds,
+            intentPills = ChatIntent.entries.toList(),
+        )
+    }
+
+    fun tapIntentPill(intent: ChatIntent) {
+        if (isIntentSelected) return
+        isIntentSelected = true
+        selectedIntent = intent
+        val saves = latestSavedPois
+        currentEngagementLevel = EngagementLevel.from(saves, clock.nowMs())
+        val tasteProfile = TasteProfileBuilder.build(saves, clock.nowMs())
+        val areaName = _uiState.value.areaName
+        val poiCount = sessionPois.size
+        val systemContext = promptBuilder.buildChatSystemContext(
+            areaName, sessionPois, intent, currentEngagementLevel,
+            saves, tasteProfile, poiCount, pendingFramingHint,
+        )
         conversationHistory.add(
             ChatMessage(
                 id = nextId(),
@@ -108,16 +140,11 @@ internal class ChatViewModel(
                 sources = emptyList(),
             )
         )
-        _uiState.value = ChatUiState(
-            isOpen = true,
-            areaName = areaName,
-            vibeName = vibeName,
-            bubbles = emptyList(),
-            followUpChips = computeStarterChips(activeVibe),
-            poiCards = emptyList(),
-            showSkeletons = false,
-            savedPoiIds = _uiState.value.savedPoiIds,
+        _uiState.value = _uiState.value.copy(
+            inputText = intent.openingMessage,
+            intentPills = emptyList(),
         )
+        sendMessage()
     }
 
     // Test-only accessor — allows ChatViewModelTest to verify system context injection
@@ -195,7 +222,7 @@ internal class ChatViewModel(
                                 ) else it
                             },
                             isStreaming = false,
-                            followUpChips = computeFollowUpChips(query),
+                            followUpChips = computeFollowUpChips(query, selectedIntent, currentEngagementLevel),
                             showSkeletons = false,
                             poiCards = parsedCards.toList(),
                         )
@@ -358,18 +385,21 @@ internal class ChatViewModel(
         return results
     }
 
-    private fun computeStarterChips(vibe: Vibe?): List<String> = when (vibe) {
-        Vibe.SAFETY -> listOf("Is it safe right now?", "Areas to avoid?", "Safe at night?", "Emergency services nearby?")
-        Vibe.WHATS_ON -> listOf("What's on tonight?", "Best events this week?", "Free things to do?", "Where's the crowd tonight?")
-        Vibe.CHARACTER -> listOf("What's the vibe here?", "Best local spots?", "Hidden gems?", "Who lives here?")
-        Vibe.HISTORY -> listOf("What's the history here?", "Oldest buildings nearby?", "Famous events here?", "Hidden historical gems?")
-        Vibe.COST -> listOf("Is this area expensive?", "Budget tips?", "Free attractions?", "Cheapest eats nearby?")
-        Vibe.NEARBY -> listOf("What's close by?", "Best way to get around?", "Transport options?", "What's within walking distance?")
-        null -> listOf("What's special about here?", "Hidden gems?", "Best time to visit?", "What's nearby?")
+    // F11: Use word boundary matching to avoid false positives (e.g., "on" in "information")
+    private fun computeFollowUpChips(query: String, intent: ChatIntent?, level: EngagementLevel): List<String> {
+        if (level == EngagementLevel.FRESH) {
+            return when (intent) {
+                ChatIntent.TONIGHT -> listOf("Solo or with company?")
+                ChatIntent.DISCOVER -> listOf("On foot or do you have wheels?")
+                ChatIntent.HUNGRY -> listOf("Any food preferences?")
+                ChatIntent.OUTSIDE -> listOf("Leisurely stroll or proper adventure?")
+                ChatIntent.SURPRISE, null -> emptyList()
+            }
+        }
+        return computeFollowUpChipsByKeyword(query)
     }
 
-    // F11: Use word boundary matching to avoid false positives (e.g., "on" in "information")
-    private fun computeFollowUpChips(query: String): List<String> {
+    private fun computeFollowUpChipsByKeyword(query: String): List<String> {
         val q = query.lowercase()
         return when {
             q.containsAnyWord("safe", "crime", "danger", "night") -> listOf("Is it safe at night?", "What areas to avoid?")

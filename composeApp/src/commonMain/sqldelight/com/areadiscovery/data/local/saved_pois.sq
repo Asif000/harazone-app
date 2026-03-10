@@ -16,8 +16,8 @@ observeSavedIds:
 SELECT poi_id FROM saved_pois;
 
 insertOrReplace:
-INSERT OR REPLACE INTO saved_pois(poi_id, name, type, area_name, lat, lng, why_special, saved_at)
-VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at);
+INSERT OR REPLACE INTO saved_pois(poi_id, name, type, area_name, lat, lng, why_special, saved_at, user_note)
+VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at, :user_note);
 
 deleteById:
 DELETE FROM saved_pois WHERE poi_id = :poi_id;

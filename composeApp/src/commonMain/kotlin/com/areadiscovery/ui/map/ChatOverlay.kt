@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.areadiscovery.BuildKonfig
+import com.areadiscovery.domain.model.ChatIntent
 import com.areadiscovery.domain.model.MessageRole
 
 private val IndigoGradient = Brush.linearGradient(
@@ -169,14 +170,16 @@ internal fun ChatOverlay(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (chatState.bubbles.isEmpty()) {
+                if (chatState.bubbles.isEmpty() && chatState.intentPills.isNotEmpty()) {
                     item(key = "empty_state") {
                         EmptyState(
                             areaName = chatState.areaName,
-                            chips = chatState.followUpChips,
-                            onChipTap = { viewModel.tapChip(it) },
+                            intentPills = chatState.intentPills,
+                            onPillTap = { viewModel.tapIntentPill(it) },
                         )
                     }
+                } else if (chatState.bubbles.isEmpty()) {
+                    // No pills and no bubbles — empty state without chips
                 } else {
                     items(chatState.bubbles, key = { it.id }) { bubble ->
                         ChatBubbleItem(
@@ -247,8 +250,8 @@ internal fun ChatOverlay(
 @Composable
 private fun EmptyState(
     areaName: String,
-    chips: List<String>,
-    onChipTap: (String) -> Unit,
+    intentPills: List<ChatIntent>,
+    onPillTap: (ChatIntent) -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -275,7 +278,7 @@ private fun EmptyState(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Try asking what's nearby, what's safe, or what's on tonight",
+            "What are you in the mood for?",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -287,10 +290,10 @@ private fun EmptyState(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
-            chips.forEach { chip ->
+            intentPills.forEach { pill ->
                 SuggestionChip(
-                    onClick = { onChipTap(chip) },
-                    label = { Text(chip, fontSize = 13.sp) },
+                    onClick = { onPillTap(pill) },
+                    label = { Text("${intentPillEmoji(pill)} ${pill.displayLabel}", fontSize = 13.sp) },
                     colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
@@ -298,6 +301,14 @@ private fun EmptyState(
             }
         }
     }
+}
+
+private fun intentPillEmoji(intent: ChatIntent): String = when (intent) {
+    ChatIntent.TONIGHT -> "\uD83C\uDF19"    // 🌙
+    ChatIntent.DISCOVER -> "\uD83D\uDD0D"   // 🔍
+    ChatIntent.HUNGRY -> "\uD83C\uDF5C"     // 🍜
+    ChatIntent.OUTSIDE -> "\uD83C\uDF33"    // 🌳
+    ChatIntent.SURPRISE -> "\uD83C\uDFB2"   // 🎲
 }
 
 @Composable

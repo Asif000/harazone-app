@@ -34,6 +34,7 @@ class SavedPoiRepositoryImpl(
                         lng = it.lng,
                         whySpecial = it.why_special,
                         savedAt = it.saved_at,
+                        userNote = it.user_note,
                     )
                 }
             }
@@ -56,6 +57,24 @@ class SavedPoiRepositoryImpl(
                 lng = poi.lng,
                 why_special = poi.whySpecial,
                 saved_at = clock.nowMs(),
+                user_note = poi.userNote,
+            )
+        }
+    }
+
+    // DevSeeder only — allows backdating saves for DORMANT persona testing
+    override suspend fun saveWithTimestamp(poi: SavedPoi, timestampMs: Long) {
+        withContext(ioDispatcher) {
+            database.saved_poisQueries.insertOrReplace(
+                poi_id = poi.id,
+                name = poi.name,
+                type = poi.type,
+                area_name = poi.areaName,
+                lat = poi.lat,
+                lng = poi.lng,
+                why_special = poi.whySpecial,
+                saved_at = timestampMs,
+                user_note = poi.userNote,
             )
         }
     }

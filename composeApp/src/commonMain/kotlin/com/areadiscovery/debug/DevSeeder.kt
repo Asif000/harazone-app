@@ -24,7 +24,7 @@ import kotlin.time.ExperimentalTime
  */
 object DevSeeder {
 
-    enum class Persona { FRESH, LIGHT, REGULAR, POWER }
+    enum class Persona { FRESH, LIGHT, REGULAR, POWER, DORMANT }
 
     /**
      * Seeds directly into the SQLDelight database, bypassing Koin entirely.
@@ -48,6 +48,7 @@ object DevSeeder {
             Persona.LIGHT -> lightPersona()
             Persona.REGULAR -> regularPersona()
             Persona.POWER -> powerPersona()
+            Persona.DORMANT -> dormantPersona()
         }
         pois.forEach { poi ->
             database.saved_poisQueries.insertOrReplace(
@@ -59,6 +60,7 @@ object DevSeeder {
                 lng = poi.lng,
                 why_special = poi.whySpecial,
                 saved_at = poi.savedAt,
+                user_note = poi.userNote,
             )
         }
         val verified = database.saved_poisQueries.observeSavedIds().executeAsList().size
@@ -79,13 +81,13 @@ object DevSeeder {
         val existingIds = repo.observeSavedIds().first()
         existingIds.forEach { repo.unsave(it) }
 
-        val pois = when (persona) {
-            Persona.FRESH -> emptyList()
-            Persona.LIGHT -> lightPersona()
-            Persona.REGULAR -> regularPersona()
-            Persona.POWER -> powerPersona()
+        when (persona) {
+            Persona.FRESH -> { /* no-op */ }
+            Persona.LIGHT -> lightPersona().forEach { repo.save(it) }
+            Persona.REGULAR -> regularPersona().forEach { repo.save(it) }
+            Persona.POWER -> powerPersona().forEach { repo.save(it) }
+            Persona.DORMANT -> seedDormantPersona(repo)
         }
-        pois.forEach { repo.save(it) }
         println("DevSeeder: seeded ${pois.size} POIs")
     }
 
@@ -131,15 +133,20 @@ object DevSeeder {
     private fun powerPersona(): List<SavedPoi> = regularPersona() + listOf(
         // New York (6) — date night focus
         poi("Employees Only", "cocktail_bar", "West Village, NYC", 40.7335, -74.0020,
-            "Speakeasy behind a psychic's neon sign — award-winning cocktails, late-night burger at 1am is legendary", 50),
+            "Speakeasy behind a psychic's neon sign — award-winning cocktails, late-night burger at 1am is legendary", 50,
+            userNote = "best spot is the rooftop at sunset"),
         poi("Westlight", "rooftop_bar", "Williamsburg, NYC", 40.7128, -73.9660,
-            "28th floor rooftop — floor-to-ceiling windows, Manhattan skyline, craft cocktails. THE date-night view", 49),
+            "28th floor rooftop — floor-to-ceiling windows, Manhattan skyline, craft cocktails. THE date-night view", 49,
+            userNote = "book ahead — fills up fast"),
         poi("Dante", "restaurant", "Greenwich Village, NYC", 40.7326, -73.9993,
-            "World's best bar (2019) — Negroni variations, Italian small plates, century-old Greenwich Village corner", 48),
+            "World's best bar (2019) — Negroni variations, Italian small plates, century-old Greenwich Village corner", 48,
+            userNote = "only open evenings"),
         poi("The Cloisters", "museum", "Fort Tryon Park, NYC", 40.8649, -73.9318,
-            "Medieval European monastery rebuilt stone by stone in upper Manhattan — unicorn tapestries, herb garden, river views", 47),
+            "Medieval European monastery rebuilt stone by stone in upper Manhattan — unicorn tapestries, herb garden, river views", 47,
+            userNote = "need to try the weekend market"),
         poi("Brooklyn Bridge Park Pier 1", "park", "DUMBO, NYC", 40.7004, -73.9971,
-            "Sunset here is unbeatable — Manhattan skyline turns gold, Brooklyn Bridge overhead, picnic on the lawn", 46),
+            "Sunset here is unbeatable — Manhattan skyline turns gold, Brooklyn Bridge overhead, picnic on the lawn", 46,
+            userNote = "order the lamb — ignore the menu"),
         poi("Casa Enrique", "restaurant", "Long Island City, NYC", 40.7462, -73.9232,
             "Michelin-starred Mexican — mole negro takes 3 days to make, mezcal list rivals anything in Oaxaca", 45),
 
@@ -222,6 +229,48 @@ object DevSeeder {
             "Tigris riverfront promenade — masgouf (open-fire grilled carp) restaurants, tea gardens, sunset strolls along the river", 13),
     )
 
+    // ── DORMANT: 3 saves, 20 days ago ─────────────────────────────
+
+    private fun dormantPersona(): List<SavedPoi> {
+        val twentyDaysAgoMs = nowMs() - 20L * 24 * 60 * 60 * 1000
+        return listOf(
+            SavedPoi(
+                id = "Cafe Ginza|35.6717|139.7642",
+                name = "Cafe Ginza",
+                type = "restaurant",
+                areaName = "Ginza, Tokyo",
+                lat = 35.6717, lng = 139.7642,
+                whySpecial = "Century-old kissaten with hand-drip coffee and egg sandwiches",
+                savedAt = twentyDaysAgoMs,
+            ),
+            SavedPoi(
+                id = "Kabukiza Theatre|35.6695|139.7674",
+                name = "Kabukiza Theatre",
+                type = "historic",
+                areaName = "Ginza, Tokyo",
+                lat = 35.6695, lng = 139.7674,
+                whySpecial = "Traditional kabuki performances in a building rebuilt 5 times since 1889",
+                savedAt = twentyDaysAgoMs,
+            ),
+            SavedPoi(
+                id = "Tsukiji Outer Market|35.6654|139.7707",
+                name = "Tsukiji Outer Market",
+                type = "food_alley",
+                areaName = "Ginza, Tokyo",
+                lat = 35.6654, lng = 139.7707,
+                whySpecial = "The inner market moved but the outer stalls stayed — tamagoyaki, fresh uni, and queue culture",
+                savedAt = twentyDaysAgoMs,
+            ),
+        )
+    }
+
+    private suspend fun seedDormantPersona(repo: SavedPoiRepository) {
+        val twentyDaysAgoMs = nowMs() - 20L * 24 * 60 * 60 * 1000
+        dormantPersona().forEach { poi ->
+            repo.saveWithTimestamp(poi, twentyDaysAgoMs)
+        }
+    }
+
     // ── Helpers ─────────────────────────────────────────────────────
 
     @OptIn(ExperimentalTime::class)
@@ -235,6 +284,7 @@ object DevSeeder {
         lng: Double,
         whySpecial: String,
         daysAgo: Int,
+        userNote: String? = null,
     ) = SavedPoi(
         id = "$name|$lat|$lng",
         name = name,
@@ -244,5 +294,6 @@ object DevSeeder {
         lng = lng,
         whySpecial = whySpecial,
         savedAt = nowMs() - (daysAgo.toLong() * 24 * 60 * 60 * 1000),
+        userNote = userNote,
     )
 }
