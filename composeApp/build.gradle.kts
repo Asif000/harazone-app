@@ -20,7 +20,7 @@ plugins {
 }
 
 buildkonfig {
-    packageName = "com.areadiscovery"
+    packageName = "com.harazone"
     defaultConfigs {
         buildConfigField(
             com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
@@ -38,7 +38,7 @@ buildkonfig {
 sqldelight {
     databases {
         create("AreaDiscoveryDatabase") {
-            packageName.set("com.areadiscovery.data.local")
+            packageName.set("com.harazone.data.local")
         }
     }
 }
@@ -147,11 +147,11 @@ kotlin {
 }
 
 android {
-    namespace = "com.areadiscovery"
+    namespace = "com.harazone"
     compileSdk = libs.versions.android.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "com.areadiscovery"
+        applicationId = "com.harazone"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 1
