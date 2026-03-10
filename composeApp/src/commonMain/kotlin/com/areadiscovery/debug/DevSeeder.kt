@@ -81,9 +81,7 @@ object DevSeeder {
         existingIds.forEach { repo.unsave(it) }
 
         if (persona == Persona.DORMANT) {
-            dormantPersona().forEach { repo.save(it) }
-            println("DevSeeder: seeded DORMANT persona (backdated via seedDirect only)")
-            return
+            error("DORMANT persona requires seedDirect() to backdate timestamps. repo.save() ignores savedAt.")
         }
         val pois = when (persona) {
             Persona.FRESH -> emptyList()
