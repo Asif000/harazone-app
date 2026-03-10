@@ -2,11 +2,12 @@ package com.areadiscovery.domain.model
 
 object TasteProfileBuilder {
 
+    // Must match Gemini output schema: Valid t values in buildAreaPortraitPrompt / outputFormatBlock
     private val COMMON_TYPES = listOf(
-        "restaurant", "bakery", "food_alley", "park", "museum",
-        "gallery", "bar", "nightlife", "historic", "street_art",
+        "food", "entertainment", "park", "historic", "shopping",
+        "arts", "beach", "district",
     )
-    private val FOOD_TYPES = listOf("restaurant", "bakery", "food_alley")
+    private val FOOD_TYPES = listOf("food")
     private const val THIRTY_DAY_MS = 30L * 24 * 60 * 60 * 1000
 
     fun build(saves: List<SavedPoi>, nowMs: Long): TasteProfile {

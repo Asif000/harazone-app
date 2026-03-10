@@ -154,7 +154,8 @@ VOICE: Mischievous. "Okay, you're not going to believe this, but...""""
             "SURPRISE FILTER: This user has NEVER saved anything in: ${profile.notableAbsences.joinToString(", ")}. Deliberately recommend from these categories — break their usual pattern. Do NOT recommend from: ${profile.strongAffinities.joinToString(", ")}."
         } else {
             val dining = if (profile.diningStyle != null) " ${profile.diningStyle}." else ""
-            "TASTE PROFILE: Strong affinities: ${profile.strongAffinities.joinToString(", ")}.$dining Prioritise recommendations that match these patterns."
+            val emerging = if (profile.emergingInterests.isNotEmpty()) " Emerging interests: ${profile.emergingInterests.joinToString(", ")} — weave these in when relevant." else ""
+            "TASTE PROFILE: Strong affinities: ${profile.strongAffinities.joinToString(", ")}.$dining$emerging Prioritise recommendations that match these patterns."
         }
     }
 

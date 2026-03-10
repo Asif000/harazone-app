@@ -305,6 +305,23 @@ class GeminiPromptBuilderTest {
     }
 
     @Test
+    fun buildChatSystemContext_layer5b_emergingInterests_injected() {
+        val profile = emptyProfile.copy(
+            totalSaves = 5,
+            strongAffinities = listOf("park"),
+            emergingInterests = listOf("arts", "beach"),
+        )
+        val result = chatContext(
+            intent = ChatIntent.DISCOVER,
+            level = EngagementLevel.REGULAR,
+            profile = profile,
+        )
+        assertTrue(result.contains("arts"))
+        assertTrue(result.contains("beach"))
+        assertTrue(result.contains("Emerging interests"))
+    }
+
+    @Test
     fun buildChatSystemContext_layer5b_surprise_uses_absences() {
         val profile = emptyProfile.copy(
             totalSaves = 5,

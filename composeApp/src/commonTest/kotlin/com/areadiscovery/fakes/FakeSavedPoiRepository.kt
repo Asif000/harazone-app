@@ -25,9 +25,4 @@ class FakeSavedPoiRepository : SavedPoiRepository {
         if (shouldThrow) throw RuntimeException("Test error")
         _pois.value = _pois.value.filter { it.id != poiId }
     }
-
-    override suspend fun saveWithTimestamp(poi: SavedPoi, timestampMs: Long) {
-        if (shouldThrow) throw RuntimeException("Test error")
-        _pois.value = _pois.value + poi.copy(savedAt = timestampMs)
-    }
 }

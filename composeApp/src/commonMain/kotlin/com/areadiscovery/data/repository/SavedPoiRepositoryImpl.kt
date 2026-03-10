@@ -62,23 +62,6 @@ class SavedPoiRepositoryImpl(
         }
     }
 
-    // DevSeeder only — allows backdating saves for DORMANT persona testing
-    override suspend fun saveWithTimestamp(poi: SavedPoi, timestampMs: Long) {
-        withContext(ioDispatcher) {
-            database.saved_poisQueries.insertOrReplace(
-                poi_id = poi.id,
-                name = poi.name,
-                type = poi.type,
-                area_name = poi.areaName,
-                lat = poi.lat,
-                lng = poi.lng,
-                why_special = poi.whySpecial,
-                saved_at = timestampMs,
-                user_note = poi.userNote,
-            )
-        }
-    }
-
     override suspend fun unsave(poiId: String) {
         withContext(ioDispatcher) {
             database.saved_poisQueries.deleteById(poiId)

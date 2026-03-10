@@ -122,29 +122,34 @@ internal class ChatViewModel(
         if (isIntentSelected) return
         isIntentSelected = true
         selectedIntent = intent
-        val saves = latestSavedPois
-        currentEngagementLevel = EngagementLevel.from(saves, clock.nowMs())
-        val tasteProfile = TasteProfileBuilder.build(saves, clock.nowMs())
-        val areaName = _uiState.value.areaName
-        val poiCount = sessionPois.size
-        val systemContext = promptBuilder.buildChatSystemContext(
-            areaName, sessionPois, intent, currentEngagementLevel,
-            saves, tasteProfile, poiCount, pendingFramingHint,
-        )
-        conversationHistory.add(
-            ChatMessage(
-                id = nextId(),
-                role = MessageRole.USER,
-                content = systemContext,
-                timestamp = clock.nowMs(),
-                sources = emptyList(),
+        viewModelScope.launch {
+            // Eagerly fetch saves if background collector hasn't emitted yet (M2 race fix)
+            val saves = latestSavedPois.ifEmpty {
+                savedPoiRepository.observeAll().first().also { latestSavedPois = it }
+            }
+            currentEngagementLevel = EngagementLevel.from(saves, clock.nowMs())
+            val tasteProfile = TasteProfileBuilder.build(saves, clock.nowMs())
+            val areaName = _uiState.value.areaName
+            val poiCount = sessionPois.size
+            val systemContext = promptBuilder.buildChatSystemContext(
+                areaName, sessionPois, intent, currentEngagementLevel,
+                saves, tasteProfile, poiCount, pendingFramingHint,
             )
-        )
-        _uiState.value = _uiState.value.copy(
-            inputText = intent.openingMessage,
-            intentPills = emptyList(),
-        )
-        sendMessage()
+            conversationHistory.add(
+                ChatMessage(
+                    id = nextId(),
+                    role = MessageRole.USER,
+                    content = systemContext,
+                    timestamp = clock.nowMs(),
+                    sources = emptyList(),
+                )
+            )
+            _uiState.value = _uiState.value.copy(
+                inputText = intent.openingMessage,
+                intentPills = emptyList(),
+            )
+            sendMessage()
+        }
     }
 
     // Test-only accessor — allows ChatViewModelTest to verify system context injection

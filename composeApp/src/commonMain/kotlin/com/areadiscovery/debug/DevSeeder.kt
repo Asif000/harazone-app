@@ -4,7 +4,6 @@ import com.areadiscovery.data.local.AreaDiscoveryDatabase
 import com.areadiscovery.domain.model.SavedPoi
 import com.areadiscovery.domain.repository.SavedPoiRepository
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -36,13 +35,6 @@ object DevSeeder {
         println("DevSeeder: seedDirect persona=$persona force=$force existing=$count")
         if (!force && count > 0) return
 
-        // Clear if forcing
-        if (force) {
-            database.saved_poisQueries.observeSavedIds().executeAsList().forEach {
-                database.saved_poisQueries.deleteById(it)
-            }
-        }
-
         val pois = when (persona) {
             Persona.FRESH -> emptyList()
             Persona.LIGHT -> lightPersona()
@@ -50,18 +42,25 @@ object DevSeeder {
             Persona.POWER -> powerPersona()
             Persona.DORMANT -> dormantPersona()
         }
-        pois.forEach { poi ->
-            database.saved_poisQueries.insertOrReplace(
-                poi_id = poi.id,
-                name = poi.name,
-                type = poi.type,
-                area_name = poi.areaName,
-                lat = poi.lat,
-                lng = poi.lng,
-                why_special = poi.whySpecial,
-                saved_at = poi.savedAt,
-                user_note = poi.userNote,
-            )
+        database.transaction {
+            if (force) {
+                database.saved_poisQueries.observeSavedIds().executeAsList().forEach {
+                    database.saved_poisQueries.deleteById(it)
+                }
+            }
+            pois.forEach { poi ->
+                database.saved_poisQueries.insertOrReplace(
+                    poi_id = poi.id,
+                    name = poi.name,
+                    type = poi.type,
+                    area_name = poi.areaName,
+                    lat = poi.lat,
+                    lng = poi.lng,
+                    why_special = poi.whySpecial,
+                    saved_at = poi.savedAt,
+                    user_note = poi.userNote,
+                )
+            }
         }
         val verified = database.saved_poisQueries.observeSavedIds().executeAsList().size
         println("DevSeeder: seeded ${pois.size} POIs directly, verified count=$verified")
@@ -81,18 +80,19 @@ object DevSeeder {
         val existingIds = repo.observeSavedIds().first()
         existingIds.forEach { repo.unsave(it) }
 
+        if (persona == Persona.DORMANT) {
+            dormantPersona().forEach { repo.save(it) }
+            println("DevSeeder: seeded DORMANT persona (backdated via seedDirect only)")
+            return
+        }
         val pois = when (persona) {
             Persona.FRESH -> emptyList()
             Persona.LIGHT -> lightPersona()
             Persona.REGULAR -> regularPersona()
             Persona.POWER -> powerPersona()
-            Persona.DORMANT -> dormantPersona()
+            Persona.DORMANT -> error("unreachable")
         }
-        if (persona == Persona.DORMANT) {
-            seedDormantPersona(repo)
-        } else {
-            pois.forEach { repo.save(it) }
-        }
+        pois.forEach { repo.save(it) }
         println("DevSeeder: seeded ${pois.size} POIs")
     }
 
@@ -267,13 +267,6 @@ object DevSeeder {
                 savedAt = twentyDaysAgoMs,
             ),
         )
-    }
-
-    private suspend fun seedDormantPersona(repo: SavedPoiRepository) {
-        val twentyDaysAgoMs = nowMs() - 20L * 24 * 60 * 60 * 1000
-        dormantPersona().forEach { poi ->
-            repo.saveWithTimestamp(poi, twentyDaysAgoMs)
-        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────

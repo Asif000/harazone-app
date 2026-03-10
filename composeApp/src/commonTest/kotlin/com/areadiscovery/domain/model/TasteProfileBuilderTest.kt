@@ -59,12 +59,12 @@ class TasteProfileBuilderTest {
     fun build_notableAbsence_zeroSaves() {
         val saves = listOf(save("park", 1))
         val profile = TasteProfileBuilder.build(saves, nowMs)
-        assertTrue("restaurant" in profile.notableAbsences)
+        assertTrue("food" in profile.notableAbsences)
     }
 
     @Test
     fun build_diningStyle_twoFoodTypeSaves() {
-        val saves = listOf(save("restaurant", 1), save("bakery", 2))
+        val saves = listOf(save("food", 1), save("food", 2))
         val profile = TasteProfileBuilder.build(saves, nowMs)
         assertEquals("food lover", profile.diningStyle)
     }
@@ -73,7 +73,7 @@ class TasteProfileBuilderTest {
     fun build_surprise_notableAbsencesAvailable() {
         val saves = listOf(save("park", 1), save("park", 2), save("park", 3))
         val profile = TasteProfileBuilder.build(saves, nowMs)
-        assertTrue("restaurant" in profile.notableAbsences)
+        assertTrue("food" in profile.notableAbsences)
     }
 
     @Test

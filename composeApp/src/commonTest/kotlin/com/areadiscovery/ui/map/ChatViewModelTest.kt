@@ -528,6 +528,26 @@ Enjoy!"""
     }
 
     @Test
+    fun `tapIntentPill_doubleTap_isNoOp`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.tapIntentPill(ChatIntent.DISCOVER)
+        assertEquals(1, fakeAiProvider.chatCallCount)
+
+        // Second tap should be ignored
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Second", false),
+            ChatToken("", true),
+        )
+        vm.tapIntentPill(ChatIntent.TONIGHT)
+        assertEquals(1, fakeAiProvider.chatCallCount, "Double-tap should not trigger a second send")
+    }
+
+    @Test
     fun `tapIntentPill_moreThanEightSaves_capsAtEight`() = runTest {
         fakeAiProvider.chatTokens = listOf(
             ChatToken("Response", false),
