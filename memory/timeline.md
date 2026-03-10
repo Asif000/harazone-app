@@ -65,3 +65,8 @@
 | 2026-03-08 | AI Chat v1 | ChatViewModel + ChatOverlay in progress (user implementing) |
 | 2026-03-08 | AI Chat v1.1 + Save Foundation | Progressive POI cards, save foundation, satellite card backgrounds — complete |
 | 2026-03-08 | Saves Awareness spec | Quick spec complete (18 tasks, 16 ACs, adversarial review 11 findings applied). Ready for Opus implement. Galaxy saves view backlogged (MEDIUM). |
+| 2026-03-10 | Prompt v3 domain models | EngagementLevel, TasteProfile, TasteProfileBuilder, ChatIntent committed. user_note schema (migration 6). GeminiPromptBuilder + ChatViewModel wiring in progress. |
+| 2026-03-10 | DevSeeder committed | Persona wiring + EngagementLevel integration. 5 personas, transaction-wrapped. |
+| 2026-03-10 | Package rebrand | com.areadiscovery → com.harazone. 166 files. Android verified on device, iOS verified on simulator. |
+| 2026-03-10 | CI fixed | google-services.ci.json updated (com.harazone + com.harazone.debug). Pre-push hook updated. iOS bundle ID set to com.harazone. |
+| 2026-03-10 | Bugs + features logged | Features 16–21 added. Bugs: iOS cold start retry (HIGH), static vibe buckets (MED), real-time POI hours (CRITICAL). Arch note: saved_pois must store full pin data. |
