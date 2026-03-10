@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS saved_pois (
     lat         REAL NOT NULL,
     lng         REAL NOT NULL,
     why_special TEXT NOT NULL,
-    saved_at    INTEGER NOT NULL
+    saved_at    INTEGER NOT NULL,
+    user_note   TEXT
 );
 
 observeAll:

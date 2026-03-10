@@ -1,6 +1,11 @@
 package com.areadiscovery.data.remote
 
 import com.areadiscovery.domain.model.AreaContext
+import com.areadiscovery.domain.model.ChatIntent
+import com.areadiscovery.domain.model.EngagementLevel
+import com.areadiscovery.domain.model.POI
+import com.areadiscovery.domain.model.SavedPoi
+import com.areadiscovery.domain.model.TasteProfile
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -15,6 +20,47 @@ class GeminiPromptBuilderTest {
         visitCount = 0,
         preferredLanguage = "English"
     )
+
+    private val emptyProfile = TasteProfile(
+        strongAffinities = emptyList(),
+        emergingInterests = emptyList(),
+        notableAbsences = emptyList(),
+        diningStyle = null,
+        totalSaves = 0,
+    )
+
+    private fun chatContext(
+        areaName: String = "Test Area",
+        pois: List<POI> = emptyList(),
+        intent: ChatIntent = ChatIntent.DISCOVER,
+        level: EngagementLevel = EngagementLevel.LIGHT,
+        saves: List<SavedPoi> = emptyList(),
+        profile: TasteProfile = emptyProfile,
+        poiCount: Int = 5,
+        framingHint: String? = null,
+    ): String = builder.buildChatSystemContext(
+        areaName, pois, intent, level, saves, profile, poiCount, framingHint,
+    )
+
+    private fun save(
+        name: String,
+        areaName: String = "Test Area",
+        type: String = "food",
+        savedAt: Long = 1000L,
+        userNote: String? = null,
+    ) = SavedPoi(
+        id = "$name|1.0|2.0",
+        name = name,
+        type = type,
+        areaName = areaName,
+        lat = 1.0,
+        lng = 2.0,
+        whySpecial = "test",
+        savedAt = savedAt,
+        userNote = userNote,
+    )
+
+    // --- buildAreaPortraitPrompt tests (must not break) ---
 
     @Test
     fun buildAreaPortraitPrompt_includesAreaName() {
@@ -66,7 +112,6 @@ class GeminiPromptBuilderTest {
     @Test
     fun buildAreaPortraitPrompt_poiTemplateHasRealCoordinates() {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
-        // Verify the template shows 4-decimal-place coordinates (LLMs follow examples)
         assertTrue(
             prompt.contains("\"lat\":38.7100") || prompt.contains("\"lat\": 38.7100"),
             "POI template must show 4-decimal-place coordinates",
@@ -100,7 +145,6 @@ class GeminiPromptBuilderTest {
 
     @Test
     fun buildAreaPortraitPrompt_doesNotHardcodeChainBrandNames() {
-        // Exclusion is principle-based, not brand-list-based — Starbucks/McDonald's must NOT appear in prompt
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
         assertFalse(prompt.contains("Starbucks"))
         assertFalse(prompt.contains("McDonald"))
@@ -139,38 +183,29 @@ class GeminiPromptBuilderTest {
         assertFalse(prompt.contains("\"sources\""))
     }
 
-    // --- Saves injection tests ---
+    // --- Updated old buildChatSystemContext tests (new signature) ---
 
     @Test
     fun buildChatSystemContext_includesSavedPlaces() {
-        val result = builder.buildChatSystemContext(
-            areaName = "Test Area",
-            poiNames = listOf("Place A"),
-            vibeName = "CHARACTER",
-            savedPoiNames = listOf("Blue Note", "Wynwood Walls"),
+        val saves = listOf(
+            save("Blue Note", areaName = "Test Area"),
+            save("Wynwood Walls", areaName = "Test Area"),
         )
+        val result = chatContext(saves = saves)
         assertTrue(result.contains("Blue Note"))
         assertTrue(result.contains("Wynwood Walls"))
-        assertTrue(result.contains("The user has saved"))
+        assertTrue(result.contains("SAVED PLACES IN THIS AREA"))
     }
 
     @Test
     fun buildChatSystemContext_noSavesLine_whenSavesEmpty() {
-        val result = builder.buildChatSystemContext(
-            areaName = "Test Area",
-            poiNames = listOf("Place A"),
-            vibeName = "CHARACTER",
-            savedPoiNames = emptyList(),
-        )
-        assertFalse(result.contains("The user has saved"))
+        val result = chatContext(saves = emptyList())
+        assertFalse(result.contains("SAVED PLACES IN THIS AREA"))
     }
 
     @Test
     fun buildChatSystemContext_savesSheetFramingLine() {
-        val result = builder.buildChatSystemContext(
-            areaName = "Test Area",
-            poiNames = listOf("Place A"),
-            vibeName = null,
+        val result = chatContext(
             framingHint = "The user is currently reviewing their saved places — lead with suggestions based on those first.",
         )
         assertTrue(result.contains("reviewing their saved places"))
@@ -178,10 +213,7 @@ class GeminiPromptBuilderTest {
 
     @Test
     fun buildChatSystemContext_poiCardFramingLine() {
-        val result = builder.buildChatSystemContext(
-            areaName = "Test Area",
-            poiNames = listOf("Place A"),
-            vibeName = null,
+        val result = chatContext(
             framingHint = "The user is currently looking at Blue Note Jazz — lead with context about that place.",
         )
         assertTrue(result.contains("Blue Note Jazz"))
@@ -189,12 +221,120 @@ class GeminiPromptBuilderTest {
 
     @Test
     fun buildChatSystemContext_nullFramingHint_noFramingLine() {
-        val result = builder.buildChatSystemContext(
-            areaName = "Test Area",
-            poiNames = listOf("Place A"),
-            vibeName = null,
-            framingHint = null,
-        )
+        val result = chatContext(framingHint = null)
         assertFalse(result.contains("currently"))
+    }
+
+    // --- New per-layer tests ---
+
+    @Test
+    fun buildChatSystemContext_layer1_persona() {
+        val result = chatContext()
+        assertTrue(result.contains("20 years"))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer3_tonight_intent() {
+        val result = chatContext(intent = ChatIntent.TONIGHT)
+        assertTrue(result.contains("MEMORABLE EVENING", ignoreCase = true))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer3_surprise_intent() {
+        val result = chatContext(intent = ChatIntent.SURPRISE)
+        assertTrue(
+            result.contains("NEVER find on their own") || result.contains("Mischievous"),
+        )
+    }
+
+    @Test
+    fun buildChatSystemContext_layer4_fresh_engagement() {
+        val result = chatContext(level = EngagementLevel.FRESH)
+        assertTrue(result.contains("Save any places that catch your eye"))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer4_dormant_engagement() {
+        val result = chatContext(level = EngagementLevel.DORMANT)
+        assertTrue(
+            result.contains("CHANGED", ignoreCase = true) || result.contains("welcome-back", ignoreCase = true),
+        )
+    }
+
+    @Test
+    fun buildChatSystemContext_layer5a_saves_capped_at_8() {
+        // Use names that aren't substrings of each other (e.g., "Alpha", "Bravo", ...)
+        val names = listOf("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet")
+        val saves = names.mapIndexed { i, name ->
+            save(name, savedAt = (i + 1).toLong())
+        }
+        val result = chatContext(saves = saves)
+        // Most recent = Juliet (savedAt=10), 8th most recent = Charlie (savedAt=3)
+        assertTrue(result.contains("Juliet"), "Should contain most recent save")
+        assertTrue(result.contains("Charlie"), "Should contain 8th most recent save")
+        assertFalse(result.contains("Bravo"), "Should NOT contain 9th save")
+        assertFalse(result.contains("Alpha"), "Should NOT contain 10th save")
+    }
+
+    @Test
+    fun buildChatSystemContext_layer5a_userNote_injected() {
+        val saves = listOf(save("Sunset Cafe", userNote = "best at sunset"))
+        val result = chatContext(saves = saves)
+        assertTrue(result.contains("best at sunset"))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer5b_omitted_for_fresh() {
+        val result = chatContext(
+            level = EngagementLevel.FRESH,
+            profile = emptyProfile.copy(totalSaves = 0),
+        )
+        assertFalse(result.contains("TASTE PROFILE"))
+        assertFalse(result.contains("SURPRISE FILTER"))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer5b_omitted_for_dormant() {
+        val profileWithSaves = emptyProfile.copy(
+            totalSaves = 10,
+            strongAffinities = listOf("park"),
+        )
+        val result = chatContext(level = EngagementLevel.DORMANT, profile = profileWithSaves)
+        assertFalse(result.contains("TASTE PROFILE"))
+        assertFalse(result.contains("SURPRISE FILTER"))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer5b_surprise_uses_absences() {
+        val profile = emptyProfile.copy(
+            totalSaves = 5,
+            notableAbsences = listOf("park"),
+            strongAffinities = listOf("restaurant"),
+        )
+        val result = chatContext(
+            intent = ChatIntent.SURPRISE,
+            level = EngagementLevel.REGULAR,
+            profile = profile,
+        )
+        assertTrue(result.contains("park"))
+        assertTrue(result.contains("NEVER saved", ignoreCase = true))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer6_high_confidence() {
+        val result = chatContext(poiCount = 12)
+        assertTrue(result.contains("insider", ignoreCase = true))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer6_low_confidence() {
+        val result = chatContext(poiCount = 3)
+        assertTrue(result.contains("LOW CONFIDENCE"))
+    }
+
+    @Test
+    fun buildChatSystemContext_layer7_context_shift() {
+        val result = chatContext()
+        assertTrue(result.contains("CONTEXT SHIFTS"))
     }
 }

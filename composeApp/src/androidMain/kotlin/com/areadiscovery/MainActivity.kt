@@ -53,7 +53,7 @@ class MainActivity : ComponentActivity() {
         val seedPersona = if (isDebug) {
             intent.getStringExtra("seed_persona")?.let {
                 DevSeeder.Persona.valueOf(it.uppercase())
-            } ?: DevSeeder.Persona.POWER
+            } ?: DevSeeder.Persona.FRESH
         } else null
         val forceSeed = isDebug && intent.hasExtra("seed_persona")
 

@@ -81,12 +81,17 @@ object DevSeeder {
         val existingIds = repo.observeSavedIds().first()
         existingIds.forEach { repo.unsave(it) }
 
-        when (persona) {
-            Persona.FRESH -> { /* no-op */ }
-            Persona.LIGHT -> lightPersona().forEach { repo.save(it) }
-            Persona.REGULAR -> regularPersona().forEach { repo.save(it) }
-            Persona.POWER -> powerPersona().forEach { repo.save(it) }
-            Persona.DORMANT -> seedDormantPersona(repo)
+        val pois = when (persona) {
+            Persona.FRESH -> emptyList()
+            Persona.LIGHT -> lightPersona()
+            Persona.REGULAR -> regularPersona()
+            Persona.POWER -> powerPersona()
+            Persona.DORMANT -> dormantPersona()
+        }
+        if (persona == Persona.DORMANT) {
+            seedDormantPersona(repo)
+        } else {
+            pois.forEach { repo.save(it) }
         }
         println("DevSeeder: seeded ${pois.size} POIs")
     }

@@ -2,6 +2,7 @@ package com.areadiscovery.ui.map
 
 import app.cash.turbine.test
 import com.areadiscovery.data.remote.GeminiPromptBuilder
+import com.areadiscovery.domain.model.ChatIntent
 import com.areadiscovery.domain.model.ChatToken
 import com.areadiscovery.domain.model.MessageRole
 import com.areadiscovery.domain.model.Vibe
@@ -48,7 +49,7 @@ class ChatViewModelTest {
     )
 
     @Test
-    fun `openChat sets isOpen and injects system turn into history`() = runTest {
+    fun `openChat sets isOpen and shows intent pills`() = runTest {
         fakeAiProvider.chatTokens = listOf(
             ChatToken("Hi", false),
             ChatToken("", true),
@@ -58,9 +59,10 @@ class ChatViewModelTest {
 
         assertTrue(vm.uiState.value.isOpen)
         assertTrue(vm.uiState.value.bubbles.isEmpty())
+        assertEquals(ChatIntent.entries.toList(), vm.uiState.value.intentPills)
 
-        // Send a message to verify system context is in history snapshot
-        vm.sendMessage("Hello")
+        // tapIntentPill injects system context and sends opening message
+        vm.tapIntentPill(ChatIntent.DISCOVER)
         val history = fakeAiProvider.lastChatHistory
         // F1 fix: snapshot taken BEFORE adding user msg, so only system context is in history
         assertEquals(1, history.size)
@@ -103,10 +105,11 @@ class ChatViewModelTest {
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), null)
 
-        vm.sendMessage("Question 1")
+        // tapIntentPill triggers system context + opening message send
+        vm.tapIntentPill(ChatIntent.DISCOVER)
+        // First call: tapIntentPill calls sendMessage which takes snapshot before adding user msg
+        // Snapshot = [system_context], then user msg (opening message) is added after snapshot
         assertEquals(1, fakeAiProvider.chatCallCount)
-        // F1 fix: history snapshot is taken BEFORE adding user msg
-        // So first call gets: [system_context] only
         assertEquals(1, fakeAiProvider.lastChatHistory.size)
 
         // Second turn
@@ -116,10 +119,10 @@ class ChatViewModelTest {
         )
         vm.sendMessage("Question 2")
         assertEquals(2, fakeAiProvider.chatCallCount)
-        // Second call gets: system_context + user1 + ai1 (snapshot before adding user2)
+        // Second call gets: system_context + user1(opening) + ai1 (snapshot before adding user2)
         assertEquals(3, fakeAiProvider.lastChatHistory.size)
         assertEquals(MessageRole.USER, fakeAiProvider.lastChatHistory[0].role) // system (USER role)
-        assertEquals(MessageRole.USER, fakeAiProvider.lastChatHistory[1].role) // user1
+        assertEquals(MessageRole.USER, fakeAiProvider.lastChatHistory[1].role) // opening message
         assertEquals(MessageRole.AI, fakeAiProvider.lastChatHistory[2].role) // ai1
     }
 
@@ -208,24 +211,41 @@ class ChatViewModelTest {
     }
 
     @Test
-    fun `starter chips are vibe-aware`() = runTest {
+    fun `openChat shows intent pills instead of vibe starter chips`() = runTest {
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), Vibe.SAFETY)
 
-        val chips = vm.uiState.value.followUpChips
-        assertEquals(4, chips.size)
-        assertTrue(chips[0].contains("safe", ignoreCase = true))
+        val pills = vm.uiState.value.intentPills
+        assertEquals(5, pills.size)
+        assertEquals(ChatIntent.TONIGHT, pills[0])
+        assertTrue(vm.uiState.value.followUpChips.isEmpty())
     }
 
     @Test
     fun `follow-up chips appear after response completes`() = runTest {
+        // Seed saves so engagement is LIGHT+ (keyword-based follow-up)
+        for (i in 1..3) {
+            fakeSavedPoiRepository.save(
+                com.areadiscovery.domain.model.SavedPoi(
+                    id = "p$i|$i.0|$i.0", name = "P$i", type = "park",
+                    areaName = "Test Area", lat = i.toDouble(), lng = i.toDouble(),
+                    whySpecial = "test", savedAt = fakeClock.nowMs,
+                )
+            )
+        }
         fakeAiProvider.chatTokens = listOf(
             ChatToken("Sure!", false),
             ChatToken("", true),
         )
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), null)
+        vm.tapIntentPill(ChatIntent.TONIGHT)
 
+        // Second message triggers keyword follow-ups (LIGHT+ engagement)
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Safe area!", false),
+            ChatToken("", true),
+        )
         vm.sendMessage("Is it safe here?")
 
         val state = vm.uiState.value
@@ -439,7 +459,11 @@ Enjoy!"""
     // --- Saves injection tests ---
 
     @Test
-    fun `openChat_withAreaSaves_injectsThemIntoSystemContext`() = runTest {
+    fun `tapIntentPill_withAreaSaves_injectsThemIntoSystemContext`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
         fakeSavedPoiRepository.save(
             com.areadiscovery.domain.model.SavedPoi(
                 id = "Cafe Roma|41.89|12.49",
@@ -467,15 +491,20 @@ Enjoy!"""
 
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), null)
+        vm.tapIntentPill(ChatIntent.DISCOVER)
 
         val context = vm.systemContextForTest
         assertTrue(context.contains("Cafe Roma"), "System context should contain saved POI name 'Cafe Roma'")
         assertTrue(context.contains("Park Verde"), "System context should contain saved POI name 'Park Verde'")
-        assertTrue(context.contains("The user has saved"), "System context should contain saves line")
+        assertTrue(context.contains("SAVED PLACES IN THIS AREA"), "System context should contain saves section")
     }
 
     @Test
-    fun `openChat_withSavesInOtherArea_doesNotInjectThem`() = runTest {
+    fun `tapIntentPill_withSavesInOtherArea_doesNotInjectThem`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
         fakeSavedPoiRepository.save(
             com.areadiscovery.domain.model.SavedPoi(
                 id = "Other Cafe|10.0|20.0",
@@ -491,38 +520,46 @@ Enjoy!"""
 
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), null)
+        vm.tapIntentPill(ChatIntent.DISCOVER)
 
         val context = vm.systemContextForTest
         assertFalse(context.contains("Other Cafe"), "System context should NOT contain saves from other areas")
-        assertFalse(context.contains("The user has saved"), "System context should NOT contain saves line when no area matches")
+        assertFalse(context.contains("SAVED PLACES IN THIS AREA"), "System context should NOT contain saves section when no area matches")
     }
 
     @Test
-    fun `openChat_moreThanTenSaves_capsAtTen`() = runTest {
-        // Populate with 15 saves for "Test Area"
-        for (i in 1..15) {
+    fun `tapIntentPill_moreThanEightSaves_capsAtEight`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
+        // Use names that aren't substrings of each other
+        val names = listOf("Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliet")
+        names.forEachIndexed { i, name ->
             fakeSavedPoiRepository.save(
                 com.areadiscovery.domain.model.SavedPoi(
-                    id = "Place$i|${i.toDouble()}|${i.toDouble()}",
-                    name = "Place$i",
+                    id = "$name|${(i + 1).toDouble()}|${(i + 1).toDouble()}",
+                    name = name,
                     type = "food",
                     areaName = "Test Area",
-                    lat = i.toDouble(),
-                    lng = i.toDouble(),
-                    whySpecial = "Place $i",
-                    savedAt = i.toLong(),
+                    lat = (i + 1).toDouble(),
+                    lng = (i + 1).toDouble(),
+                    whySpecial = "Place $name",
+                    savedAt = (i + 1).toLong(),
                 )
             )
         }
 
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), null)
+        vm.tapIntentPill(ChatIntent.DISCOVER)
 
         val context = vm.systemContextForTest
-        assertTrue(context.contains("The user has saved"), "System context should contain saves line")
-        // Count commas in the "The user has saved: X, Y, Z in this area." segment
-        val savesSegment = context.substringAfter("The user has saved: ").substringBefore(" in this area.")
-        val nameCount = savesSegment.split(", ").size
-        assertEquals(10, nameCount, "Should cap saves at 10, found $nameCount")
+        assertTrue(context.contains("SAVED PLACES IN THIS AREA"), "System context should contain saves section")
+        // Most recent = Juliet (savedAt=10), 8th = Charlie (savedAt=3)
+        assertTrue(context.contains("Juliet"), "Should contain most recent save")
+        assertTrue(context.contains("Charlie"), "Should contain 8th most recent save")
+        assertFalse(context.contains("Bravo"), "Should NOT contain 9th save")
+        assertFalse(context.contains("Alpha"), "Should NOT contain 10th save")
     }
 }
