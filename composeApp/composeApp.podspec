@@ -5,7 +5,7 @@ Pod::Spec.new do |spec|
     spec.source                   = { :http=> ''}
     spec.authors                  = ''
     spec.license                  = ''
-    spec.summary                  = 'AreaDiscovery Compose Multiplatform module'
+    spec.summary                  = 'HaraZone Compose Multiplatform module'
     spec.vendored_frameworks      = 'build/cocoapods/framework/ComposeApp.framework'
     spec.libraries                = 'c++'
     spec.ios.deployment_target    = '16.0'
