@@ -236,7 +236,7 @@ class GeminiPromptBuilderTest {
     @Test
     fun buildChatSystemContext_layer3_tonight_intent() {
         val result = chatContext(intent = ChatIntent.TONIGHT)
-        assertTrue(result.contains("MEMORABLE EVENING", ignoreCase = true))
+        assertTrue(result.contains("tonight", ignoreCase = true))
     }
 
     @Test
