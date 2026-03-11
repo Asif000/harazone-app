@@ -274,6 +274,7 @@ internal class ChatViewModel(
                         lng = card.lng,
                         whySpecial = card.whySpecial,
                         savedAt = 0L, // Repository sets the actual timestamp
+                        imageUrl = null, // ChatPoiCard has no imageUrl — gradient fallback
                     )
                 )
             } catch (e: Exception) {

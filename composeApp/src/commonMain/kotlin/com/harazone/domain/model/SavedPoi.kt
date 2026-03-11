@@ -10,4 +10,5 @@ data class SavedPoi(
     val whySpecial: String,
     val savedAt: Long,
     val userNote: String? = null,
+    val imageUrl: String? = null,
 )

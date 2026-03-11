@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS saved_pois (
     lng         REAL NOT NULL,
     why_special TEXT NOT NULL,
     saved_at    INTEGER NOT NULL,
-    user_note   TEXT
+    user_note   TEXT,
+    image_url   TEXT
 );
 
 observeAll:
@@ -17,8 +18,8 @@ observeSavedIds:
 SELECT poi_id FROM saved_pois;
 
 insertOrReplace:
-INSERT OR REPLACE INTO saved_pois(poi_id, name, type, area_name, lat, lng, why_special, saved_at, user_note)
-VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at, :user_note);
+INSERT OR REPLACE INTO saved_pois(poi_id, name, type, area_name, lat, lng, why_special, saved_at, user_note, image_url)
+VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at, :user_note, :image_url);
 
 deleteById:
 DELETE FROM saved_pois WHERE poi_id = :poi_id;

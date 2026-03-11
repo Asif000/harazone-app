@@ -59,6 +59,7 @@ object DevSeeder {
                     why_special = poi.whySpecial,
                     saved_at = poi.savedAt,
                     user_note = poi.userNote,
+                    image_url = poi.imageUrl,
                 )
             }
         }

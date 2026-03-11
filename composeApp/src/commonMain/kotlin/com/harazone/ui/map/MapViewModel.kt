@@ -168,6 +168,7 @@ class MapViewModel(
                         lng = poi.longitude ?: 0.0,
                         whySpecial = poi.insight,
                         savedAt = 0L,
+                        imageUrl = poi.imageUrl,
                     )
                 )
             } catch (e: Exception) {

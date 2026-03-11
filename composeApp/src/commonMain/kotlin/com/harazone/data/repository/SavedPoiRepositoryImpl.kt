@@ -35,6 +35,7 @@ class SavedPoiRepositoryImpl(
                         whySpecial = it.why_special,
                         savedAt = it.saved_at,
                         userNote = it.user_note,
+                        imageUrl = it.image_url,
                     )
                 }
             }
@@ -58,6 +59,7 @@ class SavedPoiRepositoryImpl(
                 why_special = poi.whySpecial,
                 saved_at = clock.nowMs(),
                 user_note = poi.userNote,
+                image_url = poi.imageUrl,
             )
         }
     }
