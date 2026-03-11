@@ -67,7 +67,7 @@ fun ExpandablePoiCard(
     activeVibe: Vibe?,
     onDismiss: () -> Unit,
     onDirectionsClick: (Double, Double, String) -> Unit,
-    onAskAiClick: (String) -> Unit,
+    onAskAiClick: () -> Unit,
     isSaved: Boolean,
     onSave: () -> Unit,
     onUnsave: () -> Unit,
@@ -225,7 +225,7 @@ fun ExpandablePoiCard(
                     )
                 }
                 AssistChip(
-                    onClick = { onAskAiClick("Tell me more about ${poi.name}") },
+                    onClick = { onAskAiClick() },
                     label = { Text("Ask AI") },
                     leadingIcon = {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))

@@ -6,4 +6,5 @@ sealed class ChatEntryPoint {
     data object Default : ChatEntryPoint()
     data object SavesSheet : ChatEntryPoint()
     data class PoiCard(val poi: POI) : ChatEntryPoint()
+    data class SavedCard(val poiName: String) : ChatEntryPoint()
 }

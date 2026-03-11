@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.harazone.data.remote.GeminiPromptBuilder
 import com.harazone.domain.model.ChatIntent
 import com.harazone.domain.model.ChatMessage
+import com.harazone.domain.model.ContextualPill
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.MessageRole
 import com.harazone.domain.model.POI
@@ -50,6 +51,7 @@ internal class ChatViewModel(
     private var currentEngagementLevel: EngagementLevel = EngagementLevel.FRESH
     private var pendingFramingHint: String? = null
     private var isIntentSelected: Boolean = false
+    private var currentEntryPoint: ChatEntryPoint = ChatEntryPoint.Default
 
     companion object {
         private const val MAX_HISTORY_TURNS = 20 // 20 messages = ~10 back-and-forth turns
@@ -93,6 +95,7 @@ internal class ChatViewModel(
         nextId = 0L
         isIntentSelected = false
         selectedIntent = null
+        currentEntryPoint = entryPoint
         val vibeName = activeVibe?.name
         sessionPois = pois
 
@@ -102,6 +105,8 @@ internal class ChatViewModel(
                 "The user is currently reviewing their saved places — lead with suggestions based on those first."
             is ChatEntryPoint.PoiCard ->
                 "The user is currently looking at ${entryPoint.poi.name} — lead with context about that place."
+            is ChatEntryPoint.SavedCard ->
+                "The user is currently looking at ${entryPoint.poiName} — lead with context about that place."
             is ChatEntryPoint.Default -> null
         }
 
@@ -114,14 +119,17 @@ internal class ChatViewModel(
             poiCards = emptyList(),
             showSkeletons = false,
             savedPoiIds = _uiState.value.savedPoiIds,
-            intentPills = ChatIntent.entries.toList(),
+            intentPills = pillsFor(entryPoint, areaName),
+            inputText = preFillFor(entryPoint),
+            contextBanner = bannerFor(entryPoint),
+            depthLevel = 0,
         )
     }
 
-    fun tapIntentPill(intent: ChatIntent) {
+    fun tapIntentPill(pill: ContextualPill) {
         if (isIntentSelected) return
         isIntentSelected = true
-        selectedIntent = intent
+        selectedIntent = pill.intent
         viewModelScope.launch {
             // Eagerly fetch saves if background collector hasn't emitted yet (M2 race fix)
             val saves = latestSavedPois.ifEmpty {
@@ -132,7 +140,7 @@ internal class ChatViewModel(
             val areaName = _uiState.value.areaName
             val poiCount = sessionPois.size
             val systemContext = promptBuilder.buildChatSystemContext(
-                areaName, sessionPois, intent, currentEngagementLevel,
+                areaName, sessionPois, pill.intent, currentEngagementLevel,
                 saves, tasteProfile, poiCount, pendingFramingHint,
             )
             conversationHistory.add(
@@ -145,8 +153,9 @@ internal class ChatViewModel(
                 )
             )
             _uiState.value = _uiState.value.copy(
-                inputText = intent.openingMessage,
+                inputText = pill.message,
                 intentPills = emptyList(),
+                depthLevel = 0,
             )
             sendMessage()
         }
@@ -173,6 +182,7 @@ internal class ChatViewModel(
 
     fun sendMessage(query: String = _uiState.value.inputText) {
         if (query.isBlank() || _uiState.value.isStreaming) return
+        _uiState.value = _uiState.value.copy(depthLevel = _uiState.value.depthLevel + 1)
         chatJob?.cancel()
         val userBubbleId = nextId()
         val aiBubbleId = nextId()
@@ -233,7 +243,7 @@ internal class ChatViewModel(
                                 ) else it
                             },
                             isStreaming = false,
-                            followUpChips = computeFollowUpChips(query, selectedIntent, currentEngagementLevel),
+                            followUpChips = computeFollowUpChips(query, selectedIntent, currentEngagementLevel, _uiState.value.depthLevel),
                             showSkeletons = false,
                             poiCards = parsedCards.toList(),
                         )
@@ -396,7 +406,10 @@ internal class ChatViewModel(
     }
 
     // F11: Use word boundary matching to avoid false positives (e.g., "on" in "information")
-    private fun computeFollowUpChips(query: String, intent: ChatIntent?, level: EngagementLevel): List<String> {
+    private fun computeFollowUpChips(query: String, intent: ChatIntent?, level: EngagementLevel, depthLevel: Int): List<String> {
+        if (depthLevel >= 3) {
+            return listOf("🔄 New topic") + computeFollowUpChipsByKeyword(query).take(1)
+        }
         if (level == EngagementLevel.FRESH) {
             return when (intent) {
                 ChatIntent.TONIGHT -> listOf("Just me tonight", "With friends")
@@ -424,5 +437,69 @@ internal class ChatViewModel(
     // TODO(BACKLOG-LOW): \b word boundaries may break with non-Latin scripts — revisit for Localisation Phase A
     private fun String.containsAnyWord(vararg terms: String) = terms.any { term ->
         this.contains("\\b${Regex.escape(term)}\\b".toRegex())
+    }
+
+    fun resetToIntentPills() {
+        chatJob?.cancel()
+        conversationHistory = mutableListOf()
+        nextId = 0L
+        isIntentSelected = false
+        selectedIntent = null
+        val areaName = _uiState.value.areaName
+        _uiState.value = _uiState.value.copy(
+            bubbles = emptyList(),
+            followUpChips = emptyList(),
+            poiCards = emptyList(),
+            showSkeletons = false,
+            isStreaming = false,
+            intentPills = pillsFor(currentEntryPoint, areaName),
+            inputText = preFillFor(currentEntryPoint),
+            contextBanner = bannerFor(currentEntryPoint),
+            depthLevel = 0,
+        )
+    }
+
+    fun dismissContextBanner() {
+        _uiState.value = _uiState.value.copy(contextBanner = null)
+    }
+
+    private fun defaultPills(areaName: String): List<ContextualPill> = listOf(
+        ContextualPill("What's on tonight in $areaName?", "What's on tonight in $areaName?", ChatIntent.TONIGHT, "🌙"),
+        ContextualPill("Best food right now", "Where should I eat right now in $areaName?", ChatIntent.HUNGRY, "🍜"),
+        ContextualPill("Show me hidden gems", "Show me hidden gems in $areaName", ChatIntent.DISCOVER, "🔍"),
+        ContextualPill("Get me outside", "Get me outside in $areaName", ChatIntent.OUTSIDE, "🌳"),
+        ContextualPill("Surprise me in $areaName", "Surprise me in $areaName", ChatIntent.SURPRISE, "🎲"),
+    )
+
+    private fun poiCardPills(poiName: String): List<ContextualPill> = listOf(
+        ContextualPill("Tell me more about $poiName", "Tell me more about $poiName", ChatIntent.DISCOVER, "✨"),
+        ContextualPill("What's nearby?", "What's nearby $poiName?", ChatIntent.DISCOVER, "📍"),
+        ContextualPill("Is this worth visiting?", "Is $poiName worth visiting?", ChatIntent.DISCOVER, "⭐"),
+    )
+
+    private fun savesOverviewPills(): List<ContextualPill> = listOf(
+        ContextualPill("Plan a day trip from my saves", "Plan a day trip using my saved places", ChatIntent.DISCOVER, "🗺️"),
+        ContextualPill("Find patterns in my saves", "What patterns do you see in my saved places?", ChatIntent.DISCOVER, "🔍"),
+        ContextualPill("What am I missing?", "What places am I missing that I should save?", ChatIntent.DISCOVER, "🤔"),
+    )
+
+    private fun pillsFor(entryPoint: ChatEntryPoint, areaName: String): List<ContextualPill> = when (entryPoint) {
+        is ChatEntryPoint.Default -> defaultPills(areaName)
+        is ChatEntryPoint.SavesSheet -> savesOverviewPills()
+        is ChatEntryPoint.PoiCard -> poiCardPills(entryPoint.poi.name)
+        is ChatEntryPoint.SavedCard -> poiCardPills(entryPoint.poiName)
+    }
+
+    private fun preFillFor(entryPoint: ChatEntryPoint): String = when (entryPoint) {
+        is ChatEntryPoint.PoiCard -> "Tell me more about ${entryPoint.poi.name}"
+        is ChatEntryPoint.SavedCard -> "Tell me more about ${entryPoint.poiName}"
+        else -> ""
+    }
+
+    private fun bannerFor(entryPoint: ChatEntryPoint): String? = when (entryPoint) {
+        is ChatEntryPoint.PoiCard -> "Asking about: ${entryPoint.poi.name}"
+        is ChatEntryPoint.SavedCard -> "Asking about: ${entryPoint.poiName}"
+        is ChatEntryPoint.SavesSheet -> "Using your saved places"
+        is ChatEntryPoint.Default -> null
     }
 }

@@ -58,6 +58,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.ui.saved.components.SavedPoiCard
 import kotlinx.coroutines.launch
@@ -73,7 +74,7 @@ fun SavedPlacesScreen(
     userLat: Double?,
     userLng: Double?,
     onDismiss: () -> Unit,
-    onAskAi: (String) -> Unit,
+    onAskAi: (poi: SavedPoi?) -> Unit,
     onDirections: (Double, Double, String) -> Unit,
     onShare: (String) -> Unit,
     viewModel: SavedPlacesViewModel = koinViewModel(),
@@ -320,7 +321,7 @@ fun SavedPlacesScreen(
                         },
                         onDirections = { onDirections(poi.lat, poi.lng, poi.name) },
                         onShare = { onShare(poi.name) },
-                        onAskAi = { onAskAi("Tell me more about ${poi.name}") },
+                        onAskAi = { onAskAi(poi) },
                     )
                 }
             }
@@ -340,9 +341,8 @@ fun SavedPlacesScreen(
                 .padding(bottom = navBarPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // TODO(BACKLOG-HIGH): "Ask AI about saves" auto-sends a hardcoded message — should open ChatOverlay and let user pick an intent pill or type their own question. Same for per-card Ask AI.
             TextButton(
-                onClick = { onAskAi("What should I do with my saved places?") },
+                onClick = { onAskAi(null) },
                 modifier = Modifier.weight(1f),
             ) {
                 Icon(

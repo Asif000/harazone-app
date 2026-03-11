@@ -66,7 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import com.harazone.BuildKonfig
-import com.harazone.domain.model.ChatIntent
+import com.harazone.domain.model.ContextualPill
 import com.harazone.domain.model.MessageRole
 
 private val IndigoGradient = Brush.linearGradient(
@@ -159,6 +159,10 @@ internal fun ChatOverlay(
                 }
             }
 
+            chatState.contextBanner?.let { banner ->
+                ContextBanner(text = banner, onDismiss = { viewModel.dismissContextBanner() })
+            }
+
             Spacer(Modifier.height(4.dp))
 
             // Messages area
@@ -225,13 +229,23 @@ internal fun ChatOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     chatState.followUpChips.forEach { chip ->
-                        SuggestionChip(
-                            onClick = { viewModel.tapChip(chip) },
-                            label = { Text(chip, fontSize = 13.sp) },
-                            colors = SuggestionChipDefaults.suggestionChipColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                            ),
-                        )
+                        if (chip == "🔄 New topic") {
+                            SuggestionChip(
+                                onClick = { viewModel.resetToIntentPills() },
+                                label = { Text(chip, fontSize = 13.sp) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                ),
+                            )
+                        } else {
+                            SuggestionChip(
+                                onClick = { viewModel.tapChip(chip) },
+                                label = { Text(chip, fontSize = 13.sp) },
+                                colors = SuggestionChipDefaults.suggestionChipColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                ),
+                            )
+                        }
                     }
                 }
             }
@@ -250,8 +264,8 @@ internal fun ChatOverlay(
 @Composable
 private fun EmptyState(
     areaName: String,
-    intentPills: List<ChatIntent>,
-    onPillTap: (ChatIntent) -> Unit,
+    intentPills: List<ContextualPill>,
+    onPillTap: (ContextualPill) -> Unit,
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -293,7 +307,7 @@ private fun EmptyState(
             intentPills.forEach { pill ->
                 SuggestionChip(
                     onClick = { onPillTap(pill) },
-                    label = { Text("${intentPillEmoji(pill)} ${pill.displayLabel}", fontSize = 13.sp) },
+                    label = { Text("${pill.emoji} ${pill.label}", fontSize = 13.sp) },
                     colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant,
                     ),
@@ -303,12 +317,35 @@ private fun EmptyState(
     }
 }
 
-private fun intentPillEmoji(intent: ChatIntent): String = when (intent) {
-    ChatIntent.TONIGHT -> "\uD83C\uDF19"    // 🌙
-    ChatIntent.DISCOVER -> "\uD83D\uDD0D"   // 🔍
-    ChatIntent.HUNGRY -> "\uD83C\uDF5C"     // 🍜
-    ChatIntent.OUTSIDE -> "\uD83C\uDF33"    // 🌳
-    ChatIntent.SURPRISE -> "\uD83C\uDFB2"   // 🎲
+@Composable
+private fun ContextBanner(
+    text: String,
+    onDismiss: () -> Unit,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
+        )
+        IconButton(onClick = onDismiss, modifier = Modifier.size(20.dp)) {
+            Icon(
+                Icons.Default.Close,
+                contentDescription = "Dismiss",
+                modifier = Modifier.size(14.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
 }
 
 @Composable

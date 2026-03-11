@@ -1,6 +1,6 @@
 package com.harazone.ui.map
 
-import com.harazone.domain.model.ChatIntent
+import com.harazone.domain.model.ContextualPill
 import com.harazone.domain.model.MessageRole
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -37,5 +37,7 @@ data class ChatUiState(
     val poiCards: List<ChatPoiCard> = emptyList(),
     val showSkeletons: Boolean = false,
     val savedPoiIds: Set<String> = emptySet(),
-    val intentPills: List<ChatIntent> = emptyList(),
+    val intentPills: List<ContextualPill> = emptyList(),
+    val contextBanner: String? = null,
+    val depthLevel: Int = 0,
 )

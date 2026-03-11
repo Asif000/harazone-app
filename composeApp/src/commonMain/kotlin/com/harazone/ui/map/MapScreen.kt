@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.AlertBanner
 import com.harazone.ui.components.ContentNoteBanner
 import com.harazone.ui.components.PlatformBackHandler
@@ -248,7 +249,7 @@ private fun ReadyContent(
                         }
                     }
                 },
-                onAskAiClick = { query ->
+                onAskAiClick = {
                     viewModel.clearPoiSelection()
                     if (chatState.isStreaming) {
                         coroutineScope.launch {
@@ -259,7 +260,6 @@ private fun ReadyContent(
                             state.areaName, state.pois, state.activeVibe,
                             entryPoint = ChatEntryPoint.PoiCard(state.selectedPoi!!),
                         )
-                        chatViewModel.sendMessage(query)
                     }
                 },
                 isSaved = state.selectedPoi.savedId in state.savedPoiIds,
@@ -392,10 +392,19 @@ private fun ReadyContent(
                 userLat = state.gpsLatitude.takeIf { state.showMyLocation },
                 userLng = state.gpsLongitude.takeIf { state.showMyLocation },
                 onDismiss = { viewModel.closeSavesSheet() },
-                onAskAi = { msg ->
+                onAskAi = { poi ->
                     viewModel.closeSavesSheet()
-                    chatViewModel.openChat(state.areaName, state.pois, state.activeVibe, ChatEntryPoint.SavesSheet)
-                    chatViewModel.sendMessage(msg)
+                    if (poi != null) {
+                        chatViewModel.openChat(
+                            state.areaName, state.pois, state.activeVibe,
+                            entryPoint = ChatEntryPoint.SavedCard(poi.name),
+                        )
+                    } else {
+                        chatViewModel.openChat(
+                            state.areaName, state.pois, state.activeVibe,
+                            entryPoint = ChatEntryPoint.SavesSheet,
+                        )
+                    }
                 },
                 onDirections = { lat, lng, name -> onNavigateToMaps(lat, lng, name) },
                 onShare = { /* TODO: platform share intent */ },
