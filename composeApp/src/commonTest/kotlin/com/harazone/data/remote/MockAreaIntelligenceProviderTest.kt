@@ -31,6 +31,7 @@ class MockAreaIntelligenceProviderTest {
                     is BucketUpdate.BucketComplete -> emittedBucketTypes.add(item.content.type)
                     is BucketUpdate.PortraitComplete -> break
                     is BucketUpdate.ContentAvailabilityNote -> {}
+                    is BucketUpdate.PinsReady -> {}
                 }
             }
             assertEquals(BucketType.entries.toSet(), emittedBucketTypes)
@@ -80,6 +81,7 @@ class MockAreaIntelligenceProviderTest {
                     is BucketUpdate.PortraitComplete -> break
                     is BucketUpdate.ContentDelta -> { /* collect but don't track order here */ }
                     is BucketUpdate.ContentAvailabilityNote -> {}
+                    is BucketUpdate.PinsReady -> {}
                 }
             }
             assertEquals(

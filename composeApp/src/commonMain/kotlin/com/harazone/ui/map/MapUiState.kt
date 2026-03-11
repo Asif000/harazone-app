@@ -23,6 +23,7 @@ sealed class MapUiState {
         val isFabExpanded: Boolean = false,
         val mapRenderFailed: Boolean = false,
         val isSearchingArea: Boolean = false,
+        val isEnrichingArea: Boolean = false,
         val gpsLatitude: Double = 0.0,
         val gpsLongitude: Double = 0.0,
         val showMyLocation: Boolean = false,

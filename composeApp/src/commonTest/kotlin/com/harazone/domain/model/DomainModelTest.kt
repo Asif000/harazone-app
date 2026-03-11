@@ -141,14 +141,16 @@ class DomainModelTest {
         val portraitComplete: BucketUpdate = BucketUpdate.PortraitComplete(emptyList())
 
         // Exhaustive when
-        val types = listOf(delta, complete, portraitComplete).map { update ->
+        val pinsReady: BucketUpdate = BucketUpdate.PinsReady(emptyList())
+        val types = listOf(delta, complete, portraitComplete, pinsReady).map { update ->
             when (update) {
                 is BucketUpdate.ContentDelta -> "delta"
                 is BucketUpdate.BucketComplete -> "complete"
                 is BucketUpdate.PortraitComplete -> "portrait"
                 is BucketUpdate.ContentAvailabilityNote -> "note"
+                is BucketUpdate.PinsReady -> "pins"
             }
         }
-        assertEquals(listOf("delta", "complete", "portrait"), types)
+        assertEquals(listOf("delta", "complete", "portrait", "pins"), types)
     }
 }

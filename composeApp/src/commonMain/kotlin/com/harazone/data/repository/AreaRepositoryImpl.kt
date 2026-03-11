@@ -113,15 +113,19 @@ internal class AreaRepositoryImpl(
                 aiProvider.streamAreaPortrait(areaName, context)
                     .catch { e -> AppLogger.e(e) { "Background refresh failed for area: $areaName" } }
                     .collect { update ->
+                        if (update is BucketUpdate.PinsReady) return@collect // Skip — user has stale data already
                         if (update is BucketUpdate.BucketComplete) {
                             withContext(ioDispatcher) {
                                 writeToCache(update.content, areaName, language)
                             }
                         }
                         if (update is BucketUpdate.PortraitComplete && update.pois.isNotEmpty()) {
-                            withContext(ioDispatcher) {
-                                val enriched = enrichPoisWithImages(update.pois)
-                                writePoisToCache(enriched, areaName, language)
+                            val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
+                            if (hasCoords) {
+                                withContext(ioDispatcher) {
+                                    val enriched = enrichPoisWithImages(update.pois)
+                                    writePoisToCache(enriched, areaName, language)
+                                }
                             }
                         }
                     }
@@ -134,13 +138,24 @@ internal class AreaRepositoryImpl(
         AppLogger.d { "Cache MISS for '$areaName' — valid=${validParsed.size}, stale=${staleParsed.size}, needed=${BucketType.entries.size}" }
         try {
             aiProvider.streamAreaPortrait(areaName, context).collect { update ->
-                if (update is BucketUpdate.PortraitComplete) {
-                    val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
-                    if (enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
-                    emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched)))
-                } else {
-                    emit(update)
-                    if (update is BucketUpdate.BucketComplete) writeToCache(update.content, areaName, language)
+                when (update) {
+                    is BucketUpdate.PinsReady -> emit(update) // Pass through — no enrichment, no cache
+                    is BucketUpdate.PortraitComplete -> {
+                        val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
+                        if (hasCoords) {
+                            // Full portrait POIs (Stage 1 fallback) — enrich images + cache as normal
+                            val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                            if (enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
+                            emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched)))
+                        } else {
+                            // Stage 2 enrichment-only POIs (no coords) — do NOT cache, pass through for VM merge
+                            emit(update)
+                        }
+                    }
+                    else -> {
+                        emit(update)
+                        if (update is BucketUpdate.BucketComplete) writeToCache(update.content, areaName, language)
+                    }
                 }
             }
         } catch (e: CancellationException) {

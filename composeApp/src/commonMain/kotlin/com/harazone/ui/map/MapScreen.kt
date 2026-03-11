@@ -27,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHost
@@ -168,6 +169,18 @@ private fun ReadyContent(
                     .padding(top = 64.dp)
                     .padding(horizontal = 16.dp)
                     .fillMaxWidth(),
+            )
+        }
+
+        // Enrichment progress bar
+        if (state.isEnrichingArea) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = navBarPadding + 72.dp),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = Color.Transparent,
             )
         }
 

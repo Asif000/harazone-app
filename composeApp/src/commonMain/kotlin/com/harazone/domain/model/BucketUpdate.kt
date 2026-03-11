@@ -10,6 +10,10 @@ sealed class BucketUpdate {
         val content: BucketContent
     ) : BucketUpdate()
 
+    data class PinsReady(
+        val pois: List<POI>
+    ) : BucketUpdate()
+
     data class PortraitComplete(
         val pois: List<POI>
     ) : BucketUpdate()

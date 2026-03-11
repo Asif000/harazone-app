@@ -61,6 +61,16 @@ internal data class PoiJson(
     val wiki: String? = null,
 )
 
+@Serializable
+internal data class EnrichJson(
+    val n: String = "",
+    val v: String = "",
+    val w: String = "",
+    val h: String? = null,
+    val s: String? = null,
+    val r: Float? = null,
+)
+
 internal class GeminiResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -68,6 +78,48 @@ internal class GeminiResponseParser {
     companion object {
         private const val BUCKET_DELIMITER = "---BUCKET---"
         private const val POIS_DELIMITER = "---POIS---"
+    }
+
+    fun parsePinOnlyResponse(text: String): List<POI> {
+        return try {
+            val cleaned = text.trim().let {
+                if (it.startsWith("```")) it.lines().drop(1).dropLast(1).joinToString("\n") else it
+            }
+            val poisJson = json.decodeFromString<List<PoiJson>>(cleaned)
+            poisJson.filter { it.n.isNotBlank() && it.lat != null && it.lng != null }.map { poiJson ->
+                POI(
+                    name = poiJson.n,
+                    type = poiJson.t,
+                    description = "",
+                    confidence = Confidence.MEDIUM,
+                    latitude = poiJson.lat,
+                    longitude = poiJson.lng,
+                    vibe = poiJson.v,
+                    insight = "",
+                    hours = null,
+                    liveStatus = null,
+                    rating = null,
+                    vibeInsights = emptyMap(),
+                    wikiSlug = null,
+                )
+            }
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: failed to parse pin-only response" }
+            emptyList()
+        }
+    }
+
+    internal fun parseEnrichmentResponse(text: String): List<EnrichJson> {
+        return try {
+            val cleaned = text.trim().let {
+                if (it.startsWith("```")) it.lines().drop(1).dropLast(1).joinToString("\n") else it
+            }
+            json.decodeFromString<List<EnrichJson>>(cleaned)
+                .filter { it.n.isNotBlank() }
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: failed to parse enrichment response" }
+            emptyList()
+        }
     }
 
     /**
@@ -107,6 +159,20 @@ internal class GeminiResponseParser {
         } catch (e: Exception) {
             AppLogger.e(e) { "GeminiResponseParser: failed to parse response" }
             Result.failure(e)
+        }
+    }
+
+    /**
+     * Extracts text from a non-streaming generateContent response JSON.
+     */
+    fun extractTextFromGenerateContent(responseJson: String): String {
+        return try {
+            val chunk = json.decodeFromString<GeminiSseChunk>(responseJson)
+            chunk.candidates.firstOrNull()?.content?.parts
+                ?.joinToString("") { it.text ?: "" } ?: ""
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: failed to parse generateContent response" }
+            ""
         }
     }
 

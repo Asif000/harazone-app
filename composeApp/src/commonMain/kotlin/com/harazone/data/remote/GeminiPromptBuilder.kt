@@ -9,7 +9,39 @@ import com.harazone.domain.model.TasteProfile
 
 internal class GeminiPromptBuilder {
 
-    // TODO(BACKLOG-HIGH): Area portrait call takes 15+ seconds — investigate streaming response or output token reduction. Current output: 6 JSON buckets + full POI array (~1000+ output tokens). Options: stream portrait like chat, tune POI count cap, or split into two cheaper calls.
+    fun buildPinOnlyPrompt(areaName: String, context: AreaContext): String {
+        return """
+10 POIs in "$areaName". JSON array only, no other text.
+[{"n":"Castelo de São Jorge","t":"historic","lat":38.7139,"lng":-9.1334},{"n":"Time Out Market","t":"food","lat":38.7068,"lng":-9.1459},{"n":"Jardim da Estrela","t":"park","lat":38.7138,"lng":-9.1605}]
+t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+GPS to 4 decimal places. Skip any POI you cannot place accurately.
+        """.trimIndent()
+    }
+
+    fun buildEnrichmentPrompt(areaName: String, poiNames: List<String>, context: AreaContext): String {
+        val namesList = poiNames.joinToString("\n") { "- $it" }
+        return """
+You are a passionate local who has lived in "$areaName" for 20 years.
+
+For each place listed below, provide enrichment details as a JSON array. The "n" field MUST exactly match the input name.
+
+Places to enrich:
+$namesList
+
+Context:
+- Time of day: ${context.timeOfDay}
+- Day of week: ${context.dayOfWeek}
+- Preferred language: ${context.preferredLanguage}
+
+Output ONLY a JSON array. No other text:
+[{"n":"Name","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5}]
+
+Valid v values: character, history, whats_on, safety, nearby, cost
+Valid s values: open, busy, closed
+WHY SPECIAL REQUIRED: Every POI needs a compelling "w". Generic descriptions are not acceptable.
+        """.trimIndent()
+    }
+
     fun buildAreaPortraitPrompt(areaName: String, context: AreaContext): String {
         return """
 You are a passionate local who has lived in "$areaName" for 20 years. You love showing visitors things they would NEVER find on Google Maps. Your mission: surface the genuinely unique, memorable, and local.

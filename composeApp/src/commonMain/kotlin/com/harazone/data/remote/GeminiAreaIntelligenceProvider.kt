@@ -4,9 +4,11 @@ import com.harazone.domain.model.AreaContext
 import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
+import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.MessageRole
 import com.harazone.domain.model.DomainError
 import com.harazone.domain.model.DomainErrorException
+import com.harazone.domain.model.POI
 import com.harazone.domain.provider.ApiKeyProvider
 import com.harazone.domain.provider.AreaIntelligenceProvider
 import com.harazone.util.AppLogger
@@ -21,9 +23,12 @@ import io.ktor.client.request.setBody
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -66,7 +71,7 @@ internal class GeminiAreaIntelligenceProvider(
 
     private val json = Json { ignoreUnknownKeys = true }
 
-    override fun streamAreaPortrait(areaName: String, context: AreaContext): Flow<BucketUpdate> = flow {
+    override fun streamAreaPortrait(areaName: String, context: AreaContext): Flow<BucketUpdate> = kotlinx.coroutines.flow.channelFlow {
         val apiKey = apiKeyProvider.geminiApiKey
         if (apiKey.isBlank()) {
             throw DomainErrorException(DomainError.ApiError(0, "Gemini API key not configured"))
@@ -74,62 +79,116 @@ internal class GeminiAreaIntelligenceProvider(
 
         AppLogger.d { "GeminiAreaIntelligenceProvider: streaming portrait for '$areaName'" }
 
-        val prompt = promptBuilder.buildAreaPortraitPrompt(areaName, context)
-        val requestBody = json.encodeToString(
-            GeminiRequest(
-                contents = listOf(
-                    GeminiRequestContent(
-                        parts = listOf(GeminiRequestPart(text = prompt))
-                    )
-                )
-            )
-        )
+        val stage1NamesDeferred = CompletableDeferred<List<String>>()
 
-        var hasEmitted = false
-
-        val result = withRetry(
-            maxAttempts = MAX_RETRY_ATTEMPTS,
-            initialDelayMs = 200,
-            maxDelayMs = 2000,
-            isRetryable = { e -> !hasEmitted && e is Exception && isRetryableError(e) }
-        ) {
-            val streamingParser = responseParser.createStreamingParser()
-
-            httpClient.sse(
-                urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
-                request = {
-                    method = HttpMethod.Post
-                    parameter("alt", "sse")
-                    parameter("key", apiKey)
-                    contentType(ContentType.Application.Json)
-                    setBody(requestBody)
-                }
-            ) {
-                incoming.collect { event ->
-                    val data = event.data ?: return@collect
-                    val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
-
-                    for (update in streamingParser.processChunk(text)) {
-                        hasEmitted = true
-                        emit(update)
+        // Stage 1 — fast pin call
+        launch {
+            try {
+                val prompt = promptBuilder.buildPinOnlyPrompt(areaName, context)
+                val requestBody = buildRequestBody(prompt)
+                val fullText = StringBuilder()
+                var hasEmitted = false
+                val result = withRetry(
+                    maxAttempts = MAX_RETRY_ATTEMPTS, initialDelayMs = 200, maxDelayMs = 2000,
+                    isRetryable = { e -> !hasEmitted && e is Exception && isRetryableError(e) }
+                ) {
+                    httpClient.sse(
+                        urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
+                        request = {
+                            method = HttpMethod.Post
+                            parameter("alt", "sse")
+                            parameter("key", apiKey)
+                            contentType(ContentType.Application.Json)
+                            setBody(requestBody)
+                        }
+                    ) {
+                        incoming.collect { event ->
+                            val data = event.data ?: return@collect
+                            val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
+                            fullText.append(text)
+                            hasEmitted = true
+                        }
                     }
                 }
+                if (result.isFailure) {
+                    stage1NamesDeferred.completeExceptionally(result.exceptionOrNull()!!)
+                    throw result.exceptionOrNull()!!
+                }
+                val pois = responseParser.parsePinOnlyResponse(fullText.toString())
+                stage1NamesDeferred.complete(pois.map { it.name })
+                if (pois.isNotEmpty()) {
+                    send(BucketUpdate.PinsReady(pois))
+                    AppLogger.d { "Stage 1 complete: ${pois.size} pins for '$areaName'" }
+                } else {
+                    AppLogger.d { "Stage 1 returned no pins for '$areaName' — Stage 2 will fallback" }
+                }
+            } catch (e: CancellationException) {
+                stage1NamesDeferred.cancel()
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Stage 1 failed for '$areaName' — Stage 2 will fallback" }
+                if (!stage1NamesDeferred.isCompleted) stage1NamesDeferred.completeExceptionally(e)
             }
-
-            for (update in streamingParser.finish()) {
-                hasEmitted = true
-                emit(update)
-            }
-
-            AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete" }
         }
 
-        if (result.isFailure) {
-            val error = result.exceptionOrNull()
-            throw when (error) {
-                is DomainErrorException -> error
-                is Exception -> mapToDomainErrorException(error)
-                else -> mapToDomainErrorException(RuntimeException("Unexpected error", error))
+        // Stage 2 — enrich call (waits for Stage 1 names)
+        launch {
+            try {
+                val stage1Names = try { stage1NamesDeferred.await() } catch (e: Exception) { emptyList() }
+                val prompt = if (stage1Names.isNotEmpty()) {
+                    promptBuilder.buildEnrichmentPrompt(areaName, stage1Names, context)
+                } else {
+                    promptBuilder.buildAreaPortraitPrompt(areaName, context)
+                }
+                val requestBody = buildRequestBody(prompt)
+                val fullText = StringBuilder()
+                var hasEmitted = false
+                val streamingParser = if (stage1Names.isEmpty()) responseParser.createStreamingParser() else null
+                val result = withRetry(
+                    maxAttempts = MAX_RETRY_ATTEMPTS, initialDelayMs = 200, maxDelayMs = 2000,
+                    isRetryable = { e -> !hasEmitted && e is Exception && isRetryableError(e) }
+                ) {
+                    httpClient.sse(
+                        urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
+                        request = {
+                            method = HttpMethod.Post
+                            parameter("alt", "sse")
+                            parameter("key", apiKey)
+                            contentType(ContentType.Application.Json)
+                            setBody(requestBody)
+                        }
+                    ) {
+                        incoming.collect { event ->
+                            val data = event.data ?: return@collect
+                            val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
+                            if (streamingParser != null) {
+                                for (update in streamingParser.processChunk(text)) {
+                                    if (update is BucketUpdate.PortraitComplete) send(update)
+                                }
+                            } else {
+                                fullText.append(text)
+                            }
+                            hasEmitted = true
+                        }
+                    }
+                    streamingParser?.finish()?.filterIsInstance<BucketUpdate.PortraitComplete>()?.forEach { send(it) }
+                }
+                if (result.isFailure) throw result.exceptionOrNull()!!
+                if (stage1Names.isNotEmpty()) {
+                    val enriched = responseParser.parseEnrichmentResponse(fullText.toString())
+                    AppLogger.d { "Stage 2 complete: ${enriched.size} enriched for '$areaName'" }
+                    send(BucketUpdate.PortraitComplete(enriched.map { e ->
+                        POI(name = e.n, type = "", description = "", confidence = Confidence.MEDIUM,
+                            latitude = null, longitude = null, vibe = e.v, insight = e.w,
+                            hours = e.h, liveStatus = e.s, rating = e.r)
+                    }))
+                }
+                AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete for '$areaName'" }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "Stage 2 failed for '$areaName'" }
+                throw mapToDomainErrorException(e)
             }
         }
     }
@@ -204,6 +263,10 @@ internal class GeminiAreaIntelligenceProvider(
             }
         }
     }
+
+    private fun buildRequestBody(prompt: String): String = json.encodeToString(
+        GeminiRequest(contents = listOf(GeminiRequestContent(parts = listOf(GeminiRequestPart(text = prompt)))))
+    )
 
     private fun isRetryableError(e: Exception): Boolean = when (e) {
         is ServerResponseException -> true  // 5xx — transient server errors

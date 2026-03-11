@@ -130,19 +130,34 @@ class MapViewModel(
         searchJob = viewModelScope.launch {
             try {
                 val context = areaContextFactory.create()
+                var stage1Pois = emptyList<POI>()
                 getAreaPortrait(query, context)
                     .catch { e -> AppLogger.e(e) { "Area search failed" } }
                     .collect { update ->
-                        if (update is BucketUpdate.PortraitComplete) {
-                            val pois = update.pois
-                            val state = _uiState.value as? MapUiState.Ready ?: return@collect
-                            val counts = computeVibePoiCounts(pois)
-                            _uiState.value = state.copy(
-                                pois = pois,
-                                areaName = query,
-                                vibePoiCounts = counts,
-                                activeVibe = null,
-                            )
+                        when (update) {
+                            is BucketUpdate.PinsReady -> {
+                                val state = _uiState.value as? MapUiState.Ready ?: return@collect
+                                stage1Pois = update.pois
+                                _uiState.value = state.copy(
+                                    pois = update.pois,
+                                    vibePoiCounts = computeVibePoiCounts(update.pois),
+                                    isSearchingArea = false,
+                                    isEnrichingArea = true,
+                                )
+                            }
+                            is BucketUpdate.PortraitComplete -> {
+                                val pois = if (stage1Pois.isNotEmpty()) mergePois(stage1Pois, update.pois) else update.pois
+                                val state = _uiState.value as? MapUiState.Ready ?: return@collect
+                                _uiState.value = state.copy(
+                                    pois = pois,
+                                    areaName = query,
+                                    vibePoiCounts = computeVibePoiCounts(pois),
+                                    activeVibe = null,
+                                    isSearchingArea = false,
+                                    isEnrichingArea = false,
+                                )
+                            }
+                            else -> {}
                         }
                     }
             } catch (e: CancellationException) {
@@ -286,6 +301,7 @@ class MapViewModel(
                             vibePoiCounts = counts,
                             activeVibe = null,
                             isSearchingArea = false,
+                            isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, state),
                         )
                     },
@@ -294,6 +310,7 @@ class MapViewModel(
                         val s = _uiState.value as? MapUiState.Ready
                         if (s != null) _uiState.value = s.copy(
                             isSearchingArea = false,
+                            isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, s),
                         )
                         _errorEvents.tryEmit("Couldn't load area info. Try again.")
@@ -367,6 +384,7 @@ class MapViewModel(
                             vibePoiCounts = counts,
                             activeVibe = null,
                             isSearchingArea = false,
+                            isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, state),
                         )
                     },
@@ -375,6 +393,7 @@ class MapViewModel(
                         val s = _uiState.value as? MapUiState.Ready
                         if (s != null) _uiState.value = s.copy(
                             isSearchingArea = false,
+                            isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, s),
                         )
                         _errorEvents.tryEmit("Couldn't load area info. Try again.")
@@ -451,6 +470,7 @@ class MapViewModel(
                             vibePoiCounts = counts,
                             activeVibe = null,
                             isSearchingArea = false,
+                            isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(lat, lng, state),
                         )
                     },
@@ -459,6 +479,7 @@ class MapViewModel(
                         val s = _uiState.value as? MapUiState.Ready
                         if (s != null) _uiState.value = s.copy(
                             isSearchingArea = false,
+                            isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(lat, lng, s),
                         )
                         _errorEvents.tryEmit("Couldn't load area info. Try panning again.")
@@ -497,6 +518,7 @@ class MapViewModel(
         searchJob?.cancel()
         _uiState.value = current.copy(
             isSearchingArea = false,
+            isEnrichingArea = false,
             isGeocodingInitiatedSearch = false,
             isGeocodingLoading = false,
             geocodingQuery = "",
@@ -609,6 +631,7 @@ class MapViewModel(
                         geocodingSelectedPlace = null,
                         isGeocodingInitiatedSearch = false,
                     )
+                    // TODO(BACKLOG-MEDIUM): returnToCurrentLocation uses returnToLocationJob, not searchJob — a concurrent new area search won't cancel this fetch. These can race.
                     collectPortraitWithRetry(
                         areaName = gpsAreaName,
                         onComplete = { pois, _ ->
@@ -620,12 +643,13 @@ class MapViewModel(
                                 vibePoiCounts = counts,
                                 activeVibe = null,
                                 isSearchingArea = false,
+                                isEnrichingArea = false,
                             )
                         },
                         onError = { e ->
                             AppLogger.e(e) { "Return to location: portrait fetch failed" }
                             val s = _uiState.value as? MapUiState.Ready
-                            if (s != null) _uiState.value = s.copy(isSearchingArea = false)
+                            if (s != null) _uiState.value = s.copy(isSearchingArea = false, isEnrichingArea = false)
                             _errorEvents.tryEmit("Couldn't load area info. Try again.")
                         },
                     )
@@ -705,6 +729,7 @@ class MapViewModel(
                             vibePoiCounts = counts,
                             activeVibe = null,
                             isSearchingArea = false,
+                            isEnrichingArea = false,
                         )
                         analyticsTracker.trackEvent(
                             "map_opened",
@@ -714,7 +739,7 @@ class MapViewModel(
                     onError = { e ->
                         AppLogger.e(e) { "Map: portrait fetch failed" }
                         val s = _uiState.value as? MapUiState.Ready
-                        if (s != null) _uiState.value = s.copy(isSearchingArea = false)
+                        if (s != null) _uiState.value = s.copy(isSearchingArea = false, isEnrichingArea = false)
                     },
                 )
             } catch (e: CancellationException) {
@@ -758,6 +783,7 @@ class MapViewModel(
         val context = areaContextFactory.create()
         try {
             var pois = emptyList<POI>()
+            var stage1Pois = emptyList<POI>()
             var fetchFailed = false
             getAreaPortrait(areaName, context)
                 .catch { e ->
@@ -766,35 +792,94 @@ class MapViewModel(
                     onError(e as? Exception ?: RuntimeException(e))
                 }
                 .collect { update ->
-                    if (update is BucketUpdate.PortraitComplete) {
-                        pois = update.pois
+                    when (update) {
+                        is BucketUpdate.PinsReady -> {
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                            val counts = computeVibePoiCounts(update.pois)
+                            stage1Pois = update.pois
+                            _uiState.value = s.copy(
+                                pois = update.pois,
+                                vibePoiCounts = counts,
+                                isSearchingArea = false,
+                                isEnrichingArea = true,
+                            )
+                        }
+                        is BucketUpdate.PortraitComplete -> {
+                            pois = if (stage1Pois.isNotEmpty()) {
+                                mergePois(stage1Pois, update.pois)
+                            } else {
+                                update.pois
+                            }
+                            // Update selectedPoi if open, so shimmer clears without user closing card
+                            val s = _uiState.value as? MapUiState.Ready
+                            if (s != null && s.selectedPoi != null) {
+                                val updatedSelected = pois.firstOrNull {
+                                    it.name.trim().lowercase() == s.selectedPoi.name.trim().lowercase()
+                                }
+                                if (updatedSelected != null) {
+                                    _uiState.value = s.copy(selectedPoi = updatedSelected)
+                                }
+                            }
+                        }
+                        else -> { /* ContentDelta, BucketComplete, ContentAvailabilityNote — ignored */ }
                     }
                 }
             if (fetchFailed) return
-            if (pois.isNotEmpty()) {
-                onComplete(pois, areaName)
+            // If Stage 1 already delivered pins, treat as success even if Stage 2 enrichment was empty
+            if (pois.isNotEmpty() || stage1Pois.isNotEmpty()) {
+                onComplete(pois.ifEmpty { stage1Pois }, areaName)
                 return
             }
-            // Retry with broader query
+            // Retry with broader query only if both stages produced nothing
             AppLogger.d { "No POIs for '$areaName' — retrying with broader query" }
             val broadQuery = "$areaName points of interest landmarks restaurants parks"
             val retryContext = areaContextFactory.create()
             getAreaPortrait(broadQuery, retryContext)
                 .catch { e -> AppLogger.e(e) { "Retry portrait fetch failed for '$areaName'" } }
                 .collect { update ->
-                    if (update is BucketUpdate.PortraitComplete) {
-                        pois = update.pois
+                    when (update) {
+                        is BucketUpdate.PinsReady -> {
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                            stage1Pois = update.pois
+                            _uiState.value = s.copy(
+                                pois = update.pois,
+                                vibePoiCounts = computeVibePoiCounts(update.pois),
+                                isSearchingArea = false,
+                                isEnrichingArea = true,
+                            )
+                        }
+                        is BucketUpdate.PortraitComplete -> {
+                            pois = if (stage1Pois.isNotEmpty()) mergePois(stage1Pois, update.pois) else update.pois
+                        }
+                        else -> {}
                     }
                 }
-            if (pois.isEmpty()) {
+            if (pois.isEmpty() && stage1Pois.isEmpty()) {
                 _errorEvents.tryEmit("Nothing to see here — try another area")
             }
-            onComplete(pois, areaName)
+            onComplete(pois.ifEmpty { stage1Pois }, areaName)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             onError(e)
         }
+    }
+
+    private fun mergePois(stage1: List<POI>, enrichments: List<POI>): List<POI> {
+        val enrichMap = enrichments.associateBy { it.name.trim().lowercase() }
+        val merged = stage1.map { pin ->
+            val enrich = enrichMap[pin.name.trim().lowercase()]
+            if (enrich != null) pin.copy(
+                vibe = enrich.vibe.ifEmpty { pin.vibe },
+                insight = enrich.insight,
+                rating = enrich.rating,
+                hours = enrich.hours,
+                liveStatus = enrich.liveStatus,
+            ) else pin
+        }
+        val stage1Keys = stage1.map { it.name.trim().lowercase() }.toSet()
+        val newPois = enrichments.filter { it.name.trim().lowercase() !in stage1Keys }
+        return merged + newPois
     }
 
     private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double =
