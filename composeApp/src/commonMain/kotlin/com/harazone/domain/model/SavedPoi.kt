@@ -11,4 +11,6 @@ data class SavedPoi(
     val savedAt: Long,
     val userNote: String? = null,
     val imageUrl: String? = null,
+    val description: String? = null,
+    val rating: Float? = null,
 )

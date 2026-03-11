@@ -12,6 +12,7 @@ data class ChatPoiCard(
     val lat: Double,
     val lng: Double,
     @SerialName("w") val whySpecial: String,
+    @SerialName("img") val imageUrl: String? = null,
 ) {
     val id: String get() = "$name|$lat|$lng"
 }

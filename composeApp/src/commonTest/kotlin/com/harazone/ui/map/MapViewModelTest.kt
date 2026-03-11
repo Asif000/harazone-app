@@ -3,6 +3,7 @@ package com.harazone.ui.map
 import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.POI
+import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Vibe
 import com.harazone.domain.model.WeatherState
 import com.harazone.domain.provider.WeatherProvider
@@ -22,6 +23,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -1227,6 +1229,34 @@ class MapViewModelTest {
         testScheduler.advanceUntilIdle()
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertFalse(state.isSearchingArea)
+    }
+
+    @Test
+    fun savePoi_passesDescriptionAndRatingToRepository() = runTest(testDispatcher) {
+        val fakeRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        val viewModel = createViewModel(savedPoiRepository = fakeRepo)
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        val poi = POI(
+            name = "Test Place",
+            type = "landmark",
+            description = "A great landmark",
+            confidence = Confidence.HIGH,
+            latitude = 38.71,
+            longitude = -9.13,
+            insight = "Why it's special",
+            rating = 4.5f,
+            imageUrl = "https://example.com/img.jpg",
+        )
+        viewModel.savePoi(poi, "Test Area")
+        testScheduler.advanceUntilIdle()
+
+        val saved = fakeRepo.observeAll().first()
+        assertEquals(1, saved.size)
+        val s = saved.first()
+        assertEquals("A great landmark", s.description)
+        assertEquals(4.5f, s.rating)
+        assertEquals("https://example.com/img.jpg", s.imageUrl)
     }
 
     // Regression: slow location provider (e.g. iOS permission dialog delay) must not trigger LocationFailed

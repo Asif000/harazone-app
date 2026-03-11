@@ -60,6 +60,8 @@ object DevSeeder {
                     saved_at = poi.savedAt,
                     user_note = poi.userNote,
                     image_url = poi.imageUrl,
+                    description = poi.description,
+                    rating = poi.rating?.toDouble(),
                 )
             }
         }

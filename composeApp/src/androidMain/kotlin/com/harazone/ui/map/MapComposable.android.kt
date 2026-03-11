@@ -24,8 +24,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.harazone.BuildKonfig
+import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.POI
+import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Vibe
+import com.harazone.util.haversineDistanceMeters
 import com.harazone.ui.theme.toColor
 import kotlinx.coroutines.delay
 import org.maplibre.android.MapLibre
@@ -64,6 +67,7 @@ actual fun MapComposable(
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
     savedPoiIds: Set<String>,
+    savedPois: List<SavedPoi>,
 ) {
     val context = LocalContext.current
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
@@ -77,6 +81,8 @@ actual fun MapComposable(
     val symbolManagerRef = remember { arrayOfNulls<SymbolManager>(1) }
     val symbolsRef = remember { mutableListOf<Symbol>() }
     val symbolPoiMap = remember { mutableMapOf<Long, POI>() }
+    val savedSymbolsRef = remember { mutableListOf<Symbol>() }
+    val symbolSavedPoiMap = remember { mutableMapOf<Long, SavedPoi>() }
     val glowLayerIds = remember { mutableListOf<String>() }
     val glowSourceIds = remember { mutableListOf<String>() }
     val glowAnimators = remember { mutableListOf<ValueAnimator>() }
@@ -124,8 +130,24 @@ actual fun MapComposable(
                         symbolManagerRef[0] = sm
 
                         sm.addClickListener { symbol ->
-                            symbolPoiMap[symbol.id]?.let { poi ->
+                            val savedPoi = symbolSavedPoiMap[symbol.id]
+                            if (savedPoi != null) {
+                                val poi = POI(
+                                    name = savedPoi.name,
+                                    type = savedPoi.type,
+                                    description = savedPoi.description ?: savedPoi.whySpecial,
+                                    insight = savedPoi.whySpecial,
+                                    confidence = Confidence.HIGH,
+                                    latitude = savedPoi.lat,
+                                    longitude = savedPoi.lng,
+                                    imageUrl = savedPoi.imageUrl,
+                                    rating = savedPoi.rating,
+                                )
                                 currentOnPoiSelected.value(poi)
+                            } else {
+                                symbolPoiMap[symbol.id]?.let { poi ->
+                                    currentOnPoiSelected.value(poi)
+                                }
                             }
                             true
                         }
@@ -166,8 +188,8 @@ actual fun MapComposable(
         }
     }
 
-    // POI pins + glow zones — react to pois + activeVibe + savedPoiIds + style loaded changes
-    LaunchedEffect(pois, activeVibe, savedPoiIds, styleLoaded.value) {
+    // POI pins + glow zones — react to pois + activeVibe + savedPoiIds + savedPois + style loaded changes
+    LaunchedEffect(pois, activeVibe, savedPoiIds, savedPois, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val map = mapRef[0] ?: return@LaunchedEffect
         val style = styleRef[0] ?: return@LaunchedEffect
@@ -201,67 +223,17 @@ actual fun MapComposable(
             pois
         }.filter { it.latitude != null && it.longitude != null }
 
-        // Ensure icon bitmap exists for a given vibe + POI type + saved state combo
-        fun ensureIcon(vibe: Vibe, poiType: String, isSaved: Boolean): String {
-            val typeKey = poiType.lowercase().trim()
-            val iconKey = "poi_${vibe.name}_${typeKey}${if (isSaved) "_saved" else ""}"
-            if (style.getImage(iconKey) == null) {
-                val vibeColorArgb = vibe.toColor().toArgb()
-                val emoji = poiTypeEmoji(typeKey)
-                val size = 64
-                val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bitmap)
-                // Vibe-colored circle background
-                val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    color = vibeColorArgb
-                    this.style = Paint.Style.FILL
-                }
-                canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
-                // Emoji icon centered
-                val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    textSize = size * 0.5f
-                    textAlign = Paint.Align.CENTER
-                    typeface = Typeface.DEFAULT
-                }
-                val textY = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
-                canvas.drawText(emoji, size / 2f, textY, textPaint)
-                // Gold ring + checkmark badge for saved POIs
-                if (isSaved) {
-                    val strokeWidth = 5f
-                    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.parseColor("#FFD700")
-                        this.style = Paint.Style.STROKE
-                        this.strokeWidth = strokeWidth
-                    }
-                    canvas.drawCircle(size / 2f, size / 2f, size / 2f - strokeWidth / 2f - 1f, ringPaint)
-                    val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.parseColor("#FFD700")
-                        this.style = Paint.Style.FILL
-                    }
-                    canvas.drawCircle(size - 10f, size - 10f, 10f, badgePaint)
-                    val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.parseColor("#1A1A1A")
-                        textSize = 12f
-                        textAlign = Paint.Align.CENTER
-                        typeface = Typeface.DEFAULT_BOLD
-                    }
-                    canvas.drawText("\u2713", size - 10f, size - 6f, checkPaint)
-                }
-                style.addImage(iconKey, bitmap)
-            }
-            return iconKey
-        }
+        val suppressedIds = filterSuppressedPois(filteredPois, savedPois)
 
         // Add symbols with stagger (runs inside LaunchedEffect — auto-cancelled on restart)
-        for ((i, poi) in filteredPois.withIndex()) {
+        for ((i, poi) in filteredPois.filter { it.savedId !in suppressedIds }.withIndex()) {
             if (isDestroyed[0]) return@LaunchedEffect
             delay(50L * i)
 
             val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
                 ?: Vibe.DEFAULT
             val vibe = activeVibe ?: poiVibe
-            val isSaved = poi.savedId in savedPoiIds
-            val iconKey = ensureIcon(vibe, poi.type, isSaved)
+            val iconKey = ensureIcon(style, vibe, poi.type, isSaved = false)
 
             // TODO(BACKLOG-LOW): Custom POI icons per type (landmark, food, culture, nature) using annotation plugin SymbolManager
             // TODO(BACKLOG-LOW): TalkBack per-marker contentDescription for map-mode accessibility
@@ -382,6 +354,38 @@ actual fun MapComposable(
         }
     }
 
+    // DB gold pins — independent layer from saved POIs in the database
+    LaunchedEffect(savedPois, styleLoaded.value) {
+        if (!styleLoaded.value) return@LaunchedEffect
+        val style = styleRef[0] ?: return@LaunchedEffect
+        val sm = symbolManagerRef[0] ?: return@LaunchedEffect
+
+        savedSymbolsRef.forEach { sm.delete(it) }
+        savedSymbolsRef.clear()
+        symbolSavedPoiMap.clear()
+
+        savedPois
+            .filter { it.lat != 0.0 && it.lng != 0.0 }
+            .forEachIndexed { i, savedPoi ->
+                if (isDestroyed[0]) return@LaunchedEffect
+                val iconKey = ensureIcon(style, Vibe.DEFAULT, savedPoi.type, isSaved = true)
+                val symbol = sm.create(
+                    SymbolOptions()
+                        .withLatLng(LatLng(savedPoi.lat, savedPoi.lng))
+                        .withIconImage(iconKey)
+                        .withIconSize(1.0f)
+                        .withTextField(savedPoi.name)
+                        .withTextSize(10f)
+                        .withTextColor("#FFD700")
+                        .withTextOffset(arrayOf(0f, 1.8f))
+                        .withTextHaloColor("rgba(0,0,0,0.7)")
+                        .withTextHaloWidth(1.5f)
+                )
+                savedSymbolsRef.add(symbol)
+                symbolSavedPoiMap[symbol.id] = savedPoi
+            }
+    }
+
     AndroidView(
         factory = { mapView },
         modifier = modifier,
@@ -415,6 +419,8 @@ actual fun MapComposable(
             glowAnimators.forEach { it.cancel() }
             symbolsRef.clear()
             symbolPoiMap.clear()
+            savedSymbolsRef.clear()
+            symbolSavedPoiMap.clear()
             context.unregisterComponentCallbacks(lowMemoryCallback)
             lifecycleOwner.lifecycle.removeObserver(observer)
             cameraIdleListenerRef[0]?.let { mapRef[0]?.removeOnCameraIdleListener(it) }
@@ -425,6 +431,73 @@ actual fun MapComposable(
         }
     }
 }
+
+/** Ensure icon bitmap exists for a given vibe + POI type + saved state combo. */
+private fun ensureIcon(style: Style, vibe: Vibe, poiType: String, isSaved: Boolean): String {
+    val typeKey = poiType.lowercase().trim()
+    val iconKey = "poi_${vibe.name}_${typeKey}${if (isSaved) "_saved" else ""}"
+    if (style.getImage(iconKey) == null) {
+        val vibeColorArgb = vibe.toColor().toArgb()
+        val emoji = poiTypeEmoji(typeKey)
+        val size = 64
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        // Vibe-colored circle background
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = vibeColorArgb
+            this.style = Paint.Style.FILL
+        }
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
+        // Emoji icon centered
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            textSize = size * 0.5f
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.DEFAULT
+        }
+        val textY = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+        canvas.drawText(emoji, size / 2f, textY, textPaint)
+        // Gold ring + checkmark badge for saved POIs
+        if (isSaved) {
+            val strokeWidth = 5f
+            val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#FFD700")
+                this.style = Paint.Style.STROKE
+                this.strokeWidth = strokeWidth
+            }
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f - strokeWidth / 2f - 1f, ringPaint)
+            val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#FFD700")
+                this.style = Paint.Style.FILL
+            }
+            canvas.drawCircle(size - 10f, size - 10f, 10f, badgePaint)
+            val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#1A1A1A")
+                textSize = 12f
+                textAlign = Paint.Align.CENTER
+                typeface = Typeface.DEFAULT_BOLD
+            }
+            canvas.drawText("\u2713", size - 10f, size - 6f, checkPaint)
+        }
+        style.addImage(iconKey, bitmap)
+    }
+    return iconKey
+}
+
+/**
+ * Returns the set of savedIds for POIs that should be suppressed (within [thresholdMeters]
+ * of any saved POI). Pure function for testability.
+ */
+internal fun filterSuppressedPois(
+    pois: List<POI>,
+    savedPois: List<SavedPoi>,
+    thresholdMeters: Double = 50.0,
+): Set<String> = pois.filter { poi ->
+    poi.latitude != null && poi.longitude != null &&
+    savedPois.any { saved ->
+        saved.lat != 0.0 && saved.lng != 0.0 &&
+        haversineDistanceMeters(poi.latitude, poi.longitude, saved.lat, saved.lng) <= thresholdMeters
+    }
+}.map { it.savedId }.toSet()
 
 /** Maps POI type strings from Gemini to emoji for map pin icons.
  *  Uses single-codepoint emoji only (no U+FE0F variation selectors)

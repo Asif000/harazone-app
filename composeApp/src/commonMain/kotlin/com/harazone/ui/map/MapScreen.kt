@@ -154,6 +154,7 @@ private fun ReadyContent(
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
                 onCameraIdle = { lat, lng -> viewModel.onCameraIdle(lat, lng) },
                 savedPoiIds = state.savedPoiIds,
+                savedPois = state.savedPois,
             )
         }
 

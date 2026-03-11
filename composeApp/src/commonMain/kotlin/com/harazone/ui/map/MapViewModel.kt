@@ -17,6 +17,7 @@ import com.harazone.domain.usecase.GetAreaPortraitUseCase
 import com.harazone.location.LocationProvider
 import com.harazone.util.AnalyticsTracker
 import com.harazone.util.AppLogger
+import com.harazone.util.haversineDistanceMeters
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -169,6 +170,8 @@ class MapViewModel(
                         whySpecial = poi.insight,
                         savedAt = 0L,
                         imageUrl = poi.imageUrl,
+                        description = poi.description,
+                        rating = poi.rating,
                     )
                 )
             } catch (e: Exception) {
@@ -794,17 +797,8 @@ class MapViewModel(
         }
     }
 
-    private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
-        val r = 6371.0
-        val dLat = (lat2 - lat1) * kotlin.math.PI / 180.0
-        val dLon = (lon2 - lon1) * kotlin.math.PI / 180.0
-        val rLat1 = lat1 * kotlin.math.PI / 180.0
-        val rLat2 = lat2 * kotlin.math.PI / 180.0
-        val a = kotlin.math.sin(dLat / 2).let { it * it } +
-            kotlin.math.cos(rLat1) * kotlin.math.cos(rLat2) *
-            kotlin.math.sin(dLon / 2).let { it * it }
-        return r * 2 * kotlin.math.atan2(kotlin.math.sqrt(a), kotlin.math.sqrt(1 - a))
-    }
+    private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double =
+        haversineDistanceMeters(lat1, lon1, lat2, lon2) / 1000.0
 
     private fun isAwayFromGps(cameraLat: Double, cameraLng: Double, state: MapUiState.Ready): Boolean {
         return kotlin.math.abs(cameraLat - state.gpsLatitude) > 0.0009 ||
