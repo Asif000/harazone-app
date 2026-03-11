@@ -21,6 +21,7 @@ import com.harazone.location.GpsCoordinates
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -1226,6 +1227,39 @@ class MapViewModelTest {
         testScheduler.advanceUntilIdle()
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertFalse(state.isSearchingArea)
+    }
+
+    // Regression: slow location provider (e.g. iOS permission dialog delay) must not trigger LocationFailed
+    @Test
+    fun slowLocationProvider_doesNotShowErrorStateBeforeTimeout() {
+        val delayedDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(delayedDispatcher)
+        try {
+            runTest(delayedDispatcher) {
+                val delayedProvider = object : com.harazone.location.LocationProvider {
+                    override suspend fun getCurrentLocation(): Result<GpsCoordinates> {
+                        delay(3_000)
+                        return Result.success(GpsCoordinates(51.5074, -0.1278))
+                    }
+                    override suspend fun reverseGeocode(latitude: Double, longitude: Double): Result<String> =
+                        Result.success("Test Area")
+                }
+                val vm = createViewModel(locationProvider = delayedProvider)
+
+                // Before delay resolves: should be Loading, never LocationFailed
+                assertIs<MapUiState.Loading>(vm.uiState.value)
+
+                // Advance past the 3s delay + geocode
+                advanceTimeBy(5_000)
+
+                // Should reach Ready, not LocationFailed
+                assertIs<MapUiState.Ready>(vm.uiState.value)
+            }
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
     }
 }
 
