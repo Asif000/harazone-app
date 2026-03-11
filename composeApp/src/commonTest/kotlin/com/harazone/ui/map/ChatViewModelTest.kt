@@ -136,6 +136,7 @@ class ChatViewModelTest {
 
         val state = vm.uiState.value
         assertFalse(state.isStreaming)
+        assertFalse(state.showSkeletons) // AC6: skeletons reset on error
         assertEquals(2, state.bubbles.size)
         assertTrue(state.bubbles.last().isError)
         assertTrue(state.bubbles.last().content.contains("Tap to retry"))
@@ -545,6 +546,115 @@ Enjoy!"""
         )
         vm.tapIntentPill(ChatIntent.TONIGHT)
         assertEquals(1, fakeAiProvider.chatCallCount, "Double-tap should not trigger a second send")
+    }
+
+    // --- Phase A streaming regression tests ---
+
+    @Test
+    fun `poiCards empty and showSkeletons true on every mid-stream token`() = runTest {
+        val poiJson = """{"n":"Café","t":"cafe","lat":1.0,"lng":2.0,"w":"good"}"""
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Some prose ", false),
+            ChatToken("more prose. $poiJson", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        vm.uiState.test {
+            awaitItem() // openChat state
+
+            vm.sendMessage("Hello")
+
+            // With UnconfinedTestDispatcher + StateFlow, intermediate states may be
+            // conflated. Drain all emitted items and verify invariants on each.
+            val emissions = mutableListOf<ChatUiState>()
+            // Collect all buffered items (sendMessage ran eagerly)
+            while (true) {
+                val item = try { awaitItem() } catch (_: Throwable) { break }
+                emissions.add(item)
+                // Stop after stream completes
+                if (!item.isStreaming && emissions.size > 1) break
+            }
+
+            assertTrue(emissions.size >= 2, "Expected at least setup + final, got ${emissions.size}")
+
+            // All mid-stream emissions: poiCards must be empty, showSkeletons must be true
+            val midStreamStates = emissions.dropLast(1) // everything except final
+            for ((i, state) in midStreamStates.withIndex()) {
+                assertTrue(state.isStreaming, "Mid-stream state $i: isStreaming should be true")
+                assertTrue(state.showSkeletons, "Mid-stream state $i: showSkeletons should be true")
+                assertTrue(state.poiCards.isEmpty(), "Mid-stream state $i: poiCards should be empty")
+            }
+
+            // Final emission: parsing happened
+            val finalState = emissions.last()
+            assertFalse(finalState.isStreaming)
+            assertFalse(finalState.showSkeletons)
+            assertEquals(1, finalState.poiCards.size)
+            assertEquals("Café", finalState.poiCards[0].name)
+        }
+    }
+
+    @Test
+    fun `poiCards populated and showSkeletons false after stream completes with JSON`() = runTest {
+        val poiJson = """{"n":"Bistro","t":"restaurant","lat":1.0,"lng":2.0,"w":"cozy"}"""
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Try this place: $poiJson", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        vm.uiState.test {
+            awaitItem() // openChat state
+            vm.sendMessage("Hello")
+            val state = expectMostRecentItem()
+            assertFalse(state.isStreaming)
+            assertFalse(state.showSkeletons)
+            assertEquals(1, state.poiCards.size)
+            assertEquals("Bistro", state.poiCards[0].name)
+        }
+    }
+
+    @Test
+    fun `poiCards empty and showSkeletons false after stream completes with no JSON`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Just some conversational prose, no POIs.", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        vm.uiState.test {
+            awaitItem() // openChat state
+            vm.sendMessage("Hello")
+            val state = expectMostRecentItem()
+            assertFalse(state.isStreaming)
+            assertFalse(state.showSkeletons)
+            assertTrue(state.poiCards.isEmpty())
+            assertEquals("Just some conversational prose, no POIs.", state.bubbles.last().content)
+        }
+    }
+
+    @Test
+    fun `closeChat resets isStreaming and showSkeletons`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Streaming...", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.sendMessage("Hello")
+
+        // Close mid-conversation
+        vm.closeChat()
+        val state = vm.uiState.value
+        assertFalse(state.isOpen)
+        assertFalse(state.isStreaming)
+        assertFalse(state.showSkeletons)
+        // Bubble-level isStreaming must also be reset (prevents stuck blinking cursor)
+        assertTrue(state.bubbles.none { it.isStreaming }, "No bubble should have isStreaming=true after closeChat")
     }
 
     @Test

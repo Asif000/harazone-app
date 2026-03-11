@@ -158,7 +158,13 @@ internal class ChatViewModel(
 
     fun closeChat() {
         chatJob?.cancel()
-        _uiState.value = _uiState.value.copy(isOpen = false)
+        val s = _uiState.value
+        _uiState.value = s.copy(
+            isOpen = false,
+            isStreaming = false,
+            showSkeletons = false,
+            bubbles = s.bubbles.map { if (it.isStreaming) it.copy(isStreaming = false) else it },
+        )
     }
 
     fun updateInput(text: String) {
@@ -239,7 +245,6 @@ internal class ChatViewModel(
                         )
                     } else {
                         accumulated += token.text
-                        parsePoiCardsIncremental(accumulated)
                         val displayText = stripPoiJson(accumulated)
                         val s = _uiState.value
                         _uiState.value = s.copy(
@@ -249,8 +254,7 @@ internal class ChatViewModel(
                                     content = displayText, isStreaming = true,
                                 ) else it
                             },
-                            poiCards = parsedCards.toList(),
-                            showSkeletons = parsedCards.size < 3,
+                            showSkeletons = true,
                         )
                     }
                 }
