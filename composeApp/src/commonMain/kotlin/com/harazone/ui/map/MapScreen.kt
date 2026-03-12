@@ -251,7 +251,10 @@ private fun ReadyContent(
                 viewModel.openSavesSheet()
             }
         }
-        PlatformBackHandler(enabled = state.selectedPoi == null && state.isFabExpanded) {
+        PlatformBackHandler(enabled = state.selectedPoi == null && state.savedVibeFilter) {
+            viewModel.onSavedVibeSelected()
+        }
+        PlatformBackHandler(enabled = state.selectedPoi == null && !state.savedVibeFilter && state.isFabExpanded) {
             viewModel.toggleFab()
         }
 
@@ -294,6 +297,7 @@ private fun ReadyContent(
                 },
                 onAskAiClick = {
                     viewModel.clearPoiSelection()
+                    returnToSaves[0] = false
                     if (chatState.isStreaming) {
                         coroutineScope.launch {
                             snackbarHostState.showSnackbar("AI is still responding...")
@@ -458,7 +462,7 @@ private fun ReadyContent(
                         POI(
                             name = saved.name,
                             type = saved.type,
-                            description = saved.whySpecial,
+                            description = saved.description ?: saved.whySpecial,
                             confidence = Confidence.HIGH,
                             latitude = saved.lat,
                             longitude = saved.lng,

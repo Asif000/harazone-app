@@ -1764,7 +1764,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun onSavedVibeSelected_activatesFilterAndOpensSavesSheet() = runTest(testDispatcher) {
+    fun onSavedVibeSelected_togglesSavedVibeFilter() = runTest(testDispatcher) {
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
                 locationResult = Result.success(GpsCoordinates(40.0, -74.0)),

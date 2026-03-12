@@ -70,6 +70,7 @@ class MapViewModel(
     private var latestRecents: List<RecentPlace> = emptyList()
     private var latestSavedPois: List<SavedPoi> = emptyList()
     private var latestSavedPoiIds: Set<String> = emptySet()
+    private var vibeBeforeSavedFilter: Vibe? = null
     private var lastWeatherFetchMs: Long = 0L
 
     // Cache for GPS home area — avoids re-querying Gemini on return-to-location
@@ -249,10 +250,14 @@ class MapViewModel(
     fun onSavedVibeSelected() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         val newFilter = !current.savedVibeFilter
+        if (newFilter) {
+            vibeBeforeSavedFilter = current.activeVibe
+        }
         _uiState.value = current.copy(
             savedVibeFilter = newFilter,
-            activeVibe = if (newFilter) null else current.activeVibe,
+            activeVibe = if (newFilter) null else vibeBeforeSavedFilter,
         )
+        if (!newFilter) vibeBeforeSavedFilter = null
     }
 
     fun closeSavesSheet() {
@@ -336,6 +341,7 @@ class MapViewModel(
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, state),
+                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, suggestion.name),
                         )
                     },
                     onError = { e ->
@@ -417,6 +423,7 @@ class MapViewModel(
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, state),
+                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, recent.name),
                         )
                     },
                     onError = { e ->
@@ -500,6 +507,7 @@ class MapViewModel(
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(lat, lng, state),
+                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, areaName),
                         )
                     },
                     onError = { e ->
@@ -719,6 +727,7 @@ class MapViewModel(
                                     activeVibe = null,
                                     isSearchingArea = false,
                                     isEnrichingArea = false,
+                                    vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, gpsAreaName),
                                 )
                                 // Update cache for future returns
                                 gpsAreaNameCache = gpsAreaName
@@ -810,6 +819,7 @@ class MapViewModel(
                             activeVibe = null,
                             isSearchingArea = false,
                             isEnrichingArea = false,
+                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, areaName),
                         )
                         // Cache GPS area POIs for instant return-to-location
                         gpsAreaNameCache = areaName

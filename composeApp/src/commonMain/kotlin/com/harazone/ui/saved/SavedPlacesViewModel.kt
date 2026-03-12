@@ -147,7 +147,7 @@ class SavedPlacesViewModel(
         }
 
         internal fun buildDiscoveryStory(saves: List<SavedPoi>): DiscoveryStory? {
-            if (saves.size < 2) return null
+            if (saves.size < 5) return null
 
             val uniqueAreas = saves.map { it.areaName }.distinct()
             val vibeGroups = saves.filter { it.vibe.isNotEmpty() }.groupBy { it.vibe }

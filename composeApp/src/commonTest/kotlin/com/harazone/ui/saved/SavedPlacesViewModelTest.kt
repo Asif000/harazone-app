@@ -183,9 +183,12 @@ class SavedPlacesViewModelTest {
     }
 
     @Test
-    fun discoveryStory_nullWhenFewerThanTwoSaves() = runTest {
+    fun discoveryStory_nullWhenFewerThanFiveSaves() = runTest {
         val repo = FakeSavedPoiRepository()
         repo.save(makePoi("1"))
+        repo.save(makePoi("2"))
+        repo.save(makePoi("3"))
+        repo.save(makePoi("4"))
         val (vm, _) = createViewModel(repo)
 
         assertNull(vm.uiState.value.discoveryStory)

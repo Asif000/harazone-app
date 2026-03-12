@@ -502,19 +502,7 @@ private fun poiThumbnailUrl(lat: Double, lng: Double): String {
     return "https://api.maptiler.com/tiles/satellite-v2/$z/$x/$y.jpg?key=${BuildKonfig.MAPTILER_API_KEY}"
 }
 
-private fun poiTypeEmoji(type: String): String = when (type.lowercase()) {
-    "food" -> "\uD83C\uDF5C"          // 🍜
-    "entertainment" -> "\uD83C\uDFAD"  // 🎭
-    "park" -> "\uD83C\uDF33"           // 🌳
-    "historic" -> "\uD83C\uDFDB\uFE0F" // 🏛️
-    "shopping" -> "\uD83D\uDECD\uFE0F" // 🛍️
-    "arts" -> "\uD83C\uDFA8"           // 🎨
-    "transit" -> "\uD83D\uDE8C"        // 🚌
-    "safety" -> "\uD83D\uDEE1\uFE0F"  // 🛡️
-    "beach" -> "\uD83C\uDFD6\uFE0F"   // 🏖️
-    "district" -> "\uD83C\uDFD8\uFE0F" // 🏘️
-    else -> "\uD83D\uDCCD"             // 📍
-}
+private fun poiTypeEmoji(type: String): String = com.harazone.util.poiTypeEmoji(type.lowercase())
 
 @Composable
 private fun ChatBubbleItem(
