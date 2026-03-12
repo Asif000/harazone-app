@@ -10,6 +10,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -60,6 +62,7 @@ fun VibeOrb(
     isFilterActive: Boolean,
     poiCount: Int,
     sizeDp: Dp,
+    saveCount: Int = 0,
     onClick: () -> Unit,
 ) {
     val reduceMotion = rememberReduceMotion()
@@ -95,51 +98,71 @@ fun VibeOrb(
         Modifier
     }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = columnModifier
-            .minimumInteractiveComponentSize()
-            .clickable(onClick = onClick)
-            .semantics { contentDescription = "${vibe.displayName}, $poiCount places" },
-    ) {
-        val circleModifier = Modifier
-            .size(sizeDp)
-            .background(
-                brush = Brush.radialGradient(
-                    listOf(lerp(vibeColor, Color.White, 0.4f), vibeColor),
-                ),
-                shape = CircleShape,
-            )
-            .let {
-                if (isActive) {
-                    it.border(2.dp, Color.White, CircleShape)
-                        .graphicsLayer { alpha = breathingAlpha }
-                } else {
-                    it
+    Box {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = columnModifier
+                .minimumInteractiveComponentSize()
+                .clickable(onClick = onClick)
+                .semantics { contentDescription = "${vibe.displayName}, $poiCount places" },
+        ) {
+            val circleModifier = Modifier
+                .size(sizeDp)
+                .background(
+                    brush = Brush.radialGradient(
+                        listOf(lerp(vibeColor, Color.White, 0.4f), vibeColor),
+                    ),
+                    shape = CircleShape,
+                )
+                .let {
+                    if (isActive) {
+                        it.border(2.dp, Color.White, CircleShape)
+                            .graphicsLayer { alpha = breathingAlpha }
+                    } else {
+                        it
+                    }
                 }
+
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = circleModifier,
+            ) {
+                Icon(
+                    imageVector = vibe.toImageVector(),
+                    contentDescription = null,
+                    tint = Color.White,
+                    // TODO(BACKLOG-LOW): Icon size hardcoded at 20dp regardless of dynamic circle size — scale proportionally with sizeDp
+                    modifier = Modifier.size(20.dp),
+                )
             }
 
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = circleModifier,
-        ) {
-            Icon(
-                imageVector = vibe.toImageVector(),
-                contentDescription = null,
-                tint = Color.White,
-                // TODO(BACKLOG-LOW): Icon size hardcoded at 20dp regardless of dynamic circle size — scale proportionally with sizeDp
-                modifier = Modifier.size(20.dp),
+            Text(
+                text = vibe.displayName,
+                fontSize = 10.sp,
+                color = labelColor,
+                fontWeight = labelWeight,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
             )
         }
-
-        Text(
-            text = vibe.displayName,
-            fontSize = 10.sp,
-            color = labelColor,
-            fontWeight = labelWeight,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            textAlign = TextAlign.Center,
-        )
+        if (saveCount > 0) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 0.dp, end = 0.dp)
+                    .defaultMinSize(minWidth = 14.dp, minHeight = 14.dp)
+                    .background(Color(0xFF4a7cf7), CircleShape)
+                    .border(1.5.dp, Color(0xFF0a0c10), CircleShape),
+            ) {
+                Text(
+                    text = saveCount.toString(),
+                    fontSize = 8.sp,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
     }
 }

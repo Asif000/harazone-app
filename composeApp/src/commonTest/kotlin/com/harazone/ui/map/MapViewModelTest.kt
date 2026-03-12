@@ -1717,6 +1717,92 @@ class MapViewModelTest {
         assertFalse(state.isEnrichingArea)
         assertFalse(state.isGeocodingInitiatedSearch)
     }
+
+    // --- Save Experience v2 tests ---
+
+    @Test
+    fun vibeAreaSaveCounts_countsOnlyCurrentArea() = runTest(testDispatcher) {
+        val savedPoiRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Area A"),
+            ),
+            savedPoiRepository = savedPoiRepo,
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Area A", state.areaName)
+
+        // Save 2 CHARACTER saves in "Area A"
+        savedPoiRepo.save(SavedPoi(id = "p1", name = "Place 1", type = "cafe", areaName = "Area A", lat = 40.0, lng = -74.0, whySpecial = "great", savedAt = 1L, vibe = "CHARACTER"))
+        savedPoiRepo.save(SavedPoi(id = "p2", name = "Place 2", type = "bar", areaName = "Area A", lat = 40.1, lng = -74.1, whySpecial = "nice", savedAt = 2L, vibe = "CHARACTER"))
+        // Save 1 HISTORY save in "Area B"
+        savedPoiRepo.save(SavedPoi(id = "p3", name = "Place 3", type = "museum", areaName = "Area B", lat = 50.0, lng = -60.0, whySpecial = "old", savedAt = 3L, vibe = "HISTORY"))
+
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(2, updated.vibeAreaSaveCounts[Vibe.CHARACTER])
+        assertNull(updated.vibeAreaSaveCounts[Vibe.HISTORY])
+    }
+
+    @Test
+    fun vibeAreaSaveCounts_emptyWhenNoVibeStored() = runTest(testDispatcher) {
+        val savedPoiRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Area A"),
+            ),
+            savedPoiRepository = savedPoiRepo,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Save with empty vibe
+        savedPoiRepo.save(SavedPoi(id = "p1", name = "Place 1", type = "cafe", areaName = "Area A", lat = 40.0, lng = -74.0, whySpecial = "great", savedAt = 1L, vibe = ""))
+
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(updated.vibeAreaSaveCounts.isEmpty())
+    }
+
+    @Test
+    fun onSavedVibeSelected_activatesFilterAndOpensSavesSheet() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Test Area"),
+            ),
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        viewModel.onSavedVibeSelected()
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.savedVibeFilter)
+        assertTrue(state.showSavesSheet)
+        assertNull(state.activeVibe)
+    }
+
+    @Test
+    fun switchVibe_clearsSavedVibeFilter() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Test Area"),
+            ),
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Activate saved filter first
+        viewModel.onSavedVibeSelected()
+        val afterSaved = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(afterSaved.savedVibeFilter)
+
+        // Now switch to a regular vibe
+        viewModel.switchVibe(Vibe.CHARACTER)
+
+        val afterSwitch = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(afterSwitch.savedVibeFilter)
+        assertEquals(Vibe.CHARACTER, afterSwitch.activeVibe)
+    }
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {

@@ -157,7 +157,7 @@ private fun ReadyContent(
                 longitude = state.longitude,
                 zoomLevel = 14.0,
                 cameraMoveId = state.cameraMoveId,
-                pois = state.pois,
+                pois = if (state.savedVibeFilter) emptyList() else state.pois,
                 activeVibe = state.activeVibe,
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
@@ -229,7 +229,11 @@ private fun ReadyContent(
             VibeRail(
                 activeVibe = state.activeVibe,
                 vibePoiCounts = state.vibePoiCounts,
+                vibeAreaSaveCounts = state.vibeAreaSaveCounts,
+                savedVibeActive = state.savedVibeFilter,
+                totalAreaSaveCount = state.savedPois.count { it.areaName == state.areaName },
                 onVibeSelected = { viewModel.switchVibe(it) },
+                onSavedVibeSelected = { viewModel.onSavedVibeSelected() },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 8.dp, bottom = navBarPadding + 88.dp),

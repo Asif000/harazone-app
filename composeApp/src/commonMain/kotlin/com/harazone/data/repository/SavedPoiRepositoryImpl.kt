@@ -38,6 +38,7 @@ class SavedPoiRepositoryImpl(
                         imageUrl = it.image_url,
                         description = it.description,
                         rating = it.rating?.toFloat(),
+                        vibe = it.vibe,
                     )
                 }
             }
@@ -64,6 +65,7 @@ class SavedPoiRepositoryImpl(
                 image_url = poi.imageUrl,
                 description = poi.description,
                 rating = poi.rating?.toDouble(),
+                vibe = poi.vibe,
             )
         }
     }

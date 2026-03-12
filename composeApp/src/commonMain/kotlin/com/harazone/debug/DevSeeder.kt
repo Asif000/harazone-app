@@ -62,6 +62,7 @@ object DevSeeder {
                     image_url = poi.imageUrl,
                     description = poi.description,
                     rating = poi.rating?.toDouble(),
+                    vibe = poi.vibe,
                 )
             }
         }

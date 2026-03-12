@@ -289,6 +289,7 @@ internal class ChatViewModel(
                         whySpecial = card.whySpecial,
                         savedAt = 0L, // Repository sets the actual timestamp
                         imageUrl = card.imageUrl,
+                        vibe = _uiState.value.vibeName ?: "",
                     )
                 )
             } catch (e: Exception) {

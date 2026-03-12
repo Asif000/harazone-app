@@ -13,4 +13,5 @@ data class SavedPoi(
     val imageUrl: String? = null,
     val description: String? = null,
     val rating: Float? = null,
+    val vibe: String = "",
 )

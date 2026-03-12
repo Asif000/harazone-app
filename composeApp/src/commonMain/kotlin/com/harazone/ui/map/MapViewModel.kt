@@ -90,7 +90,11 @@ class MapViewModel(
             savedPoiRepository.observeAll().collect { pois ->
                 latestSavedPois = pois
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
-                _uiState.value = current.copy(savedPois = pois, savedPoiCount = pois.size)
+                _uiState.value = current.copy(
+                    savedPois = pois,
+                    savedPoiCount = pois.size,
+                    vibeAreaSaveCounts = computeVibeAreaSaveCounts(pois, current.areaName),
+                )
             }
         }
         viewModelScope.launch {
@@ -130,7 +134,10 @@ class MapViewModel(
     fun switchVibe(vibe: Vibe) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         val newVibe = if (current.activeVibe == vibe) null else vibe
-        _uiState.value = current.copy(activeVibe = newVibe)
+        _uiState.value = current.copy(
+            activeVibe = newVibe,
+            savedVibeFilter = false,
+        )
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.name ?: "all")))
     }
 
@@ -202,6 +209,8 @@ class MapViewModel(
                         imageUrl = poi.imageUrl,
                         description = poi.description,
                         rating = poi.rating,
+                        vibe = current.activeVibe?.name
+                            ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
                     )
                 )
             } catch (e: Exception) {
@@ -235,6 +244,16 @@ class MapViewModel(
     fun openSavesSheet() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = current.copy(showSavesSheet = true)
+    }
+
+    fun onSavedVibeSelected() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val newFilter = !current.savedVibeFilter
+        _uiState.value = current.copy(
+            savedVibeFilter = newFilter,
+            activeVibe = if (newFilter) null else current.activeVibe,
+        )
+        if (newFilter) openSavesSheet()
     }
 
     fun closeSavesSheet() {
@@ -847,6 +866,13 @@ class MapViewModel(
             Vibe.entries.associateWith { pois.size }
         }
     }
+
+    private fun computeVibeAreaSaveCounts(saves: List<SavedPoi>, areaName: String): Map<Vibe, Int> =
+        saves.filter { it.areaName == areaName && it.vibe.isNotEmpty() }
+            .groupBy { save -> Vibe.entries.firstOrNull { it.name == save.vibe } }
+            .filterKeys { it != null }
+            .mapKeys { it.key!! }
+            .mapValues { it.value.size }
 
     private suspend fun collectPortraitWithRetry(
         areaName: String,

@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS saved_pois (
     user_note   TEXT,
     image_url   TEXT,
     description TEXT,
-    rating      REAL
+    rating      REAL,
+    vibe        TEXT NOT NULL DEFAULT ''
 );
 
 observeAll:
@@ -20,8 +21,8 @@ observeSavedIds:
 SELECT poi_id FROM saved_pois;
 
 insertOrReplace:
-INSERT OR REPLACE INTO saved_pois(poi_id, name, type, area_name, lat, lng, why_special, saved_at, user_note, image_url, description, rating)
-VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at, :user_note, :image_url, :description, :rating);
+INSERT OR REPLACE INTO saved_pois(poi_id, name, type, area_name, lat, lng, why_special, saved_at, user_note, image_url, description, rating, vibe)
+VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at, :user_note, :image_url, :description, :rating, :vibe);
 
 deleteById:
 DELETE FROM saved_pois WHERE poi_id = :poi_id;
