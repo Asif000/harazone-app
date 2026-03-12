@@ -91,8 +91,9 @@ internal fun ChatOverlay(
     val totalItems = chatState.bubbles.size +
         (if (chatState.showSkeletons) 1 else 0) +
         chatState.poiCards.size
+    // Scroll when content changes OR when overlay reopens with new context
     val scrollKey = Triple(chatState.bubbles.size, chatState.poiCards.size, chatState.isStreaming)
-    LaunchedEffect(scrollKey) {
+    LaunchedEffect(scrollKey, chatState.isOpen) {
         if (totalItems > 0) {
             listState.animateScrollToItem(maxOf(0, totalItems - 1))
         }

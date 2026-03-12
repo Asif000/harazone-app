@@ -203,6 +203,8 @@ internal class ChatViewModel(
         // M4: Trim before snapshot so the snapshot reflects the capped history
         // F1: Take snapshot BEFORE adding user msg — provider appends query itself
         trimHistory()
+        // Reinforce conversation style on follow-up turns so Gemini keeps ending with a question
+        val reinforcedQuery = query + "\n[Remember: 2-3 sentences max. End with a question.]"
         val historySnapshot = conversationHistory.toList()
         conversationHistory.add(
             ChatMessage(
@@ -213,7 +215,7 @@ internal class ChatViewModel(
 
         chatJob = viewModelScope.launch {
             var accumulated = ""
-            aiProvider.streamChatResponse(query, _uiState.value.areaName, historySnapshot)
+            aiProvider.streamChatResponse(reinforcedQuery, _uiState.value.areaName, historySnapshot)
                 .catch { e ->
                     AppLogger.e(e) { "ChatViewModel: stream failed" }
                     // F4: Find bubble by ID instead of assuming it's the last one
