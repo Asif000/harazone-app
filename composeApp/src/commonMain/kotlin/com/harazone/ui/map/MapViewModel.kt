@@ -50,13 +50,21 @@ class MapViewModel(
     val errorEvents: SharedFlow<String> = _errorEvents.asSharedFlow()
 
     private var loadJob: Job? = null
-    private var searchJob: Job? = null
+    private var areaFetchJob: Job? = null
     private var cameraIdleJob: Job? = null
-    private var returnToLocationJob: Job? = null
     private var geocodingJob: Job? = null
+
+    private fun cancelAreaFetch() {
+        areaFetchJob?.cancel()
+        areaFetchJob = null
+        cameraIdleJob?.cancel()
+        geocodingJob?.cancel()
+    }
+
     private var pendingLat: Double = 0.0
     private var pendingLng: Double = 0.0
     private var pendingAreaName: String = ""
+    private var preSearchSnapshot: MapUiState.Ready? = null
     private var latestRecents: List<RecentPlace> = emptyList()
     private var latestSavedPois: List<SavedPoi> = emptyList()
     private var latestSavedPoiIds: Set<String> = emptySet()
@@ -127,13 +135,12 @@ class MapViewModel(
     // TODO(BACKLOG-LOW): submitSearch — no current UI caller; preserve for programmatic search
     fun submitSearch(query: String) {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        cameraIdleJob?.cancel()
-        searchJob?.cancel()
+        cancelAreaFetch()
 
         // Questions are routed to ChatOverlay by MapScreen — submitSearch only handles area searches
         analyticsTracker.trackEvent("search_area_submitted", mapOf("query" to query))
 
-        searchJob = viewModelScope.launch {
+        areaFetchJob = viewModelScope.launch {
             try {
                 val context = areaContextFactory.create()
                 var stage1Pois = emptyList<POI>()
@@ -272,10 +279,8 @@ class MapViewModel(
 
     fun onGeocodingSuggestionSelected(suggestion: GeocodingSuggestion) {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        cameraIdleJob?.cancel()
-        geocodingJob?.cancel()
-        searchJob?.cancel()
-        returnToLocationJob?.cancel()
+        cancelAreaFetch()
+        preSearchSnapshot = current
         pendingLat = suggestion.latitude
         pendingLng = suggestion.longitude
         pendingAreaName = suggestion.name
@@ -295,11 +300,12 @@ class MapViewModel(
             activeVibe = null,
         )
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
-        searchJob = viewModelScope.launch {
+        areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
                     areaName = suggestion.name,
                     onComplete = { pois, _ ->
+                        preSearchSnapshot = null
                         val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
                         val counts = computeVibePoiCounts(pois)
                         _uiState.value = state.copy(
@@ -313,6 +319,7 @@ class MapViewModel(
                         )
                     },
                     onError = { e ->
+                        preSearchSnapshot = null
                         AppLogger.e(e) { "Geocoding selection: portrait fetch failed" }
                         val s = _uiState.value as? MapUiState.Ready
                         if (s != null) _uiState.value = s.copy(
@@ -355,10 +362,8 @@ class MapViewModel(
     // TODO(BACKLOG-LOW): ~50 lines duplicated between onRecentSelected and onGeocodingSuggestionSelected — extract shared helper
     fun onRecentSelected(recent: RecentPlace) {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        cameraIdleJob?.cancel()
-        geocodingJob?.cancel()
-        searchJob?.cancel()
-        returnToLocationJob?.cancel()
+        cancelAreaFetch()
+        preSearchSnapshot = current
         pendingLat = recent.latitude
         pendingLng = recent.longitude
         pendingAreaName = recent.name
@@ -378,11 +383,12 @@ class MapViewModel(
             activeVibe = null,
         )
         fetchWeatherForLocation(recent.latitude, recent.longitude)
-        searchJob = viewModelScope.launch {
+        areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
                     areaName = recent.name,
                     onComplete = { pois, _ ->
+                        preSearchSnapshot = null
                         val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
                         val counts = computeVibePoiCounts(pois)
                         _uiState.value = state.copy(
@@ -396,6 +402,7 @@ class MapViewModel(
                         )
                     },
                     onError = { e ->
+                        preSearchSnapshot = null
                         AppLogger.e(e) { "Recent selection: portrait fetch failed" }
                         val s = _uiState.value as? MapUiState.Ready
                         if (s != null) _uiState.value = s.copy(
@@ -443,9 +450,7 @@ class MapViewModel(
 
     fun onGeocodingSubmitEmpty() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        cameraIdleJob?.cancel()
-        geocodingJob?.cancel()
-        returnToLocationJob?.cancel()
+        cancelAreaFetch()
         val areaName = pendingAreaName.ifBlank { current.areaName }
         val lat = if (pendingLat != 0.0) pendingLat else current.latitude
         val lng = if (pendingLng != 0.0) pendingLng else current.longitude
@@ -461,8 +466,7 @@ class MapViewModel(
             activeVibe = null,
         )
         fetchWeatherForLocation(lat, lng)
-        searchJob?.cancel()
-        searchJob = viewModelScope.launch {
+        areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
                     areaName = areaName,
@@ -521,17 +525,39 @@ class MapViewModel(
     }
 
     fun onGeocodingCancelLoad() {
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        searchJob?.cancel()
-        _uiState.value = current.copy(
-            isSearchingArea = false,
-            isEnrichingArea = false,
-            isGeocodingInitiatedSearch = false,
-            isGeocodingLoading = false,
-            geocodingQuery = "",
-            geocodingSuggestions = emptyList(),
-            geocodingSelectedPlace = null,
-        )
+        cancelAreaFetch()
+        val snapshot = preSearchSnapshot
+        if (snapshot != null) {
+            pendingLat = snapshot.latitude
+            pendingLng = snapshot.longitude
+            pendingAreaName = snapshot.areaName
+            _uiState.value = snapshot.copy(
+                cameraMoveId = snapshot.cameraMoveId + 1,
+                isSearchingArea = false,
+                isEnrichingArea = false,
+                isGeocodingInitiatedSearch = false,
+                isGeocodingLoading = false,
+                geocodingQuery = "",
+                geocodingSuggestions = emptyList(),
+                geocodingSelectedPlace = null,
+                savedPois = latestSavedPois,
+                savedPoiIds = latestSavedPoiIds,
+                savedPoiCount = latestSavedPois.size,
+                recentPlaces = latestRecents,
+            )
+            preSearchSnapshot = null
+        } else {
+            val current = _uiState.value as? MapUiState.Ready ?: return
+            _uiState.value = current.copy(
+                isSearchingArea = false,
+                isEnrichingArea = false,
+                isGeocodingInitiatedSearch = false,
+                isGeocodingLoading = false,
+                geocodingQuery = "",
+                geocodingSuggestions = emptyList(),
+                geocodingSelectedPlace = null,
+            )
+        }
     }
 
     fun onMapRenderFailed() {
@@ -541,7 +567,7 @@ class MapViewModel(
 
     fun onCameraIdle(lat: Double, lng: Double) {
         if (lat == 0.0 && lng == 0.0) return
-        if (searchJob?.isActive == true) return
+        if (areaFetchJob?.isActive == true) return
         if (_uiState.value !is MapUiState.Ready) return
         val readyState = _uiState.value as? MapUiState.Ready ?: return
         if (!isAwayFromGps(lat, lng, readyState)) {
@@ -555,7 +581,7 @@ class MapViewModel(
         cameraIdleJob?.cancel()
         cameraIdleJob = viewModelScope.launch {
             delay(500)
-            if (searchJob?.isActive == true) return@launch
+            if (areaFetchJob?.isActive == true) return@launch
             val geocodeResult = locationProvider.reverseGeocode(lat, lng)
             if (geocodeResult.isFailure) return@launch
             val newAreaName = geocodeResult.getOrThrow()
@@ -574,14 +600,12 @@ class MapViewModel(
 
     fun returnToCurrentLocation() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        cameraIdleJob?.cancel()
-        searchJob?.cancel()
-        returnToLocationJob?.cancel()
+        cancelAreaFetch()
 
         // Hide button immediately for instant feedback (F1 + F3)
         _uiState.value = current.copy(showMyLocation = false)
 
-        returnToLocationJob = viewModelScope.launch {
+        areaFetchJob = viewModelScope.launch {
             try {
                 val locResult = locationProvider.getCurrentLocation()
                 if (locResult.isFailure) {
@@ -666,7 +690,6 @@ class MapViewModel(
                             geocodingSelectedPlace = null,
                             isGeocodingInitiatedSearch = false,
                         )
-                        // TODO(BACKLOG-MEDIUM): returnToCurrentLocation uses returnToLocationJob, not searchJob — a concurrent new area search won't cancel this fetch. These can race.
                         collectPortraitWithRetry(
                             areaName = gpsAreaName,
                             onComplete = { pois, _ ->

@@ -23,7 +23,9 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
@@ -1463,6 +1465,173 @@ class MapViewModelTest {
             Dispatchers.resetMain()
             Dispatchers.setMain(testDispatcher)
         }
+    }
+
+    @Test
+    fun newAreaFetchCancelsPreviousInFlightFetch() = runTest(testDispatcher) {
+        // Regression test: selecting a second area while the first area fetch is
+        // still in-flight must cancel the old fetch. Before the fix, separate job
+        // variables (searchJob vs returnToLocationJob) meant concurrent fetches
+        // could race and the stale one could overwrite the newer area's state.
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val locationProvider = FakeLocationProvider(
+            locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+            geocodeResult = Result.success("Home Area"),
+        )
+        val vm = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = suspendingRepo,
+        )
+
+        // Init loadLocation is suspended at portrait fetch (call 0) — complete it
+        // Use non-empty POIs to avoid the retry-with-broader-query branch
+        assertIs<MapUiState.Ready>(vm.uiState.value)
+        val initPoi = POI(
+            name = "Init Place",
+            type = "park",
+            description = "A park",
+            confidence = Confidence.HIGH,
+            latitude = 40.0,
+            longitude = -74.0,
+        )
+        suspendingRepo.completeCall(0, listOf(BucketUpdate.PortraitComplete(listOf(initPoi))))
+
+        // Start first geocoding selection — launches areaFetchJob (call 1)
+        vm.onGeocodingSuggestionSelected(GeocodingSuggestion(
+            name = "Area A",
+            fullAddress = "Area A, Country",
+            latitude = 41.0,
+            longitude = -73.0,
+            distanceKm = null,
+        ))
+        assertEquals(2, suspendingRepo.callCount) // call 1 = Area A
+
+        // Before Area A completes, select a SECOND area (call 2)
+        // This must cancel the Area A fetch
+        vm.onGeocodingSuggestionSelected(GeocodingSuggestion(
+            name = "Area B",
+            fullAddress = "Area B, Country",
+            latitude = 42.0,
+            longitude = -72.0,
+            distanceKm = null,
+        ))
+        assertEquals(3, suspendingRepo.callCount) // call 2 = Area B
+
+        // Complete the OLD Area A fetch (call 1) — should be cancelled, no effect
+        val areaAPois = listOf(
+            POI(
+                name = "Old POI",
+                type = "restaurant",
+                description = "An old restaurant",
+                confidence = Confidence.HIGH,
+                latitude = 41.0,
+                longitude = -73.0,
+                vibe = "Hungry",
+            )
+        )
+        suspendingRepo.completeCall(1, listOf(BucketUpdate.PortraitComplete(areaAPois)))
+
+        // Complete the Area B fetch (call 2) with different POIs
+        val areaBPois = listOf(
+            POI(
+                name = "New POI",
+                type = "cafe",
+                description = "A new cafe",
+                confidence = Confidence.HIGH,
+                latitude = 42.0,
+                longitude = -72.0,
+                vibe = "Hungry",
+            )
+        )
+        suspendingRepo.completeCall(2, listOf(BucketUpdate.PortraitComplete(areaBPois)))
+
+        // The final state must show Area B POIs, NOT Area A POIs
+        val finalState = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals(1, finalState.pois.size)
+        assertEquals("New POI", finalState.pois.first().name)
+        assertEquals("Area B", finalState.areaName)
+    }
+
+    @Test
+    fun cancelSearchRestoresPreviousAreaState() = runTest(testDispatcher) {
+        // Regression test: cancelling a search mid-flight must restore the previous
+        // area's coordinates, POIs, and area name — not leave the user stranded at
+        // the new location with empty POIs.
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val locationProvider = FakeLocationProvider(
+            locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+            geocodeResult = Result.success("Home Area"),
+        )
+        val vm = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = suspendingRepo,
+        )
+
+        // Complete init with POIs
+        assertIs<MapUiState.Ready>(vm.uiState.value)
+        val homePoi = POI(
+            name = "Home Cafe",
+            type = "cafe",
+            description = "A local cafe",
+            confidence = Confidence.HIGH,
+            latitude = 40.0,
+            longitude = -74.0,
+        )
+        suspendingRepo.completeCall(0, listOf(BucketUpdate.PortraitComplete(listOf(homePoi))))
+
+        val stateBeforeSearch = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals("Home Area", stateBeforeSearch.areaName)
+        assertEquals(1, stateBeforeSearch.pois.size)
+
+        // Start a geocoding selection (camera moves, POIs cleared)
+        vm.onGeocodingSuggestionSelected(GeocodingSuggestion(
+            name = "Far Away Place",
+            fullAddress = "Far Away Place, Country",
+            latitude = 50.0,
+            longitude = -60.0,
+            distanceKm = null,
+        ))
+
+        // Verify state moved to new location with empty POIs
+        val searchingState = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertTrue(searchingState.isSearchingArea)
+        assertTrue(searchingState.pois.isEmpty())
+
+        // Cancel before the fetch completes
+        vm.onGeocodingCancelLoad()
+
+        // State must be restored to pre-search snapshot
+        val restoredState = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals("Home Area", restoredState.areaName)
+        assertEquals(40.0, restoredState.latitude)
+        assertEquals(-74.0, restoredState.longitude)
+        assertEquals(1, restoredState.pois.size)
+        assertEquals("Home Cafe", restoredState.pois.first().name)
+        assertFalse(restoredState.isSearchingArea)
+    }
+}
+
+private class SuspendingFakeAreaRepository : AreaRepository {
+    private val deferreds = mutableListOf<CompletableDeferred<List<BucketUpdate>>>()
+    val callCount get() = deferreds.size
+    val lastAreaName get() = areaNames.lastOrNull()
+    private val areaNames = mutableListOf<String>()
+
+    override fun getAreaPortrait(
+        areaName: String,
+        context: com.harazone.domain.model.AreaContext,
+    ): Flow<BucketUpdate> {
+        val deferred = CompletableDeferred<List<BucketUpdate>>()
+        deferreds.add(deferred)
+        areaNames.add(areaName)
+        return flow {
+            val updates = deferred.await()
+            updates.forEach { emit(it) }
+        }
+    }
+
+    fun completeCall(index: Int, updates: List<BucketUpdate>) {
+        deferreds[index].complete(updates)
     }
 }
 
