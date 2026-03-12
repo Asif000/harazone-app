@@ -1608,6 +1608,114 @@ class MapViewModelTest {
         assertEquals(1, restoredState.pois.size)
         assertEquals("Home Cafe", restoredState.pois.first().name)
         assertFalse(restoredState.isSearchingArea)
+        assertTrue(restoredState.cameraMoveId > stateBeforeSearch.cameraMoveId)
+    }
+
+    @Test
+    fun rapidDoubleSelectionThenCancelRestoresOriginalState() = runTest(testDispatcher) {
+        // Regression test for H1: rapid Area A → Area B selection must NOT
+        // overwrite the snapshot with Area A's half-initialized state.
+        // Cancel after Area B must restore Home, not Area A.
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val vm = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Home Area"),
+            ),
+            areaRepository = suspendingRepo,
+        )
+
+        assertIs<MapUiState.Ready>(vm.uiState.value)
+        val homePoi = POI(
+            name = "Home Cafe",
+            type = "cafe",
+            description = "A local cafe",
+            confidence = Confidence.HIGH,
+            latitude = 40.0,
+            longitude = -74.0,
+        )
+        suspendingRepo.completeCall(0, listOf(BucketUpdate.PortraitComplete(listOf(homePoi))))
+        val homeState = assertIs<MapUiState.Ready>(vm.uiState.value)
+
+        // Select Area A (snapshot captures Home state)
+        vm.onGeocodingSuggestionSelected(GeocodingSuggestion(
+            name = "Area A", fullAddress = "Area A", latitude = 41.0, longitude = -73.0, distanceKm = null,
+        ))
+
+        // Immediately select Area B — snapshot must NOT be overwritten
+        vm.onGeocodingSuggestionSelected(GeocodingSuggestion(
+            name = "Area B", fullAddress = "Area B", latitude = 42.0, longitude = -72.0, distanceKm = null,
+        ))
+
+        // Cancel — must restore Home, not Area A
+        vm.onGeocodingCancelLoad()
+
+        val restored = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals("Home Area", restored.areaName)
+        assertEquals(40.0, restored.latitude)
+        assertEquals(-74.0, restored.longitude)
+        assertEquals(1, restored.pois.size)
+        assertEquals("Home Cafe", restored.pois.first().name)
+        assertFalse(restored.isSearchingArea)
+        assertTrue(restored.cameraMoveId > homeState.cameraMoveId)
+    }
+
+    @Test
+    fun cancelSearchViaRecentRestoresPreviousAreaState() = runTest(testDispatcher) {
+        // M3: cancel-restore test for onRecentSelected (mirrors cancelSearchRestoresPreviousAreaState)
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val vm = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Home Area"),
+            ),
+            areaRepository = suspendingRepo,
+        )
+        assertIs<MapUiState.Ready>(vm.uiState.value)
+        val homePoi = POI(
+            name = "Home Cafe", type = "cafe", description = "A cafe",
+            confidence = Confidence.HIGH, latitude = 40.0, longitude = -74.0,
+        )
+        suspendingRepo.completeCall(0, listOf(BucketUpdate.PortraitComplete(listOf(homePoi))))
+        val homeState = assertIs<MapUiState.Ready>(vm.uiState.value)
+
+        vm.onRecentSelected(RecentPlace(name = "Recent Place", latitude = 45.0, longitude = -70.0))
+
+        val searching = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertTrue(searching.isSearchingArea)
+
+        vm.onGeocodingCancelLoad()
+
+        val restored = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals("Home Area", restored.areaName)
+        assertEquals(40.0, restored.latitude)
+        assertEquals(1, restored.pois.size)
+        assertFalse(restored.isSearchingArea)
+        assertTrue(restored.cameraMoveId > homeState.cameraMoveId)
+    }
+
+    @Test
+    fun cancelWithoutSnapshotClearsLoadingFlags() = runTest(testDispatcher) {
+        // M4: null-snapshot fallback path — cancel fires without a prior selection
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val vm = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Home Area"),
+            ),
+            areaRepository = suspendingRepo,
+        )
+        assertIs<MapUiState.Ready>(vm.uiState.value)
+        suspendingRepo.completeCall(0, listOf(BucketUpdate.PortraitComplete(emptyList())))
+
+        // Trigger onGeocodingSubmitEmpty (clears preSearchSnapshot) then cancel
+        vm.onGeocodingSubmitEmpty()
+        vm.onGeocodingCancelLoad()
+
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertFalse(state.isSearchingArea)
+        assertFalse(state.isEnrichingArea)
+        assertFalse(state.isGeocodingInitiatedSearch)
     }
 }
 

@@ -58,7 +58,9 @@ class MapViewModel(
         areaFetchJob?.cancel()
         areaFetchJob = null
         cameraIdleJob?.cancel()
+        cameraIdleJob = null
         geocodingJob?.cancel()
+        geocodingJob = null
     }
 
     private var pendingLat: Double = 0.0
@@ -132,7 +134,7 @@ class MapViewModel(
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.name ?: "all")))
     }
 
-    // TODO(BACKLOG-LOW): submitSearch — no current UI caller; preserve for programmatic search
+    // TODO(BACKLOG-LOW): submitSearch — no current UI caller; preserve for programmatic search. If wired to UI, also set preSearchSnapshot for cancel-restore.
     fun submitSearch(query: String) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cancelAreaFetch()
@@ -280,7 +282,7 @@ class MapViewModel(
     fun onGeocodingSuggestionSelected(suggestion: GeocodingSuggestion) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cancelAreaFetch()
-        preSearchSnapshot = current
+        if (preSearchSnapshot == null) preSearchSnapshot = current
         pendingLat = suggestion.latitude
         pendingLng = suggestion.longitude
         pendingAreaName = suggestion.name
@@ -331,8 +333,6 @@ class MapViewModel(
                     },
                 )
             } catch (e: CancellationException) {
-                val s = _uiState.value as? MapUiState.Ready
-                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Geocoding selection: unexpected error" }
@@ -363,7 +363,7 @@ class MapViewModel(
     fun onRecentSelected(recent: RecentPlace) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cancelAreaFetch()
-        preSearchSnapshot = current
+        if (preSearchSnapshot == null) preSearchSnapshot = current
         pendingLat = recent.latitude
         pendingLng = recent.longitude
         pendingAreaName = recent.name
@@ -414,8 +414,6 @@ class MapViewModel(
                     },
                 )
             } catch (e: CancellationException) {
-                val s = _uiState.value as? MapUiState.Ready
-                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Recent selection: unexpected error" }
@@ -451,6 +449,7 @@ class MapViewModel(
     fun onGeocodingSubmitEmpty() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cancelAreaFetch()
+        preSearchSnapshot = null
         val areaName = pendingAreaName.ifBlank { current.areaName }
         val lat = if (pendingLat != 0.0) pendingLat else current.latitude
         val lng = if (pendingLng != 0.0) pendingLng else current.longitude
@@ -497,8 +496,6 @@ class MapViewModel(
                     },
                 )
             } catch (e: CancellationException) {
-                val s = _uiState.value as? MapUiState.Ready
-                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Empty submit: unexpected error" }
@@ -601,6 +598,7 @@ class MapViewModel(
     fun returnToCurrentLocation() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cancelAreaFetch()
+        if (preSearchSnapshot == null) preSearchSnapshot = current
 
         // Hide button immediately for instant feedback (F1 + F3)
         _uiState.value = current.copy(showMyLocation = false)
@@ -639,6 +637,7 @@ class MapViewModel(
                 // Always refresh weather + time for GPS location
                 fetchWeatherForLocation(coords.latitude, coords.longitude)
 
+                preSearchSnapshot = null
                 if (isSameArea) {
                     _uiState.value = state.copy(
                         latitude = coords.latitude,
@@ -810,8 +809,6 @@ class MapViewModel(
                     },
                 )
             } catch (e: CancellationException) {
-                val s = _uiState.value as? MapUiState.Ready
-                if (s != null) _uiState.value = s.copy(isSearchingArea = false)
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Map: unexpected error during location resolution" }
