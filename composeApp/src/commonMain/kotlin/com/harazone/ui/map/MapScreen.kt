@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.AlertBanner
@@ -69,6 +70,12 @@ fun MapScreen(
     onNavigateToMaps: (lat: Double, lon: Double, name: String) -> Boolean = { _, _, _ -> false },
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+
+    // Refresh weather when app resumes from background (if stale >5 min)
+    LifecycleResumeEffect(viewModel) {
+        viewModel.refreshWeatherIfStale()
+        onPauseOrDispose { }
+    }
 
     when (val state = uiState) {
         is MapUiState.Loading -> {

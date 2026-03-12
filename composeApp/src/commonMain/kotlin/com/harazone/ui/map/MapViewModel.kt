@@ -31,6 +31,8 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 class MapViewModel(
     private val locationProvider: LocationProvider,
@@ -60,6 +62,11 @@ class MapViewModel(
     private var latestRecents: List<RecentPlace> = emptyList()
     private var latestSavedPois: List<SavedPoi> = emptyList()
     private var latestSavedPoiIds: Set<String> = emptySet()
+    private var lastWeatherFetchMs: Long = 0L
+
+    // Cache for GPS home area — avoids re-querying Gemini on return-to-location
+    private var gpsAreaNameCache: String? = null
+    private var gpsAreaPoisCache: List<POI> = emptyList()
 
     init {
         loadLocation()
@@ -225,6 +232,7 @@ class MapViewModel(
     fun closeSavesSheet() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = current.copy(showSavesSheet = false)
+        refreshWeatherIfStale()
     }
 
     fun onGeocodingQueryChanged(query: String) {
@@ -605,6 +613,9 @@ class MapViewModel(
                 pendingLng = coords.longitude
                 pendingAreaName = gpsAreaName
 
+                // Always refresh weather + time for GPS location
+                fetchWeatherForLocation(coords.latitude, coords.longitude)
+
                 if (isSameArea) {
                     _uiState.value = state.copy(
                         latitude = coords.latitude,
@@ -617,42 +628,72 @@ class MapViewModel(
                         isGeocodingInitiatedSearch = false,
                     )
                 } else {
-                    _uiState.value = state.copy(
-                        latitude = coords.latitude,
-                        longitude = coords.longitude,
-                        gpsLatitude = coords.latitude,
-                        gpsLongitude = coords.longitude,
-                        showMyLocation = false,
-                                    cameraMoveId = state.cameraMoveId + 1,
-                        isSearchingArea = true,
-                        pois = emptyList(),
-                        vibePoiCounts = emptyMap(),
-                        activeVibe = null,
-                        geocodingSelectedPlace = null,
-                        isGeocodingInitiatedSearch = false,
-                    )
-                    // TODO(BACKLOG-MEDIUM): returnToCurrentLocation uses returnToLocationJob, not searchJob — a concurrent new area search won't cancel this fetch. These can race.
-                    collectPortraitWithRetry(
-                        areaName = gpsAreaName,
-                        onComplete = { pois, _ ->
-                            val s = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
-                            val counts = computeVibePoiCounts(pois)
-                            _uiState.value = s.copy(
-                                areaName = gpsAreaName,
-                                pois = pois,
-                                vibePoiCounts = counts,
-                                activeVibe = null,
-                                isSearchingArea = false,
-                                isEnrichingArea = false,
-                            )
-                        },
-                        onError = { e ->
-                            AppLogger.e(e) { "Return to location: portrait fetch failed" }
-                            val s = _uiState.value as? MapUiState.Ready
-                            if (s != null) _uiState.value = s.copy(isSearchingArea = false, isEnrichingArea = false)
-                            _errorEvents.tryEmit("Couldn't load area info. Try again.")
-                        },
-                    )
+                    // Check if we have cached POIs for the GPS area (avoids re-querying Gemini)
+                    val cachedToken = gpsAreaNameCache?.substringBefore(",")?.trim()
+                    val gpsTokenForCache = gpsAreaName.substringBefore(",").trim()
+                    val hasCachedPois = cachedToken != null &&
+                        gpsTokenForCache.equals(cachedToken, ignoreCase = true) &&
+                        gpsAreaPoisCache.isNotEmpty()
+
+                    if (hasCachedPois) {
+                        val counts = computeVibePoiCounts(gpsAreaPoisCache)
+                        _uiState.value = state.copy(
+                            areaName = gpsAreaNameCache!!,
+                            latitude = coords.latitude,
+                            longitude = coords.longitude,
+                            gpsLatitude = coords.latitude,
+                            gpsLongitude = coords.longitude,
+                            showMyLocation = false,
+                            cameraMoveId = state.cameraMoveId + 1,
+                            pois = gpsAreaPoisCache,
+                            vibePoiCounts = counts,
+                            activeVibe = null,
+                            isSearchingArea = false,
+                            isEnrichingArea = false,
+                            geocodingSelectedPlace = null,
+                            isGeocodingInitiatedSearch = false,
+                        )
+                    } else {
+                        _uiState.value = state.copy(
+                            latitude = coords.latitude,
+                            longitude = coords.longitude,
+                            gpsLatitude = coords.latitude,
+                            gpsLongitude = coords.longitude,
+                            showMyLocation = false,
+                                        cameraMoveId = state.cameraMoveId + 1,
+                            isSearchingArea = true,
+                            pois = emptyList(),
+                            vibePoiCounts = emptyMap(),
+                            activeVibe = null,
+                            geocodingSelectedPlace = null,
+                            isGeocodingInitiatedSearch = false,
+                        )
+                        // TODO(BACKLOG-MEDIUM): returnToCurrentLocation uses returnToLocationJob, not searchJob — a concurrent new area search won't cancel this fetch. These can race.
+                        collectPortraitWithRetry(
+                            areaName = gpsAreaName,
+                            onComplete = { pois, _ ->
+                                val s = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
+                                val counts2 = computeVibePoiCounts(pois)
+                                _uiState.value = s.copy(
+                                    areaName = gpsAreaName,
+                                    pois = pois,
+                                    vibePoiCounts = counts2,
+                                    activeVibe = null,
+                                    isSearchingArea = false,
+                                    isEnrichingArea = false,
+                                )
+                                // Update cache for future returns
+                                gpsAreaNameCache = gpsAreaName
+                                gpsAreaPoisCache = pois
+                            },
+                            onError = { e ->
+                                AppLogger.e(e) { "Return to location: portrait fetch failed" }
+                                val s = _uiState.value as? MapUiState.Ready
+                                if (s != null) _uiState.value = s.copy(isSearchingArea = false, isEnrichingArea = false)
+                                _errorEvents.tryEmit("Couldn't load area info. Try again.")
+                            },
+                        )
+                    }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -731,6 +772,9 @@ class MapViewModel(
                             isSearchingArea = false,
                             isEnrichingArea = false,
                         )
+                        // Cache GPS area POIs for instant return-to-location
+                        gpsAreaNameCache = areaName
+                        gpsAreaPoisCache = pois
                         analyticsTracker.trackEvent(
                             "map_opened",
                             mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
@@ -753,15 +797,26 @@ class MapViewModel(
         }
     }
 
+    @OptIn(ExperimentalTime::class)
     private fun fetchWeatherForLocation(lat: Double, lng: Double) {
         viewModelScope.launch {
             val weatherResult = weatherProvider.getWeather(lat, lng)
             if (weatherResult.isSuccess) {
                 val current = _uiState.value as? MapUiState.Ready ?: return@launch
                 _uiState.value = current.copy(weather = weatherResult.getOrNull())
+                lastWeatherFetchMs = Clock.System.now().toEpochMilliseconds()
             } else {
                 AppLogger.e(weatherResult.exceptionOrNull()) { "Weather fetch failed" }
             }
+        }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    fun refreshWeatherIfStale() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val elapsed = Clock.System.now().toEpochMilliseconds() - lastWeatherFetchMs
+        if (elapsed >= WEATHER_STALE_MS) {
+            fetchWeatherForLocation(current.latitude, current.longitude)
         }
     }
 
@@ -875,6 +930,8 @@ class MapViewModel(
                 rating = enrich.rating,
                 hours = enrich.hours,
                 liveStatus = enrich.liveStatus,
+                imageUrl = enrich.imageUrl ?: pin.imageUrl,
+                wikiSlug = enrich.wikiSlug ?: pin.wikiSlug,
             ) else pin
         }
         val stage1Keys = stage1.map { it.name.trim().lowercase() }.toSet()
@@ -891,6 +948,7 @@ class MapViewModel(
     }
 
     companion object {
+        private const val WEATHER_STALE_MS = 5 * 60 * 1000L // 5 minutes
         // TODO(BACKLOG-LOW): Generic location error message — detect permission denial vs GPS off and show specific guidance
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."
         internal const val LOCATION_TIMEOUT_MS = 10_000L

@@ -148,8 +148,9 @@ internal class AreaRepositoryImpl(
                             if (enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
                             emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched)))
                         } else {
-                            // Stage 2 enrichment-only POIs (no coords) — do NOT cache, pass through for VM merge
-                            emit(update)
+                            // Stage 2 enrichment-only POIs (no coords) — enrich images via wikiSlug, but don't cache
+                            val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                            emit(BucketUpdate.PortraitComplete(enriched))
                         }
                     }
                     else -> {
