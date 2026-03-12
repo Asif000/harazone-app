@@ -271,6 +271,7 @@ actual fun MapComposable(
         // Reset saved filter zoom flag when regular POIs are back
         if (pois.isNotEmpty()) savedFilterFitted[0] = false
 
+        // TODO(BACKLOG-LOW): Camera re-fits when toggling saved filter off because size guard is insufficient — need content-aware diff or explicit toggle-off flag
         // Fit camera to show all pins — only when pois list actually changed (not on vibe switch or saved filter toggle)
         if (pois !== lastFittedPois.value && pois.size != lastFittedPois.value.size && filteredPois.isNotEmpty()) {
             lastFittedPois.value = pois

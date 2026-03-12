@@ -1781,6 +1781,43 @@ class MapViewModelTest {
     }
 
     @Test
+    fun vibeAreaSaveCounts_updatesOnGeocodingAreaChange() = runTest(testDispatcher) {
+        val savedPoiRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        // Pre-seed saves: 2 CHARACTER in "Area A", 1 HISTORY in "Area B"
+        savedPoiRepo.save(SavedPoi(id = "p1", name = "Place 1", type = "cafe", areaName = "Area A", lat = 40.0, lng = -74.0, whySpecial = "great", savedAt = 1L, vibe = "CHARACTER"))
+        savedPoiRepo.save(SavedPoi(id = "p2", name = "Place 2", type = "bar", areaName = "Area A", lat = 40.1, lng = -74.1, whySpecial = "nice", savedAt = 2L, vibe = "CHARACTER"))
+        savedPoiRepo.save(SavedPoi(id = "p3", name = "Place 3", type = "museum", areaName = "Area B", lat = 50.0, lng = -60.0, whySpecial = "old", savedAt = 3L, vibe = "HISTORY"))
+
+        val pois = listOf(POI("Spot", "landmark", "desc", Confidence.HIGH, 40.0, -74.0))
+        val areaRepo = FakeAreaRepository(updates = listOf(BucketUpdate.PortraitComplete(pois)))
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Area A"),
+            ),
+            areaRepository = areaRepo,
+            savedPoiRepository = savedPoiRepo,
+        )
+
+        // Verify initial counts reflect Area A
+        val stateA = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Area A", stateA.areaName)
+        assertEquals(2, stateA.vibeAreaSaveCounts[Vibe.CHARACTER])
+        assertNull(stateA.vibeAreaSaveCounts[Vibe.HISTORY])
+
+        // Navigate to Area B via geocoding
+        val suggestion = GeocodingSuggestion("Area B", "Area B, Country", 50.0, -60.0, null)
+        viewModel.onGeocodingSuggestionSelected(suggestion)
+        testScheduler.advanceUntilIdle()
+
+        // Counts must now reflect Area B saves, not Area A
+        val stateB = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("Area B", stateB.areaName)
+        assertEquals(1, stateB.vibeAreaSaveCounts[Vibe.HISTORY])
+        assertNull(stateB.vibeAreaSaveCounts[Vibe.CHARACTER])
+    }
+
+    @Test
     fun switchVibe_clearsSavedVibeFilter() = runTest(testDispatcher) {
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
