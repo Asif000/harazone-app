@@ -204,7 +204,9 @@ class SavedPlacesViewModelTest {
         val story = vm.uiState.value.discoveryStory
         assertNotNull(story)
         assertTrue(story.summary.contains("5"))
-        assertTrue(story.summary.contains("3"))
+        assertTrue(story.summary.contains("Area A"))
+        assertTrue(story.summary.contains("Area B"))
+        assertTrue(story.summary.contains("Area C"))
     }
 
     @Test

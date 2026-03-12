@@ -77,6 +77,7 @@ fun SavedPlacesScreen(
     onAskAi: (poi: SavedPoi?) -> Unit,
     onDirections: (Double, Double, String) -> Unit,
     onShare: (String) -> Unit,
+    onPoiSelected: (SavedPoi) -> Unit = {},
     viewModel: SavedPlacesViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -305,6 +306,7 @@ fun SavedPlacesScreen(
                     SavedPoiCard(
                         poi = poi,
                         isPendingUnsave = poi.id in uiState.pendingUnsaveIds,
+                        onClick = { onPoiSelected(poi) },
                         onUnsave = {
                             viewModel.unsavePoi(poi.id)
                             scope.launch {

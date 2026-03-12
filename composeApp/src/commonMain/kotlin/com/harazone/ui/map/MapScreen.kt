@@ -46,6 +46,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.AlertBanner
 import com.harazone.ui.components.ContentNoteBanner
@@ -122,6 +124,7 @@ private fun ReadyContent(
     // TODO(BACKLOG-LOW): snackbarHostState created inside Ready branch — resets on Ready→Failed→Ready retry
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val returnToSaves = remember { booleanArrayOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.errorEvents.collect { message ->
@@ -231,7 +234,7 @@ private fun ReadyContent(
                 vibePoiCounts = state.vibePoiCounts,
                 vibeAreaSaveCounts = state.vibeAreaSaveCounts,
                 savedVibeActive = state.savedVibeFilter,
-                totalAreaSaveCount = state.savedPois.count { it.areaName == state.areaName },
+                totalAreaSaveCount = state.savedPois.size,
                 onVibeSelected = { viewModel.switchVibe(it) },
                 onSavedVibeSelected = { viewModel.onSavedVibeSelected() },
                 modifier = Modifier
@@ -243,6 +246,10 @@ private fun ReadyContent(
         // Back button: dismiss POI card > FAB (priority order)
         PlatformBackHandler(enabled = state.selectedPoi != null) {
             viewModel.clearPoiSelection()
+            if (returnToSaves[0]) {
+                returnToSaves[0] = false
+                viewModel.openSavesSheet()
+            }
         }
         PlatformBackHandler(enabled = state.selectedPoi == null && state.isFabExpanded) {
             viewModel.toggleFab()
@@ -254,7 +261,13 @@ private fun ReadyContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable { viewModel.clearPoiSelection() },
+                    .clickable {
+                        viewModel.clearPoiSelection()
+                        if (returnToSaves[0]) {
+                            returnToSaves[0] = false
+                            viewModel.openSavesSheet()
+                        }
+                    },
             )
         }
 
@@ -264,7 +277,13 @@ private fun ReadyContent(
             ExpandablePoiCard(
                 poi = state.selectedPoi,
                 activeVibe = state.activeVibe,
-                onDismiss = { viewModel.clearPoiSelection() },
+                onDismiss = {
+                    viewModel.clearPoiSelection()
+                    if (returnToSaves[0]) {
+                        returnToSaves[0] = false
+                        viewModel.openSavesSheet()
+                    }
+                },
                 onDirectionsClick = { lat, lon, name ->
                     val handled = onNavigateToMaps(lat, lon, name)
                     if (!handled) {
@@ -432,6 +451,24 @@ private fun ReadyContent(
                 },
                 onDirections = { lat, lng, name -> onNavigateToMaps(lat, lng, name) },
                 onShare = { /* TODO: platform share intent */ },
+                onPoiSelected = { saved ->
+                    viewModel.closeSavesSheet()
+                    returnToSaves[0] = true
+                    viewModel.selectPoi(
+                        POI(
+                            name = saved.name,
+                            type = saved.type,
+                            description = saved.whySpecial,
+                            confidence = Confidence.HIGH,
+                            latitude = saved.lat,
+                            longitude = saved.lng,
+                            vibe = saved.vibe,
+                            insight = saved.whySpecial,
+                            imageUrl = saved.imageUrl,
+                            rating = saved.rating,
+                        )
+                    )
+                },
             )
         }
 

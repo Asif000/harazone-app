@@ -1777,7 +1777,6 @@ class MapViewModelTest {
 
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertTrue(state.savedVibeFilter)
-        assertTrue(state.showSavesSheet)
         assertNull(state.activeVibe)
     }
 

@@ -46,10 +46,11 @@ fun SavedPoiCard(
     onDirections: () -> Unit,
     onShare: () -> Unit,
     onAskAi: () -> Unit,
+    onClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    // TODO(BACKLOG-HIGH): Card body tap should open a detail view — SavedPoi lacks full POI fields (rating, hours, description). Needs quick spec: store more at save time OR build a lighter saved-detail view.
     Card(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .alpha(if (isPendingUnsave) 0.4f else 1f),

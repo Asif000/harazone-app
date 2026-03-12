@@ -298,6 +298,36 @@ actual fun MapComposable(
             }
         }
 
+        // Fit camera to saved POIs when saved filter is active (pois is empty)
+        if (pois.isEmpty() && savedPois.isNotEmpty()) {
+            val validSaved = savedPois.filter { it.lat != 0.0 && it.lng != 0.0 }
+            if (validSaved.isNotEmpty()) {
+                suppressCameraIdle[0] = true
+                if (validSaved.size >= 2) {
+                    try {
+                        val boundsBuilder = LatLngBounds.Builder()
+                        for (sp in validSaved) {
+                            boundsBuilder.include(LatLng(sp.lat, sp.lng))
+                        }
+                        map.animateCamera(
+                            CameraUpdateFactory.newLatLngBounds(boundsBuilder.build(), 100),
+                            600,
+                        )
+                    } catch (_: Exception) {
+                        map.animateCamera(
+                            CameraUpdateFactory.newLatLngZoom(LatLng(validSaved[0].lat, validSaved[0].lng), 15.0),
+                            600,
+                        )
+                    }
+                } else {
+                    map.animateCamera(
+                        CameraUpdateFactory.newLatLngZoom(LatLng(validSaved[0].lat, validSaved[0].lng), 15.0),
+                        600,
+                    )
+                }
+            }
+        }
+
         // Add glow zones (only when a specific vibe is selected)
         if (activeVibe != null && filteredPois.size >= 2) {
             val clusters = clusterPois(filteredPois)

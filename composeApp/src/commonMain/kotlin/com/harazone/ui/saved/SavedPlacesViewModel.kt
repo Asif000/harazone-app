@@ -146,26 +146,83 @@ class SavedPlacesViewModel(
             return listOf(allCapsule) + capsules
         }
 
-        // TODO(BACKLOG-HIGH): Discovery story is bland — just counts and labels. Should surface interesting patterns: "You love coastal food spots", "All your saves are walkable from each other", time-of-day trends, vibe fingerprint insights. Consider Gemini-generated summary or richer static heuristics.
         internal fun buildDiscoveryStory(saves: List<SavedPoi>): DiscoveryStory? {
             if (saves.size < 2) return null
 
-            val uniqueAreas = saves.map { it.areaName }.distinct().size
-            val summary = "${saves.size} places across $uniqueAreas area${if (uniqueAreas == 1) "" else "s"}"
+            val uniqueAreas = saves.map { it.areaName }.distinct()
+            val vibeGroups = saves.filter { it.vibe.isNotEmpty() }.groupBy { it.vibe }
+            val typeGroups = saves.groupBy { it.type.lowercase() }
+            val topVibe = vibeGroups.maxByOrNull { it.value.size }
+            val topType = typeGroups.maxByOrNull { it.value.size }
+
+            // Build a personality-driven summary instead of just counts
+            val summary = buildSummaryLine(saves, uniqueAreas, topVibe, topType)
 
             val tags = mutableListOf<String>()
 
-            val topType = saves.groupBy { it.type.lowercase() }
-                .maxByOrNull { it.value.size }
-                ?.key
-                ?.replaceFirstChar { it.uppercaseChar() }
-            if (topType != null) tags.add(topType)
+            // Vibe fingerprint tag
+            if (topVibe != null && topVibe.value.size >= 2) {
+                val vibeName = topVibe.key.lowercase().replaceFirstChar { it.uppercaseChar() }
+                tags.add("$vibeName lover")
+            }
 
-            if (uniqueAreas > 1) tags.add("$uniqueAreas areas")
+            // Explorer breadth tag
+            when {
+                uniqueAreas.size >= 4 -> tags.add("Globe trotter")
+                uniqueAreas.size >= 2 -> tags.add("${uniqueAreas.size} areas explored")
+            }
 
-            if (saves.any { it.userNote != null }) tags.add("Note keeper")
+            // Type preference tag
+            if (topType != null && topType.value.size >= 2) {
+                val typeName = topType.key.replaceFirstChar { it.uppercaseChar() }
+                tags.add("$typeName seeker")
+            }
+
+            // Curator tag
+            val notedCount = saves.count { it.userNote != null }
+            if (notedCount >= 2) tags.add("Note keeper")
 
             return DiscoveryStory(summary = summary, tags = tags.take(3))
+        }
+
+        private fun buildSummaryLine(
+            saves: List<SavedPoi>,
+            uniqueAreas: List<String>,
+            topVibe: Map.Entry<String, List<SavedPoi>>?,
+            topType: Map.Entry<String, List<SavedPoi>>?,
+        ): String {
+            val vibeName = topVibe?.key?.lowercase()?.replaceFirstChar { it.uppercaseChar() }
+            val typeName = topType?.key?.lowercase()
+            val areaList = formatAreaList(uniqueAreas)
+            val vibeHint = if (vibeName != null) " — mostly chasing $vibeName vibes" else ""
+
+            // Pattern: multi-area wanderer
+            if (uniqueAreas.size >= 3) {
+                return "${saves.size} places across $areaList$vibeHint. You don't just visit — you collect."
+            }
+
+            // Pattern: two areas
+            if (uniqueAreas.size == 2) {
+                return "From $areaList — ${saves.size} discoveries$vibeHint."
+            }
+
+            // Pattern: single area, dominant vibe
+            if (topVibe != null && topVibe.value.size * 2 >= saves.size && vibeName != null) {
+                return "You're drawn to the $vibeName side of $areaList. ${saves.size} discoveries and counting."
+            }
+
+            // Pattern: single area, type-heavy
+            if (topType != null && topType.value.size * 2 >= saves.size && typeName != null) {
+                return "A $typeName explorer in $areaList — ${topType.value.size} of your ${saves.size} saves."
+            }
+
+            // Default
+            return "${saves.size} discoveries in $areaList. Your map is taking shape."
+        }
+
+        private fun formatAreaList(areas: List<String>): String = when {
+            areas.size <= 2 -> areas.joinToString(" and ")
+            else -> areas.dropLast(1).joinToString(", ") + " and " + areas.last()
         }
     }
 }

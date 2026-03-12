@@ -253,7 +253,6 @@ class MapViewModel(
             savedVibeFilter = newFilter,
             activeVibe = if (newFilter) null else current.activeVibe,
         )
-        if (newFilter) openSavesSheet()
     }
 
     fun closeSavesSheet() {
