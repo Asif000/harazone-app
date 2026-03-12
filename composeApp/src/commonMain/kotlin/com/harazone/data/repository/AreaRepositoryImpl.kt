@@ -183,10 +183,16 @@ internal class AreaRepositoryImpl(
         val result = pois.map { poi ->
             async {
                 semaphore.withPermit {
-                    val wikiUrl = wikipediaImageRepository.getImageUrl(poi.wikiSlug, poi.name)
-                    val imageUrl = wikiUrl ?: buildSatelliteTileRef(poi.latitude, poi.longitude)
-                    AppLogger.d { "enrichPoisWithImages: '${poi.name}' -> wiki=${wikiUrl != null}, mapTiler=${imageUrl != null && wikiUrl == null}, final=${imageUrl?.take(60)}" }
-                    poi.copy(imageUrl = imageUrl)
+                    try {
+                        val wikiUrl = wikipediaImageRepository.getImageUrl(poi.wikiSlug, poi.name)
+                        val imageUrl = wikiUrl ?: buildSatelliteTileRef(poi.latitude, poi.longitude)
+                        AppLogger.d { "enrichPoisWithImages: '${poi.name}' -> wiki=${wikiUrl != null}, mapTiler=${imageUrl != null && wikiUrl == null}, final=${imageUrl?.take(60)}" }
+                        poi.copy(imageUrl = imageUrl)
+                    } catch (e: CancellationException) { throw e }
+                    catch (e: Exception) {
+                        AppLogger.w(e) { "enrichPoisWithImages: skipping '${poi.name}' — ${e.message}" }
+                        poi
+                    }
                 }
             }
         }.awaitAll()

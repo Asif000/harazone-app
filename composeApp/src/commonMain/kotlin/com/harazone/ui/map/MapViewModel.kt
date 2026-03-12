@@ -31,9 +31,6 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.time.Clock
-import kotlin.time.ExperimentalTime
-
 class MapViewModel(
     private val locationProvider: LocationProvider,
     private val getAreaPortrait: GetAreaPortraitUseCase,
@@ -43,6 +40,7 @@ class MapViewModel(
     private val geocodingProvider: MapTilerGeocodingProvider,
     private val recentPlacesRepository: RecentPlacesRepository,
     private val savedPoiRepository: SavedPoiRepository,
+    private val clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow<MapUiState>(MapUiState.Loading)
@@ -67,6 +65,7 @@ class MapViewModel(
     // Cache for GPS home area — avoids re-querying Gemini on return-to-location
     private var gpsAreaNameCache: String? = null
     private var gpsAreaPoisCache: List<POI> = emptyList()
+    private var gpsAreaCacheMs: Long = 0L
 
     init {
         loadLocation()
@@ -629,11 +628,10 @@ class MapViewModel(
                     )
                 } else {
                     // Check if we have cached POIs for the GPS area (avoids re-querying Gemini)
-                    val cachedToken = gpsAreaNameCache?.substringBefore(",")?.trim()
-                    val gpsTokenForCache = gpsAreaName.substringBefore(",").trim()
-                    val hasCachedPois = cachedToken != null &&
-                        gpsTokenForCache.equals(cachedToken, ignoreCase = true) &&
-                        gpsAreaPoisCache.isNotEmpty()
+                    val hasCachedPois = gpsAreaNameCache != null &&
+                        gpsAreaName.equals(gpsAreaNameCache, ignoreCase = true) &&
+                        gpsAreaPoisCache.isNotEmpty() &&
+                        (clockMs() - gpsAreaCacheMs) < GPS_CACHE_STALE_MS
 
                     if (hasCachedPois) {
                         val counts = computeVibePoiCounts(gpsAreaPoisCache)
@@ -660,7 +658,7 @@ class MapViewModel(
                             gpsLatitude = coords.latitude,
                             gpsLongitude = coords.longitude,
                             showMyLocation = false,
-                                        cameraMoveId = state.cameraMoveId + 1,
+                            cameraMoveId = state.cameraMoveId + 1,
                             isSearchingArea = true,
                             pois = emptyList(),
                             vibePoiCounts = emptyMap(),
@@ -685,6 +683,7 @@ class MapViewModel(
                                 // Update cache for future returns
                                 gpsAreaNameCache = gpsAreaName
                                 gpsAreaPoisCache = pois
+                                gpsAreaCacheMs = clockMs()
                             },
                             onError = { e ->
                                 AppLogger.e(e) { "Return to location: portrait fetch failed" }
@@ -775,6 +774,7 @@ class MapViewModel(
                         // Cache GPS area POIs for instant return-to-location
                         gpsAreaNameCache = areaName
                         gpsAreaPoisCache = pois
+                        gpsAreaCacheMs = clockMs()
                         analyticsTracker.trackEvent(
                             "map_opened",
                             mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
@@ -797,24 +797,22 @@ class MapViewModel(
         }
     }
 
-    @OptIn(ExperimentalTime::class)
     private fun fetchWeatherForLocation(lat: Double, lng: Double) {
         viewModelScope.launch {
             val weatherResult = weatherProvider.getWeather(lat, lng)
             if (weatherResult.isSuccess) {
                 val current = _uiState.value as? MapUiState.Ready ?: return@launch
                 _uiState.value = current.copy(weather = weatherResult.getOrNull())
-                lastWeatherFetchMs = Clock.System.now().toEpochMilliseconds()
+                lastWeatherFetchMs = clockMs()
             } else {
                 AppLogger.e(weatherResult.exceptionOrNull()) { "Weather fetch failed" }
             }
         }
     }
 
-    @OptIn(ExperimentalTime::class)
     fun refreshWeatherIfStale() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        val elapsed = Clock.System.now().toEpochMilliseconds() - lastWeatherFetchMs
+        val elapsed = clockMs() - lastWeatherFetchMs
         if (elapsed >= WEATHER_STALE_MS) {
             fetchWeatherForLocation(current.latitude, current.longitude)
         }
@@ -949,6 +947,7 @@ class MapViewModel(
 
     companion object {
         private const val WEATHER_STALE_MS = 5 * 60 * 1000L // 5 minutes
+        private const val GPS_CACHE_STALE_MS = 30 * 60 * 1000L // 30 minutes
         // TODO(BACKLOG-LOW): Generic location error message — detect permission denial vs GPS off and show specific guidance
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."
         internal const val LOCATION_TIMEOUT_MS = 10_000L

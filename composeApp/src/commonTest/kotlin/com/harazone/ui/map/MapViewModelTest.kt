@@ -67,6 +67,7 @@ class MapViewModelTest {
         geocodingProvider: com.harazone.data.remote.MapTilerGeocodingProvider = FakeMapTilerGeocodingProvider(),
         recentPlacesRepository: com.harazone.domain.repository.RecentPlacesRepository = FakeRecentPlacesRepository(),
         savedPoiRepository: com.harazone.domain.repository.SavedPoiRepository = com.harazone.fakes.FakeSavedPoiRepository(),
+        clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
@@ -76,6 +77,7 @@ class MapViewModelTest {
         geocodingProvider = geocodingProvider,
         recentPlacesRepository = recentPlacesRepository,
         savedPoiRepository = savedPoiRepository,
+        clockMs = clockMs,
     )
 
     @Test
@@ -231,6 +233,7 @@ class MapViewModelTest {
     private fun createReadyViewModel(
         analyticsTracker: FakeAnalyticsTracker = FakeAnalyticsTracker(),
         weatherProvider: WeatherProvider = FakeWeatherProvider(),
+        clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
     ): Pair<MapViewModel, FakeAnalyticsTracker> {
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -242,6 +245,7 @@ class MapViewModelTest {
             ),
             analyticsTracker = analyticsTracker,
             weatherProvider = weatherProvider,
+            clockMs = clockMs,
         )
         return viewModel to analyticsTracker
     }
@@ -1325,34 +1329,62 @@ class MapViewModelTest {
 
     // Regression: weather stays stale when returning to home screen (closing saves sheet)
     @Test
-    fun closeSavesSheet_refreshesWeatherWhenStale() = runTest(testDispatcher) {
+    fun closeSavesSheet_doesNotRefetchWhenFresh() = runTest(testDispatcher) {
         val weatherProvider = FakeWeatherProvider()
-        val (viewModel, _) = createReadyViewModel(weatherProvider = weatherProvider)
+        var fakeTimeMs = 1000L
+        val (viewModel, _) = createReadyViewModel(weatherProvider = weatherProvider, clockMs = { fakeTimeMs })
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
         val callsAfterInit = weatherProvider.callCount
 
-        // Open and immediately close saves sheet — weather is fresh, should NOT refetch
+        // Close saves sheet with fresh weather (<5 min) — should NOT refetch
         viewModel.openSavesSheet()
         viewModel.closeSavesSheet()
         testScheduler.advanceUntilIdle()
         assertEquals(callsAfterInit, weatherProvider.callCount, "Fresh weather should not trigger refetch")
     }
 
-    // Regression: refreshWeatherIfStale called directly triggers fetch when stale
     @Test
-    fun refreshWeatherIfStale_fetchesWhenStale() = runTest(testDispatcher) {
+    fun closeSavesSheet_refetchesWhenStale() = runTest(testDispatcher) {
         val weatherProvider = FakeWeatherProvider()
-        val (viewModel, _) = createReadyViewModel(weatherProvider = weatherProvider)
+        var fakeTimeMs = 1000L
+        val (viewModel, _) = createReadyViewModel(weatherProvider = weatherProvider, clockMs = { fakeTimeMs })
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
         val callsAfterInit = weatherProvider.callCount
 
-        // Force staleness by calling refreshWeatherIfStale after advancing virtual time
-        // The staleness threshold is 5 minutes. We can't easily advance the real clock,
-        // but we can verify the method exists and doesn't crash when weather is fresh.
+        // Advance fake clock past 5-min threshold
+        fakeTimeMs += 6 * 60 * 1000L
+        viewModel.openSavesSheet()
+        viewModel.closeSavesSheet()
+        testScheduler.advanceUntilIdle()
+        assertTrue(weatherProvider.callCount > callsAfterInit, "Stale weather should trigger refetch on saves sheet close")
+    }
+
+    @Test
+    fun refreshWeatherIfStale_doesNotRefetchWhenFresh() = runTest(testDispatcher) {
+        val weatherProvider = FakeWeatherProvider()
+        var fakeTimeMs = 1000L
+        val (viewModel, _) = createReadyViewModel(weatherProvider = weatherProvider, clockMs = { fakeTimeMs })
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val callsAfterInit = weatherProvider.callCount
+
         viewModel.refreshWeatherIfStale()
         testScheduler.advanceUntilIdle()
-        // With fresh weather (<5 min), should NOT refetch
-        assertEquals(callsAfterInit, weatherProvider.callCount, "Fresh weather should not trigger refetch via refreshWeatherIfStale")
+        assertEquals(callsAfterInit, weatherProvider.callCount, "Fresh weather should not trigger refetch")
+    }
+
+    @Test
+    fun refreshWeatherIfStale_refetchesWhenStale() = runTest(testDispatcher) {
+        val weatherProvider = FakeWeatherProvider()
+        var fakeTimeMs = 1000L
+        val (viewModel, _) = createReadyViewModel(weatherProvider = weatherProvider, clockMs = { fakeTimeMs })
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val callsAfterInit = weatherProvider.callCount
+
+        // Advance fake clock past 5-min threshold
+        fakeTimeMs += 6 * 60 * 1000L
+        viewModel.refreshWeatherIfStale()
+        testScheduler.advanceUntilIdle()
+        assertTrue(weatherProvider.callCount > callsAfterInit, "Stale weather should trigger refetch")
     }
 
     @Test
