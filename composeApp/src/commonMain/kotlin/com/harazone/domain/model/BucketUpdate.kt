@@ -21,4 +21,14 @@ sealed class BucketUpdate {
     data class ContentAvailabilityNote(
         val message: String
     ) : BucketUpdate()
+
+    data class VibesReady(
+        val vibes: List<DynamicVibe>,
+        val pois: List<POI>,
+        val fromCache: Boolean = false,
+    ) : BucketUpdate()
+
+    data class DynamicVibeComplete(
+        val content: DynamicVibeContent,
+    ) : BucketUpdate()
 }

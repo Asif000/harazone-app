@@ -142,15 +142,18 @@ class DomainModelTest {
 
         // Exhaustive when
         val pinsReady: BucketUpdate = BucketUpdate.PinsReady(emptyList())
-        val types = listOf(delta, complete, portraitComplete, pinsReady).map { update ->
+        val vibesReady: BucketUpdate = BucketUpdate.VibesReady(emptyList(), emptyList())
+        val types = listOf(delta, complete, portraitComplete, pinsReady, vibesReady).map { update ->
             when (update) {
                 is BucketUpdate.ContentDelta -> "delta"
                 is BucketUpdate.BucketComplete -> "complete"
                 is BucketUpdate.PortraitComplete -> "portrait"
                 is BucketUpdate.ContentAvailabilityNote -> "note"
                 is BucketUpdate.PinsReady -> "pins"
+                is BucketUpdate.VibesReady -> "vibes"
+                is BucketUpdate.DynamicVibeComplete -> "vibe_complete"
             }
         }
-        assertEquals(listOf("delta", "complete", "portrait", "pins"), types)
+        assertEquals(listOf("delta", "complete", "portrait", "pins", "vibes"), types)
     }
 }

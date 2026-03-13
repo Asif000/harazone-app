@@ -68,6 +68,7 @@ import coil3.compose.AsyncImage
 import com.harazone.BuildKonfig
 import com.harazone.domain.model.ContextualPill
 import com.harazone.domain.model.MessageRole
+import com.harazone.ui.components.MarkdownText
 
 private val IndigoGradient = Brush.linearGradient(
     colors = listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
@@ -569,10 +570,11 @@ private fun ChatBubbleItem(
                 modifier = Modifier.fillMaxWidth(0.85f),
             ) {
                 Row(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        bubble.content,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.bodyMedium,
+                    MarkdownText(
+                        text = bubble.content,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
                         modifier = Modifier.weight(1f, fill = false),
                     )
                     if (bubble.isStreaming) {

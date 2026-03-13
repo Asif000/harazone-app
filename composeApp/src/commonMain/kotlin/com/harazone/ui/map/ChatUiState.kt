@@ -6,6 +6,12 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class ChatResponse(
+    val prose: String = "",
+    val pois: List<ChatPoiCard> = emptyList(),
+)
+
+@Serializable
 data class ChatPoiCard(
     @SerialName("n") val name: String,
     @SerialName("t") val type: String,

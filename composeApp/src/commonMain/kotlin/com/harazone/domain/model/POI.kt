@@ -11,6 +11,7 @@ data class POI(
     val latitude: Double?,
     val longitude: Double?,
     val vibe: String = "",
+    val vibes: List<String> = emptyList(),
     val insight: String = "",
     val hours: String? = null,
     val liveStatus: String? = null,

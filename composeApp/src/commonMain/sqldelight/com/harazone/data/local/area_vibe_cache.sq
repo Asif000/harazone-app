@@ -1,0 +1,18 @@
+CREATE TABLE IF NOT EXISTS area_vibe_cache (
+    area_name TEXT NOT NULL,
+    language TEXT NOT NULL,
+    vibes_json TEXT NOT NULL,
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    PRIMARY KEY (area_name, language)
+);
+
+getVibes:
+SELECT * FROM area_vibe_cache WHERE area_name = :area_name AND language = :language;
+
+insertOrReplaceVibes:
+INSERT OR REPLACE INTO area_vibe_cache(area_name, language, vibes_json, expires_at, created_at)
+VALUES (:area_name, :language, :vibes_json, :expires_at, :created_at);
+
+deleteExpiredVibes:
+DELETE FROM area_vibe_cache WHERE expires_at <= :current_time;

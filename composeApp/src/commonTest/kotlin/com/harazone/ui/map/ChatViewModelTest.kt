@@ -8,7 +8,7 @@ import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.ContextualPill
 import com.harazone.domain.model.MessageRole
 import com.harazone.domain.model.POI
-import com.harazone.domain.model.Vibe
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.fakes.FakeAreaIntelligenceProvider
 import com.harazone.fakes.FakeClock
 import com.harazone.fakes.FakeSavedPoiRepository
@@ -231,7 +231,7 @@ class ChatViewModelTest {
     @Test
     fun `openChat shows intent pills instead of vibe starter chips`() = runTest {
         val vm = createViewModel()
-        vm.openChat("Test Area", emptyList(), Vibe.SAFETY)
+        vm.openChat("Test Area", emptyList(), DynamicVibe(label = "Safety", icon = ""))
 
         val pills = vm.uiState.value.intentPills
         assertEquals(5, pills.size)

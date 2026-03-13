@@ -9,12 +9,18 @@ import com.harazone.domain.model.TasteProfile
 
 internal class GeminiPromptBuilder {
 
-    fun buildPinOnlyPrompt(areaName: String, context: AreaContext): String {
+    fun buildPinOnlyPrompt(areaName: String): String {
         return """
-8 POIs in "$areaName". JSON array only, no other text.
-[{"n":"Castelo de São Jorge","t":"historic","lat":38.7139,"lng":-9.1334},{"n":"Time Out Market","t":"food","lat":38.7068,"lng":-9.1459},{"n":"Jardim da Estrela","t":"park","lat":38.7138,"lng":-9.1605}]
-t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-GPS to 4 decimal places. Skip any POI you cannot place accurately.
+Area: "$areaName". Return JSON only, no other text.
+Schema: {"vibes":[{"label":"Street Art","icon":"🎨"},...],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art"},...]}
+Rules:
+- vibes: 4-6 most distinctive dimensions of THIS area. Each vibe must have 3+ real POIs in this list.
+- pois: 8 best POIs. Each POI "v" field MUST exactly match one of the vibe labels you returned — character-for-character, same case.
+- ONLY return vibes where at least 3 of the 8 POIs will be tagged with that vibe label.
+- t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+- GPS to 4 decimal places. Skip any POI you cannot place accurately.
+Example:
+{"vibes":[{"label":"Street Art","icon":"🎨"},{"label":"Craft Beer","icon":"🍺"}],"pois":[{"n":"Brick Lane Murals","t":"arts","lat":51.5215,"lng":-0.0714,"v":"Street Art"},{"n":"Howling Hops","t":"food","lat":51.5469,"lng":-0.0507,"v":"Craft Beer"}]}
         """.trimIndent()
     }
 
@@ -91,6 +97,30 @@ IMPORTANT:
         """.trimIndent()
     }
 
+    fun buildDynamicVibeEnrichmentPrompt(areaName: String, vibeLabels: List<String>, poiNames: List<String>): String {
+        val vibeList = vibeLabels.joinToString(", ")
+        val poiList = poiNames.joinToString(", ")
+        return """
+You are a passionate local guide for "$areaName".
+Use EXACTLY these vibe labels (verbatim): $vibeList
+POIs to enrich: $poiList
+
+For each vibe, output a section:
+---VIBE---
+{"label":"{exact label}","icon":"{emoji}","highlight":"one sentence","content":"2-3 sentences","poi_ids":["Name1","Name2"]}
+
+Then output:
+---POIS---
+[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"dominant vibe","vs":["vibe1","vibe2"],"w":"why special","r":4.2}]
+
+Rules:
+- Each vibe label MUST exactly match the labels above — character-for-character, same case.
+- Each POI "v" field is the single dominant vibe. "vs" is the full list of vibes this POI belongs to.
+- "w" field is required for every POI — one sentence on why it is special.
+- GPS to 4 decimal places. t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+        """.trimIndent()
+    }
+
     fun buildAiSearchPrompt(query: String, areaName: String): String {
         return """You are a knowledgeable local guide for $areaName. Answer the following question concisely as if you are a local expert: "$query". Keep your response under 120 words. Be specific and practical. Do not use bullet points."""
     }
@@ -104,11 +134,13 @@ IMPORTANT:
         tasteProfile: TasteProfile,
         poiCount: Int,
         framingHint: String? = null,
+        activeVibeName: String? = null,
     ): String {
         return listOf(
             personaBlock(areaName),
             areaContextBlock(areaName, pois),
             intentBlock(intent),
+            vibeContextBlock(activeVibeName),
             engagementBlock(engagementLevel),
             saveContextBlock(saves, areaName),
             tasteProfileBlock(tasteProfile, intent, engagementLevel),
@@ -117,6 +149,11 @@ IMPORTANT:
             outputFormatBlock(),
             framingBlock(framingHint),
         ).filter { it.isNotBlank() }.joinToString("\n\n")
+    }
+
+    private fun vibeContextBlock(vibeName: String?): String {
+        if (vibeName == null) return ""
+        return "EXPLORATION CONTEXT: The user is currently viewing the '$vibeName' vibe. Open your response with content relevant to this vibe, but pivot freely if they change topic."
     }
 
     private fun personaBlock(areaName: String): String =
@@ -202,12 +239,16 @@ VOICE: Mischievous. "Okay, you're not going to believe this, but...""""
         "CONTEXT SHIFTS: If the user changes their mind, switches to a different area, or blends intents mid-conversation, roll with it enthusiastically. Acknowledge the shift and adapt immediately. Your initial framing is a starting point, not a cage."
 
     private fun outputFormatBlock(): String =
-        "CONVERSATION STYLE: You are texting a friend, not writing a travel blog. 2-3 sentences max per response. End with a question to keep the conversation going — ask what they want, what vibe they're after, or if they want more options. NEVER dump a list of 3-5 places unprompted. Start with 1-2 places, then let the user guide you.\n" +
-        "DEPTH CONTROL: First response = 1-2 places + a follow-up question. If user says 'more', 'go deeper', 'tell me more' = add 2-3 more places in one short paragraph. Never exceed 5 places total in a single message.\n" +
-        "PLACE CARDS: Every place you mention MUST appear BOTH as a brief mention in your prose AND as a JSON card immediately after. No orphan cards. No orphan names. 1:1 match. JSON format: {\"n\":\"Name\",\"t\":\"type\",\"lat\":0.0,\"lng\":0.0,\"w\":\"one sentence on why it is special\"}. Valid t values: food, entertainment, park, historic, shopping, arts, transit, safety, beach, district.\n" +
-        "Pattern: mention the place naturally in a sentence, then the JSON line.\n" +
-        "Example:\n'Check out this spot for incredible arepas —\n{\"n\":\"Arepas La Dinastia\",\"t\":\"food\",\"lat\":25.7905,\"lng\":-80.3384,\"w\":\"Beloved local spot for authentic arepas and cachapas\"}\nWant something outdoorsy too, or more food options?'\n" +
-        "IMPORTANT: The name in your prose and the \"n\" field in the JSON MUST match exactly."
+        """RESPONSE FORMAT: Always respond with a single JSON object — no other text, no markdown outside the JSON.
+Schema: {"prose":"your conversational reply here","pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"w":"why special"}]}
+Rules:
+- prose: 2-3 sentences max. Conversational, not a travel blog. End with a follow-up question.
+- pois: every place mentioned in prose MUST appear in the pois array. If no places mentioned, return empty array.
+- prose may use **bold**, *italic*, and `code` for emphasis — these will be rendered.
+- t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+- DEPTH CONTROL: First response = 1-2 places. If user asks for more = 2-3 more. Never exceed 5 places total per message.
+- DEDUPLICATION: If the user context mentions previously recommended places, do NOT include them in pois or mention them in prose.
+Example: {"prose":"Check out **Brick Lane** for incredible street art — it changes weekly.\nWhat mood are you in — edgy underground spots or the well-known walls?","pois":[{"n":"Brick Lane","t":"arts","lat":51.5215,"lng":-0.0714,"w":"London's densest open-air gallery, curated by the street itself"}]}"""
 
     private fun framingBlock(framingHint: String?): String = framingHint ?: ""
 }

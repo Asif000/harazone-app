@@ -7,6 +7,7 @@ import com.harazone.domain.model.BucketContent
 import com.harazone.domain.model.BucketType
 import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.BuildKonfig
 import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.domain.model.ConnectivityState
@@ -90,12 +91,23 @@ internal class AreaRepositoryImpl(
         // POI-only cache hit — two-stage pipeline doesn't emit BucketComplete,
         // so bucket cache is empty but POI cache may be valid.
         // Only use this path when there are NO bucket entries at all (pure two-stage flow).
+        // TODO(BACKLOG-MEDIUM): Guard skips when stale bucket entries exist — if bucket cache is expired but POI cache is fresh,
+        // staleParsed is non-empty so we fall through to stale-while-revalidate and re-call Gemini unnecessarily.
+        // Fix: check validParsed.isEmpty() only, or separate the POI cache hit check from the bucket cache guard.
         if (validParsed.isEmpty() && staleParsed.isEmpty()) {
             val cachedPois = loadPoisFromCache(areaName, language, now)
             if (cachedPois.isNotEmpty()) {
                 AppLogger.d { "POI cache HIT for '$areaName' — ${cachedPois.size} POIs (no bucket cache)" }
                 // If any POIs lack images (e.g., cached from Stage 1 before enrichment),
                 // enrich in background and update cache
+                // TODO(BACKLOG-LOW): Stage 2-only POIs (no coords, wiki fails) keep imageUrl=null after enrichment,
+                // causing needsEnrichment=true on every cache hit and repeated background enrichment calls.
+                // Fix: track enrichment attempts per POI (e.g. store a flag or sentinel URL) to avoid re-enriching permanently null images.
+                // H1 fix: emit cached vibes so the vibe rail populates on revisit
+                val cachedVibes = loadVibesFromCache(areaName, language, now)
+                if (cachedVibes.isNotEmpty()) {
+                    emit(BucketUpdate.VibesReady(cachedVibes, cachedPois, fromCache = true))
+                }
                 val needsEnrichment = cachedPois.any { it.imageUrl == null }
                 if (needsEnrichment) {
                     emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPois)))
@@ -119,14 +131,20 @@ internal class AreaRepositoryImpl(
         val connectivity = connectivityObserver().first()
 
         if (connectivity is ConnectivityState.Offline) {
+            // Emit cached vibes even if expired when offline
+            val cachedVibes = loadVibesFromCache(areaName, language, now)
+            val cachedPoisForVibes = loadPoisFromCache(areaName, language, now)
+            if (cachedVibes.isNotEmpty() && cachedPoisForVibes.isNotEmpty()) {
+                emit(BucketUpdate.VibesReady(vibes = cachedVibes, pois = cachedPoisForVibes, fromCache = true))
+            }
             val allCached = validParsed + staleParsed
             if (allCached.isNotEmpty()) {
                 allCached.forEach { emit(BucketUpdate.BucketComplete(it)) }
                 emit(BucketUpdate.ContentAvailabilityNote("You're offline — showing last known content"))
-            } else {
+            } else if (cachedVibes.isEmpty()) {
                 emit(BucketUpdate.ContentAvailabilityNote("No content available offline for this area"))
             }
-            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
+            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPoisForVibes)))
             return@flow
         }
 
@@ -167,6 +185,15 @@ internal class AreaRepositoryImpl(
         try {
             aiProvider.streamAreaPortrait(areaName, context).collect { update ->
                 when (update) {
+                    is BucketUpdate.VibesReady -> {
+                        // Apply client-side quality gate: drop vibes with fewer than 2 POIs
+                        val qualityVibes = update.vibes.filter { dv ->
+                            update.pois.count { it.vibe == dv.label } >= 2
+                        }
+                        emit(BucketUpdate.VibesReady(vibes = qualityVibes, pois = update.pois, fromCache = false))
+                        if (update.pois.isNotEmpty()) writePoisToCache(update.pois, areaName, language)
+                        if (qualityVibes.isNotEmpty()) writeVibesToCache(qualityVibes, areaName, language)
+                    }
                     is BucketUpdate.PinsReady -> {
                         emit(update)
                         // Cache Stage 1 POIs (with coords) so restarts don't re-query
@@ -191,6 +218,9 @@ internal class AreaRepositoryImpl(
                                 emit(BucketUpdate.PortraitComplete(enriched))
                             }
                         }
+                    }
+                    is BucketUpdate.DynamicVibeComplete -> {
+                        emit(update)
                     }
                     else -> {
                         emit(update)
@@ -251,6 +281,7 @@ internal class AreaRepositoryImpl(
             val enrichment = candidates.first()
             cached.copy(
                 vibe = enrichment.vibe.ifEmpty { cached.vibe },
+                vibes = enrichment.vibes.ifEmpty { cached.vibes },
                 insight = enrichment.insight.ifEmpty { cached.insight },
                 description = enrichment.description.ifEmpty { cached.description },
                 imageUrl = enrichment.imageUrl ?: cached.imageUrl,
@@ -280,6 +311,29 @@ internal class AreaRepositoryImpl(
         val parts = url.removePrefix("maptiler-satellite://").split("/")
         if (parts.size != 3) return@map poi
         poi.copy(imageUrl = "https://api.maptiler.com/tiles/satellite-v2/${parts[0]}/${parts[1]}/${parts[2]}.jpg?key=${BuildKonfig.MAPTILER_API_KEY}")
+    }
+
+    private fun writeVibesToCache(vibes: List<DynamicVibe>, areaName: String, language: String) {
+        val now = clock.nowMs()
+        val vibesJson = json.encodeToString(vibes)
+        database.area_vibe_cacheQueries.insertOrReplaceVibes(
+            area_name = areaName,
+            language = language,
+            vibes_json = vibesJson,
+            expires_at = now + 3 * MS_PER_HOUR,
+            created_at = now,
+        )
+    }
+
+    private fun loadVibesFromCache(areaName: String, language: String, now: Long): List<DynamicVibe> {
+        val cached = database.area_vibe_cacheQueries.getVibes(areaName, language).executeAsOneOrNull()
+            ?: return emptyList()
+        return try {
+            json.decodeFromString(cached.vibes_json)
+        } catch (e: Exception) {
+            AppLogger.e(e) { "Failed to parse cached vibes for $areaName" }
+            emptyList()
+        }
     }
 
     private fun writePoisToCache(pois: List<POI>, areaName: String, language: String) {

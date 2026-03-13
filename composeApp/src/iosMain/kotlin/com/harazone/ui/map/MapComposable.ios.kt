@@ -15,6 +15,7 @@ import cocoapods.MapLibre.MLNPointAnnotation
 import cocoapods.MapLibre.MLNPointFeature
 import cocoapods.MapLibre.MLNShapeSource
 import cocoapods.MapLibre.MLNStyle
+import cocoapods.MapLibre.MLNSymbolStyleLayer
 import com.harazone.BuildKonfig
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
@@ -32,6 +33,9 @@ import platform.darwin.NSObject
 
 private val MAP_STYLE_URL get() =
     "https://api.maptiler.com/maps/streets-v2-dark/style.json?key=${BuildKonfig.MAPTILER_API_KEY}"
+
+private const val POI_TEXT_SOURCE_ID = "poi_text_source"
+private const val POI_TEXT_LAYER_ID = "poi_text_layer"
 
 // TODO(BACKLOG-LOW): iOS gold saved pins — implement MLNAnnotationView subclass with gold border when MLNAnnotationView ObjC bridging is resolved
 @OptIn(ExperimentalForeignApi::class)
@@ -116,7 +120,8 @@ actual fun MapComposable(
         currentAnnotations.clear()
         annotationPoiMap.clear()
 
-        // Remove previous glow layers + sources
+        // Remove previous text label layer + source and glow layers
+        removePoiTextLayer(style)
         removeGlowLayers(style)
 
         val filteredPois = if (activeVibe != null) {
@@ -127,10 +132,9 @@ actual fun MapComposable(
 
         delegate.activeVibe = activeVibe
 
-        // Build annotations
+        // Build annotations (pins + tap handling)
         val annotations = filteredPois.map { poi ->
             val annotation = MLNPointAnnotation()
-            // coordinate is readonly via MLNAnnotation protocol — use ObjC setter directly
             annotation.setCoordinate(CLLocationCoordinate2DMake(poi.latitude!!, poi.longitude!!))
             annotation.setTitle(poi.name)
             annotationPoiMap[annotation] = poi
@@ -141,6 +145,41 @@ actual fun MapComposable(
         if (annotations.isNotEmpty()) {
             @Suppress("UNCHECKED_CAST")
             mapView.addAnnotations(annotations as List<*>)
+        }
+
+        // Text labels via MLNSymbolStyleLayer — renders POI name below each pin
+        if (filteredPois.isNotEmpty()) {
+            val features = filteredPois.map { poi ->
+                MLNPointFeature().apply {
+                    setCoordinate(CLLocationCoordinate2DMake(poi.latitude!!, poi.longitude!!))
+                    @Suppress("UNCHECKED_CAST")
+                    setAttributes(mapOf("name" to poi.name) as Map<Any?, *>)
+                }
+            }
+
+            @Suppress("UNCHECKED_CAST")
+            val source = MLNShapeSource(
+                identifier = POI_TEXT_SOURCE_ID,
+                features = features as List<*>,
+                options = null,
+            )
+            style.addSource(source)
+
+            val textLayer = MLNSymbolStyleLayer(identifier = POI_TEXT_LAYER_ID, source = source)
+            textLayer.text = NSExpression.expressionForKeyPath("name")
+            textLayer.textFontSize = NSExpression.expressionForConstantValue(NSNumber(double = 10.0))
+            textLayer.textColor = NSExpression.expressionForConstantValue(
+                UIColor(red = 0.98, green = 0.98, blue = 0.98, alpha = 1.0), // #FAFAFA
+            )
+            textLayer.textHaloColor = NSExpression.expressionForConstantValue(
+                UIColor(red = 0.0, green = 0.0, blue = 0.0, alpha = 0.7),
+            )
+            textLayer.textHaloWidth = NSExpression.expressionForConstantValue(NSNumber(double = 1.5))
+            textLayer.textOffset = NSExpression.expressionForConstantValue(
+                listOf(NSNumber(double = 0.0), NSNumber(double = 1.8)),
+            )
+            textLayer.textAllowsOverlap = NSExpression.expressionForConstantValue(true)
+            style.addLayer(textLayer)
         }
 
         // Fit camera to show all pins (only when the POI list itself changes)
@@ -240,6 +279,13 @@ private fun hexToUIColor(hex: String): UIColor {
     val g = h.substring(2, 4).toInt(16) / 255.0
     val b = h.substring(4, 6).toInt(16) / 255.0
     return UIColor(red = r, green = g, blue = b, alpha = 1.0)
+}
+
+/** Remove POI text label symbol layer + source from a previous render. */
+@OptIn(ExperimentalForeignApi::class)
+private fun removePoiTextLayer(style: MLNStyle) {
+    style.layerWithIdentifier(POI_TEXT_LAYER_ID)?.let { style.removeLayer(it) }
+    style.sourceWithIdentifier(POI_TEXT_SOURCE_ID)?.let { style.removeSource(it) }
 }
 
 /** Remove any glow circle layers/sources added by a previous POI render. */

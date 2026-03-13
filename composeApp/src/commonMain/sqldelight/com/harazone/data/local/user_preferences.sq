@@ -1,0 +1,13 @@
+CREATE TABLE IF NOT EXISTS user_preferences (
+    key TEXT NOT NULL PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
+get:
+SELECT value FROM user_preferences WHERE key = :key;
+
+set:
+INSERT OR REPLACE INTO user_preferences(key, value) VALUES (:key, :value);
+
+delete:
+DELETE FROM user_preferences WHERE key = :key;

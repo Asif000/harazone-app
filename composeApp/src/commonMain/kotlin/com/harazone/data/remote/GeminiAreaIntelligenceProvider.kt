@@ -5,6 +5,7 @@ import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.MessageRole
 import com.harazone.domain.model.DomainError
 import com.harazone.domain.model.DomainErrorException
@@ -79,12 +80,13 @@ internal class GeminiAreaIntelligenceProvider(
 
         AppLogger.d { "GeminiAreaIntelligenceProvider: streaming portrait for '$areaName'" }
 
-        val stage1NamesDeferred = CompletableDeferred<List<String>>()
+        data class Stage1Result(val names: List<String>, val vibes: List<DynamicVibe>)
+        val stage1Deferred = CompletableDeferred<Stage1Result>()
 
-        // Stage 1 — fast pin call
+        // Stage 1 — fast pin call (returns vibes + POIs)
         launch {
             try {
-                val prompt = promptBuilder.buildPinOnlyPrompt(areaName, context)
+                val prompt = promptBuilder.buildPinOnlyPrompt(areaName)
                 val requestBody = buildRequestBody(prompt)
                 val fullText = StringBuilder()
                 var hasEmitted = false
@@ -111,31 +113,39 @@ internal class GeminiAreaIntelligenceProvider(
                     }
                 }
                 if (result.isFailure) {
-                    stage1NamesDeferred.completeExceptionally(result.exceptionOrNull()!!)
+                    stage1Deferred.completeExceptionally(result.exceptionOrNull()!!)
                     throw result.exceptionOrNull()!!
                 }
-                val pois = responseParser.parsePinOnlyResponse(fullText.toString())
-                stage1NamesDeferred.complete(pois.map { it.name })
+                val (dynamicVibes, pois) = responseParser.parseStage1Response(fullText.toString())
+                stage1Deferred.complete(Stage1Result(pois.map { it.name }, dynamicVibes))
                 if (pois.isNotEmpty()) {
-                    send(BucketUpdate.PinsReady(pois))
-                    AppLogger.d { "Stage 1 complete: ${pois.size} pins for '$areaName'" }
+                    if (dynamicVibes.isNotEmpty()) {
+                        send(BucketUpdate.VibesReady(vibes = dynamicVibes, pois = pois))
+                    } else {
+                        send(BucketUpdate.PinsReady(pois))
+                    }
+                    AppLogger.d { "Stage 1 complete: ${pois.size} pins, ${dynamicVibes.size} vibes for '$areaName'" }
                 } else {
                     AppLogger.d { "Stage 1 returned no pins for '$areaName' — Stage 2 will fallback" }
                 }
             } catch (e: CancellationException) {
-                stage1NamesDeferred.cancel()
+                stage1Deferred.cancel()
                 throw e
             } catch (e: Exception) {
                 AppLogger.e(e) { "Stage 1 failed for '$areaName' — Stage 2 will fallback" }
-                if (!stage1NamesDeferred.isCompleted) stage1NamesDeferred.completeExceptionally(e)
+                if (!stage1Deferred.isCompleted) stage1Deferred.completeExceptionally(e)
             }
         }
 
         // Stage 2 — enrich call (waits for Stage 1 names)
         launch {
             try {
-                val stage1Names = try { stage1NamesDeferred.await() } catch (e: Exception) { emptyList() }
-                val prompt = if (stage1Names.isNotEmpty()) {
+                val stage1Result = try { stage1Deferred.await() } catch (e: Exception) { Stage1Result(emptyList(), emptyList()) }
+                val stage1Names = stage1Result.names
+                val stage1Vibes = stage1Result.vibes
+                val prompt = if (stage1Names.isNotEmpty() && stage1Vibes.isNotEmpty()) {
+                    promptBuilder.buildDynamicVibeEnrichmentPrompt(areaName, stage1Vibes.map { it.label }, stage1Names)
+                } else if (stage1Names.isNotEmpty()) {
                     promptBuilder.buildEnrichmentPrompt(areaName, stage1Names, context)
                 } else {
                     promptBuilder.buildAreaPortraitPrompt(areaName, context)
@@ -174,7 +184,15 @@ internal class GeminiAreaIntelligenceProvider(
                     streamingParser?.finish()?.filterIsInstance<BucketUpdate.PortraitComplete>()?.forEach { send(it) }
                 }
                 if (result.isFailure) throw result.exceptionOrNull()!!
-                if (stage1Names.isNotEmpty()) {
+                if (stage1Names.isNotEmpty() && stage1Vibes.isNotEmpty()) {
+                    // Dynamic vibe enrichment path
+                    val (vibeContents, enrichedPois) = responseParser.parseDynamicVibeResponse(fullText.toString())
+                    AppLogger.d { "Stage 2 (dynamic vibes) complete: ${vibeContents.size} vibes, ${enrichedPois.size} POIs for '$areaName'" }
+                    for (vc in vibeContents) {
+                        send(BucketUpdate.DynamicVibeComplete(vc))
+                    }
+                    send(BucketUpdate.PortraitComplete(enrichedPois))
+                } else if (stage1Names.isNotEmpty()) {
                     val enriched = responseParser.parseEnrichmentResponse(fullText.toString())
                     AppLogger.d { "Stage 2 complete: ${enriched.size} enriched for '$areaName'" }
                     send(BucketUpdate.PortraitComplete(enriched.map { e ->

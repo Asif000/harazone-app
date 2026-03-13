@@ -16,9 +16,9 @@ object HttpClientFactory {
         }
         install(HttpTimeout) {
             connectTimeoutMillis = 10_000
-            socketTimeoutMillis = 30_000
-            // Do NOT set requestTimeoutMillis — SSE streams run 6-8s total
-            // and requestTimeout kills the entire request, including active streaming
+            socketTimeoutMillis = 60_000
+            // Do NOT set requestTimeoutMillis — SSE streams can run 15-20s with
+            // gemini-2.5-flash thinking; requestTimeout kills the entire request
         }
     }
 }

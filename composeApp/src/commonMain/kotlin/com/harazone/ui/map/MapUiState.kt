@@ -1,10 +1,10 @@
 package com.harazone.ui.map
 
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.RecentPlace
 import com.harazone.domain.model.SavedPoi
-import com.harazone.domain.model.Vibe
 import com.harazone.domain.model.WeatherState
 
 sealed class MapUiState {
@@ -16,8 +16,8 @@ sealed class MapUiState {
         val pois: List<POI> = emptyList(),
         val selectedPoi: POI? = null,
         val showListView: Boolean = false,
-        val activeVibe: Vibe? = null,
-        val vibePoiCounts: Map<Vibe, Int> = emptyMap(),
+        val activeDynamicVibe: DynamicVibe? = null,
+        val dynamicVibePoiCounts: Map<String, Int> = emptyMap(),
         val weather: WeatherState? = null,
         val visitTag: String = "First visit",
         val isFabExpanded: Boolean = false,
@@ -39,7 +39,11 @@ sealed class MapUiState {
         val savedPoiIds: Set<String> = emptySet(),
         val showSavesSheet: Boolean = false,
         val savedVibeFilter: Boolean = false,
-        val vibeAreaSaveCounts: Map<Vibe, Int> = emptyMap(),
+        val dynamicVibeAreaSaveCounts: Map<String, Int> = emptyMap(),
+        val dynamicVibes: List<DynamicVibe> = emptyList(),
+        val isLoadingVibes: Boolean = false,
+        val isOfflineVibes: Boolean = false,
+        val showColdStartPicker: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

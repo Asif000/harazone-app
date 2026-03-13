@@ -9,7 +9,7 @@ import io.ktor.http.HttpStatusCode
 import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
-import com.harazone.domain.model.Vibe
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.WeatherState
 import com.harazone.domain.provider.WeatherProvider
 import com.harazone.domain.repository.AreaRepository
@@ -80,6 +80,7 @@ class MapViewModelTest {
         savedPoiRepository: com.harazone.domain.repository.SavedPoiRepository = com.harazone.fakes.FakeSavedPoiRepository(),
         clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
         wikipediaImageRepository: com.harazone.data.remote.WikipediaImageRepository = stubWikipediaImageRepository,
+        userPreferencesRepository: com.harazone.data.repository.UserPreferencesRepository = com.harazone.fakes.FakeUserPreferencesRepository(),
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
@@ -90,6 +91,7 @@ class MapViewModelTest {
         recentPlacesRepository = recentPlacesRepository,
         savedPoiRepository = savedPoiRepository,
         wikipediaImageRepository = wikipediaImageRepository,
+        userPreferencesRepository = userPreferencesRepository,
         clockMs = clockMs,
     )
 
@@ -337,12 +339,12 @@ class MapViewModelTest {
         )
         // Ready state with no pois yet
         val state1 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertNull(state1.activeVibe)
+        assertNull(state1.activeDynamicVibe)
         assertEquals(emptyList(), state1.pois)
 
         // User taps a vibe before POIs arrive
-        viewModel.switchVibe(Vibe.CHARACTER)
-        assertEquals(Vibe.CHARACTER, (viewModel.uiState.value as MapUiState.Ready).activeVibe)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "CHARACTER", icon = ""))
+        assertEquals("CHARACTER", (viewModel.uiState.value as MapUiState.Ready).activeDynamicVibe?.label)
 
         // Portrait completes — should reset activeVibe to null
         val pois = listOf(
@@ -353,7 +355,7 @@ class MapViewModelTest {
         testScheduler.advanceUntilIdle()
 
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertNull(state2.activeVibe, "activeVibe should reset to null after initial portrait load")
+        assertNull(state2.activeDynamicVibe, "activeVibe should reset to null after initial portrait load")
         assertFalse(state2.isSearchingArea, "isSearchingArea should be false after portrait load")
         assertEquals(2, state2.pois.size)
     }
@@ -361,9 +363,14 @@ class MapViewModelTest {
     @Test
     fun initialLoad_showsAllPoisWithNullActiveVibe() = runTest(testDispatcher) {
         val vibedPois = listOf(
-            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "CHARACTER"),
-            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "COST"),
-            POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2, vibe = "HISTORY"),
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "CHARACTER", vibes = listOf("CHARACTER")),
+            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "COST", vibes = listOf("COST")),
+            POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2, vibe = "HISTORY", vibes = listOf("HISTORY")),
+        )
+        val dynamicVibes = listOf(
+            DynamicVibe(label = "CHARACTER", icon = ""),
+            DynamicVibe(label = "COST", icon = ""),
+            DynamicVibe(label = "HISTORY", icon = ""),
         )
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -371,24 +378,31 @@ class MapViewModelTest {
                 geocodeResult = Result.success("Manhattan, New York"),
             ),
             areaRepository = FakeAreaRepository(
-                updates = listOf(BucketUpdate.PortraitComplete(vibedPois))
+                updates = listOf(
+                    BucketUpdate.VibesReady(dynamicVibes, vibedPois),
+                    BucketUpdate.PortraitComplete(vibedPois),
+                )
             ),
         )
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertNull(state.activeVibe)
+        assertNull(state.activeDynamicVibe)
         assertEquals(3, state.pois.size)
-        assertEquals(1, state.vibePoiCounts[Vibe.CHARACTER])
-        assertEquals(1, state.vibePoiCounts[Vibe.COST])
-        assertEquals(1, state.vibePoiCounts[Vibe.HISTORY])
-        assertEquals(0, state.vibePoiCounts[Vibe.SAFETY])
+        assertEquals(1, state.dynamicVibePoiCounts["CHARACTER"])
+        assertEquals(1, state.dynamicVibePoiCounts["COST"])
+        assertEquals(1, state.dynamicVibePoiCounts["HISTORY"])
     }
 
     @Test
     fun computeVibePoiCounts_handlesMultiVibePois() = runTest(testDispatcher) {
         val multiVibePois = listOf(
-            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "character,whats_on"),
-            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "character,history"),
-            POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2, vibe = "history"),
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0, vibe = "character", vibes = listOf("character", "whats_on")),
+            POI("Place B", "cafe", "desc", Confidence.HIGH, 1.1, 2.1, vibe = "character", vibes = listOf("character", "history")),
+            POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2, vibe = "history", vibes = listOf("history")),
+        )
+        val dynamicVibes = listOf(
+            DynamicVibe(label = "character", icon = ""),
+            DynamicVibe(label = "history", icon = ""),
+            DynamicVibe(label = "whats_on", icon = ""),
         )
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -396,14 +410,16 @@ class MapViewModelTest {
                 geocodeResult = Result.success("Manhattan, New York"),
             ),
             areaRepository = FakeAreaRepository(
-                updates = listOf(BucketUpdate.PortraitComplete(multiVibePois))
+                updates = listOf(
+                    BucketUpdate.VibesReady(dynamicVibes, multiVibePois),
+                    BucketUpdate.PortraitComplete(multiVibePois),
+                )
             ),
         )
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(2, state.vibePoiCounts[Vibe.CHARACTER])
-        assertEquals(2, state.vibePoiCounts[Vibe.HISTORY])
-        assertEquals(1, state.vibePoiCounts[Vibe.WHATS_ON])
-        assertEquals(0, state.vibePoiCounts[Vibe.SAFETY])
+        assertEquals(2, state.dynamicVibePoiCounts["character"])
+        assertEquals(2, state.dynamicVibePoiCounts["history"])
+        assertEquals(1, state.dynamicVibePoiCounts["whats_on"])
     }
 
     @Test
@@ -422,12 +438,12 @@ class MapViewModelTest {
             ),
         )
         // Default: all visible
-        assertNull((viewModel.uiState.value as MapUiState.Ready).activeVibe)
+        assertNull((viewModel.uiState.value as MapUiState.Ready).activeDynamicVibe)
         assertEquals(2, (viewModel.uiState.value as MapUiState.Ready).pois.size)
 
         // Filter to CHARACTER — should include Place A (has "character,whats_on")
-        viewModel.switchVibe(Vibe.CHARACTER)
-        assertEquals(Vibe.CHARACTER, (viewModel.uiState.value as MapUiState.Ready).activeVibe)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "CHARACTER", icon = ""))
+        assertEquals("CHARACTER", (viewModel.uiState.value as MapUiState.Ready).activeDynamicVibe?.label)
         // POIs list stays the same — filtering happens in MapComposable/POIListView
         assertEquals(2, (viewModel.uiState.value as MapUiState.Ready).pois.size)
     }
@@ -435,26 +451,26 @@ class MapViewModelTest {
     @Test
     fun switchVibe_updatesActiveVibe() = runTest(testDispatcher) {
         val (viewModel, _) = createReadyViewModel()
-        assertNull((viewModel.uiState.value as MapUiState.Ready).activeVibe)
-        viewModel.switchVibe(Vibe.HISTORY)
+        assertNull((viewModel.uiState.value as MapUiState.Ready).activeDynamicVibe)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "HISTORY", icon = ""))
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(Vibe.HISTORY, state.activeVibe)
+        assertEquals("HISTORY", state.activeDynamicVibe?.label)
     }
 
     @Test
     fun switchVibe_togglesOffWhenTappedAgain() = runTest(testDispatcher) {
         val (viewModel, _) = createReadyViewModel()
-        viewModel.switchVibe(Vibe.HISTORY)
-        assertEquals(Vibe.HISTORY, (viewModel.uiState.value as MapUiState.Ready).activeVibe)
-        viewModel.switchVibe(Vibe.HISTORY)
-        assertNull((viewModel.uiState.value as MapUiState.Ready).activeVibe)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "HISTORY", icon = ""))
+        assertEquals("HISTORY", (viewModel.uiState.value as MapUiState.Ready).activeDynamicVibe?.label)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "HISTORY", icon = ""))
+        assertNull((viewModel.uiState.value as MapUiState.Ready).activeDynamicVibe)
     }
 
     @Test
     fun switchVibe_firesAnalytics() = runTest(testDispatcher) {
         val tracker = FakeAnalyticsTracker()
         val (viewModel, _) = createReadyViewModel(analyticsTracker = tracker)
-        viewModel.switchVibe(Vibe.HISTORY)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "HISTORY", icon = ""))
         tracker.assertEventTracked("vibe_switched", mapOf("vibe" to "HISTORY"))
     }
 
@@ -480,9 +496,13 @@ class MapViewModelTest {
     @Test
     fun portraitComplete_computesVibePoiCounts() = runTest(testDispatcher) {
         val mixedPois = listOf(
-            POI("A", "food", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "character"),
-            POI("B", "park", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "character"),
-            POI("C", "historic", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "history"),
+            POI("A", "food", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "character", vibes = listOf("character")),
+            POI("B", "park", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "character", vibes = listOf("character")),
+            POI("C", "historic", "desc", Confidence.HIGH, 1.0, 1.0, vibe = "history", vibes = listOf("history")),
+        )
+        val dynamicVibes = listOf(
+            DynamicVibe(label = "character", icon = ""),
+            DynamicVibe(label = "history", icon = ""),
         )
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
@@ -490,13 +510,15 @@ class MapViewModelTest {
                 geocodeResult = Result.success("Manhattan, New York"),
             ),
             areaRepository = FakeAreaRepository(
-                updates = listOf(BucketUpdate.PortraitComplete(mixedPois))
+                updates = listOf(
+                    BucketUpdate.VibesReady(dynamicVibes, mixedPois),
+                    BucketUpdate.PortraitComplete(mixedPois),
+                )
             ),
         )
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(2, state.vibePoiCounts[Vibe.CHARACTER])
-        assertEquals(1, state.vibePoiCounts[Vibe.HISTORY])
-        assertEquals(0, state.vibePoiCounts[Vibe.SAFETY])
+        assertEquals(2, state.dynamicVibePoiCounts["character"])
+        assertEquals(1, state.dynamicVibePoiCounts["history"])
     }
 
     @Test
@@ -1751,8 +1773,8 @@ class MapViewModelTest {
         savedPoiRepo.save(SavedPoi(id = "p3", name = "Place 3", type = "museum", areaName = "Area B", lat = 50.0, lng = -60.0, whySpecial = "old", savedAt = 3L, vibe = "HISTORY"))
 
         val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(2, updated.vibeAreaSaveCounts[Vibe.CHARACTER])
-        assertNull(updated.vibeAreaSaveCounts[Vibe.HISTORY])
+        assertEquals(2, updated.dynamicVibeAreaSaveCounts["CHARACTER"])
+        assertNull(updated.dynamicVibeAreaSaveCounts["HISTORY"])
     }
 
     @Test
@@ -1771,7 +1793,7 @@ class MapViewModelTest {
         savedPoiRepo.save(SavedPoi(id = "p1", name = "Place 1", type = "cafe", areaName = "Area A", lat = 40.0, lng = -74.0, whySpecial = "great", savedAt = 1L, vibe = ""))
 
         val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(updated.vibeAreaSaveCounts.isEmpty())
+        assertTrue(updated.dynamicVibeAreaSaveCounts.isEmpty())
     }
 
     @Test
@@ -1788,7 +1810,7 @@ class MapViewModelTest {
 
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertTrue(state.savedVibeFilter)
-        assertNull(state.activeVibe)
+        assertNull(state.activeDynamicVibe)
     }
 
     @Test
@@ -1813,8 +1835,8 @@ class MapViewModelTest {
         // Verify initial counts reflect Area A
         val stateA = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Area A", stateA.areaName)
-        assertEquals(2, stateA.vibeAreaSaveCounts[Vibe.CHARACTER])
-        assertNull(stateA.vibeAreaSaveCounts[Vibe.HISTORY])
+        assertEquals(2, stateA.dynamicVibeAreaSaveCounts["CHARACTER"])
+        assertNull(stateA.dynamicVibeAreaSaveCounts["HISTORY"])
 
         // Navigate to Area B via geocoding
         val suggestion = GeocodingSuggestion("Area B", "Area B, Country", 50.0, -60.0, null)
@@ -1824,8 +1846,8 @@ class MapViewModelTest {
         // Counts must now reflect Area B saves, not Area A
         val stateB = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals("Area B", stateB.areaName)
-        assertEquals(1, stateB.vibeAreaSaveCounts[Vibe.HISTORY])
-        assertNull(stateB.vibeAreaSaveCounts[Vibe.CHARACTER])
+        assertEquals(1, stateB.dynamicVibeAreaSaveCounts["HISTORY"])
+        assertNull(stateB.dynamicVibeAreaSaveCounts["CHARACTER"])
     }
 
     // --- selectPoiWithImageResolve tests (M2) ---
@@ -1913,11 +1935,11 @@ class MapViewModelTest {
         assertTrue(afterSaved.savedVibeFilter)
 
         // Now switch to a regular vibe
-        viewModel.switchVibe(Vibe.CHARACTER)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "CHARACTER", icon = ""))
 
         val afterSwitch = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertFalse(afterSwitch.savedVibeFilter)
-        assertEquals(Vibe.CHARACTER, afterSwitch.activeVibe)
+        assertEquals("CHARACTER", afterSwitch.activeDynamicVibe?.label)
     }
 }
 

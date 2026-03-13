@@ -8,10 +8,10 @@ import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ContextualPill
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.MessageRole
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfileBuilder
-import com.harazone.domain.model.Vibe
 import com.harazone.domain.provider.AreaIntelligenceProvider
 import com.harazone.domain.repository.SavedPoiRepository
 import com.harazone.util.AppClock
@@ -52,6 +52,9 @@ internal class ChatViewModel(
     private var pendingFramingHint: String? = null
     private var isIntentSelected: Boolean = false
     private var currentEntryPoint: ChatEntryPoint = ChatEntryPoint.Default
+    private val recommendedPoiNames: MutableList<String> = mutableListOf()
+    private var injectedContextIndex: Int = -1
+    private var activeVibeName: String? = null
 
     companion object {
         private const val MAX_HISTORY_TURNS = 20 // 20 messages = ~10 back-and-forth turns
@@ -73,7 +76,7 @@ internal class ChatViewModel(
     fun openChat(
         areaName: String,
         pois: List<POI>,
-        activeVibe: Vibe?,
+        activeDynamicVibe: DynamicVibe?,
         entryPoint: ChatEntryPoint = ChatEntryPoint.Default,
     ) {
         val current = _uiState.value
@@ -96,7 +99,10 @@ internal class ChatViewModel(
         isIntentSelected = false
         selectedIntent = null
         currentEntryPoint = entryPoint
-        val vibeName = activeVibe?.name
+        val vibeName = activeDynamicVibe?.label
+        activeVibeName = vibeName
+        recommendedPoiNames.clear()
+        injectedContextIndex = -1
         sessionPois = pois
 
         // Map ChatEntryPoint to plain String — keeps data.remote free of ui.map imports
@@ -141,7 +147,7 @@ internal class ChatViewModel(
             val poiCount = sessionPois.size
             val systemContext = promptBuilder.buildChatSystemContext(
                 areaName, sessionPois, pill.intent, currentEngagementLevel,
-                saves, tasteProfile, poiCount, pendingFramingHint,
+                saves, tasteProfile, poiCount, pendingFramingHint, activeVibeName,
             )
             conversationHistory.add(
                 ChatMessage(
@@ -208,8 +214,20 @@ internal class ChatViewModel(
         // M4: Trim before snapshot so the snapshot reflects the capped history
         // F1: Take snapshot BEFORE adding user msg — provider appends query itself
         trimHistory()
+
+        // Follow-up context injection: prevent duplicate POI recommendations
+        if (conversationHistory.size > 1 && recommendedPoiNames.isNotEmpty()) {
+            val dedupMsg = ChatMessage(
+                id = nextId(), role = MessageRole.USER,
+                content = "Context: Do not repeat these previously recommended places: ${recommendedPoiNames.joinToString(", ")}. Return only NEW places.",
+                timestamp = clock.nowMs(), sources = emptyList(),
+            )
+            conversationHistory.add(dedupMsg)
+            injectedContextIndex = conversationHistory.size - 1
+        }
+
         // Reinforce conversation style on follow-up turns so Gemini keeps ending with a question
-        val reinforcedQuery = query + "\n[Remember: 2-3 sentences max. End with a question.]"
+        val reinforcedQuery = query + "\n[Remember: 2-3 sentences max. End with a question. Respond with JSON only: {\"prose\":\"...\",\"pois\":[...]}]"
         val historySnapshot = conversationHistory.toList()
         conversationHistory.add(
             ChatMessage(
@@ -223,7 +241,7 @@ internal class ChatViewModel(
             aiProvider.streamChatResponse(reinforcedQuery, _uiState.value.areaName, historySnapshot)
                 .catch { e ->
                     AppLogger.e(e) { "ChatViewModel: stream failed" }
-                    // F4: Find bubble by ID instead of assuming it's the last one
+                    removeInjectedContext()
                     val s = _uiState.value
                     _uiState.value = s.copy(
                         bubbles = s.bubbles.map {
@@ -240,8 +258,10 @@ internal class ChatViewModel(
                 }
                 .collect { token ->
                     if (token.isComplete) {
-                        parsePoiCardsIncremental(accumulated)
-                        val displayText = stripPoiJson(accumulated)
+                        val response = parseChatResponse(accumulated)
+                        recommendedPoiNames += response.pois.map { it.name }
+                        removeInjectedContext()
+                        val displayText = response.prose.ifBlank { stripPoiJson(accumulated) }
                         val s = _uiState.value
                         _uiState.value = s.copy(
                             bubbles = s.bubbles.map {
@@ -252,7 +272,7 @@ internal class ChatViewModel(
                             isStreaming = false,
                             followUpChips = computeFollowUpChips(query, selectedIntent, currentEngagementLevel, _uiState.value.depthLevel),
                             showSkeletons = false,
-                            poiCards = parsedCards.toList(),
+                            poiCards = response.pois.ifEmpty { parsedCards.toList() },
                         )
                         conversationHistory.add(
                             ChatMessage(
@@ -276,6 +296,29 @@ internal class ChatViewModel(
                     }
                 }
         }
+    }
+
+    private fun parseChatResponse(text: String): ChatResponse {
+        val cleaned = text.trim().let {
+            if (it.startsWith("```")) it.lines().drop(1).dropLast(1).joinToString("\n") else it
+        }
+        return try {
+            json.decodeFromString<ChatResponse>(cleaned)
+        } catch (_: Exception) {
+            // Fallback: try to extract POI cards the old way, use stripped text as prose
+            parsePoiCardsIncremental(text)
+            ChatResponse(prose = stripMarkdownChars(stripPoiJson(text)), pois = parsedCards.toList())
+        }
+    }
+
+    private fun stripMarkdownChars(text: String): String =
+        text.replace("**", "").replace(Regex("(?<![\\w*])\\*(?![\\w*])"), "").replace("`", "").replace(Regex("^- ", RegexOption.MULTILINE), "")
+
+    private fun removeInjectedContext() {
+        if (injectedContextIndex >= 0 && injectedContextIndex < conversationHistory.size) {
+            conversationHistory.removeAt(injectedContextIndex)
+        }
+        injectedContextIndex = -1
     }
 
     fun savePoi(card: ChatPoiCard, areaName: String) {
@@ -453,6 +496,8 @@ internal class ChatViewModel(
         nextId = 0L
         isIntentSelected = false
         selectedIntent = null
+        recommendedPoiNames.clear()
+        removeInjectedContext()
         val areaName = _uiState.value.areaName
         _uiState.value = _uiState.value.copy(
             bubbles = emptyList(),

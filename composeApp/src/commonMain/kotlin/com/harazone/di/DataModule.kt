@@ -12,6 +12,7 @@ import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.data.repository.AreaRepositoryImpl
 import com.harazone.data.repository.RecentPlacesRepositoryImpl
 import com.harazone.data.repository.SavedPoiRepositoryImpl
+import com.harazone.data.repository.UserPreferencesRepository
 import com.harazone.domain.provider.ApiKeyProvider
 import com.harazone.domain.repository.RecentPlacesRepository
 import com.harazone.domain.repository.SavedPoiRepository
@@ -61,4 +62,5 @@ val dataModule = module {
     single { MapTilerGeocodingProvider(get()) }
     single<RecentPlacesRepository> { RecentPlacesRepositoryImpl(get(), get()) }
     single<SavedPoiRepository> { SavedPoiRepositoryImpl(get(), get()) }
+    single { UserPreferencesRepository(get()) }
 }

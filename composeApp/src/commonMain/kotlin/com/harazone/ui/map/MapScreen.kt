@@ -54,6 +54,7 @@ import com.harazone.ui.components.AlertBanner
 import com.harazone.ui.components.ContentNoteBanner
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.ui.map.components.AISearchBar
+import com.harazone.ui.map.components.ColdStartPickerOverlay
 import com.harazone.ui.map.components.ExpandablePoiCard
 import com.harazone.ui.map.components.GeocodingSearchBar
 import com.harazone.ui.saved.SavedPlacesScreen
@@ -145,8 +146,8 @@ private fun ReadyContent(
         if (state.showListView) {
             POIListView(
                 pois = state.pois,
-                activeVibe = state.activeVibe,
-                onVibeSelected = { viewModel.switchVibe(it) },
+                activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled in list view
+                onVibeSelected = { },
                 onPoiClick = { viewModel.selectPoi(it) },
                 modifier = Modifier
                     .fillMaxSize()
@@ -163,7 +164,7 @@ private fun ReadyContent(
                 zoomLevel = 14.0,
                 cameraMoveId = state.cameraMoveId,
                 pois = if (state.savedVibeFilter) emptyList() else state.pois,
-                activeVibe = state.activeVibe,
+                activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled on map
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
                 onCameraIdle = { lat, lng -> viewModel.onCameraIdle(lat, lng) },
@@ -233,13 +234,19 @@ private fun ReadyContent(
         // Vibe rail (right side, bottom-aligned above FAB) — map mode only
         if (!state.showListView) {
             VibeRail(
-                activeVibe = state.activeVibe,
-                vibePoiCounts = state.vibePoiCounts,
-                vibeAreaSaveCounts = state.vibeAreaSaveCounts,
+                vibes = state.dynamicVibes,
+                activeDynamicVibe = state.activeDynamicVibe,
+                dynamicVibePoiCounts = state.dynamicVibePoiCounts,
+                dynamicVibeAreaSaveCounts = state.dynamicVibeAreaSaveCounts,
                 savedVibeActive = state.savedVibeFilter,
                 totalAreaSaveCount = state.savedPois.size,
-                onVibeSelected = { viewModel.switchVibe(it) },
+                isLoadingVibes = state.isLoadingVibes,
+                isOfflineVibes = state.isOfflineVibes,
+                pinnedVibeLabels = viewModel.pinnedVibeLabels,
+                onVibeSelected = { viewModel.switchDynamicVibe(it) },
                 onSavedVibeSelected = { viewModel.onSavedVibeSelected() },
+                onLongPressVibe = { viewModel.togglePin(it) },
+                onExploreRetry = { viewModel.retryAreaFetch() },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 8.dp, bottom = navBarPadding + 88.dp),
@@ -288,7 +295,7 @@ private fun ReadyContent(
         if (state.selectedPoi != null) {
             ExpandablePoiCard(
                 poi = state.selectedPoi,
-                activeVibe = state.activeVibe,
+                activeVibe = null, // Dynamic vibes — old Vibe enum coloring disabled
                 onDismiss = {
                     viewModel.clearPoiSelection()
                     if (returnToChat[0]) {
@@ -316,7 +323,7 @@ private fun ReadyContent(
                         }
                     } else {
                         chatViewModel.openChat(
-                            state.areaName, state.pois, state.activeVibe,
+                            state.areaName, state.pois, state.activeDynamicVibe,
                             entryPoint = ChatEntryPoint.PoiCard(state.selectedPoi!!),
                         )
                     }
@@ -419,7 +426,7 @@ private fun ReadyContent(
 
         // AI search bar — tapping opens the ChatOverlay directly
         AISearchBar(
-            onTap = { chatViewModel.openChat(state.areaName, state.pois, state.activeVibe) },
+            onTap = { chatViewModel.openChat(state.areaName, state.pois, state.activeDynamicVibe) },
             chatIsOpen = chatState.isOpen,
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -476,12 +483,12 @@ private fun ReadyContent(
                     viewModel.closeSavesSheet()
                     if (poi != null) {
                         chatViewModel.openChat(
-                            state.areaName, state.pois, state.activeVibe,
+                            state.areaName, state.pois, state.activeDynamicVibe,
                             entryPoint = ChatEntryPoint.SavedCard(poi.name),
                         )
                     } else {
                         chatViewModel.openChat(
-                            state.areaName, state.pois, state.activeVibe,
+                            state.areaName, state.pois, state.activeDynamicVibe,
                             entryPoint = ChatEntryPoint.SavesSheet,
                         )
                     }
@@ -506,6 +513,14 @@ private fun ReadyContent(
                         )
                     )
                 },
+            )
+        }
+
+        // Cold start picker overlay
+        if (state.showColdStartPicker) {
+            ColdStartPickerOverlay(
+                onConfirm = { viewModel.onColdStartConfirmed(it) },
+                onSkip = { viewModel.onColdStartSkipped() },
             )
         }
 

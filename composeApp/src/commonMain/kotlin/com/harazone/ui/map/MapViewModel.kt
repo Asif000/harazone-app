@@ -5,13 +5,14 @@ import androidx.lifecycle.viewModelScope
 import com.harazone.data.remote.MapTilerGeocodingProvider
 import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.domain.model.BucketUpdate
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.RecentPlace
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.repository.RecentPlacesRepository
 import com.harazone.domain.repository.SavedPoiRepository
-import com.harazone.domain.model.Vibe
+import com.harazone.data.repository.UserPreferencesRepository
 import com.harazone.domain.provider.WeatherProvider
 import com.harazone.domain.service.AreaContextFactory
 import com.harazone.domain.usecase.GetAreaPortraitUseCase
@@ -42,6 +43,7 @@ class MapViewModel(
     private val recentPlacesRepository: RecentPlacesRepository,
     private val savedPoiRepository: SavedPoiRepository,
     private val wikipediaImageRepository: WikipediaImageRepository,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
 ) : ViewModel() {
 
@@ -72,8 +74,12 @@ class MapViewModel(
     private var latestRecents: List<RecentPlace> = emptyList()
     private var latestSavedPois: List<SavedPoi> = emptyList()
     private var latestSavedPoiIds: Set<String> = emptySet()
-    private var vibeBeforeSavedFilter: Vibe? = null
+    private var vibeBeforeSavedFilter: DynamicVibe? = null
     private var lastWeatherFetchMs: Long = 0L
+    private var currentDynamicVibes: List<DynamicVibe> = emptyList()
+    var pinnedVibeLabels: List<String> = emptyList()
+        private set
+    private var pendingColdStart = false
 
     // Cache for GPS home area — avoids re-querying Gemini on return-to-location
     private var gpsAreaNameCache: String? = null
@@ -82,6 +88,13 @@ class MapViewModel(
 
     init {
         loadLocation()
+        viewModelScope.launch {
+            pinnedVibeLabels = userPreferencesRepository.getPinnedVibes()
+            val coldStartSeen = userPreferencesRepository.getColdStartSeen()
+            if (!coldStartSeen) {
+                pendingColdStart = true
+            }
+        }
         viewModelScope.launch {
             recentPlacesRepository.observeRecent().collect { recents ->
                 latestRecents = recents
@@ -96,7 +109,7 @@ class MapViewModel(
                 _uiState.value = current.copy(
                     savedPois = pois,
                     savedPoiCount = pois.size,
-                    vibeAreaSaveCounts = computeVibeAreaSaveCounts(pois, current.areaName),
+                    dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(pois, current.areaName),
                 )
             }
         }
@@ -156,14 +169,14 @@ class MapViewModel(
         _uiState.value = current.copy(showListView = !current.showListView)
     }
 
-    fun switchVibe(vibe: Vibe) {
+    fun switchDynamicVibe(vibe: DynamicVibe) {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        val newVibe = if (current.activeVibe == vibe) null else vibe
+        val newVibe = if (current.activeDynamicVibe?.label == vibe.label) null else vibe
         _uiState.value = current.copy(
-            activeVibe = newVibe,
+            activeDynamicVibe = newVibe,
             savedVibeFilter = false,
         )
-        analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.name ?: "all")))
+        analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.label ?: "all")))
     }
 
     // TODO(BACKLOG-LOW): submitSearch — no current UI caller; preserve for programmatic search. If wired to UI, also set preSearchSnapshot for cancel-restore.
@@ -187,7 +200,7 @@ class MapViewModel(
                                 stage1Pois = update.pois
                                 _uiState.value = state.copy(
                                     pois = update.pois,
-                                    vibePoiCounts = computeVibePoiCounts(update.pois),
+                                    dynamicVibePoiCounts = computeDynamicVibePoiCounts(update.pois),
                                     isSearchingArea = false,
                                     isEnrichingArea = true,
                                 )
@@ -198,8 +211,8 @@ class MapViewModel(
                                 _uiState.value = state.copy(
                                     pois = pois,
                                     areaName = query,
-                                    vibePoiCounts = computeVibePoiCounts(pois),
-                                    activeVibe = null,
+                                    dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
+                                    activeDynamicVibe = null,
                                     isSearchingArea = false,
                                     isEnrichingArea = false,
                                 )
@@ -234,7 +247,7 @@ class MapViewModel(
                         imageUrl = poi.imageUrl,
                         description = poi.description,
                         rating = poi.rating,
-                        vibe = current.activeVibe?.name
+                        vibe = current.activeDynamicVibe?.label
                             ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
                     )
                 )
@@ -275,11 +288,11 @@ class MapViewModel(
         val current = _uiState.value as? MapUiState.Ready ?: return
         val newFilter = !current.savedVibeFilter
         if (newFilter) {
-            vibeBeforeSavedFilter = current.activeVibe
+            vibeBeforeSavedFilter = current.activeDynamicVibe
         }
         _uiState.value = current.copy(
             savedVibeFilter = newFilter,
-            activeVibe = if (newFilter) null else vibeBeforeSavedFilter,
+            activeDynamicVibe = if (newFilter) null else vibeBeforeSavedFilter,
         )
         if (!newFilter) vibeBeforeSavedFilter = null
     }
@@ -343,10 +356,11 @@ class MapViewModel(
             longitude = suggestion.longitude,
             cameraMoveId = current.cameraMoveId + 1,
             isSearchingArea = true,
+                isLoadingVibes = true,
             showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, current),
-            vibePoiCounts = emptyMap(),
+            dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
-            activeVibe = null,
+            activeDynamicVibe = null,
         )
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
         areaFetchJob = viewModelScope.launch {
@@ -356,16 +370,16 @@ class MapViewModel(
                     onComplete = { pois, _ ->
                         preSearchSnapshot = null
                         val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
-                        val counts = computeVibePoiCounts(pois)
+                        val counts = computeDynamicVibePoiCounts(pois)
                         _uiState.value = state.copy(
                             areaName = suggestion.name,
                             pois = pois,
-                            vibePoiCounts = counts,
-                            activeVibe = null,
+                            dynamicVibePoiCounts = counts,
+                            activeDynamicVibe = null,
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, state),
-                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, suggestion.name),
+                            dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, suggestion.name),
                         )
                     },
                     onError = { e ->
@@ -425,10 +439,11 @@ class MapViewModel(
             longitude = recent.longitude,
             cameraMoveId = current.cameraMoveId + 1,
             isSearchingArea = true,
+                isLoadingVibes = true,
             showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, current),
-            vibePoiCounts = emptyMap(),
+            dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
-            activeVibe = null,
+            activeDynamicVibe = null,
         )
         fetchWeatherForLocation(recent.latitude, recent.longitude)
         areaFetchJob = viewModelScope.launch {
@@ -438,16 +453,16 @@ class MapViewModel(
                     onComplete = { pois, _ ->
                         preSearchSnapshot = null
                         val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
-                        val counts = computeVibePoiCounts(pois)
+                        val counts = computeDynamicVibePoiCounts(pois)
                         _uiState.value = state.copy(
                             areaName = recent.name,
                             pois = pois,
-                            vibePoiCounts = counts,
-                            activeVibe = null,
+                            dynamicVibePoiCounts = counts,
+                            activeDynamicVibe = null,
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, state),
-                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, recent.name),
+                            dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, recent.name),
                         )
                     },
                     onError = { e ->
@@ -507,11 +522,12 @@ class MapViewModel(
         pendingLng = lng
         _uiState.value = current.copy(
             isSearchingArea = true,
+                isLoadingVibes = true,
             isGeocodingInitiatedSearch = true,
             showMyLocation = isAwayFromGps(lat, lng, current),
-            vibePoiCounts = emptyMap(),
+            dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
-            activeVibe = null,
+            activeDynamicVibe = null,
         )
         fetchWeatherForLocation(lat, lng)
         areaFetchJob = viewModelScope.launch {
@@ -520,18 +536,18 @@ class MapViewModel(
                     areaName = areaName,
                     onComplete = { pois, _ ->
                         val state = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
-                        val counts = computeVibePoiCounts(pois)
+                        val counts = computeDynamicVibePoiCounts(pois)
                         _uiState.value = state.copy(
                             areaName = areaName,
                             latitude = lat,
                             longitude = lng,
                             pois = pois,
-                            vibePoiCounts = counts,
-                            activeVibe = null,
+                            dynamicVibePoiCounts = counts,
+                            activeDynamicVibe = null,
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             showMyLocation = isAwayFromGps(lat, lng, state),
-                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, areaName),
+                            dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, areaName),
                         )
                     },
                     onError = { e ->
@@ -707,7 +723,7 @@ class MapViewModel(
                         (clockMs() - gpsAreaCacheMs) < GPS_CACHE_STALE_MS
 
                     if (hasCachedPois) {
-                        val counts = computeVibePoiCounts(gpsAreaPoisCache)
+                        val counts = computeDynamicVibePoiCounts(gpsAreaPoisCache)
                         _uiState.value = state.copy(
                             areaName = gpsAreaNameCache!!,
                             latitude = coords.latitude,
@@ -717,8 +733,8 @@ class MapViewModel(
                             showMyLocation = false,
                             cameraMoveId = state.cameraMoveId + 1,
                             pois = gpsAreaPoisCache,
-                            vibePoiCounts = counts,
-                            activeVibe = null,
+                            dynamicVibePoiCounts = counts,
+                            activeDynamicVibe = null,
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             geocodingSelectedPlace = null,
@@ -733,9 +749,10 @@ class MapViewModel(
                             showMyLocation = false,
                             cameraMoveId = state.cameraMoveId + 1,
                             isSearchingArea = true,
+                isLoadingVibes = true,
                             pois = emptyList(),
-                            vibePoiCounts = emptyMap(),
-                            activeVibe = null,
+                            dynamicVibePoiCounts = emptyMap(),
+                            activeDynamicVibe = null,
                             geocodingSelectedPlace = null,
                             isGeocodingInitiatedSearch = false,
                         )
@@ -743,15 +760,15 @@ class MapViewModel(
                             areaName = gpsAreaName,
                             onComplete = { pois, _ ->
                                 val s = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
-                                val counts2 = computeVibePoiCounts(pois)
+                                val counts2 = computeDynamicVibePoiCounts(pois)
                                 _uiState.value = s.copy(
                                     areaName = gpsAreaName,
                                     pois = pois,
-                                    vibePoiCounts = counts2,
-                                    activeVibe = null,
+                                    dynamicVibePoiCounts = counts2,
+                                    activeDynamicVibe = null,
                                     isSearchingArea = false,
                                     isEnrichingArea = false,
-                                    vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, gpsAreaName),
+                                    dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, gpsAreaName),
                                 )
                                 // Update cache for future returns
                                 gpsAreaNameCache = gpsAreaName
@@ -823,6 +840,7 @@ class MapViewModel(
                     gpsLatitude = coords.latitude,
                     gpsLongitude = coords.longitude,
                     isSearchingArea = true,
+                isLoadingVibes = true,
                     recentPlaces = latestRecents,
                     savedPois = latestSavedPois,
                     savedPoiIds = latestSavedPoiIds,
@@ -836,14 +854,14 @@ class MapViewModel(
                     areaName = areaName,
                     onComplete = { pois, _ ->
                         val current = _uiState.value as? MapUiState.Ready ?: return@collectPortraitWithRetry
-                        val counts = computeVibePoiCounts(pois)
+                        val counts = computeDynamicVibePoiCounts(pois)
                         _uiState.value = current.copy(
                             pois = pois,
-                            vibePoiCounts = counts,
-                            activeVibe = null,
+                            dynamicVibePoiCounts = counts,
+                            activeDynamicVibe = null,
                             isSearchingArea = false,
                             isEnrichingArea = false,
-                            vibeAreaSaveCounts = computeVibeAreaSaveCounts(latestSavedPois, areaName),
+                            dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, areaName),
                         )
                         // Cache GPS area POIs for instant return-to-location
                         gpsAreaNameCache = areaName
@@ -890,22 +908,77 @@ class MapViewModel(
         }
     }
 
-    private fun computeVibePoiCounts(pois: List<POI>): Map<Vibe, Int> {
-        val hasAnyVibes = pois.any { it.vibe.isNotBlank() }
-        return if (hasAnyVibes) {
-            Vibe.entries.associateWith { v -> pois.count { it.vibe.contains(v.name, ignoreCase = true) } }
-        } else {
-            // No vibes assigned — show total count on every vibe
-            Vibe.entries.associateWith { pois.size }
+    private fun computeDynamicVibePoiCounts(pois: List<POI>, vibes: List<DynamicVibe> = currentDynamicVibes): Map<String, Int> {
+        if (vibes.isEmpty()) return emptyMap()
+        return vibes.associate { dv ->
+            dv.label to pois.count { poi -> poi.vibe == dv.label || dv.label in poi.vibes }
         }
     }
 
-    private fun computeVibeAreaSaveCounts(saves: List<SavedPoi>, areaName: String): Map<Vibe, Int> =
+    private fun computeDynamicVibeAreaSaveCounts(saves: List<SavedPoi>, areaName: String): Map<String, Int> =
         saves.filter { it.areaName == areaName && it.vibe.isNotEmpty() }
-            .groupBy { save -> Vibe.entries.firstOrNull { it.name == save.vibe } }
-            .filterKeys { it != null }
-            .mapKeys { it.key!! }
+            .groupBy { it.vibe }
             .mapValues { it.value.size }
+
+    fun buildChipRowVibes(geminiVibes: List<DynamicVibe>, areaName: String): List<DynamicVibe> {
+        // 1. Collect saved-POI vibes not in Gemini list
+        val geminiLabels = geminiVibes.map { it.label }.toSet()
+        val savedPoiVibes = latestSavedPois
+            .filter { it.areaName == areaName && it.vibe.isNotBlank() && it.vibe !in geminiLabels }
+            .map { it.vibe }
+            .distinct()
+            .map { DynamicVibe(label = it, icon = "\uD83D\uDD16") } // 🔖
+
+        // 2. Sort: pinned first → saved-POI vibes → remaining Gemini vibes
+        val pinnedSet = pinnedVibeLabels.toSet()
+        val pinned = pinnedVibeLabels.mapNotNull { label ->
+            geminiVibes.firstOrNull { it.label == label }
+                ?: savedPoiVibes.firstOrNull { it.label == label }
+                ?: if (label in pinnedSet) DynamicVibe(label = label, icon = "\uD83D\uDCCC") else null // 📌
+        }
+        val pinnedLabels = pinned.map { it.label }.toSet()
+        val savedNotPinned = savedPoiVibes.filter { it.label !in pinnedLabels }
+        val geminiNotPinned = geminiVibes.filter { it.label !in pinnedLabels }
+
+        return (pinned + savedNotPinned + geminiNotPinned).take(6)
+    }
+
+    fun togglePin(vibe: DynamicVibe) {
+        if (vibe.label in pinnedVibeLabels) {
+            pinnedVibeLabels = pinnedVibeLabels - vibe.label
+        } else if (pinnedVibeLabels.size < 3) {
+            pinnedVibeLabels = pinnedVibeLabels + vibe.label
+        } else {
+            _errorEvents.tryEmit("Maximum 3 pinned vibes")
+            return
+        }
+        viewModelScope.launch { userPreferencesRepository.setPinnedVibes(pinnedVibeLabels) }
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val chipRow = buildChipRowVibes(currentDynamicVibes, current.areaName)
+        _uiState.value = current.copy(dynamicVibes = chipRow)
+    }
+
+    fun onColdStartConfirmed(labels: List<String>) {
+        pinnedVibeLabels = labels
+        viewModelScope.launch {
+            userPreferencesRepository.setPinnedVibes(labels)
+            userPreferencesRepository.setColdStartSeen()
+        }
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val chipRow = buildChipRowVibes(currentDynamicVibes, current.areaName)
+        _uiState.value = current.copy(showColdStartPicker = false, dynamicVibes = chipRow)
+    }
+
+    fun onColdStartSkipped() {
+        viewModelScope.launch { userPreferencesRepository.setColdStartSeen() }
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(showColdStartPicker = false)
+    }
+
+    fun retryAreaFetch() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        onGeocodingSubmitEmpty()
+    }
 
     private suspend fun collectPortraitWithRetry(
         areaName: String,
@@ -921,20 +994,44 @@ class MapViewModel(
                 .catch { e ->
                     AppLogger.e(e) { "Portrait fetch failed for '$areaName'" }
                     fetchFailed = true
+                    // H4 fix: clear loading state on error so skeleton shimmer doesn't persist
+                    val s = _uiState.value as? MapUiState.Ready
+                    if (s != null) _uiState.value = s.copy(isLoadingVibes = false)
                     onError(e as? Exception ?: RuntimeException(e))
                 }
                 .collect { update ->
                     when (update) {
+                        is BucketUpdate.VibesReady -> {
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                            stage1Pois = update.pois
+                            currentDynamicVibes = update.vibes
+                            val chipRow = buildChipRowVibes(update.vibes, areaName)
+                            val counts = computeDynamicVibePoiCounts(update.pois, chipRow)
+                            _uiState.value = s.copy(
+                                pois = update.pois,
+                                dynamicVibes = chipRow,
+                                dynamicVibePoiCounts = counts,
+                                isLoadingVibes = false,
+                                isOfflineVibes = update.fromCache,
+                                isSearchingArea = false,
+                                isEnrichingArea = true,
+                                showColdStartPicker = if (pendingColdStart) { pendingColdStart = false; true } else s.showColdStartPicker,
+                            )
+                        }
                         is BucketUpdate.PinsReady -> {
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect
-                            val counts = computeVibePoiCounts(update.pois)
                             stage1Pois = update.pois
                             _uiState.value = s.copy(
                                 pois = update.pois,
-                                vibePoiCounts = counts,
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
+                                isLoadingVibes = false,
                             )
+                        }
+                        is BucketUpdate.DynamicVibeComplete -> {
+                            currentDynamicVibes = currentDynamicVibes.map { dv ->
+                                if (dv.label == update.content.label) dv.copy(poiIds = update.content.poiIds) else dv
+                            }
                         }
                         is BucketUpdate.PortraitComplete -> {
                             pois = if (stage1Pois.isNotEmpty()) {
@@ -942,14 +1039,21 @@ class MapViewModel(
                             } else {
                                 update.pois
                             }
-                            // Update selectedPoi if open, so shimmer clears without user closing card
                             val s = _uiState.value as? MapUiState.Ready
-                            if (s != null && s.selectedPoi != null) {
+                            if (s != null) {
+                                _uiState.value = s.copy(
+                                    dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
+                                    isLoadingVibes = false,
+                                )
+                            }
+                            // Update selectedPoi if open, so shimmer clears without user closing card
+                            val s2 = _uiState.value as? MapUiState.Ready
+                            if (s2 != null && s2.selectedPoi != null) {
                                 val updatedSelected = pois.firstOrNull {
-                                    it.name.trim().lowercase() == s.selectedPoi.name.trim().lowercase()
+                                    it.name.trim().lowercase() == s2.selectedPoi.name.trim().lowercase()
                                 }
                                 if (updatedSelected != null) {
-                                    _uiState.value = s.copy(selectedPoi = updatedSelected)
+                                    _uiState.value = s2.copy(selectedPoi = updatedSelected)
                                 }
                             }
                         }
@@ -970,12 +1074,26 @@ class MapViewModel(
                 .catch { e -> AppLogger.e(e) { "Retry portrait fetch failed for '$areaName'" } }
                 .collect { update ->
                     when (update) {
+                        is BucketUpdate.VibesReady -> {
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                            currentDynamicVibes = update.vibes
+                            stage1Pois = update.pois
+                            val chipVibes = buildChipRowVibes(update.vibes, areaName)
+                            _uiState.value = s.copy(
+                                pois = update.pois,
+                                dynamicVibes = chipVibes,
+                                dynamicVibePoiCounts = computeDynamicVibePoiCounts(update.pois),
+                                isSearchingArea = false,
+                                isEnrichingArea = true,
+                                isLoadingVibes = false,
+                            )
+                        }
                         is BucketUpdate.PinsReady -> {
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect
                             stage1Pois = update.pois
                             _uiState.value = s.copy(
                                 pois = update.pois,
-                                vibePoiCounts = computeVibePoiCounts(update.pois),
+                                dynamicVibePoiCounts = computeDynamicVibePoiCounts(update.pois),
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
                             )
@@ -1003,6 +1121,7 @@ class MapViewModel(
             val enrich = enrichMap[pin.name.trim().lowercase()]
             if (enrich != null) pin.copy(
                 vibe = enrich.vibe.ifEmpty { pin.vibe },
+                vibes = enrich.vibes.ifEmpty { pin.vibes },
                 insight = enrich.insight,
                 rating = enrich.rating,
                 hours = enrich.hours,

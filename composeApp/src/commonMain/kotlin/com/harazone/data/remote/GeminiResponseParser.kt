@@ -5,6 +5,8 @@ import com.harazone.domain.model.BucketType
 import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.DomainError
+import com.harazone.domain.model.DynamicVibe
+import com.harazone.domain.model.DynamicVibeContent
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.Source
 import com.harazone.util.AppLogger
@@ -59,6 +61,7 @@ internal data class PoiJson(
     val lat: Double? = null,
     val lng: Double? = null,
     val wiki: String? = null,
+    val vs: List<String>? = null,
 )
 
 @Serializable
@@ -71,6 +74,24 @@ internal data class EnrichJson(
     val r: Float? = null,
 )
 
+@Serializable
+internal data class VibeJson(val label: String = "", val icon: String = "")
+
+@Serializable
+internal data class Stage1Response(
+    val vibes: List<VibeJson> = emptyList(),
+    val pois: List<PoiJson> = emptyList(),
+)
+
+@Serializable
+internal data class DynamicVibeJson(
+    val label: String = "",
+    val icon: String = "",
+    val highlight: String = "",
+    val content: String = "",
+    val poi_ids: List<String> = emptyList(),
+)
+
 internal class GeminiResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -78,6 +99,7 @@ internal class GeminiResponseParser {
     companion object {
         private const val BUCKET_DELIMITER = "---BUCKET---"
         private const val POIS_DELIMITER = "---POIS---"
+        private const val VIBE_DELIMITER = "---VIBE---"
     }
 
     fun parsePinOnlyResponse(text: String): List<POI> {
@@ -106,6 +128,118 @@ internal class GeminiResponseParser {
         } catch (e: Exception) {
             AppLogger.e(e) { "GeminiResponseParser: failed to parse pin-only response" }
             emptyList()
+        }
+    }
+
+    fun parseStage1Response(text: String): Pair<List<DynamicVibe>, List<POI>> {
+        return try {
+            val cleaned = text.trim().let {
+                if (it.startsWith("```")) it.lines().drop(1).dropLast(1).joinToString("\n") else it
+            }
+            try {
+                val stage1 = json.decodeFromString<Stage1Response>(cleaned)
+                val vibes = stage1.vibes
+                    .filter { it.label.isNotBlank() }
+                    .map { DynamicVibe(label = it.label, icon = it.icon) }
+                val pois = stage1.pois
+                    .filter { it.n.isNotBlank() && it.lat != null && it.lng != null }
+                    .map { poiJson ->
+                        POI(
+                            name = poiJson.n,
+                            type = poiJson.t,
+                            description = "",
+                            confidence = Confidence.MEDIUM,
+                            latitude = poiJson.lat,
+                            longitude = poiJson.lng,
+                            vibe = poiJson.v,
+                            insight = "",
+                        )
+                    }
+                Pair(vibes, pois)
+            } catch (_: Exception) {
+                // Fallback: old flat array format
+                val poisJson = json.decodeFromString<List<PoiJson>>(cleaned)
+                val pois = poisJson
+                    .filter { it.n.isNotBlank() && it.lat != null && it.lng != null }
+                    .map { poiJson ->
+                        POI(
+                            name = poiJson.n,
+                            type = poiJson.t,
+                            description = "",
+                            confidence = Confidence.MEDIUM,
+                            latitude = poiJson.lat,
+                            longitude = poiJson.lng,
+                            vibe = poiJson.v,
+                            insight = "",
+                        )
+                    }
+                Pair(emptyList(), pois)
+            }
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: failed to parse Stage 1 response" }
+            Pair(emptyList(), emptyList())
+        }
+    }
+
+    fun parseDynamicVibeResponse(text: String): Pair<List<DynamicVibeContent>, List<POI>> {
+        return try {
+            val poisSplit = text.split(POIS_DELIMITER)
+            val vibesSection = poisSplit[0]
+            val poisSection = poisSplit.getOrNull(1)?.trim()
+
+            val vibeStrings = vibesSection.split(VIBE_DELIMITER)
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+
+            val vibeContents = vibeStrings.mapNotNull { vibeStr ->
+                try {
+                    val vibeJson = json.decodeFromString<DynamicVibeJson>(vibeStr)
+                    DynamicVibeContent(
+                        label = vibeJson.label,
+                        icon = vibeJson.icon,
+                        highlight = vibeJson.highlight,
+                        content = vibeJson.content,
+                        poiIds = vibeJson.poi_ids,
+                    )
+                } catch (e: Exception) {
+                    AppLogger.e(e) { "GeminiResponseParser: failed to parse dynamic vibe JSON: ${vibeStr.take(100)}" }
+                    null
+                }
+            }
+
+            val pois = if (!poisSection.isNullOrBlank()) {
+                try {
+                    val poisJson = json.decodeFromString<List<PoiJson>>(poisSection)
+                    poisJson.filter { it.n.isNotBlank() }.map { poiJson ->
+                        POI(
+                            name = poiJson.n,
+                            type = poiJson.t,
+                            description = "",
+                            confidence = Confidence.MEDIUM,
+                            latitude = poiJson.lat,
+                            longitude = poiJson.lng,
+                            vibe = poiJson.v,
+                            insight = poiJson.w,
+                            hours = poiJson.h,
+                            liveStatus = poiJson.s,
+                            rating = poiJson.r,
+                            vibeInsights = emptyMap(),
+                            wikiSlug = poiJson.wiki,
+                            vibes = poiJson.vs ?: emptyList(),
+                        )
+                    }
+                } catch (e: Exception) {
+                    AppLogger.e(e) { "GeminiResponseParser: failed to parse dynamic vibe POIs" }
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
+            Pair(vibeContents, pois)
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: failed to parse dynamic vibe response" }
+            Pair(emptyList(), emptyList())
         }
     }
 
