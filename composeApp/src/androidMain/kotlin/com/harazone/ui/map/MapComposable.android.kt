@@ -93,6 +93,7 @@ actual fun MapComposable(
     val cameraIdleListenerRef = remember { arrayOfNulls<MapLibreMap.OnCameraIdleListener>(1) }
     val lastFittedPois = remember { mutableStateOf<List<POI>>(emptyList()) }
     val savedFilterFitted = remember { booleanArrayOf(false) }
+    val wasSavedVibeFilter = remember { booleanArrayOf(false) }
     val suppressCameraIdle = remember { booleanArrayOf(false) }
 
     val mapView = remember {
@@ -279,11 +280,12 @@ actual fun MapComposable(
         // Reset saved filter zoom flag when regular POIs are back
         if (pois.isNotEmpty()) savedFilterFitted[0] = false
 
-        // Force camera re-fit when saved filter is toggled off (pois ref unchanged but view context changed)
-        val forceRefit = !savedVibeFilter && filteredPois.isNotEmpty() && pois === lastFittedPois.value
+        // Force camera re-fit only when savedVibeFilter transitions true -> false
+        val forceRefit = wasSavedVibeFilter[0] && !savedVibeFilter && filteredPois.isNotEmpty()
+        wasSavedVibeFilter[0] = savedVibeFilter
         if (forceRefit) lastFittedPois.value = emptyList()
 
-        // Fit camera to show all pins — only when pois list actually changed (not on vibe switch)
+        // Fit camera to show all pins — when pois list changes or saved filter toggles off
         if (pois !== lastFittedPois.value && filteredPois.isNotEmpty()) {
             lastFittedPois.value = pois
             suppressCameraIdle[0] = true

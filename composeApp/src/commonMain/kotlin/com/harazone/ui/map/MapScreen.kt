@@ -442,9 +442,7 @@ private fun ReadyContent(
                     chatViewModel.closeChat()
                     returnToChat[0] = true
                     // Prefer enriched POI from map (has image, rating, vibe) over chat card
-                    // Try exact name match first, then containment for transliteration differences
                     val enriched = state.pois.firstOrNull { it.name.equals(card.name, ignoreCase = true) }
-                        ?: state.pois.firstOrNull { it.name.contains(card.name, ignoreCase = true) || card.name.contains(it.name, ignoreCase = true) }
                     val fallbackPoi = POI(
                         name = card.name,
                         type = card.type,

@@ -94,7 +94,23 @@ internal class AreaRepositoryImpl(
             val cachedPois = loadPoisFromCache(areaName, language, now)
             if (cachedPois.isNotEmpty()) {
                 AppLogger.d { "POI cache HIT for '$areaName' — ${cachedPois.size} POIs (no bucket cache)" }
-                emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPois)))
+                // If any POIs lack images (e.g., cached from Stage 1 before enrichment),
+                // enrich in background and update cache
+                val needsEnrichment = cachedPois.any { it.imageUrl == null }
+                if (needsEnrichment) {
+                    emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPois)))
+                    scope.launch {
+                        try {
+                            val enriched = enrichPoisWithImages(cachedPois)
+                            withContext(ioDispatcher) { writePoisToCache(enriched, areaName, language) }
+                        } catch (e: CancellationException) { throw e }
+                        catch (e: Exception) {
+                            AppLogger.e(e) { "Background POI enrichment failed for '$areaName'" }
+                        }
+                    }
+                } else {
+                    emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPois)))
+                }
                 return@flow
             }
         }
@@ -224,9 +240,15 @@ internal class AreaRepositoryImpl(
     }
 
     private fun mergeStage2OntoCached(stage1: List<POI>, stage2: List<POI>): List<POI> {
-        val enrichmentByName = stage2.associateBy { it.name.lowercase() }
-        return stage1.map { cached ->
-            val enrichment = enrichmentByName[cached.name.lowercase()] ?: return@map cached
+        val enrichmentByName = stage2.groupBy { it.name.lowercase() }
+        val stage1Names = stage1.map { it.name.lowercase() }.toSet()
+        val merged = stage1.map { cached ->
+            val candidates = enrichmentByName[cached.name.lowercase()]
+            if (candidates.isNullOrEmpty()) return@map cached
+            if (candidates.size > 1) {
+                AppLogger.w { "mergeStage2OntoCached: ${candidates.size} Stage 2 POIs with name '${cached.name}' — using first" }
+            }
+            val enrichment = candidates.first()
             cached.copy(
                 vibe = enrichment.vibe.ifEmpty { cached.vibe },
                 insight = enrichment.insight.ifEmpty { cached.insight },
@@ -237,6 +259,9 @@ internal class AreaRepositoryImpl(
                 rating = enrichment.rating ?: cached.rating,
             )
         }
+        // Append Stage 2-only POIs that had no match in Stage 1
+        val unmatched = stage2.filter { it.name.lowercase() !in stage1Names }
+        return merged + unmatched
     }
 
     private fun buildSatelliteTileRef(lat: Double?, lng: Double?): String? {

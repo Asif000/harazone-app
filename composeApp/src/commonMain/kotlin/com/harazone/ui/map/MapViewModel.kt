@@ -132,7 +132,10 @@ class MapViewModel(
                 val url = wikipediaImageRepository.getImageUrl(poi.wikiSlug, poi.name)
                 if (url != null) {
                     val current = _uiState.value as? MapUiState.Ready ?: return@launch
-                    if (current.selectedPoi?.name == poi.name) {
+                    if (current.selectedPoi?.name == poi.name &&
+                        current.selectedPoi?.latitude == poi.latitude &&
+                        current.selectedPoi?.longitude == poi.longitude
+                    ) {
                         _uiState.value = current.copy(selectedPoi = poi.copy(imageUrl = url))
                     }
                 }

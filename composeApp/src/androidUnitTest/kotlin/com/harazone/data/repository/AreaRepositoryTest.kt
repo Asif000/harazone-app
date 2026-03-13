@@ -828,10 +828,12 @@ class AreaRepositoryTest {
         assertEquals(1, fakeProvider.callCount, "First call should hit AI provider")
 
         // Verify merged POIs were cached (coords + enrichment)
-        val cached = database.area_poi_cacheQueries.getPois("Test Area", "en").executeAsOneOrNull()
-        assertNotNull(cached, "POIs should be cached after two-stage pipeline")
+        val cached = requireNotNull(
+            database.area_poi_cacheQueries.getPois("Test Area", "en").executeAsOneOrNull(),
+            { "POIs should be cached after two-stage pipeline" }
+        )
         val cachedPois = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-            .decodeFromString<List<POI>>(cached!!.pois_json)
+            .decodeFromString<List<POI>>(cached.pois_json)
         assertEquals(stage1Pois[0].latitude, cachedPois[0].latitude, "Cached POI should have Stage 1 coords")
         assertEquals("Character", cachedPois[0].vibe, "Cached POI should have Stage 2 vibe")
 
@@ -846,6 +848,100 @@ class AreaRepositoryTest {
             awaitComplete()
         }
         assertEquals(1, fakeProvider.callCount, "Second call should NOT hit AI provider — POIs served from cache")
+    }
+
+    @Test
+    fun twoStagePipeline_stage2OnlyPoisAreAppended() = testScope.runTest {
+        // Stage 1: two POIs
+        val stage1Pois = listOf(
+            POI("Cafe Roma", "cafe", "Good coffee", Confidence.HIGH, 40.7128, -74.0060),
+            POI("Central Park", "park", "Large park", Confidence.MEDIUM, 40.7829, -73.9654),
+        )
+        // Stage 2: one matching + one new POI not in Stage 1
+        val stage2Pois = listOf(
+            POI("Cafe Roma", "cafe", "Good coffee enriched", Confidence.HIGH, latitude = null, longitude = null, vibe = "Character"),
+            POI("Hidden Gem", "bar", "Secret bar", Confidence.HIGH, latitude = null, longitude = null, vibe = "Character"),
+        )
+
+        fakeProvider.responseFlow = flow {
+            emit(BucketUpdate.PinsReady(stage1Pois))
+            emit(BucketUpdate.PortraitComplete(stage2Pois))
+        }
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val pins = awaitItem()
+            assertIs<BucketUpdate.PinsReady>(pins)
+
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            // Should have 3 POIs: 2 merged + 1 appended from Stage 2
+            assertEquals(3, portrait.pois.size, "Stage 2-only POIs must be appended")
+            assertEquals("Cafe Roma", portrait.pois[0].name)
+            assertEquals("Central Park", portrait.pois[1].name)
+            assertEquals("Hidden Gem", portrait.pois[2].name)
+            // Merged POI should have Stage 2 enrichment
+            assertEquals("Character", portrait.pois[0].vibe)
+            assertEquals("Good coffee enriched", portrait.pois[0].description)
+            // Appended POI should retain its data
+            assertEquals("Secret bar", portrait.pois[2].description)
+            awaitComplete()
+        }
+    }
+
+    @Test
+    fun poiOnlyCacheHit_unenrichedPoisEmittedImmediately() = testScope.runTest {
+        // Write unenriched POIs (imageUrl = null) to POI cache — simulates Stage 1 cached before app kill
+        val unenrichedPois = listOf(
+            POI("Cafe Roma", "cafe", "Good coffee", Confidence.HIGH, 40.7128, -74.0060, imageUrl = null),
+        )
+        val json = kotlinx.serialization.json.Json.encodeToString(unenrichedPois)
+        database.area_poi_cacheQueries.insertOrReplacePois(
+            area_name = "Test Area",
+            language = "en",
+            pois_json = json,
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs()
+        )
+
+        // No bucket cache — pure POI-only path should emit immediately (not re-query AI)
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(1, portrait.pois.size)
+            assertEquals("Cafe Roma", portrait.pois[0].name)
+            assertEquals(40.7128, portrait.pois[0].latitude)
+            awaitComplete()
+        }
+
+        // AI provider should NOT have been called — POI-only cache hit path
+        assertEquals(0, fakeProvider.callCount, "AI provider should not be called on POI-only cache hit")
+    }
+
+    @Test
+    fun poiOnlyCacheHit_enrichedPoisSkipBackgroundEnrich() = testScope.runTest {
+        // Write already-enriched POIs (imageUrl is set) to POI cache
+        val enrichedPois = listOf(
+            POI("Cafe Roma", "cafe", "Good coffee", Confidence.HIGH, 40.7128, -74.0060, imageUrl = "https://existing.jpg"),
+        )
+        val json = kotlinx.serialization.json.Json.encodeToString(enrichedPois)
+        database.area_poi_cacheQueries.insertOrReplacePois(
+            area_name = "Test Area",
+            language = "en",
+            pois_json = json,
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs()
+        )
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(1, portrait.pois.size)
+            // Already enriched — should have the resolved MapTiler URL or existing URL
+            assertNotNull(portrait.pois[0].imageUrl, "Already-enriched POIs should keep their imageUrl")
+            awaitComplete()
+        }
+
+        assertEquals(0, fakeProvider.callCount, "AI provider should not be called on POI-only cache hit")
     }
 
     @Test

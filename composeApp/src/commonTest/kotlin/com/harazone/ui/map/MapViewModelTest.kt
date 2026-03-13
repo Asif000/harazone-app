@@ -1828,6 +1828,75 @@ class MapViewModelTest {
         assertNull(stateB.vibeAreaSaveCounts[Vibe.CHARACTER])
     }
 
+    // --- selectPoiWithImageResolve tests (M2) ---
+
+    @Test
+    fun selectPoiWithImageResolve_alreadyHasImage_skipsWikipedia() = runTest(testDispatcher) {
+        var wikiCalled = false
+        val wikiRepo = WikipediaImageRepository(HttpClient(MockEngine { _ ->
+            wikiCalled = true
+            respond("{}", HttpStatusCode.OK)
+        }))
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Test Area"),
+            ),
+            wikipediaImageRepository = wikiRepo,
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        val poi = POI("Castle", "historic", "Old castle", Confidence.HIGH, 40.0, -9.0, imageUrl = "https://existing.jpg")
+        viewModel.selectPoiWithImageResolve(poi)
+        testScheduler.advanceUntilIdle()
+
+        assertFalse(wikiCalled, "Wikipedia should not be called when POI already has imageUrl")
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("https://existing.jpg", state.selectedPoi!!.imageUrl)
+    }
+
+    @Test
+    fun selectPoiWithImageResolve_noImage_selectsPoiWithNull() = runTest(testDispatcher) {
+        // Mock Wikipedia returns no thumbnail → imageUrl stays null
+        // Tests that the POI is at least selected (guard works)
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Test Area"),
+            ),
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        val poi = POI("Castle", "historic", "Old castle", Confidence.HIGH, 40.0, -9.0)
+        viewModel.selectPoiWithImageResolve(poi)
+        testScheduler.advanceUntilIdle()
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(state.selectedPoi, "POI should be selected even if image resolve fails")
+        assertEquals("Castle", state.selectedPoi!!.name)
+    }
+
+    @Test
+    fun selectPoiWithImageResolve_guardChecksCoordinates() = runTest(testDispatcher) {
+        // Verifies the M1 fix: guard uses name + coordinates, not just name
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("Test Area"),
+            ),
+        )
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Select first POI
+        val poi1 = POI("Starbucks", "cafe", "Coffee", Confidence.HIGH, 40.0, -9.0)
+        viewModel.selectPoiWithImageResolve(poi1)
+        testScheduler.advanceUntilIdle()
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(40.0, state.selectedPoi!!.latitude)
+        assertEquals(-9.0, state.selectedPoi!!.longitude)
+    }
+
     @Test
     fun switchVibe_clearsSavedVibeFilter() = runTest(testDispatcher) {
         val viewModel = createViewModel(
