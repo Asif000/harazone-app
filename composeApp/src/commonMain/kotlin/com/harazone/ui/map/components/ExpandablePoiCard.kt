@@ -111,6 +111,14 @@ fun ExpandablePoiCard(
                     placeholder = ColorPainter(vibeColor.copy(alpha = 0.15f)),
                     modifier = Modifier.matchParentSize(),
                 )
+            } else {
+                // TODO(BACKLOG-HIGH): Replace with Foursquare photo API before public release
+                Text(
+                    text = "Looking...",
+                    color = Color.White.copy(alpha = 0.25f),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.align(Alignment.Center),
+                )
             }
             // Close button
             IconButton(

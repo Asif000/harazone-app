@@ -68,6 +68,7 @@ actual fun MapComposable(
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
     savedPoiIds: Set<String>,
     savedPois: List<SavedPoi>,
+    savedVibeFilter: Boolean,
 ) {
     val context = LocalContext.current
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
@@ -108,12 +109,19 @@ actual fun MapComposable(
     // Camera + style setup
     LaunchedEffect(latitude, longitude, cameraMoveId) {
         if (latitude == 0.0 && longitude == 0.0) return@LaunchedEffect
+        // Fast path: if map already loaded, move camera directly without getMapAsync callback delay
+        val existingMap = mapRef[0]
+        if (existingMap != null && styleLoaded.value && !isDestroyed[0]) {
+            suppressCameraIdle[0] = true
+            existingMap.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoomLevel), 600, null)
+            return@LaunchedEffect
+        }
         mapView.getMapAsync { map ->
             if (isDestroyed[0]) return@getMapAsync
             mapRef[0] = map
             if (styleLoaded.value) {
                 suppressCameraIdle[0] = true
-                map.animateCamera(CameraUpdateFactory.newLatLng(LatLng(latitude, longitude)), 600, null)
+                map.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(latitude, longitude), zoomLevel), 600, null)
             } else if (!styleLoading[0]) {
                 styleLoading[0] = true
 
@@ -189,8 +197,8 @@ actual fun MapComposable(
         }
     }
 
-    // POI pins + glow zones — react to pois + activeVibe + savedPoiIds + savedPois + style loaded changes
-    LaunchedEffect(pois, activeVibe, savedPoiIds, savedPois, styleLoaded.value) {
+    // POI pins + glow zones — react to pois + activeVibe + savedPoiIds + savedPois + savedVibeFilter + style loaded changes
+    LaunchedEffect(pois, activeVibe, savedPoiIds, savedPois, savedVibeFilter, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val map = mapRef[0] ?: return@LaunchedEffect
         val style = styleRef[0] ?: return@LaunchedEffect
@@ -271,9 +279,12 @@ actual fun MapComposable(
         // Reset saved filter zoom flag when regular POIs are back
         if (pois.isNotEmpty()) savedFilterFitted[0] = false
 
-        // TODO(BACKLOG-LOW): Camera re-fits when toggling saved filter off because size guard is insufficient — need content-aware diff or explicit toggle-off flag
-        // Fit camera to show all pins — only when pois list actually changed (not on vibe switch or saved filter toggle)
-        if (pois !== lastFittedPois.value && pois.size != lastFittedPois.value.size && filteredPois.isNotEmpty()) {
+        // Force camera re-fit when saved filter is toggled off (pois ref unchanged but view context changed)
+        val forceRefit = !savedVibeFilter && filteredPois.isNotEmpty() && pois === lastFittedPois.value
+        if (forceRefit) lastFittedPois.value = emptyList()
+
+        // Fit camera to show all pins — only when pois list actually changed (not on vibe switch)
+        if (pois !== lastFittedPois.value && filteredPois.isNotEmpty()) {
             lastFittedPois.value = pois
             suppressCameraIdle[0] = true
             if (filteredPois.size >= 2) {
@@ -303,8 +314,8 @@ actual fun MapComposable(
             }
         }
 
-        // Fit camera to saved POIs when saved filter is first activated (pois is empty)
-        if (pois.isEmpty() && savedPois.isNotEmpty() && !savedFilterFitted[0]) {
+        // Fit camera to saved POIs when saved filter is first activated
+        if (savedVibeFilter && pois.isEmpty() && savedPois.isNotEmpty() && !savedFilterFitted[0]) {
             savedFilterFitted[0] = true
             val validSaved = savedPois.filter { it.lat != 0.0 && it.lng != 0.0 }
             if (validSaved.isNotEmpty()) {

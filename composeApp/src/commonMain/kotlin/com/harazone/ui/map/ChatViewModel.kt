@@ -176,6 +176,11 @@ internal class ChatViewModel(
         )
     }
 
+    /** Reopen chat without resetting conversation state (e.g. after dismissing a POI detail card). */
+    fun reopenChat() {
+        _uiState.value = _uiState.value.copy(isOpen = true)
+    }
+
     fun updateInput(text: String) {
         _uiState.value = _uiState.value.copy(inputText = text)
     }

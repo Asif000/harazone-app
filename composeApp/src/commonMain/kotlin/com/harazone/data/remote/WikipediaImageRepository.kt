@@ -16,7 +16,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
-internal class WikipediaImageRepository(private val httpClient: HttpClient) {
+class WikipediaImageRepository(private val httpClient: HttpClient) {
 
     companion object {
         private const val USER_AGENT = "HaraZone/1.0 (https://github.com/harazone; contact@harazone.com)"

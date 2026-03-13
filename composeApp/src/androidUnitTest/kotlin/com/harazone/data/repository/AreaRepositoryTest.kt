@@ -783,6 +783,71 @@ class AreaRepositoryTest {
         assertEquals(0, wikiCallCount, "Wikipedia should not be called on cache hit")
     }
 
+    /**
+     * Regression test: two-stage pipeline (PinsReady + PortraitComplete) must cache POIs
+     * so that restarting the app does NOT re-run the Gemini query.
+     *
+     * Root cause (fixed): PinsReady was emitted but never cached; PortraitComplete Stage 2
+     * had null coords so hasCoords was false and wasn't cached either. Second call always
+     * hit AI provider again.
+     */
+    @Test
+    fun twoStagePipelineCachesPoisAndServesFromCacheOnSecondCall() = testScope.runTest {
+        // Stage 1: PinsReady with coords (slim POIs from Gemini)
+        val stage1Pois = listOf(
+            POI("Cafe Roma", "cafe", "Good coffee", Confidence.HIGH, 40.7128, -74.0060),
+            POI("Central Park", "park", "Large park", Confidence.MEDIUM, 40.7829, -73.9654),
+        )
+        // Stage 2: PortraitComplete with enrichment-only POIs (no coords — matches real behavior)
+        val stage2Pois = listOf(
+            POI("Cafe Roma", "cafe", "Good coffee with a vibe", Confidence.HIGH, latitude = null, longitude = null, vibe = "Character"),
+            POI("Central Park", "park", "Large park for walks", Confidence.MEDIUM, latitude = null, longitude = null, vibe = "History"),
+        )
+
+        // Configure provider to emit two-stage flow (no BucketComplete — matches real pipeline)
+        fakeProvider.responseFlow = flow {
+            emit(BucketUpdate.PinsReady(stage1Pois))
+            emit(BucketUpdate.PortraitComplete(stage2Pois))
+        }
+
+        // First call — should hit AI provider
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val pins = awaitItem()
+            assertIs<BucketUpdate.PinsReady>(pins)
+            assertEquals(stage1Pois.size, pins.pois.size)
+
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            // Merged POIs should have Stage 1 coords + Stage 2 enrichment
+            assertEquals(stage1Pois.size, portrait.pois.size)
+            assertEquals(stage1Pois[0].latitude, portrait.pois[0].latitude, "Coords preserved from Stage 1")
+            assertEquals("Character", portrait.pois[0].vibe, "Vibe merged from Stage 2")
+            assertEquals("Good coffee with a vibe", portrait.pois[0].description, "Description merged from Stage 2")
+            awaitComplete()
+        }
+        assertEquals(1, fakeProvider.callCount, "First call should hit AI provider")
+
+        // Verify merged POIs were cached (coords + enrichment)
+        val cached = database.area_poi_cacheQueries.getPois("Test Area", "en").executeAsOneOrNull()
+        assertNotNull(cached, "POIs should be cached after two-stage pipeline")
+        val cachedPois = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString<List<POI>>(cached!!.pois_json)
+        assertEquals(stage1Pois[0].latitude, cachedPois[0].latitude, "Cached POI should have Stage 1 coords")
+        assertEquals("Character", cachedPois[0].vibe, "Cached POI should have Stage 2 vibe")
+
+        // Second call — should serve from POI cache, NOT call AI provider
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(stage1Pois.size, portrait.pois.size, "Should serve cached POIs")
+            assertEquals(stage1Pois[0].name, portrait.pois[0].name)
+            assertEquals("Character", portrait.pois[0].vibe, "Cached POI should retain merged vibe")
+            assertNotNull(portrait.pois[0].latitude, "Cached POI should retain coords")
+            awaitComplete()
+        }
+        assertEquals(1, fakeProvider.callCount, "Second call should NOT hit AI provider — POIs served from cache")
+    }
+
     @Test
     fun onlineNormalPathUnchanged() = testScope.runTest {
         fakeConnectivity.setState(ConnectivityState.Online)

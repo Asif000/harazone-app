@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.harazone.domain.model.Confidence
+import com.harazone.util.AppLogger
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.AlertBanner
@@ -125,6 +126,7 @@ private fun ReadyContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val returnToSaves = remember { booleanArrayOf(false) }
+    val returnToChat = remember { booleanArrayOf(false) }
 
     LaunchedEffect(viewModel) {
         viewModel.errorEvents.collect { message ->
@@ -167,6 +169,7 @@ private fun ReadyContent(
                 onCameraIdle = { lat, lng -> viewModel.onCameraIdle(lat, lng) },
                 savedPoiIds = state.savedPoiIds,
                 savedPois = state.savedPois,
+                savedVibeFilter = state.savedVibeFilter,
             )
         }
 
@@ -246,7 +249,10 @@ private fun ReadyContent(
         // Back button: dismiss POI card > FAB (priority order)
         PlatformBackHandler(enabled = state.selectedPoi != null) {
             viewModel.clearPoiSelection()
-            if (returnToSaves[0]) {
+            if (returnToChat[0]) {
+                returnToChat[0] = false
+                chatViewModel.reopenChat()
+            } else if (returnToSaves[0]) {
                 returnToSaves[0] = false
                 viewModel.openSavesSheet()
             }
@@ -266,7 +272,10 @@ private fun ReadyContent(
                     .background(Color.Black.copy(alpha = 0.4f))
                     .clickable {
                         viewModel.clearPoiSelection()
-                        if (returnToSaves[0]) {
+                        if (returnToChat[0]) {
+                            returnToChat[0] = false
+                            chatViewModel.reopenChat()
+                        } else if (returnToSaves[0]) {
                             returnToSaves[0] = false
                             viewModel.openSavesSheet()
                         }
@@ -282,7 +291,10 @@ private fun ReadyContent(
                 activeVibe = state.activeVibe,
                 onDismiss = {
                     viewModel.clearPoiSelection()
-                    if (returnToSaves[0]) {
+                    if (returnToChat[0]) {
+                        returnToChat[0] = false
+                        chatViewModel.reopenChat()
+                    } else if (returnToSaves[0]) {
                         returnToSaves[0] = false
                         viewModel.openSavesSheet()
                     }
@@ -424,6 +436,29 @@ private fun ReadyContent(
                 onDirectionsFailed = {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar("No maps app available")
+                    }
+                },
+                onPoiCardClick = { card ->
+                    chatViewModel.closeChat()
+                    returnToChat[0] = true
+                    // Prefer enriched POI from map (has image, rating, vibe) over chat card
+                    // Try exact name match first, then containment for transliteration differences
+                    val enriched = state.pois.firstOrNull { it.name.equals(card.name, ignoreCase = true) }
+                        ?: state.pois.firstOrNull { it.name.contains(card.name, ignoreCase = true) || card.name.contains(it.name, ignoreCase = true) }
+                    val fallbackPoi = POI(
+                        name = card.name,
+                        type = card.type,
+                        description = card.whySpecial,
+                        confidence = Confidence.HIGH,
+                        latitude = card.lat,
+                        longitude = card.lng,
+                        insight = card.whySpecial,
+                        imageUrl = card.imageUrl,
+                    )
+                    if (enriched != null) {
+                        viewModel.selectPoi(enriched)
+                    } else {
+                        viewModel.selectPoiWithImageResolve(fallbackPoi)
                     }
                 },
             )

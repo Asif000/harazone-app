@@ -1,6 +1,11 @@
 package com.harazone.ui.map
 
+import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.domain.model.BucketUpdate
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.mock.MockEngine
+import io.ktor.client.engine.mock.respond
+import io.ktor.http.HttpStatusCode
 import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
@@ -44,6 +49,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+private val stubWikipediaImageRepository by lazy {
+    WikipediaImageRepository(HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) }))
+}
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class MapViewModelTest {
 
@@ -70,6 +79,7 @@ class MapViewModelTest {
         recentPlacesRepository: com.harazone.domain.repository.RecentPlacesRepository = FakeRecentPlacesRepository(),
         savedPoiRepository: com.harazone.domain.repository.SavedPoiRepository = com.harazone.fakes.FakeSavedPoiRepository(),
         clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
+        wikipediaImageRepository: com.harazone.data.remote.WikipediaImageRepository = stubWikipediaImageRepository,
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
@@ -79,6 +89,7 @@ class MapViewModelTest {
         geocodingProvider = geocodingProvider,
         recentPlacesRepository = recentPlacesRepository,
         savedPoiRepository = savedPoiRepository,
+        wikipediaImageRepository = wikipediaImageRepository,
         clockMs = clockMs,
     )
 

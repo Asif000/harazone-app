@@ -20,4 +20,5 @@ expect fun MapComposable(
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
     savedPoiIds: Set<String> = emptySet(),
     savedPois: List<SavedPoi> = emptyList(),
+    savedVibeFilter: Boolean = false,
 )

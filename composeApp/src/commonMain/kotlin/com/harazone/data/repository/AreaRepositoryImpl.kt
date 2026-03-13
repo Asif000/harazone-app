@@ -87,6 +87,18 @@ internal class AreaRepositoryImpl(
             return@flow
         }
 
+        // POI-only cache hit — two-stage pipeline doesn't emit BucketComplete,
+        // so bucket cache is empty but POI cache may be valid.
+        // Only use this path when there are NO bucket entries at all (pure two-stage flow).
+        if (validParsed.isEmpty() && staleParsed.isEmpty()) {
+            val cachedPois = loadPoisFromCache(areaName, language, now)
+            if (cachedPois.isNotEmpty()) {
+                AppLogger.d { "POI cache HIT for '$areaName' — ${cachedPois.size} POIs (no bucket cache)" }
+                emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPois)))
+                return@flow
+            }
+        }
+
         // Check connectivity before attempting AI call
         val connectivity = connectivityObserver().first()
 
@@ -139,7 +151,11 @@ internal class AreaRepositoryImpl(
         try {
             aiProvider.streamAreaPortrait(areaName, context).collect { update ->
                 when (update) {
-                    is BucketUpdate.PinsReady -> emit(update) // Pass through — no enrichment, no cache
+                    is BucketUpdate.PinsReady -> {
+                        emit(update)
+                        // Cache Stage 1 POIs (with coords) so restarts don't re-query
+                        if (update.pois.isNotEmpty()) writePoisToCache(update.pois, areaName, language)
+                    }
                     is BucketUpdate.PortraitComplete -> {
                         val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
                         if (hasCoords) {
@@ -148,9 +164,16 @@ internal class AreaRepositoryImpl(
                             if (enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
                             emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched)))
                         } else {
-                            // Stage 2 enrichment-only POIs (no coords) — enrich images via wikiSlug, but don't cache
+                            // Stage 2 enrichment-only POIs (no coords) — merge onto cached Stage 1 POIs
                             val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
-                            emit(BucketUpdate.PortraitComplete(enriched))
+                            val cachedStage1 = loadPoisFromCache(areaName, language, clock.nowMs())
+                            if (cachedStage1.isNotEmpty() && enriched.isNotEmpty()) {
+                                val merged = mergeStage2OntoCached(cachedStage1, enriched)
+                                writePoisToCache(merged, areaName, language)
+                                emit(BucketUpdate.PortraitComplete(resolveTileRefs(merged)))
+                            } else {
+                                emit(BucketUpdate.PortraitComplete(enriched))
+                            }
                         }
                     }
                     else -> {
@@ -198,6 +221,22 @@ internal class AreaRepositoryImpl(
         }.awaitAll()
         AppLogger.d { "enrichPoisWithImages: done — ${result.count { it.imageUrl != null }}/${result.size} have images" }
         result
+    }
+
+    private fun mergeStage2OntoCached(stage1: List<POI>, stage2: List<POI>): List<POI> {
+        val enrichmentByName = stage2.associateBy { it.name.lowercase() }
+        return stage1.map { cached ->
+            val enrichment = enrichmentByName[cached.name.lowercase()] ?: return@map cached
+            cached.copy(
+                vibe = enrichment.vibe.ifEmpty { cached.vibe },
+                insight = enrichment.insight.ifEmpty { cached.insight },
+                description = enrichment.description.ifEmpty { cached.description },
+                imageUrl = enrichment.imageUrl ?: cached.imageUrl,
+                wikiSlug = enrichment.wikiSlug ?: cached.wikiSlug,
+                hours = enrichment.hours ?: cached.hours,
+                rating = enrichment.rating ?: cached.rating,
+            )
+        }
     }
 
     private fun buildSatelliteTileRef(lat: Double?, lng: Double?): String? {

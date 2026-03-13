@@ -11,7 +11,7 @@ internal class GeminiPromptBuilder {
 
     fun buildPinOnlyPrompt(areaName: String, context: AreaContext): String {
         return """
-10 POIs in "$areaName". JSON array only, no other text.
+8 POIs in "$areaName". JSON array only, no other text.
 [{"n":"Castelo de São Jorge","t":"historic","lat":38.7139,"lng":-9.1334},{"n":"Time Out Market","t":"food","lat":38.7068,"lng":-9.1459},{"n":"Jardim da Estrela","t":"park","lat":38.7138,"lng":-9.1605}]
 t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 GPS to 4 decimal places. Skip any POI you cannot place accurately.

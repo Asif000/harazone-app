@@ -83,6 +83,7 @@ internal fun ChatOverlay(
     onDismiss: () -> Unit,
     onNavigateToMaps: (Double, Double, String) -> Boolean = { _, _, _ -> false },
     onDirectionsFailed: () -> Unit = {},
+    onPoiCardClick: (ChatPoiCard) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
@@ -215,6 +216,7 @@ internal fun ChatOverlay(
                                     val handled = onNavigateToMaps(card.lat, card.lng, card.name)
                                     if (!handled) onDirectionsFailed()
                                 },
+                                onClick = { onPoiCardClick(card) },
                             )
                         }
                     }
@@ -384,11 +386,13 @@ private fun ChatPoiMiniCard(
     onSave: () -> Unit,
     onUnsave: () -> Unit,
     onDirections: () -> Unit,
+    onClick: () -> Unit = {},
 ) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp)),
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() },
     ) {
         // Background satellite image
         AsyncImage(

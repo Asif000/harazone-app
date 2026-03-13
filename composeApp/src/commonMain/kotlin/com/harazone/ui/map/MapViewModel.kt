@@ -3,6 +3,7 @@ package com.harazone.ui.map
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.harazone.data.remote.MapTilerGeocodingProvider
+import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.POI
@@ -40,6 +41,7 @@ class MapViewModel(
     private val geocodingProvider: MapTilerGeocodingProvider,
     private val recentPlacesRepository: RecentPlacesRepository,
     private val savedPoiRepository: SavedPoiRepository,
+    private val wikipediaImageRepository: WikipediaImageRepository,
     private val clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
 ) : ViewModel() {
 
@@ -119,6 +121,25 @@ class MapViewModel(
                     "poi_type" to poi.type,
                 )
             )
+        }
+    }
+
+    fun selectPoiWithImageResolve(poi: POI) {
+        selectPoi(poi)
+        if (poi.imageUrl != null) return
+        viewModelScope.launch {
+            try {
+                val url = wikipediaImageRepository.getImageUrl(poi.wikiSlug, poi.name)
+                if (url != null) {
+                    val current = _uiState.value as? MapUiState.Ready ?: return@launch
+                    if (current.selectedPoi?.name == poi.name) {
+                        _uiState.value = current.copy(selectedPoi = poi.copy(imageUrl = url))
+                    }
+                }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                AppLogger.w(e) { "Wikipedia image resolve failed for '${poi.name}'" }
+            }
         }
     }
 

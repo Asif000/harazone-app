@@ -49,6 +49,7 @@ actual fun MapComposable(
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
     savedPoiIds: Set<String>,
     savedPois: List<SavedPoi>,
+    savedVibeFilter: Boolean,
 ) {
     // TODO(BACKLOG-HIGH): iOS dual-pin layer deferred — see tech-spec-save-as-snapshot-poi-architecture.md
     // Required: load savedPois from DB, render as gold pins, apply 50m suppression for Gemini results
