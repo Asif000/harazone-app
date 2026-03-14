@@ -217,6 +217,39 @@ class MapViewModelTest {
     }
 
     @Test
+    fun portraitCompleteOnly_updatesVibePoiCountsAndClearsEnriching() = runTest(testDispatcher) {
+        // Regression: on cache-hit revisit, only PortraitComplete fires (no VibesReady/PinsReady).
+        // UI state must still get pois, vibePoiCounts, and isEnrichingArea=false.
+        val dynamicVibes = listOf(
+            DynamicVibe(label = "culture", icon = ""),
+            DynamicVibe(label = "food", icon = ""),
+        )
+        val pois = listOf(
+            POI("Museum", "museum", "A museum", Confidence.HIGH, 1.0, 2.0, vibe = "culture", vibes = listOf("culture")),
+            POI("Cafe", "cafe", "A cafe", Confidence.HIGH, 1.1, 2.1, vibe = "food", vibes = listOf("food")),
+            POI("Gallery", "gallery", "A gallery", Confidence.HIGH, 1.2, 2.2, vibe = "culture", vibes = listOf("culture", "food")),
+        )
+        // Emit VibesReady first to set currentDynamicVibes, then PortraitComplete without PinsReady
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(dynamicVibes, emptyList()),
+                    BucketUpdate.PortraitComplete(pois),
+                )
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(3, state.pois.size)
+        assertEquals(2, state.dynamicVibePoiCounts["culture"])
+        assertEquals(2, state.dynamicVibePoiCounts["food"])
+        assertFalse(state.isEnrichingArea)
+    }
+
+    @Test
     fun analyticsMapOpenedFiredWithCorrectParams() = runTest(testDispatcher) {
         val mockPOIs = listOf(
             POI("Statue of Liberty", "landmark", "Famous statue", Confidence.HIGH, 40.6892, -74.0445),

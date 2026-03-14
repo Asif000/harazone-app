@@ -1131,8 +1131,11 @@ class MapViewModel(
                             val s = _uiState.value as? MapUiState.Ready
                             if (s != null) {
                                 _uiState.value = s.copy(
+                                    pois = pois,
                                     dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
+                                    allDiscoveredPois = pois,
                                     isLoadingVibes = false,
+                                    isEnrichingArea = false,
                                 )
                             }
                             // Update selectedPoi if open, so shimmer clears without user closing card
@@ -1251,6 +1254,16 @@ class MapViewModel(
                         }
                         is BucketUpdate.PortraitComplete -> {
                             pois = if (stage1Pois.isNotEmpty()) mergePois(stage1Pois, update.pois) else update.pois
+                            val s = _uiState.value as? MapUiState.Ready
+                            if (s != null) {
+                                _uiState.value = s.copy(
+                                    pois = pois,
+                                    dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
+                                    allDiscoveredPois = pois,
+                                    isLoadingVibes = false,
+                                    isEnrichingArea = false,
+                                )
+                            }
                         }
                         else -> {}
                     }
