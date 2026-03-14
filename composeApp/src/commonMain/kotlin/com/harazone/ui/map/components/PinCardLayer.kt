@@ -60,7 +60,8 @@ fun PinCardLayer(
     // Android back button: if a chip has been promoted to hero (selectedPinId != null),
     // back clears the selection and returns to nearest-as-hero.
     PlatformBackHandler(enabled = selectedPinId != null) {
-        onChipTapped(pois.first { it.savedId == selectedPinId!! })  // toggle-deselect via onChipTapped
+        val selected = pois.firstOrNull { it.savedId == selectedPinId } ?: return@PlatformBackHandler
+        onChipTapped(selected)  // toggle-deselect via onChipTapped
     }
 
     AnimatedVisibility(

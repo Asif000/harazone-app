@@ -196,6 +196,9 @@ class MapViewModel(
             activeDynamicVibe = newVibe,
             savedVibeFilter = false,
             pois = visiblePois,
+            selectedPinId = null,
+            cardsVisible = false,
+            pinScreenPositions = emptyMap(),
         )
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.label ?: "all")))
     }
@@ -333,6 +336,9 @@ class MapViewModel(
             dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
             activeDynamicVibe = null,
+            selectedPinId = null,
+            cardsVisible = false,
+            pinScreenPositions = emptyMap(),
         )
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
         areaFetchJob = viewModelScope.launch {
@@ -416,6 +422,9 @@ class MapViewModel(
             dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
             activeDynamicVibe = null,
+            selectedPinId = null,
+            cardsVisible = false,
+            pinScreenPositions = emptyMap(),
         )
         fetchWeatherForLocation(recent.latitude, recent.longitude)
         areaFetchJob = viewModelScope.launch {
