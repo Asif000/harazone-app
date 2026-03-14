@@ -10,6 +10,8 @@ class FakeSavedPoiRepository : SavedPoiRepository {
 
     private val _pois = MutableStateFlow<List<SavedPoi>>(emptyList())
     var shouldThrow: Boolean = false
+    var lastUpdatedPoiId: String? = null
+    var lastUpdatedNote: String? = null
 
     override fun observeAll(): Flow<List<SavedPoi>> = _pois
 
@@ -24,5 +26,13 @@ class FakeSavedPoiRepository : SavedPoiRepository {
     override suspend fun unsave(poiId: String) {
         if (shouldThrow) throw RuntimeException("Test error")
         _pois.value = _pois.value.filter { it.id != poiId }
+    }
+
+    override suspend fun updateUserNote(poiId: String, note: String?) {
+        lastUpdatedPoiId = poiId
+        lastUpdatedNote = note
+        _pois.value = _pois.value.map {
+            if (it.id == poiId) it.copy(userNote = note) else it
+        }
     }
 }

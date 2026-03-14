@@ -1,6 +1,7 @@
 package com.harazone.ui.saved.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,11 +13,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.Create
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -24,14 +28,24 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -47,8 +61,17 @@ fun SavedPoiCard(
     onShare: () -> Unit,
     onAskAi: () -> Unit,
     onClick: () -> Unit = {},
+    isEditingNote: Boolean = false,
+    onStartEditingNote: () -> Unit = {},
+    onNoteChanged: (String) -> Unit = {},
+    onStopEditingNote: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    var noteText by remember(poi.id, poi.userNote) { mutableStateOf(poi.userNote ?: "") }
+    LaunchedEffect(isEditingNote, poi.id) {
+        if (isEditingNote) focusRequester.requestFocus()
+    }
     Card(
         onClick = onClick,
         modifier = modifier
@@ -89,7 +112,6 @@ fun SavedPoiCard(
             }
         }
 
-        // TODO(BACKLOG-MEDIUM): Show userNote on SavedPoiCard — needs design feedback on placement, truncation, and styling
         // Card body
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
@@ -106,6 +128,67 @@ fun SavedPoiCard(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+
+            // Note area
+            Spacer(Modifier.height(6.dp))
+            if (isEditingNote) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    BasicTextField(
+                        value = noteText,
+                        onValueChange = { new ->
+                            if (new.length <= 280) {
+                                noteText = new
+                                onNoteChanged(new)
+                            }
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(focusRequester),
+                        textStyle = MaterialTheme.typography.bodySmall.copy(color = Color.White.copy(alpha = 0.8f)),
+                        cursorBrush = SolidColor(Color.White),
+                        singleLine = false,
+                        maxLines = 4,
+                        keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Default),
+                        // ImeAction.Default preserves the Enter key for newlines in this multi-line field.
+                        // User dismisses editing via back button, tapping outside, or sheet dismiss.
+                    )
+                    if (noteText.length >= 240) {
+                        Text(
+                            text = "${280 - noteText.length}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (noteText.length >= 270) Color(0xFFFF6B6B) else Color.White.copy(alpha = 0.4f),
+                            modifier = Modifier.padding(start = 6.dp),
+                        )
+                    }
+                }
+            } else if (poi.userNote != null) {
+                Row(
+                    modifier = Modifier.clickable { onStartEditingNote() },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = poi.userNote,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.6f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Icon(
+                        Icons.Outlined.Create,
+                        contentDescription = "Edit note",
+                        tint = Color.White.copy(alpha = 0.3f),
+                        modifier = Modifier.size(14.dp).padding(start = 4.dp),
+                    )
+                }
+            } else {
+                Text(
+                    text = "Add a note\u2026",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.25f),
+                    modifier = Modifier.clickable { onStartEditingNote() },
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 

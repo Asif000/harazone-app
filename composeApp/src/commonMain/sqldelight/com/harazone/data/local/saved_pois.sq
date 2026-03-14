@@ -26,3 +26,6 @@ VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at, 
 
 deleteById:
 DELETE FROM saved_pois WHERE poi_id = :poi_id;
+
+updateUserNote:
+UPDATE saved_pois SET user_note = :user_note WHERE poi_id = :poi_id;

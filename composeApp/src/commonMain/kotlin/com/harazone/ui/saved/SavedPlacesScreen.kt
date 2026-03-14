@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -95,6 +96,11 @@ fun SavedPlacesScreen(
     }
 
     PlatformBackHandler(enabled = true) { onDismiss() }
+    PlatformBackHandler(enabled = uiState.editingNotePoiId != null) {
+        // Find the current note text from the editing card
+        val editingPoi = uiState.filteredSaves.find { it.id == uiState.editingNotePoiId }
+        viewModel.onStopEditingNote(editingPoi?.userNote ?: "")
+    }
 
     Box(
         modifier = Modifier
@@ -255,7 +261,7 @@ fun SavedPlacesScreen(
                     bottom = 80.dp + navBarPadding,
                 ),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).imePadding(),
             ) {
                 // Discovery Story card
                 if (uiState.discoveryStory != null) {
@@ -306,6 +312,10 @@ fun SavedPlacesScreen(
                     SavedPoiCard(
                         poi = poi,
                         isPendingUnsave = poi.id in uiState.pendingUnsaveIds,
+                        isEditingNote = poi.id == uiState.editingNotePoiId,
+                        onStartEditingNote = { viewModel.onStartEditingNote(poi.id) },
+                        onNoteChanged = { note -> viewModel.onNoteChanged(poi.id, note) },
+                        onStopEditingNote = { noteText -> viewModel.onStopEditingNote(noteText) },
                         onClick = { onPoiSelected(poi) },
                         onUnsave = {
                             viewModel.unsavePoi(poi.id)

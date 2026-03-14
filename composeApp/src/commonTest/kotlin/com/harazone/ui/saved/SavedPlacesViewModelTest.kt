@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -258,5 +259,69 @@ class SavedPlacesViewModelTest {
         vm.commitAllPendingUnsaves()
 
         assertTrue(vm.uiState.value.pendingUnsaveIds.isEmpty())
+    }
+
+    // --- User Notes tests ---
+
+    @Test
+    fun onStartEditingNote_setsEditingNotePoiId() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onStartEditingNote("poi-1")
+
+        assertEquals("poi-1", vm.uiState.value.editingNotePoiId)
+    }
+
+    @Test
+    fun onStopEditingNote_clearsEditingNotePoiId() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onStartEditingNote("poi-1")
+        vm.onStopEditingNote("note text")
+
+        assertNull(vm.uiState.value.editingNotePoiId)
+    }
+
+    @Test
+    fun onNoteChanged_savesAfterDebounce() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onNoteChanged("poi-1", "Great spot")
+        advanceTimeBy(600)
+
+        assertEquals("Great spot", repo.lastUpdatedNote)
+        assertEquals("poi-1", repo.lastUpdatedPoiId)
+    }
+
+    @Test
+    fun onNoteChanged_blankNotesPersistAsNull() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onNoteChanged("poi-1", "   ")
+        advanceTimeBy(600)
+
+        assertNull(repo.lastUpdatedNote)
+    }
+
+    @Test
+    fun onStopEditingNote_flushesImmediately() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onStartEditingNote("poi-1")
+        vm.onNoteChanged("poi-1", "Fast note")
+        // Do NOT advance time — stop immediately within 500ms
+        vm.onStopEditingNote("Fast note")
+
+        assertEquals("Fast note", repo.lastUpdatedNote)
     }
 }

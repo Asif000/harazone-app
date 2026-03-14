@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.repository.SavedPoiRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +22,7 @@ class SavedPlacesViewModel(
     private var allSaves: List<SavedPoi> = emptyList()
     private var userLat: Double? = null
     private var userLng: Double? = null
+    private var saveNoteJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -63,6 +66,40 @@ class SavedPlacesViewModel(
             }
         } else {
             recompute()
+        }
+    }
+
+    fun onStartEditingNote(poiId: String) {
+        _uiState.update { it.copy(editingNotePoiId = poiId) }
+    }
+
+    fun onNoteChanged(poiId: String, note: String) {
+        val trimmed = if (note.isBlank()) null else note
+        saveNoteJob?.cancel()
+        saveNoteJob = viewModelScope.launch {
+            delay(500)
+            try {
+                savedPoiRepository.updateUserNote(poiId, trimmed)
+            } catch (_: Exception) {
+                // Known limitation (v1): silent failure — DB flow will reflect true state on next emit.
+            }
+        }
+    }
+
+    fun onStopEditingNote(finalNote: String) {
+        saveNoteJob?.cancel()
+        saveNoteJob = null
+        val trimmed = if (finalNote.isBlank()) null else finalNote
+        val poiId = _uiState.value.editingNotePoiId
+        _uiState.update { it.copy(editingNotePoiId = null) }
+        if (poiId != null) {
+            viewModelScope.launch {
+                try {
+                    savedPoiRepository.updateUserNote(poiId, trimmed)
+                } catch (_: Exception) {
+                    // Known limitation (v1): silent failure — DB flow will reflect true state on next emit
+                }
+            }
         }
     }
 

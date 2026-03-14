@@ -75,4 +75,13 @@ class SavedPoiRepositoryImpl(
             database.saved_poisQueries.deleteById(poiId)
         }
     }
+
+    override suspend fun updateUserNote(poiId: String, note: String?) {
+        withContext(ioDispatcher) {
+            database.saved_poisQueries.updateUserNote(
+                user_note = note,
+                poi_id = poiId,
+            )
+        }
+    }
 }

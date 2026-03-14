@@ -27,6 +27,7 @@ data class SavedPlacesUiState(
     val searchQuery: String = "",
     val discoveryStory: DiscoveryStory? = null,
     val pendingUnsaveIds: Set<String> = emptySet(),
+    val editingNotePoiId: String? = null,
 )
 
 // TODO(BACKLOG-MEDIUM): Move haversineKm to shared util — duplicated in MapViewModel. Deduplicate when a third caller appears.
