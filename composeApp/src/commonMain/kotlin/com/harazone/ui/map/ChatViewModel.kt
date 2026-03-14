@@ -55,6 +55,8 @@ internal class ChatViewModel(
     private val recommendedPoiNames: MutableList<String> = mutableListOf()
     private var injectedContextIndex: Int = -1
     private var activeVibeName: String? = null
+    private var chatOpenedAt: Long = 0L
+    private val EXPIRY_MS = 30 * 60 * 1000L // 30 minutes
 
     companion object {
         private const val MAX_HISTORY_TURNS = 20 // 20 messages = ~10 back-and-forth turns
@@ -82,6 +84,11 @@ internal class ChatViewModel(
         val current = _uiState.value
         // F7/M2: Same area — preserve conversation (whether open or closed)
         if (current.areaName == areaName && (current.isOpen || current.bubbles.isNotEmpty())) {
+            val isExpired = current.bubbles.isNotEmpty() && (clock.nowMs() - chatOpenedAt) > EXPIRY_MS
+            if (isExpired) {
+                _uiState.value = current.copy(isOpen = true, showReturnDialog = true)
+                return
+            }
             if (conversationHistory.isNotEmpty() && current.bubbles.isNotEmpty()) {
                 // A pill was already tapped — clear pills
                 _uiState.value = current.copy(isOpen = true, intentPills = emptyList())
@@ -98,6 +105,7 @@ internal class ChatViewModel(
         nextId = 0L
         isIntentSelected = false
         selectedIntent = null
+        chatOpenedAt = clock.nowMs()
         currentEntryPoint = entryPoint
         val vibeName = activeDynamicVibe?.label
         activeVibeName = vibeName
@@ -126,6 +134,7 @@ internal class ChatViewModel(
             showSkeletons = false,
             savedPoiIds = _uiState.value.savedPoiIds,
             intentPills = pillsFor(entryPoint, areaName),
+            persistentPills = pillsFor(entryPoint, areaName),
             inputText = preFillFor(entryPoint),
             contextBanner = bannerFor(entryPoint),
             depthLevel = 0,
@@ -161,6 +170,7 @@ internal class ChatViewModel(
             _uiState.value = _uiState.value.copy(
                 inputText = pill.message,
                 intentPills = emptyList(),
+                persistentPills = emptyList(),
                 depthLevel = 0,
             )
             sendMessage()
@@ -180,6 +190,17 @@ internal class ChatViewModel(
             showSkeletons = false,
             bubbles = s.bubbles.map { if (it.isStreaming) it.copy(isStreaming = false) else it },
         )
+    }
+
+    fun continueConversation() {
+        chatOpenedAt = clock.nowMs()
+        _uiState.value = _uiState.value.copy(showReturnDialog = false)
+    }
+
+    fun startFreshConversation() {
+        _uiState.value = _uiState.value.copy(showReturnDialog = false)
+        chatOpenedAt = clock.nowMs()
+        resetToIntentPills()
     }
 
     /** Reopen chat without resetting conversation state (e.g. after dismissing a POI detail card). */
@@ -207,7 +228,6 @@ internal class ChatViewModel(
             inputText = "",
             lastUserQuery = query,
             showSkeletons = true,
-            poiCards = emptyList(),
         )
         lastParseOffset = 0
         parsedCards = mutableListOf()
@@ -227,7 +247,10 @@ internal class ChatViewModel(
         }
 
         // Reinforce conversation style on follow-up turns so Gemini keeps ending with a question
-        val reinforcedQuery = query + "\n[Remember: 2-3 sentences max. End with a question. Respond with JSON only: {\"prose\":\"...\",\"pois\":[...]}]"
+        val mapPoiReminder = if (sessionPois.isNotEmpty()) {
+            " Map POIs: ${sessionPois.take(15).joinToString("; ") { it.name }}."
+        } else ""
+        val reinforcedQuery = query + "\n[REQUIRED: JSON only. prose = 2-3 sentences, LAST SENTENCE ENDS WITH '?'.$mapPoiReminder Every named place in prose → entry in pois array.]"
         val historySnapshot = conversationHistory.toList()
         conversationHistory.add(
             ChatMessage(
@@ -263,6 +286,10 @@ internal class ChatViewModel(
                         removeInjectedContext()
                         val displayText = response.prose.ifBlank { stripPoiJson(accumulated) }
                         val s = _uiState.value
+                        val newCards = response.pois.ifEmpty { parsedCards.toList() }
+                        val existingIds = s.poiCards.map { it.id }.toSet()
+                        val deduped = newCards.filter { it.id !in existingIds }
+                        // Newest cards first so user sees them without scrolling
                         _uiState.value = s.copy(
                             bubbles = s.bubbles.map {
                                 if (it.id == aiBubbleId) ChatBubble(
@@ -270,9 +297,10 @@ internal class ChatViewModel(
                                 ) else it
                             },
                             isStreaming = false,
-                            followUpChips = computeFollowUpChips(query, selectedIntent, currentEngagementLevel, _uiState.value.depthLevel),
+                            followUpChips = emptyList(),
+                            persistentPills = computePersistentPills(selectedIntent, query, _uiState.value.depthLevel),
                             showSkeletons = false,
-                            poiCards = response.pois.ifEmpty { parsedCards.toList() },
+                            poiCards = deduped + s.poiCards,
                         )
                         conversationHistory.add(
                             ChatMessage(
@@ -282,7 +310,7 @@ internal class ChatViewModel(
                         )
                     } else {
                         accumulated += token.text
-                        val displayText = stripPoiJson(accumulated)
+                        val displayText = extractStreamingProse(accumulated)
                         val s = _uiState.value
                         _uiState.value = s.copy(
                             bubbles = s.bubbles.map {
@@ -305,10 +333,28 @@ internal class ChatViewModel(
         return try {
             json.decodeFromString<ChatResponse>(cleaned)
         } catch (_: Exception) {
-            // Fallback: try to extract POI cards the old way, use stripped text as prose
+            // Fallback 1: regex-extract prose from {"prose":"...","pois":[...]} wrapper
+            val proseMatch = Regex(""""prose"\s*:\s*"((?:[^"\\]|\\.)*)"""").find(cleaned)
+            if (proseMatch != null) {
+                val prose = proseMatch.groupValues[1]
+                    .replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\")
+                parsePoiCardsIncremental(text)
+                return ChatResponse(prose = prose, pois = parsedCards.toList())
+            }
+            // Fallback 2: extract POI cards the old way, use stripped text as prose
             parsePoiCardsIncremental(text)
             ChatResponse(prose = stripMarkdownChars(stripPoiJson(text)), pois = parsedCards.toList())
         }
+    }
+
+    private fun extractStreamingProse(text: String): String {
+        // If the response is a JSON wrapper {"prose":"...",...}, extract the prose value mid-stream
+        val proseMatch = Regex(""""prose"\s*:\s*"((?:[^"\\]|\\.)*)""").find(text)
+        if (proseMatch != null) {
+            return proseMatch.groupValues[1]
+                .replace("\\n", "\n").replace("\\\"", "\"").replace("\\\\", "\\")
+        }
+        return stripPoiJson(text)
     }
 
     private fun stripMarkdownChars(text: String): String =
@@ -490,6 +536,44 @@ internal class ChatViewModel(
         this.contains("\\b${Regex.escape(term)}\\b".toRegex())
     }
 
+    fun tapPersistentPill(pill: ContextualPill) {
+        if (_uiState.value.isStreaming) return
+        if (selectedIntent == null) selectedIntent = pill.intent
+        sendMessage(pill.message)
+    }
+
+    private fun computePersistentPills(intent: ChatIntent?, lastQuery: String, depthLevel: Int): List<ContextualPill> {
+        val areaName = _uiState.value.areaName
+        if (depthLevel >= 3) {
+            return listOf(
+                ContextualPill("New topic", "Let's change topic", ChatIntent.DISCOVER, "🔄"),
+            ) + computeContextualPills(lastQuery, areaName).take(2)
+        }
+        return computeContextualPills(lastQuery, areaName).take(3)
+    }
+
+    private fun computeContextualPills(query: String, areaName: String): List<ContextualPill> {
+        val q = query.lowercase()
+        return when {
+            q.containsAnyWord("safe", "crime", "danger", "night") -> listOf(
+                ContextualPill("Safe at night?", "Is it safe at night around here?", ChatIntent.DISCOVER, "🌙"),
+                ContextualPill("Areas to avoid", "What areas should I avoid?", ChatIntent.DISCOVER, "⚠️"),
+            )
+            q.containsAnyWord("food", "eat", "restaurant", "drink") -> listOf(
+                ContextualPill("Best time to go", "What's the best time to visit?", ChatIntent.HUNGRY, "⏰"),
+                ContextualPill("Veggie options?", "Are there vegetarian options nearby?", ChatIntent.HUNGRY, "🥗"),
+            )
+            q.containsAnyWord("history", "historic", "built", "founded") -> listOf(
+                ContextualPill("Tell me more", "Tell me more about the history here", ChatIntent.DISCOVER, "📖"),
+                ContextualPill("Famous events?", "Any famous events happened here?", ChatIntent.DISCOVER, "🏛️"),
+            )
+            else -> listOf(
+                ContextualPill("What's nearby?", "What else is nearby worth seeing?", ChatIntent.DISCOVER, "📍"),
+                ContextualPill("Surprise me", "Surprise me with something unexpected in $areaName", ChatIntent.SURPRISE, "🎲"),
+            )
+        }
+    }
+
     fun resetToIntentPills() {
         chatJob?.cancel()
         conversationHistory = mutableListOf()
@@ -506,6 +590,7 @@ internal class ChatViewModel(
             showSkeletons = false,
             isStreaming = false,
             intentPills = pillsFor(currentEntryPoint, areaName),
+            persistentPills = pillsFor(currentEntryPoint, areaName),
             inputText = preFillFor(currentEntryPoint),
             contextBanner = bannerFor(currentEntryPoint),
             depthLevel = 0,

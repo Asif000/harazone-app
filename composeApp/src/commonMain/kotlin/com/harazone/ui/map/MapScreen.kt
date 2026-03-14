@@ -506,6 +506,10 @@ private fun ReadyContent(
                         viewModel.selectPoiWithImageResolve(fallbackPoi)
                     }
                 },
+                onShowOnMap = { card ->
+                    chatViewModel.closeChat()
+                    viewModel.flyToCoords(card.lat, card.lng)
+                },
             )
         }
 

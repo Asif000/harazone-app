@@ -268,7 +268,7 @@ class ChatViewModelTest {
 
         val state = vm.uiState.value
         assertFalse(state.isStreaming)
-        assertTrue(state.followUpChips.isNotEmpty())
+        assertTrue(state.persistentPills.isNotEmpty(), "Persistent pills should replenish after response")
     }
 
     @Test
@@ -812,5 +812,195 @@ Enjoy!"""
         assertTrue(state.bubbles.isEmpty())
         assertTrue(state.intentPills.isNotEmpty())
         assertEquals(0, state.depthLevel)
+    }
+
+    // --- Chat Experience Redesign tests ---
+
+    @Test
+    fun `mapAwarePrompt_injectsAllSessionPois`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
+        val pois = listOf(
+            testPoi("Brick Lane"),
+            testPoi("Beigel Bake"),
+            testPoi("Rivington St"),
+            testPoi("Spitalfields Market"),
+            testPoi("Old Truman Brewery"),
+            testPoi("Columbia Road"),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", pois, null)
+        vm.tapIntentPill(discoverPill())
+
+        val context = vm.systemContextForTest
+        // All 6 POIs should appear — not just top 5
+        pois.forEach { poi ->
+            assertTrue(context.contains(poi.name), "System context should contain '${poi.name}'")
+        }
+        assertTrue(context.contains("MAP POIS"), "System context should contain MAP POIS section")
+        assertTrue(context.contains("REFERENCE RULE"), "System context should contain REFERENCE RULE")
+    }
+
+    @Test
+    fun `reinforcedQuery_containsPoisAndQuestion`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Hi!", false),
+            ChatToken("", true),
+        )
+        val pois = listOf(testPoi("Brick Lane"), testPoi("Beigel Bake"))
+        val vm = createViewModel()
+        vm.openChat("Test Area", pois, null)
+
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Sure!", false),
+            ChatToken("", true),
+        )
+        vm.sendMessage("Show me food")
+
+        val lastQuery = fakeAiProvider.lastChatQuery
+        assertTrue(lastQuery.contains("LAST SENTENCE ENDS WITH '?'"), "Reinforced query should enforce question ending")
+        assertTrue(lastQuery.contains("Brick Lane"), "Reinforced query should contain POI name 'Brick Lane'")
+        assertTrue(lastQuery.contains("Beigel Bake"), "Reinforced query should contain POI name 'Beigel Bake'")
+    }
+
+    @Test
+    fun `poiCards_accumulateAcrossTurns`() = runTest {
+        val card1Json = """{"prose":"Try this","pois":[{"n":"Cafe A","t":"food","lat":1.0,"lng":2.0,"w":"great"}]}"""
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken(card1Json, false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.sendMessage("First")
+        assertEquals(1, vm.uiState.value.poiCards.size, "Should have 1 card after first turn")
+
+        val card2Json = """{"prose":"Also try","pois":[{"n":"Park B","t":"park","lat":3.0,"lng":4.0,"w":"nice"}]}"""
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken(card2Json, false),
+            ChatToken("", true),
+        )
+        vm.sendMessage("Second")
+        assertEquals(2, vm.uiState.value.poiCards.size, "Should have 2 cards accumulated across turns")
+        assertEquals("Park B", vm.uiState.value.poiCards[0].name, "Newest cards should be first")
+        assertEquals("Cafe A", vm.uiState.value.poiCards[1].name)
+    }
+
+    @Test
+    fun `poiCards_clearOnReset`() = runTest {
+        val cardJson = """{"prose":"Try this","pois":[{"n":"Cafe A","t":"food","lat":1.0,"lng":2.0,"w":"great"}]}"""
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken(cardJson, false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.sendMessage("First")
+        assertTrue(vm.uiState.value.poiCards.isNotEmpty())
+
+        vm.resetToIntentPills()
+        assertTrue(vm.uiState.value.poiCards.isEmpty(), "POI cards should clear on reset")
+    }
+
+    @Test
+    fun `openChat_sameArea_expiry_showsReturnDialog`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.sendMessage("Hello")
+
+        // Close chat
+        vm.closeChat()
+
+        // Advance clock past 30 minutes
+        fakeClock.nowMs += 31 * 60 * 1000L
+
+        // Reopen same area
+        vm.openChat("Test Area", emptyList(), null)
+
+        assertTrue(vm.uiState.value.showReturnDialog, "Should show return dialog after 30-minute expiry")
+    }
+
+    @Test
+    fun `continueConversation_resetsTimerAndPreservesChat`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.sendMessage("Hello")
+        vm.closeChat()
+
+        fakeClock.nowMs += 31 * 60 * 1000L
+        vm.openChat("Test Area", emptyList(), null)
+        assertTrue(vm.uiState.value.showReturnDialog)
+
+        vm.continueConversation()
+        assertFalse(vm.uiState.value.showReturnDialog, "Dialog should be dismissed")
+        assertTrue(vm.uiState.value.bubbles.isNotEmpty(), "Conversation should be preserved")
+    }
+
+    @Test
+    fun `startFreshConversation_clearsHistory`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.sendMessage("Hello")
+        vm.closeChat()
+
+        fakeClock.nowMs += 31 * 60 * 1000L
+        vm.openChat("Test Area", emptyList(), null)
+        assertTrue(vm.uiState.value.showReturnDialog)
+
+        vm.startFreshConversation()
+        assertFalse(vm.uiState.value.showReturnDialog, "Dialog should be dismissed")
+        assertTrue(vm.uiState.value.bubbles.isEmpty(), "Conversation should be cleared")
+        assertTrue(vm.uiState.value.poiCards.isEmpty(), "POI cards should be cleared")
+    }
+
+    @Test
+    fun `persistentPills_replenishAfterResponse`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Sure!", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.tapIntentPill(discoverPill())
+
+        // After tapIntentPill triggers sendMessage, persistentPills should be replenished
+        val state = vm.uiState.value
+        assertFalse(state.isStreaming)
+        assertTrue(state.persistentPills.isNotEmpty(), "Persistent pills should replenish after AI response")
+    }
+
+    @Test
+    fun `persistentPills_depthGate_includesNewTopic`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("R", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+
+        // Send 3 messages to reach depthLevel >= 3
+        vm.sendMessage("Q1")
+        fakeAiProvider.chatTokens = listOf(ChatToken("R2", false), ChatToken("", true))
+        vm.sendMessage("Q2")
+        fakeAiProvider.chatTokens = listOf(ChatToken("R3", false), ChatToken("", true))
+        vm.sendMessage("Q3")
+
+        assertEquals(3, vm.uiState.value.depthLevel)
+        val newTopicPill = vm.uiState.value.persistentPills.find { it.label == "New topic" }
+        assertTrue(newTopicPill != null, "At depthLevel >= 3, persistent pills should include 'New topic'")
     }
 }

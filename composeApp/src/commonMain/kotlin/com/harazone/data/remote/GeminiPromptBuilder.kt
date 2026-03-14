@@ -176,8 +176,19 @@ WHY SPECIAL REQUIRED: Every place you mention must have a compelling reason. "Po
 NO CHAINS: Never recommend chain brands, international franchises, or tourist traps."""
 
     private fun areaContextBlock(areaName: String, pois: List<POI>): String {
-        val poiLine = if (pois.isNotEmpty()) " Key places in this area include: ${pois.take(5).joinToString(", ") { it.name }}." else ""
-        return """AREA CONTEXT: You are guiding someone around $areaName.$poiLine
+        val poiSection = if (pois.isNotEmpty()) {
+            val poiList = pois.take(15).mapIndexed { i, poi ->
+                val desc = poi.insight?.takeIf { it.isNotBlank() } ?: poi.description?.take(80) ?: ""
+                "${i + 1}. ${poi.name} (${poi.type})${if (desc.isNotBlank()) " — $desc" else ""}"
+            }.joinToString("\n")
+            """
+
+MAP POIS — these are the exact places visible on the user's map right now:
+$poiList
+
+REFERENCE RULE: Any place you mention in your prose MUST appear in the pois array with matching name and coordinates. Do NOT mention places outside this list unless the user specifically asks for something not here."""
+        } else ""
+        return """AREA CONTEXT: You are guiding someone around $areaName.$poiSection
 Local dining culture: adapt to what "good food" means HERE — street carts, markets, fine dining, whatever fits this place. QUALITY MEANS: memorable, worth the trip, has a story. NOT: has a website, has 4+ Google stars, looks good on Instagram."""
     }
 

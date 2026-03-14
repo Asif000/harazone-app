@@ -46,4 +46,6 @@ data class ChatUiState(
     val intentPills: List<ContextualPill> = emptyList(),
     val contextBanner: String? = null,
     val depthLevel: Int = 0,
+    val persistentPills: List<ContextualPill> = emptyList(),
+    val showReturnDialog: Boolean = false,
 )

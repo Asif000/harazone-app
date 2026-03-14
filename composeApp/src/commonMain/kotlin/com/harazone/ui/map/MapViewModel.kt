@@ -139,6 +139,15 @@ class MapViewModel(
         }
     }
 
+    fun flyToCoords(lat: Double, lng: Double) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(
+            latitude = lat,
+            longitude = lng,
+            cameraMoveId = current.cameraMoveId + 1,
+        )
+    }
+
     fun selectPoiWithImageResolve(poi: POI) {
         selectPoi(poi)
         if (poi.imageUrl != null) return

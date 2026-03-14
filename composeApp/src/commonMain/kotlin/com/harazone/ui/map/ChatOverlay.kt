@@ -25,7 +25,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,6 +49,7 @@ import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -85,14 +89,14 @@ internal fun ChatOverlay(
     onNavigateToMaps: (Double, Double, String) -> Boolean = { _, _, _ -> false },
     onDirectionsFailed: () -> Unit = {},
     onPoiCardClick: (ChatPoiCard) -> Unit = {},
+    onShowOnMap: (ChatPoiCard) -> Unit = {},
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
 
-    // Scroll to last item: bubbles + skeleton (1 item if shown) + POI cards
+    // Scroll to last item: bubbles + skeleton (1 item if shown)
     val totalItems = chatState.bubbles.size +
-        (if (chatState.showSkeletons) 1 else 0) +
-        chatState.poiCards.size
+        (if (chatState.showSkeletons) 1 else 0)
     // Scroll when content changes OR when overlay reopens with new context
     val scrollKey = Triple(chatState.bubbles.size, chatState.poiCards.size, chatState.isStreaming)
     LaunchedEffect(scrollKey, chatState.isOpen) {
@@ -166,6 +170,21 @@ internal fun ChatOverlay(
                 ContextBanner(text = banner, onDismiss = { viewModel.dismissContextBanner() })
             }
 
+            // Return dialog for expired conversations
+            if (chatState.showReturnDialog) {
+                AlertDialog(
+                    onDismissRequest = { viewModel.continueConversation() },
+                    title = { Text("Welcome back!") },
+                    text = { Text("Your earlier conversation has been paused. Pick up where you left off, or start fresh?") },
+                    confirmButton = {
+                        TextButton(onClick = { viewModel.continueConversation() }) { Text("Continue") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { viewModel.startFreshConversation() }) { Text("Start Fresh") }
+                    },
+                )
+            }
+
             Spacer(Modifier.height(4.dp))
 
             // Messages area
@@ -177,16 +196,20 @@ internal fun ChatOverlay(
                     .padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                if (chatState.bubbles.isEmpty() && chatState.intentPills.isNotEmpty()) {
+                if (chatState.bubbles.isEmpty() && chatState.persistentPills.isNotEmpty()) {
                     item(key = "empty_state") {
-                        EmptyState(
-                            areaName = chatState.areaName,
-                            intentPills = chatState.intentPills,
-                            onPillTap = { viewModel.tapIntentPill(it) },
-                        )
+                        EmptyStateText(areaName = chatState.areaName)
                     }
                 } else if (chatState.bubbles.isEmpty()) {
-                    // No pills and no bubbles — empty state without chips
+                    item(key = "empty_prompt") {
+                        Text(
+                            "Tap a suggestion below to start exploring",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                        )
+                    }
                 } else {
                     items(chatState.bubbles, key = { it.id }) { bubble ->
                         ChatBubbleItem(
@@ -197,54 +220,63 @@ internal fun ChatOverlay(
 
                     // Skeleton shimmer section
                     if (chatState.showSkeletons) {
-                        val remainingSkeletons = (3 - chatState.poiCards.size).coerceAtLeast(0)
-                        if (remainingSkeletons > 0) {
-                            item(key = "skeletons") {
-                                SkeletonSection(remainingSkeletons)
-                            }
-                        }
-                    }
-
-                    // POI mini-cards section
-                    if (chatState.poiCards.isNotEmpty()) {
-                        items(chatState.poiCards, key = { it.id }) { card ->
-                            ChatPoiMiniCard(
-                                card = card,
-                                isSaved = card.id in chatState.savedPoiIds,
-                                onSave = { viewModel.savePoi(card, chatState.areaName) },
-                                onUnsave = { viewModel.unsavePoi(card.id) },
-                                onDirections = {
-                                    val handled = onNavigateToMaps(card.lat, card.lng, card.name)
-                                    if (!handled) onDirectionsFailed()
-                                },
-                                onClick = { onPoiCardClick(card) },
-                            )
+                        item(key = "skeletons") {
+                            SkeletonSection(3)
                         }
                     }
                 }
             }
 
-            // Follow-up chips (below messages, not scrollable)
-            if (chatState.followUpChips.isNotEmpty() && !chatState.isStreaming && chatState.bubbles.isNotEmpty()) {
-                FlowRow(
+            // POI card rail — accumulates across turns
+            if (chatState.poiCards.isNotEmpty()) {
+                LazyRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    chatState.followUpChips.forEach { chip ->
-                        if (chip == "🔄 New topic") {
+                    items(chatState.poiCards, key = { it.id }) { card ->
+                        ChatPoiMiniCard(
+                            card = card,
+                            isSaved = card.id in chatState.savedPoiIds,
+                            onSave = { viewModel.savePoi(card, chatState.areaName) },
+                            onUnsave = { viewModel.unsavePoi(card.id) },
+                            onDirections = {
+                                val handled = onNavigateToMaps(card.lat, card.lng, card.name)
+                                if (!handled) onDirectionsFailed()
+                            },
+                            onClick = { onPoiCardClick(card) },
+                            onShowOnMap = { onShowOnMap(card) },
+                        )
+                    }
+                }
+            }
+
+            // Persistent pill rail — always visible when pills exist
+            if (chatState.persistentPills.isNotEmpty() && !chatState.isStreaming) {
+                LazyRow(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(chatState.persistentPills) { pill ->
+                        if (pill.label == "New topic") {
                             SuggestionChip(
                                 onClick = { viewModel.resetToIntentPills() },
-                                label = { Text(chip, fontSize = 13.sp) },
+                                label = { Text("${pill.emoji} ${pill.label}", fontSize = 13.sp) },
                                 colors = SuggestionChipDefaults.suggestionChipColors(
                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
                                 ),
                             )
                         } else {
                             SuggestionChip(
-                                onClick = { viewModel.tapChip(chip) },
-                                label = { Text(chip, fontSize = 13.sp) },
+                                onClick = {
+                                    if (chatState.bubbles.isEmpty()) viewModel.tapIntentPill(pill)
+                                    else viewModel.tapPersistentPill(pill)
+                                },
+                                label = { Text("${pill.emoji} ${pill.label}", fontSize = 13.sp) },
                                 colors = SuggestionChipDefaults.suggestionChipColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 ),
@@ -322,6 +354,40 @@ private fun EmptyState(
 }
 
 @Composable
+private fun EmptyStateText(areaName: String) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 40.dp),
+    ) {
+        Box(
+            modifier = Modifier
+                .size(52.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(IndigoGradient),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("AI", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Ask me anything about $areaName",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Tap a suggestion below to start exploring",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
 private fun ContextBanner(
     text: String,
     onDismiss: () -> Unit,
@@ -388,10 +454,11 @@ private fun ChatPoiMiniCard(
     onUnsave: () -> Unit,
     onDirections: () -> Unit,
     onClick: () -> Unit = {},
+    onShowOnMap: () -> Unit = {},
 ) {
     Box(
         modifier = Modifier
-            .fillMaxWidth()
+            .width(220.dp)
             .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
     ) {
@@ -489,6 +556,14 @@ private fun ChatPoiMiniCard(
                     },
                     colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = Color.White.copy(alpha = 0.15f),
+                    ),
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                )
+                SuggestionChip(
+                    onClick = onShowOnMap,
+                    label = { Text("\uD83D\uDCCD Show on Map", fontSize = 11.sp, color = Color.White) },
+                    colors = SuggestionChipDefaults.suggestionChipColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     ),
                     border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
                 )

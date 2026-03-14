@@ -36,6 +36,7 @@ class FakeAreaIntelligenceProvider : AreaIntelligenceProvider {
     var shouldThrowChat: Boolean = false
     var chatCallCount = 0
     var lastChatHistory: List<ChatMessage> = emptyList()
+    var lastChatQuery: String = ""
 
     override fun streamChatResponse(
         query: String,
@@ -44,6 +45,7 @@ class FakeAreaIntelligenceProvider : AreaIntelligenceProvider {
     ): Flow<ChatToken> {
         chatCallCount++
         lastChatHistory = conversationHistory
+        lastChatQuery = query
         return flow {
             if (shouldThrowChat) throw RuntimeException("Chat test error")
             chatTokens.forEach { emit(it) }
