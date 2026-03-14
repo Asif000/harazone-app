@@ -83,6 +83,7 @@ internal class ChatViewModel(
     ) {
         val current = _uiState.value
         // F7/M2: Same area — preserve conversation (whether open or closed)
+        // TODO(BACKLOG-MEDIUM): chatOpenedAt measures from first open, not last interaction — re-open at T+31min triggers expiry even if user was active 2min ago. Consider resetting on each re-open.
         if (current.areaName == areaName && (current.isOpen || current.bubbles.isNotEmpty())) {
             val isExpired = current.bubbles.isNotEmpty() && (clock.nowMs() - chatOpenedAt) > EXPIRY_MS
             if (isExpired) {
@@ -242,7 +243,7 @@ internal class ChatViewModel(
             injectedContextIndex = conversationHistory.size - 1
         }
 
-        // Reinforce conversation style on follow-up turns so Gemini keeps ending with a question
+        // TODO(BACKLOG-LOW): mapPoiReminder duplicates POI names already in system context MAP POIS section — ~200-400 redundant tokens per turn. Consider removing once REFERENCE RULE proves reliable.
         val mapPoiReminder = if (sessionPois.isNotEmpty()) {
             " Map POIs: ${sessionPois.take(15).joinToString("; ") { it.name }}."
         } else ""

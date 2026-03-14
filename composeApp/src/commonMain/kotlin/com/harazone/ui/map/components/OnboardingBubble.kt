@@ -101,6 +101,7 @@ fun OnboardingBubble(
                 .background(Color.Black.copy(alpha = 0.5f))
                 .clickable(onClick = onDismiss),
         ) {
+            // TODO(BACKLOG-MEDIUM): Callout dot positions are hardcoded pixel offsets — will misalign on different screen sizes/aspect ratios. Use layout measurement or onGloballyPositioned to anchor dots to actual UI element positions.
             // Callout dot — vibes rail (right side, mid-screen)
             CalloutDot(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 48.dp, bottom = 80.dp))
             // Callout dot — saved orb (right side, above mid)
