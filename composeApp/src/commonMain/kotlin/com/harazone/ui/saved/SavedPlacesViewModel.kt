@@ -23,6 +23,7 @@ class SavedPlacesViewModel(
     private var userLat: Double? = null
     private var userLng: Double? = null
     private var saveNoteJob: Job? = null
+    private var currentEditingNoteText: String = ""
 
     init {
         viewModelScope.launch {
@@ -70,10 +71,26 @@ class SavedPlacesViewModel(
     }
 
     fun onStartEditingNote(poiId: String) {
+        val previousPoiId = _uiState.value.editingNotePoiId
+        if (previousPoiId != null && previousPoiId != poiId) {
+            // Flush pending save for previously edited card before switching
+            saveNoteJob?.cancel()
+            saveNoteJob = null
+            val trimmed = if (currentEditingNoteText.isBlank()) null else currentEditingNoteText
+            viewModelScope.launch {
+                try {
+                    savedPoiRepository.updateUserNote(previousPoiId, trimmed)
+                } catch (_: Exception) {
+                    // Known limitation (v1): silent failure
+                }
+            }
+        }
+        currentEditingNoteText = ""
         _uiState.update { it.copy(editingNotePoiId = poiId) }
     }
 
     fun onNoteChanged(poiId: String, note: String) {
+        currentEditingNoteText = note
         val trimmed = if (note.isBlank()) null else note
         saveNoteJob?.cancel()
         saveNoteJob = viewModelScope.launch {
@@ -91,6 +108,7 @@ class SavedPlacesViewModel(
         saveNoteJob = null
         val trimmed = if (finalNote.isBlank()) null else finalNote
         val poiId = _uiState.value.editingNotePoiId
+        currentEditingNoteText = ""
         _uiState.update { it.copy(editingNotePoiId = null) }
         if (poiId != null) {
             viewModelScope.launch {
@@ -99,6 +117,22 @@ class SavedPlacesViewModel(
                 } catch (_: Exception) {
                     // Known limitation (v1): silent failure — DB flow will reflect true state on next emit
                 }
+            }
+        }
+    }
+
+    fun flushPendingNoteEdit() {
+        val poiId = _uiState.value.editingNotePoiId ?: return
+        saveNoteJob?.cancel()
+        saveNoteJob = null
+        val trimmed = if (currentEditingNoteText.isBlank()) null else currentEditingNoteText
+        currentEditingNoteText = ""
+        _uiState.update { it.copy(editingNotePoiId = null) }
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.updateUserNote(poiId, trimmed)
+            } catch (_: Exception) {
+                // Known limitation (v1): silent failure
             }
         }
     }

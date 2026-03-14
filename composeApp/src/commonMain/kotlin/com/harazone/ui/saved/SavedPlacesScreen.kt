@@ -92,15 +92,13 @@ fun SavedPlacesScreen(
     }
 
     DisposableEffect(Unit) {
-        onDispose { viewModel.commitAllPendingUnsaves() }
+        onDispose {
+            viewModel.flushPendingNoteEdit()
+            viewModel.commitAllPendingUnsaves()
+        }
     }
 
     PlatformBackHandler(enabled = true) { onDismiss() }
-    PlatformBackHandler(enabled = uiState.editingNotePoiId != null) {
-        // Find the current note text from the editing card
-        val editingPoi = uiState.filteredSaves.find { it.id == uiState.editingNotePoiId }
-        viewModel.onStopEditingNote(editingPoi?.userNote ?: "")
-    }
 
     Box(
         modifier = Modifier

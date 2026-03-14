@@ -28,10 +28,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,12 +47,12 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.harazone.domain.model.SavedPoi
+import com.harazone.ui.components.PlatformBackHandler
 
 @Composable
 fun SavedPoiCard(
@@ -72,6 +74,25 @@ fun SavedPoiCard(
     LaunchedEffect(isEditingNote, poi.id) {
         if (isEditingNote) focusRequester.requestFocus()
     }
+
+    // Back button dismisses note editing with correct local text (fixes H1 — screen-level handler had stale DB value)
+    PlatformBackHandler(enabled = isEditingNote) {
+        onStopEditingNote(noteText)
+    }
+
+    // Flush on compose exit (sheet dismiss, card-switch recomposition) — uses rememberUpdatedState
+    // to always capture the latest noteText and isEditingNote values
+    val currentNoteText by rememberUpdatedState(noteText)
+    val currentIsEditing by rememberUpdatedState(isEditingNote)
+    val currentOnStop by rememberUpdatedState(onStopEditingNote)
+    DisposableEffect(Unit) {
+        onDispose {
+            if (currentIsEditing) {
+                currentOnStop(currentNoteText)
+            }
+        }
+    }
+
     Card(
         onClick = onClick,
         modifier = modifier
@@ -178,7 +199,7 @@ fun SavedPoiCard(
                         Icons.Outlined.Create,
                         contentDescription = "Edit note",
                         tint = Color.White.copy(alpha = 0.3f),
-                        modifier = Modifier.size(14.dp).padding(start = 4.dp),
+                        modifier = Modifier.padding(start = 4.dp).size(14.dp),
                     )
                 }
             } else {

@@ -324,4 +324,72 @@ class SavedPlacesViewModelTest {
 
         assertEquals("Fast note", repo.lastUpdatedNote)
     }
+
+    // Regression: H1 — onStopEditingNote must use the text passed by the caller (composable's noteText),
+    // not the DB value. This test verifies the ViewModel correctly saves whatever finalNote is passed.
+    @Test
+    fun onStopEditingNote_usesPassedTextNotDbValue() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1", userNote = null))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onStartEditingNote("poi-1")
+        // User types "Great spot" but debounce hasn't fired — DB still has null
+        vm.onNoteChanged("poi-1", "Great spot")
+        // Stop with the CURRENT typed text (as card's PlatformBackHandler would pass)
+        vm.onStopEditingNote("Great spot")
+
+        assertEquals("Great spot", repo.lastUpdatedNote)
+        assertEquals("poi-1", repo.lastUpdatedPoiId)
+    }
+
+    // Regression: M1 — switching cards must flush the previous card's pending note
+    @Test
+    fun onStartEditingNote_flushesPreviousCardNote() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        repo.save(makePoi("poi-2"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onStartEditingNote("poi-1")
+        vm.onNoteChanged("poi-1", "Note for card 1")
+        // Switch to card 2 without stopping card 1 — should auto-flush
+        vm.onStartEditingNote("poi-2")
+
+        assertEquals("poi-1", repo.lastUpdatedPoiId)
+        assertEquals("Note for card 1", repo.lastUpdatedNote)
+        assertEquals("poi-2", vm.uiState.value.editingNotePoiId)
+    }
+
+    // Regression: M2 — updateUserNote DB error should not crash
+    @Test
+    fun onNoteChanged_dbErrorDoesNotCrash() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        val (vm, _) = createViewModel(repo)
+
+        repo.shouldThrow = true
+        vm.onNoteChanged("poi-1", "Will fail")
+        advanceTimeBy(600)
+
+        // Should not throw — error is caught silently
+        // lastUpdatedNote is NOT set because shouldThrow prevented it
+        assertNull(repo.lastUpdatedNote)
+    }
+
+    // Regression: M3 — flushPendingNoteEdit saves tracked text on dispose
+    @Test
+    fun flushPendingNoteEdit_savesTrackedText() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onStartEditingNote("poi-1")
+        vm.onNoteChanged("poi-1", "Unsaved on dismiss")
+        // Simulate sheet dismiss — flushPendingNoteEdit uses tracked currentEditingNoteText
+        vm.flushPendingNoteEdit()
+
+        assertEquals("Unsaved on dismiss", repo.lastUpdatedNote)
+        assertNull(vm.uiState.value.editingNotePoiId)
+    }
 }

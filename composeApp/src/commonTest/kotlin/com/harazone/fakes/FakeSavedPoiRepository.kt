@@ -29,6 +29,7 @@ class FakeSavedPoiRepository : SavedPoiRepository {
     }
 
     override suspend fun updateUserNote(poiId: String, note: String?) {
+        if (shouldThrow) throw RuntimeException("Test error")
         lastUpdatedPoiId = poiId
         lastUpdatedNote = note
         _pois.value = _pois.value.map {
