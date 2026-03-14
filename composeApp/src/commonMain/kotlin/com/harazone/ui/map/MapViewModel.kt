@@ -268,6 +268,9 @@ class MapViewModel(
         _uiState.value = current.copy(
             savedVibeFilter = newFilter,
             activeDynamicVibe = if (newFilter) null else vibeBeforeSavedFilter,
+            selectedPinId = null,
+            cardsVisible = false,
+            pinScreenPositions = emptyMap(),
         )
         if (!newFilter) vibeBeforeSavedFilter = null
     }
