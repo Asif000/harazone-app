@@ -361,6 +361,23 @@ class SavedPlacesViewModelTest {
         assertEquals("poi-2", vm.uiState.value.editingNotePoiId)
     }
 
+    // Regression: card-switch with existing note and no typing must preserve the note
+    @Test
+    fun onStartEditingNote_switchWithoutTypingPreservesExistingNote() = runTest {
+        val repo = FakeSavedPoiRepository()
+        repo.save(makePoi("poi-1", userNote = "Old note"))
+        repo.save(makePoi("poi-2"))
+        val (vm, _) = createViewModel(repo)
+
+        vm.onStartEditingNote("poi-1")
+        // User enters edit mode on poi-1 but types NOTHING, then taps poi-2
+        vm.onStartEditingNote("poi-2")
+
+        // poi-1's existing note must be preserved, not erased to null
+        assertEquals("poi-1", repo.lastUpdatedPoiId)
+        assertEquals("Old note", repo.lastUpdatedNote)
+    }
+
     // Regression: M2 — updateUserNote DB error should not crash
     @Test
     fun onNoteChanged_dbErrorDoesNotCrash() = runTest {

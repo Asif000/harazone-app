@@ -85,7 +85,9 @@ class SavedPlacesViewModel(
                 }
             }
         }
-        currentEditingNoteText = ""
+        // Initialize from existing note so flush has the right value if user types nothing
+        val existingNote = allSaves.find { it.id == poiId }?.userNote ?: ""
+        currentEditingNoteText = existingNote
         _uiState.update { it.copy(editingNotePoiId = poiId) }
     }
 
