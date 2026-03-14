@@ -96,6 +96,7 @@ actual fun MapComposable(
     val mapRef = remember { arrayOfNulls<MapLibreMap>(1) }
     val styleRef = remember { arrayOfNulls<Style>(1) }
     val cameraIdleListenerRef = remember { arrayOfNulls<MapLibreMap.OnCameraIdleListener>(1) }
+    val gestureMoveListenerRef = remember { arrayOfNulls<MapLibreMap.OnCameraMoveStartedListener>(1) }
     val lastFittedPois = remember { mutableStateOf<List<POI>>(emptyList()) }
     val savedFilterFitted = remember { booleanArrayOf(false) }
     val wasSavedVibeFilter = remember { booleanArrayOf(false) }
@@ -217,6 +218,7 @@ actual fun MapComposable(
                             }
                         }
                         map.addOnCameraMoveStartedListener(gestureMoveListener)
+                        gestureMoveListenerRef[0] = gestureMoveListener
                     }
                 }
             }
@@ -498,6 +500,7 @@ actual fun MapComposable(
             context.unregisterComponentCallbacks(lowMemoryCallback)
             lifecycleOwner.lifecycle.removeObserver(observer)
             cameraIdleListenerRef[0]?.let { mapRef[0]?.removeOnCameraIdleListener(it) }
+            gestureMoveListenerRef[0]?.let { mapRef[0]?.removeOnCameraMoveStartedListener(it) }
             symbolManagerRef[0]?.onDestroy()
             mapView.onPause()
             mapView.onStop()
