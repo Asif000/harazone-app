@@ -2430,6 +2430,94 @@ class MapViewModelTest {
         viewModel.onPinChipTapped("id2")
         assertEquals("id2", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
     }
+
+    // -----------------------------------------------------------------------
+    // Regression tests — H2/M3/M4 review findings
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun switchDynamicVibe_resetsSelectedPinIdAndCards() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        // Simulate pin card state
+        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
+        viewModel.onPinChipTapped("id1")
+        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals("id1", before.selectedPinId)
+        assertTrue(before.cardsVisible)
+
+        // Switch vibe → pin card state must reset
+        viewModel.switchDynamicVibe(DynamicVibe(label = "HISTORY", icon = ""))
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNull(after.selectedPinId)
+        assertFalse(after.cardsVisible)
+        assertTrue(after.pinScreenPositions.isEmpty())
+    }
+
+    @Test
+    fun onGeocodingSuggestionSelected_resetsSelectedPinId() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        // Simulate pin card state
+        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
+        viewModel.onPinChipTapped("id1")
+        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+
+        // Select geocoding suggestion → pin card state must reset
+        viewModel.onGeocodingSuggestionSelected(
+            GeocodingSuggestion(name = "Paris", fullAddress = "Paris, France", latitude = 48.8, longitude = 2.3, distanceKm = null)
+        )
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNull(after.selectedPinId)
+        assertFalse(after.cardsVisible)
+        assertTrue(after.pinScreenPositions.isEmpty())
+    }
+
+    @Test
+    fun onSavedVibeSelected_clearsPinScreenPositions() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        // Simulate pin card state
+        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
+        assertTrue(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
+
+        // Toggle saved vibe filter on → pin cards must clear
+        viewModel.onSavedVibeSelected()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(after.savedVibeFilter)
+        assertNull(after.selectedPinId)
+        assertFalse(after.cardsVisible)
+        assertTrue(after.pinScreenPositions.isEmpty())
+    }
+
+    @Test
+    fun switchDynamicVibe_cardsNotVisibleAfterSwitch() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        // Make cards visible
+        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
+        assertTrue(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
+
+        // Switch vibe → cardsVisible must be false (stale card visibility)
+        viewModel.switchDynamicVibe(DynamicVibe(label = "CULTURE", icon = ""))
+        assertFalse(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
+    }
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {
