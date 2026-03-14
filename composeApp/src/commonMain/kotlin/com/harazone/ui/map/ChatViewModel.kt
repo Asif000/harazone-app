@@ -90,13 +90,8 @@ internal class ChatViewModel(
                 _uiState.value = current.copy(isOpen = true, showReturnDialog = true)
                 return
             }
-            if (conversationHistory.isNotEmpty() && current.bubbles.isNotEmpty()) {
-                // A pill was already tapped — clear pills so they don't re-appear mid-conversation
-                _uiState.value = current.copy(isOpen = true, persistentPills = emptyList())
-            } else {
-                // No pill tapped yet — preserve pills so user can still choose an intent
-                _uiState.value = current.copy(isOpen = true)
-            }
+            // Pills are persistent — always preserve them on reopen (collapsed from dead if/else)
+            _uiState.value = current.copy(isOpen = true)
             return
         }
         // M2: Different area while open — fall through to reset and reinitialize
