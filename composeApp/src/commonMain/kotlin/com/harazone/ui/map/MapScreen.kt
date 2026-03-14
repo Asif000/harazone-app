@@ -36,13 +36,19 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -58,6 +64,7 @@ import com.harazone.ui.map.components.OnboardingBubble
 import com.harazone.ui.map.components.ExpandablePoiCard
 import com.harazone.ui.map.components.FloatingPoiCard
 import com.harazone.ui.map.components.GeocodingSearchBar
+import com.harazone.ui.map.components.PinCardLayer
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.ui.map.components.FabMenu
 import com.harazone.ui.map.components.MapListToggle
@@ -138,8 +145,16 @@ private fun ReadyContent(
 
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    var screenHeightPx by remember { mutableStateOf(0f) }
 
-    Box(Modifier.fillMaxSize()) {
+    // Measured onboarding target offsets (Task 11)
+    var vibeRailOffset by remember { mutableStateOf(Offset.Zero) }
+    var savedFabOffset by remember { mutableStateOf(Offset.Zero) }
+    var searchBarOffset by remember { mutableStateOf(Offset.Zero) }
+
+    Box(Modifier.fillMaxSize().onGloballyPositioned { coords ->
+        screenHeightPx = coords.size.height.toFloat()
+    }) {
         // Base: map or list
         // TODO(BACKLOG-MEDIUM): POIListView needs polish pass — list rows lack save CTAs, tap opens
         //   ExpandablePoiCard but save state isn't visible inline. Should show save icon per row,
@@ -169,6 +184,8 @@ private fun ReadyContent(
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
                 onCameraIdle = { lat, lng -> viewModel.onCameraIdle(lat, lng) },
+                onPinsProjected = { positions -> viewModel.onPinsProjected(positions) },
+                onMapGestureStart = { viewModel.onMapGestureStart() },
                 savedPoiIds = state.savedPoiIds,
                 savedPois = state.savedPois,
                 savedVibeFilter = state.savedVibeFilter,
@@ -199,8 +216,23 @@ private fun ReadyContent(
             )
         }
 
-        // Floating POI card strip (3 compact cards at bottom)
-        if (!state.showListView && !state.showAllMode && state.pois.isNotEmpty() && state.selectedPoi == null) {
+        // Pin-anchored card layer — shown on both platforms once pinScreenPositions is populated
+        if (state.pinScreenPositions.isNotEmpty() && !state.showListView && state.selectedPoi == null) {
+            PinCardLayer(
+                pois = state.pois,
+                pinScreenPositions = state.pinScreenPositions,
+                savedPoiIds = state.savedPoiIds,
+                selectedPinId = state.selectedPinId,
+                cardsVisible = state.cardsVisible,
+                screenHeightPx = screenHeightPx,
+                onChipTapped = { poi -> viewModel.onPinChipTapped(poi.savedId) },
+                onHeroTapped = { poi -> viewModel.selectPoi(poi) },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+
+        // Floating POI card strip — fallback before first pin projection (both platforms, brief)
+        if (state.pinScreenPositions.isEmpty() && !state.showListView && !state.showAllMode && state.pois.isNotEmpty() && state.selectedPoi == null) {
             Row(
                 verticalAlignment = Alignment.Top,
                 modifier = Modifier
@@ -277,7 +309,10 @@ private fun ReadyContent(
                 showCalloutDot = state.showOnboardingBubble,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 8.dp, bottom = navBarPadding + 88.dp),
+                    .padding(end = 8.dp, bottom = navBarPadding + 88.dp)
+                    .onGloballyPositioned { coords ->
+                        vibeRailOffset = coords.boundsInRoot().centerLeft
+                    },
             )
         }
 
@@ -421,7 +456,10 @@ private fun ReadyContent(
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = navBarPadding + 16.dp, end = 16.dp),
+                .padding(bottom = navBarPadding + 16.dp, end = 16.dp)
+                .onGloballyPositioned { coords ->
+                    savedFabOffset = coords.boundsInRoot().center
+                },
         )
 
         // MyLocation button (Position C — left side, above AI bar)
@@ -465,7 +503,10 @@ private fun ReadyContent(
             chatIsOpen = chatState.isOpen,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp),
+                .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp)
+                .onGloballyPositioned { coords ->
+                    searchBarOffset = coords.boundsInRoot().center
+                },
         )
 
         // Chat overlay
@@ -560,6 +601,9 @@ private fun ReadyContent(
         OnboardingBubble(
             visible = state.showOnboardingBubble,
             onDismiss = { viewModel.onOnboardingBubbleDismissed() },
+            vibeRailOffset = vibeRailOffset,
+            savedFabOffset = savedFabOffset,
+            searchBarOffset = searchBarOffset,
         )
 
         // Must be LAST PlatformBackHandler in ReadyContent — last-composed = highest priority

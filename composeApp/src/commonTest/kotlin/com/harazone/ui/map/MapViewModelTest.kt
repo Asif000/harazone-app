@@ -2319,6 +2319,117 @@ class MapViewModelTest {
             "Expected saved-POI vibe to appear despite area name case mismatch"
         )
     }
+
+    // -----------------------------------------------------------------------
+    // Pin-Anchored Hybrid Cards — ViewModel tests
+    // -----------------------------------------------------------------------
+
+    @Test
+    fun onPinsProjected_setsPositionsAndCardsVisible() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.cardsVisible)
+        assertTrue(state.pinScreenPositions.isEmpty())
+
+        val positions = mapOf("k" to ScreenOffset(10f, 20f))
+        viewModel.onPinsProjected(positions)
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(ScreenOffset(10f, 20f), updated.pinScreenPositions["k"])
+        assertTrue(updated.cardsVisible)
+    }
+
+    @Test
+    fun onMapGestureStart_hidesCards() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        // First make cards visible
+        viewModel.onPinsProjected(mapOf("k" to ScreenOffset(10f, 20f)))
+        assertTrue(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
+
+        viewModel.onMapGestureStart()
+        assertFalse(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
+    }
+
+    @Test
+    fun onPinChipTapped_togglesSelection() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        assertNull(assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+
+        viewModel.onPinChipTapped("id1")
+        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+
+        // Tap same again → deselect
+        viewModel.onPinChipTapped("id1")
+        assertNull(assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+    }
+
+    @Test
+    fun onPinChipTapped_backButtonClearsSelection() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        // Select a pin
+        viewModel.onPinChipTapped("id1")
+        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+
+        // Simulate back → toggle deselect via same function (PlatformBackHandler calls onChipTapped)
+        viewModel.onPinChipTapped("id1")
+        assertNull(assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+    }
+
+    @Test
+    fun onPinsProjected_notReadyState_noOp() = runTest(testDispatcher) {
+        val suspendingLocation = ResettableFakeLocationProvider()
+        val viewModel = createViewModel(locationProvider = suspendingLocation)
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+
+        // Should not crash on non-Ready state
+        viewModel.onPinsProjected(mapOf("k" to ScreenOffset(10f, 20f)))
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+    }
+
+    @Test
+    fun onMapGestureStart_notReadyState_noOp() = runTest(testDispatcher) {
+        val suspendingLocation = ResettableFakeLocationProvider()
+        val viewModel = createViewModel(locationProvider = suspendingLocation)
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+
+        viewModel.onMapGestureStart()
+        assertIs<MapUiState.Loading>(viewModel.uiState.value)
+    }
+
+    @Test
+    fun onPinChipTapped_switchesSelection() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
+                geocodeResult = Result.success("TestArea"),
+            ),
+        )
+        viewModel.onPinChipTapped("id1")
+        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+
+        // Tap different chip → switches to new selection
+        viewModel.onPinChipTapped("id2")
+        assertEquals("id2", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
+    }
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {

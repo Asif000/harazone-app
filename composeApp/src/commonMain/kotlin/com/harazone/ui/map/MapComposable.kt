@@ -18,6 +18,8 @@ expect fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
+    onPinsProjected: (Map<String, ScreenOffset>) -> Unit,
+    onMapGestureStart: () -> Unit,
     savedPoiIds: Set<String> = emptySet(),
     savedPois: List<SavedPoi> = emptyList(),
     savedVibeFilter: Boolean = false,

@@ -66,6 +66,8 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
+    onPinsProjected: (Map<String, ScreenOffset>) -> Unit,
+    onMapGestureStart: () -> Unit,
     savedPoiIds: Set<String>,
     savedPois: List<SavedPoi>,
     savedVibeFilter: Boolean,
@@ -74,6 +76,9 @@ actual fun MapComposable(
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnMapRenderFailed = rememberUpdatedState(onMapRenderFailed)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
+    val currentOnPinsProjected = rememberUpdatedState(onPinsProjected)
+    val currentOnMapGestureStart = rememberUpdatedState(onMapGestureStart)
+    val currentPois = rememberUpdatedState(pois)
 
     val isDestroyed = remember { booleanArrayOf(false) }
     val styleLoaded = remember { mutableStateOf(false) }
@@ -183,6 +188,19 @@ actual fun MapComposable(
                         }
 
                         val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
+                            // Always project pins — even after programmatic camera moves
+                            if (styleLoaded.value && !isDestroyed[0]) {
+                                val projected = currentPois.value.mapNotNull { poi ->
+                                    val lat = poi.latitude ?: return@mapNotNull null
+                                    val lng = poi.longitude ?: return@mapNotNull null
+                                    val point = map.projection.toScreenLocation(LatLng(lat, lng))
+                                    poi.savedId to ScreenOffset(point.x, point.y)
+                                }.toMap()
+                                if (projected.isNotEmpty()) {
+                                    currentOnPinsProjected.value(projected)
+                                }
+                            }
+
                             if (suppressCameraIdle[0]) {
                                 suppressCameraIdle[0] = false
                                 return@OnCameraIdleListener
@@ -192,6 +210,13 @@ actual fun MapComposable(
                         }
                         map.addOnCameraIdleListener(cameraIdleListener)
                         cameraIdleListenerRef[0] = cameraIdleListener
+
+                        val gestureMoveListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
+                            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
+                                currentOnMapGestureStart.value()
+                            }
+                        }
+                        map.addOnCameraMoveStartedListener(gestureMoveListener)
                     }
                 }
             }

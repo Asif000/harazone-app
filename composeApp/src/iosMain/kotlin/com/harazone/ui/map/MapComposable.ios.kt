@@ -51,6 +51,8 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
+    onPinsProjected: (Map<String, ScreenOffset>) -> Unit,
+    onMapGestureStart: () -> Unit,
     savedPoiIds: Set<String>,
     savedPois: List<SavedPoi>,
     savedVibeFilter: Boolean,
@@ -59,6 +61,8 @@ actual fun MapComposable(
     // Required: load savedPois from DB, render as gold pins, apply 50m suppression for Gemini results
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
+    val currentOnPinsProjected = rememberUpdatedState(onPinsProjected)
+    val currentOnMapGestureStart = rememberUpdatedState(onMapGestureStart)
     val currentOnMapRenderFailed = rememberUpdatedState(onMapRenderFailed)
 
     val suppressCameraIdle = remember { booleanArrayOf(false) }
@@ -73,6 +77,8 @@ actual fun MapComposable(
             suppressCameraIdle = suppressCameraIdle,
             onPoiSelected = { currentOnPoiSelected.value(it) },
             onCameraIdle = { lat, lng -> currentOnCameraIdle.value(lat, lng) },
+            onPinsProjected = { positions -> currentOnPinsProjected.value(positions) },
+            onMapGestureStart = { currentOnMapGestureStart.value() },
             onStyleLoaded = { styleLoaded.value = true },
             onRenderFailed = { currentOnMapRenderFailed.value() },
         )
@@ -232,6 +238,8 @@ private class MapDelegate(
     private val suppressCameraIdle: BooleanArray,
     private val onPoiSelected: (POI?) -> Unit,
     private val onCameraIdle: (Double, Double) -> Unit,
+    private val onPinsProjected: (Map<String, ScreenOffset>) -> Unit,
+    private val onMapGestureStart: () -> Unit,
     private val onStyleLoaded: () -> Unit,
     private val onRenderFailed: () -> Unit,
 ) : NSObject(), MLNMapViewDelegateProtocol {
@@ -251,6 +259,28 @@ private class MapDelegate(
         }
         val (lat, lng) = mapView.centerCoordinate.useContents { latitude to longitude }
         onCameraIdle(lat, lng)
+
+        // Project annotation screen positions (settle-and-show — fires once after camera stops)
+        val projected = annotationPoiMap.entries.mapNotNull { (annotation, poi) ->
+            val point = annotation.coordinate.useContents {
+                mapView.convertCoordinate(
+                    CLLocationCoordinate2DMake(latitude, longitude),
+                    toPointTo = mapView,
+                )
+            }
+            val x = point.useContents { x.toFloat() }
+            val y = point.useContents { y.toFloat() }
+            if (x == 0f && y == 0f) return@mapNotNull null  // off-screen or unmeasured
+            poi.savedId to ScreenOffset(x, y)
+        }.toMap()
+        onPinsProjected(projected)
+    }
+
+    /** Fires when the camera region begins changing. animated=false → user gesture. */
+    override fun mapView(mapView: MLNMapView, regionWillChangeAnimated: Boolean) {
+        if (!regionWillChangeAnimated && !suppressCameraIdle[0]) {
+            onMapGestureStart()
+        }
     }
 
     /** POI pin tapped → select. */

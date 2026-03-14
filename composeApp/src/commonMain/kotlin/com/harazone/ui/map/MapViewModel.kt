@@ -600,6 +600,22 @@ class MapViewModel(
         _uiState.value = current.copy(mapRenderFailed = true, showListView = true)
     }
 
+    fun onPinsProjected(positions: Map<String, ScreenOffset>) {
+        val state = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = state.copy(pinScreenPositions = positions, cardsVisible = true)
+    }
+
+    fun onMapGestureStart() {
+        val state = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = state.copy(cardsVisible = false)
+    }
+
+    fun onPinChipTapped(poiId: String) {
+        val state = _uiState.value as? MapUiState.Ready ?: return
+        val newSelected = if (state.selectedPinId == poiId) null else poiId
+        _uiState.value = state.copy(selectedPinId = newSelected)
+    }
+
     fun onCameraIdle(lat: Double, lng: Double) {
         if (lat == 0.0 && lng == 0.0) return
         if (areaFetchJob?.isActive == true) return

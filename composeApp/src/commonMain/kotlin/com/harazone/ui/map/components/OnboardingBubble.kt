@@ -34,8 +34,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
 import com.harazone.ui.components.CalloutDot
 import com.harazone.ui.components.PlatformBackHandler
+import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.resources.ExperimentalResourceApi
@@ -74,6 +78,9 @@ private val fallbackTips = OnboardingTipsData(
 fun OnboardingBubble(
     visible: Boolean,
     onDismiss: () -> Unit,
+    vibeRailOffset: Offset = Offset.Zero,
+    savedFabOffset: Offset = Offset.Zero,
+    searchBarOffset: Offset = Offset.Zero,
 ) {
     var tipsData by remember { mutableStateOf(fallbackTips) }
 
@@ -99,13 +106,29 @@ fun OnboardingBubble(
                 .background(Color.Black.copy(alpha = 0.5f))
                 .clickable(onClick = onDismiss),
         ) {
-            // TODO(BACKLOG-MEDIUM): Callout dot positions are hardcoded pixel offsets — will misalign on different screen sizes/aspect ratios. Use layout measurement or onGloballyPositioned to anchor dots to actual UI element positions.
-            // Callout dot — vibes rail (right side, mid-screen)
-            CalloutDot(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 48.dp, bottom = 80.dp))
-            // Callout dot — saved orb (right side, above mid)
-            CalloutDot(modifier = Modifier.align(Alignment.CenterEnd).padding(end = 20.dp, bottom = 200.dp))
-            // Callout dot — AI bar (bottom left)
-            CalloutDot(modifier = Modifier.align(Alignment.BottomStart).padding(start = 60.dp, bottom = 32.dp))
+            // Callout dots — positioned at measured layout bounds of target UI elements.
+            // Offset.Zero means not yet measured (first frame); dots skip rendering until measured.
+            if (vibeRailOffset != Offset.Zero) {
+                CalloutDot(
+                    modifier = Modifier.offset {
+                        IntOffset(vibeRailOffset.x.roundToInt(), vibeRailOffset.y.roundToInt())
+                    }
+                )
+            }
+            if (savedFabOffset != Offset.Zero) {
+                CalloutDot(
+                    modifier = Modifier.offset {
+                        IntOffset(savedFabOffset.x.roundToInt(), savedFabOffset.y.roundToInt())
+                    }
+                )
+            }
+            if (searchBarOffset != Offset.Zero) {
+                CalloutDot(
+                    modifier = Modifier.offset {
+                        IntOffset(searchBarOffset.x.roundToInt(), searchBarOffset.y.roundToInt())
+                    }
+                )
+            }
 
             // Bubble card — anchored above bottom bar
             AnimatedVisibility(
