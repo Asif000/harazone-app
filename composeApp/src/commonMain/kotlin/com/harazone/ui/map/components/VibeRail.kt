@@ -68,7 +68,10 @@ fun VibeRail(
     onExploreRetry: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    // REGRESSION: horizontalAlignment MUST be End — orbs right-align against the map edge.
+    // No Compose UI test infra yet; verify visually if changed.
     Column(
+        horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier,
     ) {
@@ -190,7 +193,7 @@ private fun DynamicVibeOrb(
                 .size(sizeDp)
                 .background(
                     brush = Brush.radialGradient(
-                        listOf(Color.White.copy(alpha = 0.3f), Color(0xFF2a2e35)),
+                        listOf(Color.White.copy(alpha = 0.45f), Color(0xFF3a3f4a)),
                     ),
                     shape = CircleShape,
                 )
@@ -221,20 +224,20 @@ private fun DynamicVibeOrb(
             )
         }
 
-        // Count badge
+        // Count badge — white badge with dark text, matching Saved orb design language
         if (poiCount > 0) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .defaultMinSize(minWidth = 14.dp, minHeight = 14.dp)
-                    .background(Color(0xFF4a7cf7), CircleShape)
+                    .background(Color.White, CircleShape)
                     .border(1.5.dp, Color(0xFF0a0c10), CircleShape),
             ) {
                 Text(
                     text = poiCount.toString(),
                     fontSize = 8.sp,
-                    color = Color.White,
+                    color = Color.Black,
                     fontWeight = FontWeight.Bold,
                 )
             }

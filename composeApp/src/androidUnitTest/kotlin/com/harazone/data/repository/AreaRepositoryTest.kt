@@ -944,6 +944,169 @@ class AreaRepositoryTest {
         assertEquals(0, fakeProvider.callCount, "AI provider should not be called on POI-only cache hit")
     }
 
+    // --- 3-Pin batch pagination regression tests ---
+
+    private val batch0Pois = listOf(
+        POI("Cafe Roma", "cafe", "Good coffee", Confidence.HIGH, 40.7128, -74.0060, imageUrl = "https://img1.jpg"),
+        POI("Central Park", "park", "Large park", Confidence.MEDIUM, 40.7829, -73.9654, imageUrl = "https://img2.jpg"),
+        POI("Jazz Club", "music", "Live jazz", Confidence.HIGH, 40.7500, -73.9800, imageUrl = "https://img3.jpg"),
+    )
+    private val batch1Pois = listOf(
+        POI("Bookshop", "shop", "Rare books", Confidence.HIGH, 40.7200, -74.0100, imageUrl = "https://img4.jpg"),
+        POI("Art Gallery", "gallery", "Modern art", Confidence.MEDIUM, 40.7300, -74.0200, imageUrl = "https://img5.jpg"),
+        POI("Rooftop Bar", "bar", "Great views", Confidence.HIGH, 40.7400, -74.0300, imageUrl = "https://img6.jpg"),
+    )
+    private val batch2Pois = listOf(
+        POI("History Museum", "museum", "Local history", Confidence.HIGH, 40.7600, -73.9500, imageUrl = "https://img7.jpg"),
+        POI("Sushi Spot", "restaurant", "Fresh sushi", Confidence.MEDIUM, 40.7700, -73.9600, imageUrl = "https://img8.jpg"),
+        POI("Vinyl Records", "shop", "Classic vinyl", Confidence.HIGH, 40.7100, -74.0400, imageUrl = "https://img9.jpg"),
+    )
+
+    /**
+     * Regression: Background batch POIs must be cached so that on app relaunch,
+     * the POI cache contains all 9 POIs (3 batches × 3 POIs), not just batch 0.
+     */
+    @Test
+    fun cacheMiss_backgroundBatchPoisAreCachedForRelaunch() = testScope.runTest {
+        val vibes = listOf(com.harazone.domain.model.DynamicVibe("Art", "🎨"))
+        fakeProvider.responseFlow = flow {
+            emit(BucketUpdate.VibesReady(vibes, batch0Pois))
+            emit(BucketUpdate.PortraitComplete(batch0Pois))
+            emit(BucketUpdate.BackgroundBatchReady(batch1Pois, batchIndex = 1))
+            emit(BucketUpdate.BackgroundEnrichmentComplete(batch1Pois, batchIndex = 1))
+            emit(BucketUpdate.BackgroundBatchReady(batch2Pois, batchIndex = 2))
+            emit(BucketUpdate.BackgroundEnrichmentComplete(batch2Pois, batchIndex = 2))
+            emit(BucketUpdate.BackgroundFetchComplete)
+        }
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            // Consume all events
+            while (true) {
+                val item = awaitItem()
+                if (item is BucketUpdate.BackgroundFetchComplete) break
+            }
+            awaitComplete()
+        }
+
+        // Verify all 9 POIs were cached (batch 0 + batch 1 + batch 2)
+        val cached = database.area_poi_cacheQueries.getPois("Test Area", "en").executeAsOneOrNull()
+        assertNotNull(cached, "POI cache should exist after background batches")
+        val cachedPois = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+            .decodeFromString<List<POI>>(cached!!.pois_json)
+        assertEquals(9, cachedPois.size, "All 9 POIs (3 batches × 3) should be cached")
+        // Verify batch 0 POIs
+        assertTrue(cachedPois.any { it.name == "Cafe Roma" }, "Batch 0 POI should be cached")
+        // Verify batch 1 POIs
+        assertTrue(cachedPois.any { it.name == "Bookshop" }, "Batch 1 POI should be cached")
+        // Verify batch 2 POIs
+        assertTrue(cachedPois.any { it.name == "History Museum" }, "Batch 2 POI should be cached")
+    }
+
+    /**
+     * Regression: On POI cache hit with 9 cached POIs, the repository must emit
+     * batch events (BackgroundBatchReady) so pagination controls appear on relaunch.
+     * Previously only PortraitComplete was emitted with all POIs, so batch nav was hidden.
+     */
+    @Test
+    fun poiCacheHit_emitsBatchEventsForPagination() = testScope.runTest {
+        // Pre-populate cache with 9 POIs (simulates prior session with 3 batches)
+        val allPois = batch0Pois + batch1Pois + batch2Pois
+        val vibes = listOf(com.harazone.domain.model.DynamicVibe("Art", "🎨"))
+        val poisJson = kotlinx.serialization.json.Json.encodeToString(allPois)
+        database.area_poi_cacheQueries.insertOrReplacePois(
+            area_name = "Test Area",
+            language = "en",
+            pois_json = poisJson,
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs(),
+        )
+        // Also cache vibes so VibesReady is emitted
+        val vibesJson = kotlinx.serialization.json.Json.encodeToString(vibes)
+        database.area_vibe_cacheQueries.insertOrReplaceVibes(
+            area_name = "Test Area",
+            language = "en",
+            vibes_json = vibesJson,
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs(),
+        )
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            // 1. VibesReady with batch 0 only (3 POIs)
+            val vibesReady = awaitItem()
+            assertIs<BucketUpdate.VibesReady>(vibesReady)
+            assertEquals(3, vibesReady.pois.size, "VibesReady should contain batch 0 (3 POIs)")
+            assertEquals("Cafe Roma", vibesReady.pois[0].name)
+
+            // 2. PortraitComplete with batch 0
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(3, portrait.pois.size, "PortraitComplete should contain batch 0 (3 POIs)")
+
+            // 3. BackgroundBatchReady for batch 1
+            val batch1 = awaitItem()
+            assertIs<BucketUpdate.BackgroundBatchReady>(batch1)
+            assertEquals(1, batch1.batchIndex)
+            assertEquals(3, batch1.pois.size)
+            assertEquals("Bookshop", batch1.pois[0].name)
+
+            // 4. BackgroundBatchReady for batch 2
+            val batch2 = awaitItem()
+            assertIs<BucketUpdate.BackgroundBatchReady>(batch2)
+            assertEquals(2, batch2.batchIndex)
+            assertEquals(3, batch2.pois.size)
+            assertEquals("History Museum", batch2.pois[0].name)
+
+            // 5. BackgroundFetchComplete
+            val complete = awaitItem()
+            assertIs<BucketUpdate.BackgroundFetchComplete>(complete)
+
+            awaitComplete()
+        }
+
+        // AI provider should NOT be called — served from cache
+        assertEquals(0, fakeProvider.callCount, "AI provider should not be called on cache hit with batches")
+    }
+
+    /**
+     * Regression: POI cache with exactly 3 POIs should NOT emit batch events
+     * (only 1 batch = no pagination needed).
+     */
+    @Test
+    fun poiCacheHit_singleBatchDoesNotEmitBatchEvents() = testScope.runTest {
+        val vibes = listOf(com.harazone.domain.model.DynamicVibe("Art", "🎨"))
+        val poisJson = kotlinx.serialization.json.Json.encodeToString(batch0Pois)
+        database.area_poi_cacheQueries.insertOrReplacePois(
+            area_name = "Test Area",
+            language = "en",
+            pois_json = poisJson,
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs(),
+        )
+        val vibesJson = kotlinx.serialization.json.Json.encodeToString(vibes)
+        database.area_vibe_cacheQueries.insertOrReplaceVibes(
+            area_name = "Test Area",
+            language = "en",
+            vibes_json = vibesJson,
+            expires_at = fakeClock.nowMs() + 100_000L,
+            created_at = fakeClock.nowMs(),
+        )
+
+        repository.getAreaPortrait("Test Area", defaultContext).test {
+            val vibesReady = awaitItem()
+            assertIs<BucketUpdate.VibesReady>(vibesReady)
+            assertEquals(3, vibesReady.pois.size)
+
+            val portrait = awaitItem()
+            assertIs<BucketUpdate.PortraitComplete>(portrait)
+            assertEquals(3, portrait.pois.size)
+
+            // No batch events — only 1 batch
+            awaitComplete()
+        }
+
+        assertEquals(0, fakeProvider.callCount)
+    }
+
     @Test
     fun onlineNormalPathUnchanged() = testScope.runTest {
         fakeConnectivity.setState(ConnectivityState.Online)

@@ -253,7 +253,7 @@ actual fun MapComposable(
                     .withIconImage(iconKey)
                     .withIconSize(0.1f)
                     .withTextField(poi.name)
-                    .withTextSize(10f)
+                    .withTextSize(12f)
                     .withTextColor("#FAFAFA")
                     .withTextOffset(arrayOf(0f, 1.8f))
                     .withTextHaloColor("rgba(0,0,0,0.7)")
@@ -262,8 +262,8 @@ actual fun MapComposable(
             symbolsRef.add(symbol)
             symbolPoiMap[symbol.id] = poi
 
-            // Animate icon size 0.1 -> 1.0
-            val animator = ValueAnimator.ofFloat(0.1f, 1.0f).apply {
+            // Animate icon size 0.1 -> 1.2
+            val animator = ValueAnimator.ofFloat(0.1f, 1.2f).apply {
                 duration = 300
                 interpolator = AccelerateDecelerateInterpolator()
                 addUpdateListener { anim ->
@@ -422,9 +422,9 @@ actual fun MapComposable(
                     SymbolOptions()
                         .withLatLng(LatLng(savedPoi.lat, savedPoi.lng))
                         .withIconImage(iconKey)
-                        .withIconSize(1.0f)
+                        .withIconSize(1.2f)
                         .withTextField(savedPoi.name)
-                        .withTextSize(10f)
+                        .withTextSize(12f)
                         .withTextColor("#FFD700")
                         .withTextOffset(arrayOf(0f, 1.8f))
                         .withTextHaloColor("rgba(0,0,0,0.7)")

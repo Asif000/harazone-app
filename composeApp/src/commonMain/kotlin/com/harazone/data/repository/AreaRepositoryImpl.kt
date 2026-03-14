@@ -98,19 +98,29 @@ internal class AreaRepositoryImpl(
             val cachedPois = loadPoisFromCache(areaName, language, now)
             if (cachedPois.isNotEmpty()) {
                 AppLogger.d { "POI cache HIT for '$areaName' — ${cachedPois.size} POIs (no bucket cache)" }
-                // If any POIs lack images (e.g., cached from Stage 1 before enrichment),
-                // enrich in background and update cache
+                // Split cached POIs into batches of 3 for progressive discovery pagination
+                val batches = cachedPois.chunked(3)
+                val batch0 = batches.first()
                 // TODO(BACKLOG-LOW): Stage 2-only POIs (no coords, wiki fails) keep imageUrl=null after enrichment,
                 // causing needsEnrichment=true on every cache hit and repeated background enrichment calls.
                 // Fix: track enrichment attempts per POI (e.g. store a flag or sentinel URL) to avoid re-enriching permanently null images.
                 // H1 fix: emit cached vibes so the vibe rail populates on revisit
                 val cachedVibes = loadVibesFromCache(areaName, language, now)
                 if (cachedVibes.isNotEmpty()) {
-                    emit(BucketUpdate.VibesReady(cachedVibes, cachedPois, fromCache = true))
+                    emit(BucketUpdate.VibesReady(cachedVibes, batch0, fromCache = true))
                 }
+                // Emit batch 0 via PortraitComplete (triggers onComplete in ViewModel)
+                emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(batch0)))
+                // Re-constitute background batches from cache so pagination works on relaunch
+                for (i in 1 until batches.size) {
+                    emit(BucketUpdate.BackgroundBatchReady(batches[i], batchIndex = i))
+                }
+                if (batches.size > 1) {
+                    emit(BucketUpdate.BackgroundFetchComplete)
+                }
+                // Enrich images in background if any POIs lack them
                 val needsEnrichment = cachedPois.any { it.imageUrl == null }
                 if (needsEnrichment) {
-                    emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPois)))
                     scope.launch {
                         try {
                             val enriched = enrichPoisWithImages(cachedPois)
@@ -120,8 +130,6 @@ internal class AreaRepositoryImpl(
                             AppLogger.e(e) { "Background POI enrichment failed for '$areaName'" }
                         }
                     }
-                } else {
-                    emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPois)))
                 }
                 return@flow
             }
@@ -225,11 +233,16 @@ internal class AreaRepositoryImpl(
                     }
                     is BucketUpdate.BackgroundEnrichmentComplete -> {
                         val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                        if (enriched.isNotEmpty()) mergePoisIntoCache(enriched, areaName, language)
                         emit(BucketUpdate.BackgroundEnrichmentComplete(enriched, update.batchIndex))
                     }
                     else -> {
                         emit(update)
                         if (update is BucketUpdate.BucketComplete) writeToCache(update.content, areaName, language)
+                        // Cache background batch POIs so pagination survives relaunch
+                        if (update is BucketUpdate.BackgroundBatchReady && update.pois.isNotEmpty()) {
+                            mergePoisIntoCache(update.pois, areaName, language)
+                        }
                     }
                 }
             }
@@ -350,6 +363,49 @@ internal class AreaRepositoryImpl(
             expires_at = now + CACHE_TTL_SEMI_STATIC_MS,
             created_at = now,
         )
+    }
+
+    /**
+     * Merge new POIs into the existing POI cache — deduplicates by name,
+     * updates existing entries with enriched fields, appends truly new ones.
+     */
+    private fun mergePoisIntoCache(newPois: List<POI>, areaName: String, language: String) {
+        val now = clock.nowMs()
+        val existing = loadPoisFromCache(areaName, language, now)
+        if (existing.isEmpty()) {
+            writePoisToCache(newPois, areaName, language)
+            return
+        }
+        val newByName = newPois.associateBy { it.name.trim().lowercase() }
+        val seen = mutableSetOf<String>()
+        val merged = mutableListOf<POI>()
+        for (poi in existing) {
+            val key = poi.name.trim().lowercase()
+            seen.add(key)
+            val update = newByName[key]
+            if (update != null) {
+                merged.add(poi.copy(
+                    vibe = update.vibe.ifEmpty { poi.vibe },
+                    vibes = update.vibes.ifEmpty { poi.vibes },
+                    insight = update.insight.ifEmpty { poi.insight },
+                    description = update.description.ifEmpty { poi.description },
+                    imageUrl = update.imageUrl ?: poi.imageUrl,
+                    wikiSlug = update.wikiSlug ?: poi.wikiSlug,
+                    hours = update.hours ?: poi.hours,
+                    rating = update.rating ?: poi.rating,
+                    latitude = update.latitude ?: poi.latitude,
+                    longitude = update.longitude ?: poi.longitude,
+                ))
+            } else {
+                merged.add(poi)
+            }
+        }
+        for (poi in newPois) {
+            if (poi.name.trim().lowercase() !in seen) {
+                merged.add(poi)
+            }
+        }
+        writePoisToCache(merged, areaName, language)
     }
 
     private fun loadPoisFromCache(areaName: String, language: String, now: Long): List<POI> {

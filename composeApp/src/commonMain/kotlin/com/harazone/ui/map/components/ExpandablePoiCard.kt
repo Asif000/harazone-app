@@ -153,8 +153,9 @@ fun ExpandablePoiCard(
             }
         }
     } else {
-        val scrollModifier = rootModifier.verticalScroll(rememberScrollState())
-        Column(modifier = scrollModifier, verticalArrangement = Arrangement.Top) {
+        // No outer verticalScroll — PoiCardContent has its own verticalScroll.
+        // Nesting two scrollables causes crash (infinite height constraints).
+        Column(modifier = rootModifier, verticalArrangement = Arrangement.Top) {
             PoiCardContent(
                 poi = poi,
                 activeVibe = activeVibe,
