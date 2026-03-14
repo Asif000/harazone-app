@@ -15,7 +15,7 @@ import kotlinx.coroutines.withContext
 class SavedPoiRepositoryImpl(
     private val database: AreaDiscoveryDatabase,
     private val clock: AppClock,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : SavedPoiRepository {
 
     override fun observeAll(): Flow<List<SavedPoi>> =

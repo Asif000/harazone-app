@@ -246,7 +246,6 @@ actual fun MapComposable(
 // Delegate
 // ---------------------------------------------------------------------------
 
-@Suppress("CONFLICTING_OVERLOADS")
 @OptIn(ExperimentalForeignApi::class)
 private class MapDelegate(
     val annotationPoiMap: MutableMap<MLNPointAnnotation, POI>,
@@ -266,8 +265,18 @@ private class MapDelegate(
         onStyleLoaded()
     }
 
-    /** Called after camera animation completes or user stops panning/zooming. */
+    /** Called after camera animation completes or user stops panning/zooming.
+     *  Also handles gesture detection (animated=false → user gesture) since
+     *  regionWillChangeAnimated has the same Kotlin/Native signature and causes
+     *  CONFLICTING_OVERLOADS. Detecting gestures on region-did-change (end of gesture)
+     *  is slightly later than region-will-change but functionally equivalent for
+     *  hiding pin cards. */
     override fun mapView(mapView: MLNMapView, regionDidChangeAnimated: Boolean) {
+        // Gesture detection: animated=false means user panned/zoomed (not programmatic)
+        if (!regionDidChangeAnimated && !suppressCameraIdle[0]) {
+            onMapGestureStart()
+        }
+
         // Always project pins — even after programmatic camera moves (matches Android ordering)
         val projected = annotationPoiMap.entries.mapNotNull { (annotation, poi) ->
             val point = annotation.coordinate.useContents {
@@ -291,13 +300,6 @@ private class MapDelegate(
         }
         val (lat, lng) = mapView.centerCoordinate.useContents { latitude to longitude }
         onCameraIdle(lat, lng)
-    }
-
-    /** Fires when the camera region begins changing. animated=false → user gesture. */
-    override fun mapView(mapView: MLNMapView, regionWillChangeAnimated: Boolean) {
-        if (!regionWillChangeAnimated && !suppressCameraIdle[0]) {
-            onMapGestureStart()
-        }
     }
 
     /** POI pin tapped → select. */
