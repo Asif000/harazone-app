@@ -253,14 +253,7 @@ private class MapDelegate(
 
     /** Called after camera animation completes or user stops panning/zooming. */
     override fun mapView(mapView: MLNMapView, regionDidChangeAnimated: Boolean) {
-        if (suppressCameraIdle[0]) {
-            suppressCameraIdle[0] = false
-            return
-        }
-        val (lat, lng) = mapView.centerCoordinate.useContents { latitude to longitude }
-        onCameraIdle(lat, lng)
-
-        // Project annotation screen positions (settle-and-show — fires once after camera stops)
+        // Always project pins — even after programmatic camera moves (matches Android ordering)
         val projected = annotationPoiMap.entries.mapNotNull { (annotation, poi) ->
             val point = annotation.coordinate.useContents {
                 mapView.convertCoordinate(
@@ -273,7 +266,16 @@ private class MapDelegate(
             if (x == 0f && y == 0f) return@mapNotNull null  // off-screen or unmeasured
             poi.savedId to ScreenOffset(x, y)
         }.toMap()
-        onPinsProjected(projected)
+        if (projected.isNotEmpty()) {
+            onPinsProjected(projected)
+        }
+
+        if (suppressCameraIdle[0]) {
+            suppressCameraIdle[0] = false
+            return
+        }
+        val (lat, lng) = mapView.centerCoordinate.useContents { latitude to longitude }
+        onCameraIdle(lat, lng)
     }
 
     /** Fires when the camera region begins changing. animated=false → user gesture. */
