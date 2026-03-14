@@ -6,4 +6,6 @@ data class AreaContext(
     val visitCount: Int,
     val preferredLanguage: String,
     val isNewUser: Boolean = false,
+    val isRtl: Boolean = false,
+    val homeCurrencyCode: String = "USD",
 )

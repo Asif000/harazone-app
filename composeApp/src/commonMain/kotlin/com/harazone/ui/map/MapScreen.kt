@@ -80,6 +80,9 @@ import com.harazone.ui.map.components.TopContextBar
 import com.harazone.ui.map.components.VibeRail
 import com.harazone.ui.theme.MapFloatingUiDark
 import com.harazone.ui.theme.spacing
+import org.jetbrains.compose.resources.pluralStringResource
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -119,7 +122,7 @@ fun MapScreen(
                 ContentNoteBanner(message = state.message)
                 Spacer(Modifier.height(MaterialTheme.spacing.md))
                 Button(onClick = { viewModel.retry() }) {
-                    Text("Retry")
+                    Text(stringResource(Res.string.map_retry))
                 }
             }
         }
@@ -143,6 +146,8 @@ private fun ReadyContent(
     // TODO(BACKLOG-LOW): snackbarHostState created inside Ready branch — resets on Ready→Failed→Ready retry
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val noMapsAppMessage = stringResource(Res.string.map_no_maps_app)
+    val sharingComingSoonMessage = stringResource(Res.string.map_sharing_coming_soon)
     val returnToSaves = remember { booleanArrayOf(false) }
     val returnToChat = remember { booleanArrayOf(false) }
 
@@ -438,7 +443,7 @@ private fun ReadyContent(
                     val handled = onNavigateToMaps(lat, lon, name)
                     if (!handled) {
                         coroutineScope.launch {
-                            snackbarHostState.showSnackbar("No maps app available")
+                            snackbarHostState.showSnackbar(noMapsAppMessage)
                         }
                     }
                 },
@@ -461,7 +466,7 @@ private fun ReadyContent(
                 onUnsave = { state.selectedPoi?.let { viewModel.unsavePoi(it) } },
                 onShareClick = {
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar("Sharing coming soon")
+                        snackbarHostState.showSnackbar(sharingComingSoonMessage)
                     }
                 },
                 modifier = Modifier
@@ -578,7 +583,7 @@ private fun ReadyContent(
                 onNavigateToMaps = onNavigateToMaps,
                 onDirectionsFailed = {
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar("No maps app available")
+                        snackbarHostState.showSnackbar(noMapsAppMessage)
                     }
                 },
                 onPoiCardClick = { card ->
@@ -739,7 +744,7 @@ private fun SavesNearbyPill(count: Int, modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.width(6.dp))
         Text(
-            text = "$count saved place${if (count == 1) "" else "s"} nearby",
+            text = pluralStringResource(Res.plurals.saved_places_nearby, count, count),
             style = MaterialTheme.typography.labelSmall,
             color = Color(0xFFE0E0E0),
         )

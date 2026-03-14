@@ -53,7 +53,7 @@ Context:
 - Time of day: ${context.timeOfDay}
 - Day of week: ${context.dayOfWeek}
 - Preferred language: ${context.preferredLanguage}
-
+${if (!context.preferredLanguage.startsWith("en")) "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '${context.preferredLanguage}'. Every word of your response must be in that language." else ""}
 Output ONLY a JSON array. No other text:
 [{"n":"Name","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5}]
 
@@ -71,7 +71,7 @@ Context:
 - Time of day: ${context.timeOfDay}
 - Day of week: ${context.dayOfWeek}
 - Preferred language: ${context.preferredLanguage}
-
+${if (!context.preferredLanguage.startsWith("en")) "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '${context.preferredLanguage}'. Every word of your response must be in that language." else ""}
 Output EXACTLY 6 JSON objects, one per bucket, separated by the delimiter line:
 ---BUCKET---
 
@@ -150,6 +150,7 @@ Rules:
         poiCount: Int,
         framingHint: String? = null,
         activeVibeName: String? = null,
+        languageTag: String,
     ): String {
         return listOf(
             personaBlock(areaName),
@@ -163,8 +164,13 @@ Rules:
             contextShiftBlock(),
             outputFormatBlock(),
             framingBlock(framingHint),
+            languageBlock(languageTag),
         ).filter { it.isNotBlank() }.joinToString("\n\n")
     }
+
+    private fun languageBlock(languageTag: String): String =
+        if (languageTag.startsWith("en")) ""
+        else "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '$languageTag'. Every word of your response must be in that language."
 
     private fun vibeContextBlock(vibeName: String?): String {
         if (vibeName == null) return ""

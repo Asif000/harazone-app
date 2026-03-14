@@ -1,13 +1,14 @@
 package com.harazone.domain.service
 
 import com.harazone.fakes.FakeClock
+import com.harazone.fakes.FakeLocaleProvider
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class AreaContextFactoryTest {
 
     private val fakeClock = FakeClock()
-    private val factory = AreaContextFactory(fakeClock)
+    private val factory = AreaContextFactory(fakeClock, FakeLocaleProvider())
 
     // Time-of-day tests
     // Using UTC hours: epoch 0 = midnight Thursday Jan 1 1970
@@ -127,5 +128,25 @@ class AreaContextFactoryTest {
     @Test
     fun `preferredLanguage defaults to en`() {
         assertEquals("en", factory.create().preferredLanguage)
+    }
+
+    // --- Locale wiring tests ---
+
+    @Test
+    fun `LocaleProvider languageTag flows through to preferredLanguage`() {
+        val factory = AreaContextFactory(fakeClock, FakeLocaleProvider("pt-BR"))
+        assertEquals("pt-BR", factory.create().preferredLanguage)
+    }
+
+    @Test
+    fun `LocaleProvider isRtl flows through`() {
+        val factory = AreaContextFactory(fakeClock, FakeLocaleProvider(isRtl = true))
+        assertEquals(true, factory.create().isRtl)
+    }
+
+    @Test
+    fun `LocaleProvider homeCurrencyCode flows through`() {
+        val factory = AreaContextFactory(fakeClock, FakeLocaleProvider(homeCurrencyCode = "BRL"))
+        assertEquals("BRL", factory.create().homeCurrencyCode)
     }
 }

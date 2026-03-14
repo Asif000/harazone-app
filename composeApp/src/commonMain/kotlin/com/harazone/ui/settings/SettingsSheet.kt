@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.util.appVersionName
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -26,12 +28,12 @@ fun SettingsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss) {
         PlatformBackHandler(enabled = true) { onDismiss() }
         ListItem(
-            headlineContent = { Text("Version") },
+            headlineContent = { Text(stringResource(Res.string.settings_version)) },
             trailingContent = { Text(appVersionName) },
         )
         HorizontalDivider()
         ListItem(
-            headlineContent = { Text("Send Feedback") },
+            headlineContent = { Text(stringResource(Res.string.settings_send_feedback)) },
             leadingContent = { Icon(Icons.Default.BugReport, contentDescription = null) },
             modifier = Modifier.clickable { onSendFeedback() },
         )

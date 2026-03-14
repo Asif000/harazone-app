@@ -66,6 +66,8 @@ import com.harazone.domain.model.Vibe
 import kotlinx.coroutines.flow.drop
 import com.harazone.ui.theme.MapSurfaceDark
 import com.harazone.ui.theme.toColor
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -221,7 +223,7 @@ private fun PoiCardContent(
             } else {
                 // TODO(BACKLOG-HIGH): Replace with Foursquare photo API before public release
                 Text(
-                    text = "Looking...",
+                    text = stringResource(Res.string.poi_card_loading),
                     color = Color.White.copy(alpha = 0.25f),
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.align(Alignment.Center),
@@ -340,7 +342,7 @@ private fun PoiCardContent(
             ) {
                 AssistChip(
                     onClick = { if (isSaved) onUnsave() else onSave() },
-                    label = { Text(if (isSaved) "Saved" else "Save") },
+                    label = { Text(if (isSaved) stringResource(Res.string.poi_card_saved) else stringResource(Res.string.poi_card_save)) },
                     leadingIcon = {
                         Icon(
                             if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
@@ -353,7 +355,7 @@ private fun PoiCardContent(
                 )
                 AssistChip(
                     onClick = onShareClick,
-                    label = { Text("Share") },
+                    label = { Text(stringResource(Res.string.poi_card_share)) },
                     leadingIcon = {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
@@ -363,7 +365,7 @@ private fun PoiCardContent(
                 if (poi.latitude != null && poi.longitude != null) {
                     AssistChip(
                         onClick = { onDirectionsClick(poi.latitude!!, poi.longitude!!, poi.name) },
-                        label = { Text("Directions") },
+                        label = { Text(stringResource(Res.string.poi_card_directions)) },
                         leadingIcon = {
                             Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp))
                         },
@@ -373,7 +375,7 @@ private fun PoiCardContent(
                 }
                 AssistChip(
                     onClick = { onAskAiClick() },
-                    label = { Text("Ask AI") },
+                    label = { Text(stringResource(Res.string.poi_card_ask_ai)) },
                     leadingIcon = {
                         Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
@@ -398,7 +400,7 @@ private fun PoiCardContent(
                     if (poi.hours != null) {
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Hours: ${poi.hours}",
+                            text = stringResource(Res.string.poi_card_hours, poi.hours!!),
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.6f),
                         )
@@ -406,7 +408,7 @@ private fun PoiCardContent(
                     if (poi.vibeInsights.isNotEmpty()) {
                         Spacer(Modifier.height(12.dp))
                         Text(
-                            text = "Vibe Insights",
+                            text = stringResource(Res.string.poi_card_vibe_insights),
                             style = MaterialTheme.typography.titleSmall,
                             color = Color.White,
                         )
@@ -437,7 +439,7 @@ private fun PoiCardContent(
 
             TextButton(onClick = onExpandToggle) {
                 Text(
-                    if (expanded) "Less" else "More details",
+                    if (expanded) stringResource(Res.string.poi_card_less_details) else stringResource(Res.string.poi_card_more_details),
                     color = vibeColor,
                 )
             }
@@ -447,10 +449,13 @@ private fun PoiCardContent(
 
 @Composable
 private fun LiveStatusBadge(status: String) {
+    val statusOpen = stringResource(Res.string.poi_status_open)
+    val statusBusy = stringResource(Res.string.poi_status_busy)
+    val statusClosed = stringResource(Res.string.poi_status_closed)
     val (color, label) = when (status.lowercase()) {
-        "open" -> Color(0xFF4CAF50) to "Open"
-        "busy" -> Color(0xFFFF9800) to "Busy"
-        "closed" -> Color(0xFF9E9E9E) to "Closed"
+        "open" -> Color(0xFF4CAF50) to statusOpen
+        "busy" -> Color(0xFFFF9800) to statusBusy
+        "closed" -> Color(0xFF9E9E9E) to statusClosed
         else -> Color.Gray to status
     }
     Text(
@@ -471,11 +476,15 @@ private fun BuzzMeter(liveStatus: String, vibeColor: Color) {
         "closed" -> 1
         else -> 0
     }
+    val statusOpen = stringResource(Res.string.poi_status_open)
+    val statusBusy = stringResource(Res.string.poi_status_busy)
+    val statusClosed = stringResource(Res.string.poi_status_closed)
+    val statusUnknown = stringResource(Res.string.poi_status_unknown)
     val activityLabel = when (liveStatus.lowercase()) {
-        "busy" -> "Busy"
-        "open" -> "Open"
-        "closed" -> "Closed"
-        else -> "Unknown"
+        "busy" -> statusBusy
+        "open" -> statusOpen
+        "closed" -> statusClosed
+        else -> statusUnknown
     }
     Row(
         horizontalArrangement = Arrangement.spacedBy(3.dp),

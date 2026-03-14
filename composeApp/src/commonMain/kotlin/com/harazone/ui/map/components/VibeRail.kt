@@ -46,6 +46,8 @@ import androidx.compose.ui.unit.sp
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.ui.components.CalloutDot
 import com.harazone.ui.components.rememberReduceMotion
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 fun computeVibeSizeDp(count: Int, minCount: Int, maxCount: Int): Float =
     if (maxCount == minCount) 40f
@@ -149,7 +151,7 @@ fun VibeRail(
                         .background(Color(0xFFFF9800), CircleShape),
                 )
                 Text(
-                    text = "Offline \u00B7 cached",
+                    text = stringResource(Res.string.vibe_rail_offline),
                     fontSize = 8.sp,
                     color = Color.White.copy(alpha = 0.4f),
                 )
@@ -303,7 +305,7 @@ private fun ExploringChip(onClick: () -> Unit) {
             )
         }
         Text(
-            text = "Exploring...",
+            text = stringResource(Res.string.vibe_rail_exploring),
             fontSize = 10.sp,
             color = Color.White.copy(alpha = 0.6f),
             maxLines = 1,
@@ -363,7 +365,7 @@ private fun SavedVibeOrb(
                 )
             }
             Text(
-                text = "Saved",
+                text = stringResource(Res.string.vibe_rail_saved),
                 fontSize = 10.sp,
                 color = if (isDimmed) Color.White.copy(alpha = 0.35f) else goldColor,
                 fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,

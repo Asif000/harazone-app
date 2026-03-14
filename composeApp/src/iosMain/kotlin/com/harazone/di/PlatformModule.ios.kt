@@ -5,6 +5,8 @@ import com.harazone.feedback.FeedbackReporter
 import com.harazone.feedback.IosFeedbackReporter
 import com.harazone.feedback.IosShakeDetector
 import com.harazone.feedback.ShakeDetector
+import com.harazone.domain.provider.IosLocaleProvider
+import com.harazone.domain.provider.LocaleProvider
 import com.harazone.location.IosLocationProvider
 import com.harazone.location.LocationProvider
 import com.harazone.util.AnalyticsTracker
@@ -15,6 +17,7 @@ import org.koin.dsl.module
 actual fun platformModule() = module {
     single<AnalyticsTracker> { IosAnalyticsTracker() }
     single<LocationProvider> { IosLocationProvider() }
+    single<LocaleProvider> { IosLocaleProvider() }
     single { DatabaseDriverFactory() }
     single { ConnectivityMonitor() }
     single<FeedbackReporter> { IosFeedbackReporter() }

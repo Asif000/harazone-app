@@ -39,11 +39,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
 import com.harazone.ui.components.CalloutDot
 import com.harazone.ui.components.PlatformBackHandler
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 import kotlin.math.roundToInt
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import org.jetbrains.compose.resources.ExperimentalResourceApi
-import areadiscovery.composeapp.generated.resources.Res
 
 private val Accent = Color(0xFF4ECDC4)
 private val DarkCard = Color(0xFF1A1224)
@@ -73,7 +72,6 @@ private val fallbackTips = OnboardingTipsData(
     ),
 )
 
-@OptIn(ExperimentalResourceApi::class)
 @Composable
 fun OnboardingBubble(
     visible: Boolean,
@@ -82,17 +80,22 @@ fun OnboardingBubble(
     savedFabOffset: Offset = Offset.Zero,
     searchBarOffset: Offset = Offset.Zero,
 ) {
+    val localizedFallback = OnboardingTipsData(
+        avatar_emoji = "\u2728",
+        title = "I'm your AI travel guide!",
+        footer_text = stringResource(Res.string.onboarding_footer),
+        dismiss_label = "Let's go!",
+        tips = listOf(
+            OnboardingTip("\uD83D\uDC46", stringResource(Res.string.onboarding_tip1_title), stringResource(Res.string.onboarding_tip1_body)),
+            OnboardingTip("\uD83D\uDD16", stringResource(Res.string.onboarding_tip2_title), stringResource(Res.string.onboarding_tip2_body)),
+            OnboardingTip("\uD83C\uDFA8", stringResource(Res.string.onboarding_tip3_title), stringResource(Res.string.onboarding_tip3_body)),
+            OnboardingTip("\uD83D\uDCAC", stringResource(Res.string.onboarding_tip4_title), stringResource(Res.string.onboarding_tip4_body)),
+        ),
+    )
     var tipsData by remember { mutableStateOf(fallbackTips) }
 
-    LaunchedEffect(Unit) {
-        try {
-            val bytes = Res.readBytes("files/onboarding-tips.json")
-            val parsed = Json { ignoreUnknownKeys = true }
-                .decodeFromString(OnboardingTipsData.serializer(), bytes.decodeToString())
-            tipsData = parsed
-        } catch (_: Exception) {
-            // fallback already set
-        }
+    LaunchedEffect(localizedFallback) {
+        tipsData = localizedFallback
     }
 
     PlatformBackHandler(enabled = visible) { onDismiss() }

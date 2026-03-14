@@ -63,6 +63,8 @@ import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.ui.saved.components.SavedPoiCard
 import kotlinx.coroutines.launch
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 import org.koin.compose.viewmodel.koinViewModel
 
 // TODO(BACKLOG-MEDIUM): Centralize hardcoded colors (storyPurple, storyGold, screenBg, card colors) into theme or CompositionLocal — makes future theming possible
@@ -84,6 +86,8 @@ fun SavedPlacesScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val removedMessage = stringResource(Res.string.saved_removed)
+    val undoLabel = stringResource(Res.string.saved_undo)
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
@@ -123,7 +127,7 @@ fun SavedPlacesScreen(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Saved Places",
+                        text = stringResource(Res.string.saved_places_title),
                         style = MaterialTheme.typography.headlineSmall,
                         color = Color.White,
                         modifier = Modifier.weight(1f),
@@ -209,6 +213,7 @@ fun SavedPlacesScreen(
                         items(uiState.capsules, key = { it.label }) { capsule ->
                             val isActive = capsule.label == uiState.activeCapsule ||
                                 (uiState.activeCapsule == null && capsule.label == "All")
+                            val capsuleDisplayLabel = if (capsule.label == "All") stringResource(Res.string.filter_all) else capsule.label
                             FilterChip(
                                 selected = isActive,
                                 onClick = {
@@ -218,7 +223,7 @@ fun SavedPlacesScreen(
                                 },
                                 label = {
                                     Text(
-                                        "${capsule.label} (${capsule.count})",
+                                        "$capsuleDisplayLabel (${capsule.count})",
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
                                     )
@@ -296,7 +301,7 @@ fun SavedPlacesScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                "No matching saves",
+                                stringResource(Res.string.saved_no_matches),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = Color.White.copy(alpha = 0.4f),
                             )
@@ -319,8 +324,8 @@ fun SavedPlacesScreen(
                             viewModel.unsavePoi(poi.id)
                             scope.launch {
                                 val result = snackbarHostState.showSnackbar(
-                                    message = "Removed",
-                                    actionLabel = "Undo",
+                                    message = removedMessage,
+                                    actionLabel = undoLabel,
                                     duration = SnackbarDuration.Long,
                                 )
                                 viewModel.commitUnsave(
@@ -377,7 +382,7 @@ fun SavedPlacesScreen(
                 )
                 Spacer(Modifier.width(4.dp))
                 Text(
-                    "Map",
+                    stringResource(Res.string.saved_map_button),
                     color = Color.White.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodyMedium,
                 )

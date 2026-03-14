@@ -53,6 +53,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.PlatformBackHandler
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @Composable
 fun SavedPoiCard(
@@ -204,7 +206,7 @@ fun SavedPoiCard(
                 }
             } else {
                 Text(
-                    text = "Add a note\u2026",
+                    text = stringResource(Res.string.note_placeholder),
                     style = MaterialTheme.typography.bodySmall,
                     color = Color.White.copy(alpha = 0.25f),
                     modifier = Modifier.clickable { onStartEditingNote() },
@@ -231,8 +233,16 @@ fun SavedPoiCard(
                 Spacer(Modifier.width(8.dp))
 
                 // Saved date
+                val monthAbbrevs = listOf(
+                    stringResource(Res.string.month_jan), stringResource(Res.string.month_feb),
+                    stringResource(Res.string.month_mar), stringResource(Res.string.month_apr),
+                    stringResource(Res.string.month_may), stringResource(Res.string.month_jun),
+                    stringResource(Res.string.month_jul), stringResource(Res.string.month_aug),
+                    stringResource(Res.string.month_sep), stringResource(Res.string.month_oct),
+                    stringResource(Res.string.month_nov), stringResource(Res.string.month_dec),
+                )
                 Text(
-                    text = formatSavedDate(poi.savedAt),
+                    text = formatSavedDate(poi.savedAt, monthAbbrevs),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.3f),
                 )
@@ -309,8 +319,7 @@ private fun emojiForType(type: String): String {
     }
 }
 
-private fun formatSavedDate(epochMs: Long): String {
-    val months = arrayOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+private fun formatSavedDate(epochMs: Long, months: List<String>): String {
     // Civil date from epoch ms — accounts for leap years
     var days = (epochMs / 86_400_000).toInt()
     var year = 1970

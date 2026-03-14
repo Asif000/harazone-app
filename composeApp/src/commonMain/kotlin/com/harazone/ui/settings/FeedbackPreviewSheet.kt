@@ -29,6 +29,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.util.toImageBitmap
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,22 +54,22 @@ fun FeedbackPreviewSheet(
                         contentScale = ContentScale.Crop,
                     )
                 } else {
-                    Text("Screenshot captured \u2713", style = MaterialTheme.typography.bodyMedium)
+                    Text(stringResource(Res.string.feedback_screenshot_captured), style = MaterialTheme.typography.bodyMedium)
                 }
             }
             Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = description,
                 onValueChange = { description = it },
-                placeholder = { Text("Describe the issue...") },
+                placeholder = { Text(stringResource(Res.string.feedback_description_placeholder)) },
                 modifier = Modifier.fillMaxWidth(),
                 minLines = 3,
             )
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) { Text(stringResource(Res.string.feedback_cancel)) }
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = { onSend(description) }) { Text("Send Report") }
+                Button(onClick = { onSend(description) }) { Text(stringResource(Res.string.feedback_send_report)) }
             }
         }
     }

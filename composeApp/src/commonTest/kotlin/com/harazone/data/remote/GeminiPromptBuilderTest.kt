@@ -38,8 +38,10 @@ class GeminiPromptBuilderTest {
         profile: TasteProfile = emptyProfile,
         poiCount: Int = 5,
         framingHint: String? = null,
+        languageTag: String = "en",
     ): String = builder.buildChatSystemContext(
         areaName, pois, intent, level, saves, profile, poiCount, framingHint,
+        languageTag = languageTag,
     )
 
     private fun save(
@@ -373,5 +375,36 @@ class GeminiPromptBuilderTest {
     fun buildPinOnlyPrompt_defaultIsNotNewUser() {
         val prompt = builder.buildPinOnlyPrompt("Shoreditch")
         assertFalse(prompt.contains("NEW USER MODE"))
+    }
+
+    // --- Language block tests ---
+
+    @Test
+    fun buildChatSystemContext_withPtBR_includesLanguageRule() {
+        val result = chatContext(framingHint = null)
+        val resultWithLang = builder.buildChatSystemContext(
+            "Test Area", emptyList(), ChatIntent.DISCOVER, EngagementLevel.LIGHT,
+            emptyList(), emptyProfile, 5, null, null, languageTag = "pt-BR",
+        )
+        assertTrue(resultWithLang.contains("LANGUAGE RULE"))
+        assertTrue(resultWithLang.contains("pt-BR"))
+    }
+
+    @Test
+    fun buildChatSystemContext_withEn_omitsLanguageRule() {
+        val result = builder.buildChatSystemContext(
+            "Test Area", emptyList(), ChatIntent.DISCOVER, EngagementLevel.LIGHT,
+            emptyList(), emptyProfile, 5, null, null, languageTag = "en",
+        )
+        assertFalse(result.contains("LANGUAGE RULE"))
+    }
+
+    @Test
+    fun buildChatSystemContext_withEnUS_omitsLanguageRule() {
+        val result = builder.buildChatSystemContext(
+            "Test Area", emptyList(), ChatIntent.DISCOVER, EngagementLevel.LIGHT,
+            emptyList(), emptyProfile, 5, null, null, languageTag = "en-US",
+        )
+        assertFalse(result.contains("LANGUAGE RULE"))
     }
 }

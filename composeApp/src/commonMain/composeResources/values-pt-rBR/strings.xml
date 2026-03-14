@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Search / Map -->
+    <string name="search_placeholder">Procurar um lugar ou atualizar área</string>
+    <string name="search_field_placeholder">Procurar um lugar…</string>
+    <string name="search_clear_history">Limpar histórico</string>
+    <string name="search_refreshing">Atualizando área…</string>
+    <string name="poi_list_empty">Nenhum lugar encontrado nesta área</string>
+
+    <!-- Chat Overlay -->
+    <string name="chat_input_hint">Pergunte sobre esta área</string>
+    <string name="chat_input_placeholder">Faça uma pergunta…</string>
+    <string name="chat_return_title">Bem-vindo(a) de volta!</string>
+    <string name="chat_return_message">Sua conversa anterior foi pausada. Continue de onde parou, ou comece do zero?</string>
+    <string name="chat_return_continue">Continuar</string>
+    <string name="chat_return_start_fresh">Começar do Zero</string>
+    <string name="chat_suggestion_hint">Toque em uma sugestão abaixo para começar a explorar</string>
+    <string name="chat_poi_save">Salvar</string>
+    <string name="chat_poi_saved">Salvo</string>
+    <string name="chat_poi_directions">Rotas</string>
+    <string name="chat_poi_show_on_map">Ver no Mapa</string>
+
+    <!-- POI Card -->
+    <string name="poi_card_loading">Buscando…</string>
+    <string name="poi_card_save">Salvar</string>
+    <string name="poi_card_saved">Salvo</string>
+    <string name="poi_card_share">Compartilhar</string>
+    <string name="poi_card_directions">Rotas</string>
+    <string name="poi_card_ask_ai">Perguntar à IA</string>
+    <string name="poi_card_hours">Horário: %s</string>
+    <string name="poi_card_vibe_insights">Características do Vibe</string>
+    <string name="poi_card_more_details">Mais detalhes</string>
+    <string name="poi_card_less_details">Menos</string>
+    <string name="poi_status_open">Aberto</string>
+    <string name="poi_status_busy">Movimentado</string>
+    <string name="poi_status_closed">Fechado</string>
+    <string name="poi_status_unknown">Desconhecido</string>
+
+    <!-- Vibe Rail -->
+    <string name="vibe_rail_saved">Salvos</string>
+    <string name="vibe_rail_offline">Offline · salvo</string>
+    <string name="vibe_rail_exploring">Explorando…</string>
+
+    <!-- Map Screen -->
+    <string name="map_retry">Tentar novamente</string>
+    <string name="map_no_maps_app">Nenhum aplicativo de mapas disponível</string>
+    <string name="map_sharing_coming_soon">Compartilhamento em breve</string>
+    <plurals name="saved_places_nearby">
+        <item quantity="one">%d lugar salvo próximo</item>
+        <item quantity="other">%d lugares salvos próximos</item>
+    </plurals>
+
+    <!-- Saved Places -->
+    <string name="saved_places_title">Lugares Salvos</string>
+    <string name="saved_no_matches">Nenhuma correspondência</string>
+    <string name="saved_removed">Removido</string>
+    <string name="saved_undo">Desfazer</string>
+    <string name="saved_map_button">Mapa</string>
+    <string name="filter_all">Todos</string>
+    <string name="note_placeholder">Adicionar uma nota…</string>
+
+    <!-- Month abbreviations -->
+    <string name="month_jan">jan</string>
+    <string name="month_feb">fev</string>
+    <string name="month_mar">mar</string>
+    <string name="month_apr">abr</string>
+    <string name="month_may">mai</string>
+    <string name="month_jun">jun</string>
+    <string name="month_jul">jul</string>
+    <string name="month_aug">ago</string>
+    <string name="month_sep">set</string>
+    <string name="month_oct">out</string>
+    <string name="month_nov">nov</string>
+    <string name="month_dec">dez</string>
+
+    <!-- Settings / Feedback -->
+    <string name="settings_version">Versão</string>
+    <string name="settings_send_feedback">Enviar Feedback</string>
+    <string name="feedback_screenshot_captured">Captura de tela feita ✓</string>
+    <string name="feedback_description_placeholder">Descreva o problema…</string>
+    <string name="feedback_cancel">Cancelar</string>
+    <string name="feedback_send_report">Enviar Relatório</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_tip1_title">Toque nos pinos</string>
+    <string name="onboarding_tip1_body">para descobrir o que torna cada lugar especial</string>
+    <string name="onboarding_tip2_title">Salve lugares</string>
+    <string name="onboarding_tip2_body">que você gostou — vou aprender seu gosto e recomendar lugares melhores</string>
+    <string name="onboarding_tip3_title">Toque nos vibes</string>
+    <string name="onboarding_tip3_body">à direita para filtrar pelo que te anima</string>
+    <string name="onboarding_tip4_title">Converse comigo</string>
+    <string name="onboarding_tip4_body">a qualquer hora — pergunte sobre joias escondidas, segurança, comida, qualquer coisa</string>
+    <string name="onboarding_footer">Quanto mais você explora, mais inteligente fico</string>
+
+    <!-- Chat Pill Labels -->
+    <string name="pill_new_topic">Novo assunto</string>
+    <string name="pill_areas_to_avoid">Áreas a evitar</string>
+    <string name="pill_best_time">Melhor hora para ir</string>
+    <string name="pill_tell_me_more">Conta mais</string>
+    <string name="pill_surprise_me">Me surpreenda</string>
+    <string name="pill_best_food">Melhor comida agora</string>
+    <string name="pill_hidden_gems">Joias escondidas</string>
+    <string name="pill_get_outside">Sair para explorar</string>
+    <string name="pill_day_trip">Planejar um passeio com meus salvos</string>
+    <string name="pill_find_patterns">Padrões nos meus salvos</string>
+</resources>

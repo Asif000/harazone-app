@@ -11,6 +11,7 @@ import com.harazone.domain.model.POI
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.fakes.FakeAreaIntelligenceProvider
 import com.harazone.fakes.FakeClock
+import com.harazone.fakes.FakeLocaleProvider
 import com.harazone.fakes.FakeSavedPoiRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,6 +50,7 @@ class ChatViewModelTest {
         promptBuilder = promptBuilder,
         clock = fakeClock,
         savedPoiRepository = fakeSavedPoiRepository,
+        localeProvider = FakeLocaleProvider(),
     )
 
     private fun discoverPill() = ContextualPill("Show me hidden gems", "Show me hidden gems in Test Area", ChatIntent.DISCOVER, "🔍")

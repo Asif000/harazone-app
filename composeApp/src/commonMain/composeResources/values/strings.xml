@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Search / Map -->
+    <string name="search_placeholder">Search a place or refresh area</string>
+    <string name="search_field_placeholder">Search a place…</string>
+    <string name="search_clear_history">Clear history</string>
+    <string name="search_refreshing">Refreshing area…</string>
+    <string name="poi_list_empty">No places found for this area</string>
+
+    <!-- Chat Overlay -->
+    <string name="chat_input_hint">Ask about this area</string>
+    <string name="chat_input_placeholder">Ask a question…</string>
+    <string name="chat_return_title">Welcome back!</string>
+    <string name="chat_return_message">Your earlier conversation has been paused. Pick up where you left off, or start fresh?</string>
+    <string name="chat_return_continue">Continue</string>
+    <string name="chat_return_start_fresh">Start Fresh</string>
+    <string name="chat_suggestion_hint">Tap a suggestion below to start exploring</string>
+    <string name="chat_poi_save">Save</string>
+    <string name="chat_poi_saved">Saved</string>
+    <string name="chat_poi_directions">Directions</string>
+    <string name="chat_poi_show_on_map">Show on Map</string>
+
+    <!-- POI Card -->
+    <string name="poi_card_loading">Looking…</string>
+    <string name="poi_card_save">Save</string>
+    <string name="poi_card_saved">Saved</string>
+    <string name="poi_card_share">Share</string>
+    <string name="poi_card_directions">Directions</string>
+    <string name="poi_card_ask_ai">Ask AI</string>
+    <string name="poi_card_hours">Hours: %s</string>
+    <string name="poi_card_vibe_insights">Vibe Insights</string>
+    <string name="poi_card_more_details">More details</string>
+    <string name="poi_card_less_details">Less</string>
+    <string name="poi_status_open">Open</string>
+    <string name="poi_status_busy">Busy</string>
+    <string name="poi_status_closed">Closed</string>
+    <string name="poi_status_unknown">Unknown</string>
+
+    <!-- Vibe Rail -->
+    <string name="vibe_rail_saved">Saved</string>
+    <string name="vibe_rail_offline">Offline · cached</string>
+    <string name="vibe_rail_exploring">Exploring…</string>
+
+    <!-- Map Screen -->
+    <string name="map_retry">Retry</string>
+    <string name="map_no_maps_app">No maps app available</string>
+    <string name="map_sharing_coming_soon">Sharing coming soon</string>
+    <plurals name="saved_places_nearby">
+        <item quantity="one">%d saved place nearby</item>
+        <item quantity="other">%d saved places nearby</item>
+    </plurals>
+
+    <!-- Saved Places -->
+    <string name="saved_places_title">Saved Places</string>
+    <string name="saved_no_matches">No matching saves</string>
+    <string name="saved_removed">Removed</string>
+    <string name="saved_undo">Undo</string>
+    <string name="saved_map_button">Map</string>
+    <string name="filter_all">All</string>
+    <string name="note_placeholder">Add a note…</string>
+
+    <!-- Month abbreviations -->
+    <string name="month_jan">Jan</string>
+    <string name="month_feb">Feb</string>
+    <string name="month_mar">Mar</string>
+    <string name="month_apr">Apr</string>
+    <string name="month_may">May</string>
+    <string name="month_jun">Jun</string>
+    <string name="month_jul">Jul</string>
+    <string name="month_aug">Aug</string>
+    <string name="month_sep">Sep</string>
+    <string name="month_oct">Oct</string>
+    <string name="month_nov">Nov</string>
+    <string name="month_dec">Dec</string>
+
+    <!-- Settings / Feedback -->
+    <string name="settings_version">Version</string>
+    <string name="settings_send_feedback">Send Feedback</string>
+    <string name="feedback_screenshot_captured">Screenshot captured ✓</string>
+    <string name="feedback_description_placeholder">Describe the issue…</string>
+    <string name="feedback_cancel">Cancel</string>
+    <string name="feedback_send_report">Send Report</string>
+
+    <!-- Onboarding -->
+    <string name="onboarding_tip1_title">Tap pins</string>
+    <string name="onboarding_tip1_body">to discover what makes each place special</string>
+    <string name="onboarding_tip2_title">Save places</string>
+    <string name="onboarding_tip2_body">you like — I\'ll learn your taste and recommend better spots</string>
+    <string name="onboarding_tip3_title">Tap vibes</string>
+    <string name="onboarding_tip3_body">on the right to filter by what excites you</string>
+    <string name="onboarding_tip4_title">Chat with me</string>
+    <string name="onboarding_tip4_body">anytime — ask about hidden gems, safety, food, anything</string>
+    <string name="onboarding_footer">The more you explore, the smarter I get</string>
+
+    <!-- Chat Pill Labels -->
+    <string name="pill_new_topic">New topic</string>
+    <string name="pill_areas_to_avoid">Areas to avoid</string>
+    <string name="pill_best_time">Best time to go</string>
+    <string name="pill_tell_me_more">Tell me more</string>
+    <string name="pill_surprise_me">Surprise me</string>
+    <string name="pill_best_food">Best food right now</string>
+    <string name="pill_hidden_gems">Show me hidden gems</string>
+    <string name="pill_get_outside">Get me outside</string>
+    <string name="pill_day_trip">Plan a day trip from my saves</string>
+    <string name="pill_find_patterns">Find patterns in my saves</string>
+</resources>

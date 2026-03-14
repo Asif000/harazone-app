@@ -50,6 +50,8 @@ import com.harazone.domain.model.Vibe
 import com.harazone.ui.theme.MapSurfaceDark
 import com.harazone.ui.theme.spacing
 import com.harazone.ui.theme.toColor
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @Composable
 fun POIListView(
@@ -91,8 +93,7 @@ fun POIListView(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = if (activeVibe != null) "No places found for ${activeVibe.displayName}"
-                           else "No places found for this area",
+                    text = stringResource(Res.string.poi_list_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -10,7 +10,7 @@ class FakeAreaContextFactory(
         visitCount = 0,
         preferredLanguage = "en",
     ),
-) : AreaContextFactory(FakeClock()) {
+) : AreaContextFactory(FakeClock(), FakeLocaleProvider()) {
 
     var callCount = 0
         private set

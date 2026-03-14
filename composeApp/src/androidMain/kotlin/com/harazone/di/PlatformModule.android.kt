@@ -5,6 +5,8 @@ import com.harazone.feedback.AndroidFeedbackReporter
 import com.harazone.feedback.AndroidShakeDetector
 import com.harazone.feedback.FeedbackReporter
 import com.harazone.feedback.ShakeDetector
+import com.harazone.domain.provider.AndroidLocaleProvider
+import com.harazone.domain.provider.LocaleProvider
 import com.harazone.location.AndroidLocationProvider
 import com.harazone.location.LocationProvider
 import com.harazone.util.AnalyticsTracker
@@ -16,6 +18,7 @@ import org.koin.dsl.module
 actual fun platformModule() = module {
     single<AnalyticsTracker> { AndroidAnalyticsTracker() }
     single<LocationProvider> { AndroidLocationProvider(androidContext()) }
+    single<LocaleProvider> { AndroidLocaleProvider(androidContext()) }
     single { DatabaseDriverFactory(androidContext()) }
     single { ConnectivityMonitor(androidContext()) }
     single<FeedbackReporter> { AndroidFeedbackReporter(androidContext()) }

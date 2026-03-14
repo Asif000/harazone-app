@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.RecentPlace
 import com.harazone.ui.theme.MapFloatingUiDark
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @Composable
 fun GeocodingSearchBar(
@@ -182,7 +184,7 @@ private fun IdleState(
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Search a place or refresh area",
+                text = stringResource(Res.string.search_placeholder),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.5f),
                 modifier = Modifier.weight(1f),
@@ -267,7 +269,7 @@ private fun ActiveState(
                         Box {
                             if (query.isEmpty()) {
                                 Text(
-                                    text = "Search a place\u2026",
+                                    text = stringResource(Res.string.search_field_placeholder),
                                     style = MaterialTheme.typography.labelMedium,
                                     color = Color.White.copy(alpha = 0.4f),
                                 )
@@ -322,7 +324,7 @@ private fun ActiveState(
                                 .padding(horizontal = 14.dp, vertical = 9.dp),
                         ) {
                             Text(
-                                text = "Clear history",
+                                text = stringResource(Res.string.search_clear_history),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = Color.White.copy(alpha = 0.4f),
                             )
@@ -552,7 +554,7 @@ private fun SpinningState(showCancel: Boolean, onCancelLoad: () -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = "Refreshing area\u2026",
+                text = stringResource(Res.string.search_refreshing),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),

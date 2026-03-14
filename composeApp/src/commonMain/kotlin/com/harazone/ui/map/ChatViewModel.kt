@@ -13,6 +13,7 @@ import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfileBuilder
 import com.harazone.domain.provider.AreaIntelligenceProvider
+import com.harazone.domain.provider.LocaleProvider
 import com.harazone.domain.repository.SavedPoiRepository
 import com.harazone.util.AppClock
 import com.harazone.util.AppLogger
@@ -30,6 +31,7 @@ internal class ChatViewModel(
     private val promptBuilder: GeminiPromptBuilder,
     private val clock: AppClock,
     private val savedPoiRepository: SavedPoiRepository,
+    private val localeProvider: LocaleProvider,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -151,6 +153,7 @@ internal class ChatViewModel(
             val systemContext = promptBuilder.buildChatSystemContext(
                 areaName, sessionPois, pill.intent, currentEngagementLevel,
                 saves, tasteProfile, poiCount, pendingFramingHint, activeVibeName,
+                languageTag = localeProvider.languageTag,
             )
             conversationHistory.add(
                 ChatMessage(

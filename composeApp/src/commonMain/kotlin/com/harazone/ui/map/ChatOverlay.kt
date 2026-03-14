@@ -73,6 +73,8 @@ import com.harazone.BuildKonfig
 import com.harazone.domain.model.ContextualPill
 import com.harazone.domain.model.MessageRole
 import com.harazone.ui.components.MarkdownText
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 private val IndigoGradient = Brush.linearGradient(
     colors = listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
@@ -147,7 +149,7 @@ internal fun ChatOverlay(
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "Ask about this area",
+                        stringResource(Res.string.chat_input_hint),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
@@ -174,13 +176,13 @@ internal fun ChatOverlay(
             if (chatState.showReturnDialog) {
                 AlertDialog(
                     onDismissRequest = { viewModel.continueConversation() },
-                    title = { Text("Welcome back!") },
-                    text = { Text("Your earlier conversation has been paused. Pick up where you left off, or start fresh?") },
+                    title = { Text(stringResource(Res.string.chat_return_title)) },
+                    text = { Text(stringResource(Res.string.chat_return_message)) },
                     confirmButton = {
-                        TextButton(onClick = { viewModel.continueConversation() }) { Text("Continue") }
+                        TextButton(onClick = { viewModel.continueConversation() }) { Text(stringResource(Res.string.chat_return_continue)) }
                     },
                     dismissButton = {
-                        TextButton(onClick = { viewModel.startFreshConversation() }) { Text("Start Fresh") }
+                        TextButton(onClick = { viewModel.startFreshConversation() }) { Text(stringResource(Res.string.chat_return_start_fresh)) }
                     },
                 )
             }
@@ -203,7 +205,7 @@ internal fun ChatOverlay(
                 } else if (chatState.bubbles.isEmpty()) {
                     item(key = "empty_prompt") {
                         Text(
-                            "Tap a suggestion below to start exploring",
+                            stringResource(Res.string.chat_suggestion_hint),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -262,10 +264,23 @@ internal fun ChatOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(chatState.persistentPills) { pill ->
+                        val pillDisplayLabel = when (pill.label) {
+                            "New topic"                     -> stringResource(Res.string.pill_new_topic)
+                            "Areas to avoid"                -> stringResource(Res.string.pill_areas_to_avoid)
+                            "Best time to go"               -> stringResource(Res.string.pill_best_time)
+                            "Tell me more"                  -> stringResource(Res.string.pill_tell_me_more)
+                            "Surprise me"                   -> stringResource(Res.string.pill_surprise_me)
+                            "Best food right now"           -> stringResource(Res.string.pill_best_food)
+                            "Show me hidden gems"           -> stringResource(Res.string.pill_hidden_gems)
+                            "Get me outside"                -> stringResource(Res.string.pill_get_outside)
+                            "Plan a day trip from my saves" -> stringResource(Res.string.pill_day_trip)
+                            "Find patterns in my saves"     -> stringResource(Res.string.pill_find_patterns)
+                            else                            -> pill.label
+                        }
                         if (pill.label == "New topic") {
                             SuggestionChip(
                                 onClick = { viewModel.resetToIntentPills() },
-                                label = { Text("${pill.emoji} ${pill.label}", fontSize = 13.sp) },
+                                label = { Text("${pill.emoji} $pillDisplayLabel", fontSize = 13.sp) },
                                 colors = SuggestionChipDefaults.suggestionChipColors(
                                     containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
                                 ),
@@ -276,7 +291,7 @@ internal fun ChatOverlay(
                                     if (chatState.bubbles.isEmpty()) viewModel.tapIntentPill(pill)
                                     else viewModel.tapPersistentPill(pill)
                                 },
-                                label = { Text("${pill.emoji} ${pill.label}", fontSize = 13.sp) },
+                                label = { Text("${pill.emoji} $pillDisplayLabel", fontSize = 13.sp) },
                                 colors = SuggestionChipDefaults.suggestionChipColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
                                 ),
@@ -323,7 +338,7 @@ private fun EmptyStateText(areaName: String) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Tap a suggestion below to start exploring",
+            stringResource(Res.string.chat_suggestion_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
@@ -473,7 +488,7 @@ private fun ChatPoiMiniCard(
                                 tint = Color.White,
                             )
                             Spacer(Modifier.width(4.dp))
-                            Text(if (isSaved) "Saved" else "Save", fontSize = 12.sp, color = Color.White)
+                            Text(if (isSaved) stringResource(Res.string.chat_poi_saved) else stringResource(Res.string.chat_poi_save), fontSize = 12.sp, color = Color.White)
                         }
                     },
                     colors = SuggestionChipDefaults.suggestionChipColors(
@@ -495,7 +510,7 @@ private fun ChatPoiMiniCard(
                                 tint = Color.White,
                             )
                             Spacer(Modifier.width(4.dp))
-                            Text("Directions", fontSize = 12.sp, color = Color.White)
+                            Text(stringResource(Res.string.chat_poi_directions), fontSize = 12.sp, color = Color.White)
                         }
                     },
                     colors = SuggestionChipDefaults.suggestionChipColors(
@@ -505,7 +520,7 @@ private fun ChatPoiMiniCard(
                 )
                 SuggestionChip(
                     onClick = onShowOnMap,
-                    label = { Text("\uD83D\uDCCD Show on Map", fontSize = 11.sp, color = Color.White) },
+                    label = { Text("\uD83D\uDCCD ${stringResource(Res.string.chat_poi_show_on_map)}", fontSize = 11.sp, color = Color.White) },
                     colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                     ),
@@ -642,7 +657,7 @@ private fun ChatInputBar(
             value = inputText,
             onValueChange = onInputChange,
             enabled = !isStreaming,
-            placeholder = { Text("Ask a question...") },
+            placeholder = { Text(stringResource(Res.string.chat_input_placeholder)) },
             singleLine = true,
             shape = RoundedCornerShape(24.dp),
             colors = TextFieldDefaults.colors(
