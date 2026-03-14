@@ -71,6 +71,8 @@ actual fun MapComposable(
     val currentAnnotations = remember { mutableListOf<MLNPointAnnotation>() }
     val styleLoaded = remember { mutableStateOf(false) }
     val lastFittedPois = remember { mutableStateOf<List<POI>>(emptyList()) }
+    val savedFilterFitted = remember { booleanArrayOf(false) }
+    val wasSavedVibeFilter = remember { booleanArrayOf(false) }
 
     val delegate = remember {
         MapDelegate(
@@ -114,8 +116,8 @@ actual fun MapComposable(
         )
     }
 
-    // POI markers + glow zones — react to pois / activeVibe / style ready
-    LaunchedEffect(pois, activeVibe, styleLoaded.value) {
+    // POI markers + glow zones — react to pois / activeVibe / savedPois / savedVibeFilter / style ready
+    LaunchedEffect(pois, activeVibe, savedPoiIds, savedPois, savedVibeFilter, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val style = mapView.style ?: return@LaunchedEffect
 
@@ -189,12 +191,36 @@ actual fun MapComposable(
             style.addLayer(textLayer)
         }
 
+        // Reset saved filter zoom flag when regular POIs are back
+        if (pois.isNotEmpty()) savedFilterFitted[0] = false
+
+        // Force camera re-fit when savedVibeFilter transitions true -> false
+        val forceRefit = wasSavedVibeFilter[0] && !savedVibeFilter && filteredPois.isNotEmpty()
+        wasSavedVibeFilter[0] = savedVibeFilter
+        if (forceRefit) lastFittedPois.value = emptyList()
+
         // Fit camera to show all pins (only when the POI list itself changes)
         if (pois !== lastFittedPois.value && annotations.isNotEmpty()) {
             lastFittedPois.value = pois
             suppressCameraIdle[0] = true
             @Suppress("UNCHECKED_CAST")
             mapView.showAnnotations(annotations as List<*>, animated = true)
+        }
+
+        // Fit camera to saved POIs when saved filter is first activated
+        if (savedVibeFilter && pois.isEmpty() && savedPois.isNotEmpty() && !savedFilterFitted[0]) {
+            savedFilterFitted[0] = true
+            val validSaved = savedPois.filter { it.lat != 0.0 && it.lng != 0.0 }
+            if (validSaved.isNotEmpty()) {
+                suppressCameraIdle[0] = true
+                val savedAnnotations = validSaved.map { sp ->
+                    val a = MLNPointAnnotation()
+                    a.setCoordinate(CLLocationCoordinate2DMake(sp.lat, sp.lng))
+                    a
+                }
+                @Suppress("UNCHECKED_CAST")
+                mapView.showAnnotations(savedAnnotations as List<*>, animated = true)
+            }
         }
 
         // Glow zones — only when a vibe is active and there are clusters
