@@ -200,55 +200,6 @@ class MapViewModel(
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.label ?: "all")))
     }
 
-    // TODO(BACKLOG-LOW): submitSearch — no current UI caller; preserve for programmatic search. If wired to UI, also set preSearchSnapshot for cancel-restore.
-    fun submitSearch(query: String) {
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        cancelAreaFetch()
-
-        // Questions are routed to ChatOverlay by MapScreen — submitSearch only handles area searches
-        analyticsTracker.trackEvent("search_area_submitted", mapOf("query" to query))
-
-        areaFetchJob = viewModelScope.launch {
-            try {
-                val context = areaContextFactory.create()
-                var stage1Pois = emptyList<POI>()
-                getAreaPortrait(query, context)
-                    .catch { e -> AppLogger.e(e) { "Area search failed" } }
-                    .collect { update ->
-                        when (update) {
-                            is BucketUpdate.PinsReady -> {
-                                val state = _uiState.value as? MapUiState.Ready ?: return@collect
-                                stage1Pois = update.pois
-                                _uiState.value = state.copy(
-                                    pois = update.pois,
-                                    dynamicVibePoiCounts = computeDynamicVibePoiCounts(update.pois),
-                                    isSearchingArea = false,
-                                    isEnrichingArea = true,
-                                )
-                            }
-                            is BucketUpdate.PortraitComplete -> {
-                                val pois = if (stage1Pois.isNotEmpty()) mergePois(stage1Pois, update.pois) else update.pois
-                                val state = _uiState.value as? MapUiState.Ready ?: return@collect
-                                _uiState.value = state.copy(
-                                    pois = pois,
-                                    areaName = query,
-                                    dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
-                                    activeDynamicVibe = null,
-                                    isSearchingArea = false,
-                                    isEnrichingArea = false,
-                                )
-                            }
-                            else -> {}
-                        }
-                    }
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                AppLogger.e(e) { "Area search error" }
-            }
-        }
-    }
-
     fun savePoi(poi: POI, areaName: String) {
         val poiId = poi.savedId
         val current = _uiState.value as? MapUiState.Ready ?: return
@@ -936,16 +887,19 @@ class MapViewModel(
         }
     }
 
-    private fun computeDynamicVibeAreaSaveCounts(saves: List<SavedPoi>, areaName: String): Map<String, Int> =
-        saves.filter { it.areaName == areaName && it.vibe.isNotEmpty() }
+    private fun computeDynamicVibeAreaSaveCounts(saves: List<SavedPoi>, areaName: String): Map<String, Int> {
+        val normalizedArea = areaName.lowercase().trim()
+        return saves.filter { it.areaName.lowercase().trim() == normalizedArea && it.vibe.isNotEmpty() }
             .groupBy { it.vibe }
             .mapValues { it.value.size }
+    }
 
     fun buildChipRowVibes(geminiVibes: List<DynamicVibe>, areaName: String): List<DynamicVibe> {
         // 1. Collect saved-POI vibes not in Gemini list
         val geminiLabels = geminiVibes.map { it.label }.toSet()
+        val normalizedArea = areaName.lowercase().trim()
         val savedPoiVibes = latestSavedPois
-            .filter { it.areaName == areaName && it.vibe.isNotBlank() && it.vibe !in geminiLabels }
+            .filter { it.areaName.lowercase().trim() == normalizedArea && it.vibe.isNotBlank() && it.vibe !in geminiLabels }
             .map { it.vibe }
             .distinct()
             .map { DynamicVibe(label = it, icon = "\uD83D\uDD16") } // 🔖
@@ -1035,6 +989,9 @@ class MapViewModel(
 
     fun onSearchDeeper() {
         val current = _uiState.value as? MapUiState.Ready ?: return
+        // M3 fix: cancel job (and clear poiBatchesCache) BEFORE resetting UI state so no
+        // stale BackgroundBatchReady event can repopulate the cache between clear and cancel.
+        cancelAreaFetch()
         _uiState.value = current.copy(
             activeBatchIndex = 0,
             showAllMode = false,
@@ -1043,7 +1000,6 @@ class MapViewModel(
             allDiscoveredPois = emptyList(),
             pois = emptyList(),
         )
-        poiBatchesCache.clear()
         retryAreaFetch()
     }
 
@@ -1168,6 +1124,11 @@ class MapViewModel(
                             }
                         }
                         is BucketUpdate.BackgroundBatchReady -> {
+                            // TODO(BACKLOG-MEDIUM): M1 — stale BackgroundBatchReady events can still
+                            // arrive after cancelAreaFetch() clears the cache if cancellation is delayed.
+                            // Guard: check poiBatchesCache.isEmpty() as a proxy for "fetch was reset"
+                            // and discard the event. Requires a generation counter or cancellation token
+                            // to do this reliably without a concurrent-modification race of its own.
                             if (update.pois.isEmpty()) return@collect
                             // Pad cache to correct index if a prior batch was empty/skipped
                             while (poiBatchesCache.size < update.batchIndex) {

@@ -21,5 +21,5 @@ data class POI(
     val imageUrl: String? = null,
     val userNote: String? = null,
 ) {
-    val savedId: String get() = "$name|$latitude|$longitude"
+    val savedId: String get() = "$name|${latitude ?: 0.0}|${longitude ?: 0.0}"
 }

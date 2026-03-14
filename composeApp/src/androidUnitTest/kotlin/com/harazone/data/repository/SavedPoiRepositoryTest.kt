@@ -8,6 +8,7 @@ import com.harazone.fakes.FakeClock
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.Dispatchers
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -115,6 +116,23 @@ class SavedPoiRepositoryTest {
             val list = awaitItem()
             assertEquals(1, list.size)
             assertEquals("Updated reason", list.first().whySpecial)
+        }
+    }
+
+    // Regression: H1 — ioDispatcher default was Dispatchers.Default, changed to Dispatchers.IO.
+    // SQLDelight mapToList requires a dispatcher that allows blocking IO. Dispatchers.Default can
+    // cause thread-starvation on coroutines that do blocking SQLite reads.
+    @Test
+    fun `repository constructed with IO dispatcher performs save and observe correctly`() = testScope.runTest {
+        val ioRepo = SavedPoiRepositoryImpl(
+            database = database,
+            clock = fakeClock,
+            ioDispatcher = Dispatchers.IO,
+        )
+        val poi = poi("IO Dispatcher POI")
+        ioRepo.save(poi)
+        ioRepo.observeSavedIds().test {
+            assertTrue(awaitItem().contains(poi.id))
         }
     }
 }

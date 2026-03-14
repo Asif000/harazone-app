@@ -618,10 +618,11 @@ class MapViewModelTest {
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
         val geocodeCountAfterLoad = geocodeTracker.geocodeCallCount
 
-        // Start a search that never completes
-        viewModel.submitSearch("some area")
+        // Start an area fetch that never completes (initial load uses loadJob, not areaFetchJob).
+        // retryAreaFetch() sets areaFetchJob via onGeocodingSubmitEmpty.
+        viewModel.retryAreaFetch()
 
-        // Camera idle should be blocked
+        // Camera idle should be blocked while areaFetchJob is in flight.
         viewModel.onCameraIdle(10.0, 20.0)
         testScheduler.advanceUntilIdle()
         assertEquals(geocodeCountAfterLoad, geocodeTracker.geocodeCallCount)
@@ -2256,6 +2257,67 @@ class MapViewModelTest {
         testScheduler.advanceTimeBy(3000)
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertFalse(state.showOnboardingBubble)
+    }
+
+    // Regression: M3 — onSearchDeeper cleared poiBatchesCache before cancelAreaFetch, leaving a
+    // window where a stale BackgroundBatchReady event could repopulate the cache. Fix: cancelAreaFetch
+    // (which cancels the job AND clears the cache) must run first.
+    @Test
+    fun onSearchDeeper_cancelsJobBeforeClearingBatchState() = runTest(testDispatcher) {
+        // First fetch delivers batches immediately; second fetch (triggered by onSearchDeeper) suspends
+        // so we can inspect state before any new batches arrive.
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = suspendingRepo,
+        )
+        // Complete initial location fetch — deliver vibes + a background batch
+        suspendingRepo.completeCall(
+            0, listOf(
+                BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                BucketUpdate.BackgroundBatchReady(batch1Pois, 1),
+                BucketUpdate.BackgroundFetchComplete,
+            )
+        )
+        viewModel.onNextBatch()
+        val beforeDeeper = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, beforeDeeper.activeBatchIndex)
+        assertTrue(beforeDeeper.poiBatches.isNotEmpty(), "Expected batches loaded before deeper search")
+
+        // onSearchDeeper must cancel the existing fetch THEN clear state.
+        // The re-fetch (call index 1) is left suspended — so no new batches arrive.
+        viewModel.onSearchDeeper()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(0, after.activeBatchIndex, "activeBatchIndex must reset to 0 after onSearchDeeper")
+        assertTrue(after.poiBatches.isEmpty(), "poiBatches must be empty immediately after onSearchDeeper before re-fetch delivers data")
+        assertTrue(after.allDiscoveredPois.isEmpty(), "allDiscoveredPois must be empty after onSearchDeeper")
+    }
+
+    // Regression: M2 — area-name matching used == (case-sensitive) in MapViewModel while
+    // GeminiPromptBuilder used lowercase().trim(). Both now normalised to lowercase().trim().
+    @Test
+    fun buildChipRowVibes_matchesSavedPoisWithDifferentCasing() = runTest(testDispatcher) {
+        val savedRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        // Save a POI under lowercase area name
+        savedRepo.save(
+            SavedPoi(
+                id = "poi1|1.0|2.0", name = "Hidden Gem", type = "cafe",
+                areaName = "manhattan, new york", // lowercase — different from query casing
+                lat = 1.0, lng = 2.0, whySpecial = "Great", savedAt = 0L,
+                vibe = "HiddenGems",
+            )
+        )
+        val viewModel = createViewModel(savedPoiRepository = savedRepo)
+
+        // Call with title-case area name — should still find the saved-POI vibe
+        val chips = viewModel.buildChipRowVibes(emptyList(), "Manhattan, New York")
+        assertTrue(
+            chips.any { it.label == "HiddenGems" },
+            "Expected saved-POI vibe to appear despite area name case mismatch"
+        )
     }
 }
 

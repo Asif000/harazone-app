@@ -451,19 +451,13 @@ private fun ReadyContent(
         }
 
         // Map/List toggle
-        AnimatedVisibility(
-            visible = true,
-            enter = fadeIn(),
-            exit = fadeOut(),
+        MapListToggle(
+            showListView = state.showListView,
+            onToggle = { viewModel.toggleListView() },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(bottom = navBarPadding + 16.dp, end = 80.dp),
-        ) {
-            MapListToggle(
-                showListView = state.showListView,
-                onToggle = { viewModel.toggleListView() },
-            )
-        }
+        )
 
         // AI search bar — tapping opens the ChatOverlay directly
         AISearchBar(

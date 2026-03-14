@@ -159,4 +159,34 @@ class DomainModelTest {
         }
         assertEquals(listOf("delta", "complete", "portrait", "pins", "vibes"), types)
     }
+
+    // Regression: M6 — POI.savedId produced "name|null|null" when coordinates were null.
+    // Now guards with 0.0 fallback so the id is always a valid, non-null-containing string.
+    @Test
+    fun poiSavedId_withNullCoords_doesNotContainNull() {
+        val poi = POI(
+            name = "Mystery Place",
+            type = "unknown",
+            description = "No coordinates known",
+            confidence = Confidence.LOW,
+            latitude = null,
+            longitude = null,
+        )
+        val id = poi.savedId
+        assert(!id.contains("null")) { "savedId must not contain the string 'null', got: $id" }
+        assertEquals("Mystery Place|0.0|0.0", id)
+    }
+
+    @Test
+    fun poiSavedId_withValidCoords_includesCoordinates() {
+        val poi = POI(
+            name = "Cafe Roma",
+            type = "food",
+            description = "Great espresso",
+            confidence = Confidence.HIGH,
+            latitude = 41.8902,
+            longitude = 12.4922,
+        )
+        assertEquals("Cafe Roma|41.8902|12.4922", poi.savedId)
+    }
 }

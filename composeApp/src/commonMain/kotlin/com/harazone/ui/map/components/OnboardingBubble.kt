@@ -1,11 +1,11 @@
 package com.harazone.ui.map.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -90,11 +90,9 @@ fun OnboardingBubble(
 
     PlatformBackHandler(enabled = visible) { onDismiss() }
 
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(300)),
-        exit = fadeOut(tween(200)),
-    ) {
+    // M5 fix: removed outer AnimatedVisibility(visible=visible) — it was redundant since the
+    // inner AnimatedVisibility already handles fade+slide for the card.
+    if (visible) {
         Box(
             modifier = Modifier
                 .fillMaxSize()

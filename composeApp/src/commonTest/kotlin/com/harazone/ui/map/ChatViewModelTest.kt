@@ -1002,4 +1002,41 @@ Enjoy!"""
         val newTopicPill = vm.uiState.value.persistentPills.find { it.label == "New topic" }
         assertTrue(newTopicPill != null, "At depthLevel >= 3, persistent pills should include 'New topic'")
     }
+
+    // --- Regression: H2 — openChat re-open pill-clearing logic ---
+
+    @Test
+    fun `openChat on reopen after pill tapped clears persistent pills`() = runTest {
+        // Regression: H2 — both if/else branches did isOpen=true without clearing pills.
+        // When a conversation exists (pill was tapped), pills should be cleared on reopen.
+        fakeAiProvider.chatTokens = listOf(ChatToken("Response", false), ChatToken("", true))
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        // Tap a pill — this starts conversation history and adds bubbles
+        vm.tapIntentPill(discoverPill())
+        assertTrue(vm.uiState.value.bubbles.isNotEmpty(), "Expected bubbles after pill tap")
+
+        vm.closeChat()
+        // Reopen same area after conversation history is populated
+        vm.openChat("Test Area", emptyList(), null)
+
+        assertTrue(vm.uiState.value.isOpen)
+        assertTrue(vm.uiState.value.persistentPills.isEmpty(), "Pills must be cleared when reopening mid-conversation")
+    }
+
+    @Test
+    fun `openChat on reopen before any pill tapped preserves persistent pills`() = runTest {
+        // Regression: H2 — the fix must NOT clear pills when no conversation has started yet.
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        val initialPills = vm.uiState.value.persistentPills
+        assertTrue(initialPills.isNotEmpty(), "Expected pills on fresh open")
+
+        vm.closeChat()
+        // Reopen without tapping any pill — conversationHistory is empty
+        vm.openChat("Test Area", emptyList(), null)
+
+        assertTrue(vm.uiState.value.isOpen)
+        assertEquals(initialPills, vm.uiState.value.persistentPills, "Pills must be preserved when no conversation has started")
+    }
 }
