@@ -34,6 +34,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -52,13 +53,19 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.harazone.getPlatform
 import com.harazone.domain.model.Confidence
+import com.harazone.feedback.FeedbackReporter
+import com.harazone.feedback.ShakeDetector
 import com.harazone.util.AppLogger
+import com.harazone.util.ringBufferLogWriter
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.AlertBanner
 import com.harazone.ui.components.ContentNoteBanner
 import com.harazone.ui.components.PlatformBackHandler
+import com.harazone.ui.settings.FeedbackPreviewSheet
+import com.harazone.ui.settings.SettingsSheet
 import com.harazone.ui.map.components.AISearchBar
 import com.harazone.ui.map.components.OnboardingBubble
 import com.harazone.ui.map.components.ExpandablePoiCard
@@ -73,7 +80,9 @@ import com.harazone.ui.map.components.TopContextBar
 import com.harazone.ui.map.components.VibeRail
 import com.harazone.ui.theme.MapFloatingUiDark
 import com.harazone.ui.theme.spacing
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import org.koin.compose.viewmodel.koinViewModel
 
 @Composable
@@ -136,6 +145,59 @@ private fun ReadyContent(
     val coroutineScope = rememberCoroutineScope()
     val returnToSaves = remember { booleanArrayOf(false) }
     val returnToChat = remember { booleanArrayOf(false) }
+
+    // Feedback / settings state
+    val feedbackReporter: FeedbackReporter = koinInject()
+    val shakeDetector: ShakeDetector = koinInject()
+    var showSettings by remember { mutableStateOf(false) }
+    var showFeedbackPreview by remember { mutableStateOf(false) }
+    var feedbackScreenshot by remember { mutableStateOf<ByteArray?>(null) }
+    var pendingCapture by remember { mutableStateOf(false) }
+    var pendingShakeCapture by remember { mutableStateOf(false) }
+
+    fun dismissAllOverlays() {
+        if (state.isFabExpanded) viewModel.toggleFab()
+        if (chatState.isOpen) chatViewModel.closeChat()
+        if (state.showSavesSheet) viewModel.closeSavesSheet()
+        if (state.selectedPoi != null) viewModel.clearPoiSelection()
+        showSettings = false
+        showFeedbackPreview = false
+    }
+
+    // Settings path capture: wait one frame after SettingsSheet closes
+    LaunchedEffect(pendingCapture) {
+        if (pendingCapture) {
+            kotlinx.coroutines.yield()
+            feedbackScreenshot = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                feedbackReporter.captureScreenshot()
+            }
+            pendingCapture = false
+            showFeedbackPreview = true
+        }
+    }
+
+    // Shake path capture: 350ms budget for exit animations
+    LaunchedEffect(pendingShakeCapture) {
+        if (pendingShakeCapture) {
+            delay(350)
+            feedbackScreenshot = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                feedbackReporter.captureScreenshot()
+            }
+            pendingShakeCapture = false
+            showFeedbackPreview = true
+        }
+    }
+
+    // Shake detector wiring
+    DisposableEffect(Unit) {
+        shakeDetector.start {
+            if (!showFeedbackPreview && !pendingShakeCapture) {
+                dismissAllOverlays()
+                pendingShakeCapture = true
+            }
+        }
+        onDispose { shakeDetector.stop() }
+    }
 
     LaunchedEffect(viewModel) {
         viewModel.errorEvents.collect { message ->
@@ -450,9 +512,7 @@ private fun ReadyContent(
             savedCount = state.savedPoiCount,
             onSettings = {
                 viewModel.toggleFab()
-                coroutineScope.launch {
-                    snackbarHostState.showSnackbar("Coming soon")
-                }
+                showSettings = true
             },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -597,6 +657,38 @@ private fun ReadyContent(
             )
         }
 
+        // Settings sheet (secondary feedback entry point)
+        if (showSettings) {
+            SettingsSheet(
+                onDismiss = { showSettings = false },
+                onSendFeedback = {
+                    showSettings = false
+                    pendingCapture = true
+                },
+            )
+        }
+
+        // Feedback preview (shared by both entry points)
+        if (showFeedbackPreview) {
+            FeedbackPreviewSheet(
+                screenshotBytes = feedbackScreenshot,
+                onDismiss = {
+                    showFeedbackPreview = false
+                    feedbackScreenshot = null
+                },
+                onSend = { desc ->
+                    feedbackReporter.launchEmail(
+                        screenshot = feedbackScreenshot,
+                        description = desc,
+                        deviceInfo = getPlatform().name,
+                        logs = ringBufferLogWriter.getLines(),
+                    )
+                    showFeedbackPreview = false
+                    feedbackScreenshot = null
+                },
+            )
+        }
+
         // Onboarding bubble — first launch only
         OnboardingBubble(
             visible = state.showOnboardingBubble,
@@ -605,6 +697,14 @@ private fun ReadyContent(
             savedFabOffset = savedFabOffset,
             searchBarOffset = searchBarOffset,
         )
+
+        PlatformBackHandler(enabled = showSettings) {
+            showSettings = false
+        }
+        PlatformBackHandler(enabled = showFeedbackPreview) {
+            showFeedbackPreview = false
+            feedbackScreenshot = null
+        }
 
         // Must be LAST PlatformBackHandler in ReadyContent — last-composed = highest priority
         PlatformBackHandler(enabled = chatState.isOpen) {

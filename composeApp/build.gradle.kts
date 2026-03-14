@@ -32,6 +32,11 @@ buildkonfig {
             "MAPTILER_API_KEY",
             localProperties.getProperty("MAPTILER_API_KEY") ?: project.findProperty("MAPTILER_API_KEY")?.toString() ?: ""
         )
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "VERSION_NAME",
+            "1.0"
+        )
     }
 }
 
@@ -117,6 +122,9 @@ kotlin {
 
             // Logging
             implementation(libs.kermit)
+
+            // Atomicfu (thread-safe synchronization for K/N)
+            implementation("org.jetbrains.kotlinx:atomicfu:0.23.2")
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

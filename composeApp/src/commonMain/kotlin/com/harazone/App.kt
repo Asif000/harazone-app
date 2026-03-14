@@ -10,9 +10,15 @@ import com.harazone.debug.DevSeeder
 import com.harazone.di.appModule
 import com.harazone.ui.map.MapScreen
 import com.harazone.ui.theme.AreaDiscoveryTheme
+import co.touchlab.kermit.Logger
+import com.harazone.util.ringBufferLogWriter
 import io.ktor.client.HttpClient
 import org.koin.compose.KoinApplication
 import org.koin.compose.koinInject
+
+private object LogWriterInit {
+    init { Logger.addLogWriter(ringBufferLogWriter) }
+}
 
 @Composable
 fun App(
@@ -21,6 +27,7 @@ fun App(
     seedPersona: DevSeeder.Persona? = null,
     forceSeed: Boolean = false,
 ) {
+    remember { LogWriterInit; true }
     KoinApplication(application = { platformConfig(); modules(appModule()) }) {
         val httpClient: HttpClient = koinInject()
         // TODO(BACKLOG-HIGH): Coil disk cache not configured — iOS has no default disk cache, thumbnails re-fetched every session
