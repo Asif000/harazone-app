@@ -84,7 +84,12 @@ internal class AreaRepositoryImpl(
             // Full cache hit — emit all from cache
             AppLogger.d { "Cache HIT for '$areaName' — ${validParsed.size} buckets" }
             validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
-            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
+            val cachedPois = resolveTileRefs(loadPoisFromCache(areaName, language, now))
+            val cachedVibes = loadVibesFromCache(areaName, language, now)
+            if (cachedVibes.isNotEmpty()) {
+                emit(BucketUpdate.VibesReady(cachedVibes, cachedPois, fromCache = true))
+            }
+            emit(BucketUpdate.PortraitComplete(pois = cachedPois))
             return@flow
         }
 
@@ -163,6 +168,11 @@ internal class AreaRepositoryImpl(
             // failure would disrupt the UI for no user benefit.
             staleParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
             validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
+            val staleVibes = loadVibesFromCache(areaName, language, now)
+            val stalePois = resolveTileRefs(loadPoisFromCache(areaName, language, now))
+            if (staleVibes.isNotEmpty()) {
+                emit(BucketUpdate.VibesReady(staleVibes, stalePois, fromCache = true))
+            }
             scope.launch {
                 aiProvider.streamAreaPortrait(areaName, context)
                     .catch { e -> AppLogger.e(e) { "Background refresh failed for area: $areaName" } }
@@ -184,7 +194,7 @@ internal class AreaRepositoryImpl(
                         }
                     }
             }
-            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
+            emit(BucketUpdate.PortraitComplete(pois = stalePois))
             return@flow
         }
 
@@ -260,7 +270,12 @@ internal class AreaRepositoryImpl(
             } else {
                 emit(BucketUpdate.ContentAvailabilityNote("Could not load area content — please try again"))
             }
-            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(loadPoisFromCache(areaName, language, now))))
+            val fallbackPois = resolveTileRefs(loadPoisFromCache(areaName, language, now))
+            val fallbackVibes = loadVibesFromCache(areaName, language, now)
+            if (fallbackVibes.isNotEmpty()) {
+                emit(BucketUpdate.VibesReady(fallbackVibes, fallbackPois, fromCache = true))
+            }
+            emit(BucketUpdate.PortraitComplete(pois = fallbackPois))
         }
     }.flowOn(ioDispatcher)
 

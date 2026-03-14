@@ -217,9 +217,9 @@ class MapViewModelTest {
     }
 
     @Test
-    fun portraitCompleteOnly_updatesVibePoiCountsAndClearsEnriching() = runTest(testDispatcher) {
-        // Regression: on cache-hit revisit, only PortraitComplete fires (no VibesReady/PinsReady).
-        // UI state must still get pois, vibePoiCounts, and isEnrichingArea=false.
+    fun portraitCompleteOnly_updatesVibePoiCountsOnCacheHit() = runTest(testDispatcher) {
+        // Regression: on cache-hit revisit, only PortraitComplete fires (no PinsReady).
+        // UI state must still get pois and vibePoiCounts.
         val dynamicVibes = listOf(
             DynamicVibe(label = "culture", icon = ""),
             DynamicVibe(label = "food", icon = ""),
@@ -246,7 +246,6 @@ class MapViewModelTest {
         assertEquals(3, state.pois.size)
         assertEquals(2, state.dynamicVibePoiCounts["culture"])
         assertEquals(2, state.dynamicVibePoiCounts["food"])
-        assertFalse(state.isEnrichingArea)
     }
 
     @Test

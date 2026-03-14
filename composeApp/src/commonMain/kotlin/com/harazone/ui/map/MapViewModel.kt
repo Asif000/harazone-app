@@ -703,8 +703,13 @@ class MapViewModel(
                 // Always refresh weather + time for GPS location
                 fetchWeatherForLocation(coords.latitude, coords.longitude)
 
+                val homeSnapshot = preSearchSnapshot
                 preSearchSnapshot = null
                 if (isSameArea) {
+                    // Restore pagination from home snapshot (cancelAreaFetch cleared poiBatchesCache)
+                    val homeBatches = homeSnapshot?.poiBatches ?: state.poiBatches
+                    poiBatchesCache.clear()
+                    poiBatchesCache.addAll(homeBatches)
                     _uiState.value = state.copy(
                         latitude = coords.latitude,
                         longitude = coords.longitude,
@@ -714,6 +719,15 @@ class MapViewModel(
                                     cameraMoveId = state.cameraMoveId + 1,
                         geocodingSelectedPlace = null,
                         isGeocodingInitiatedSearch = false,
+                        pois = homeSnapshot?.pois ?: state.pois,
+                        poiBatches = homeBatches,
+                        allDiscoveredPois = homeSnapshot?.allDiscoveredPois ?: state.allDiscoveredPois,
+                        activeBatchIndex = 0,
+                        showAllMode = false,
+                        dynamicVibes = homeSnapshot?.dynamicVibes ?: state.dynamicVibes,
+                        dynamicVibePoiCounts = homeSnapshot?.dynamicVibePoiCounts ?: state.dynamicVibePoiCounts,
+                        activeDynamicVibe = null,
+                        isBackgroundFetching = false,
                     )
                 } else {
                     // Check if we have cached POIs for the GPS area (avoids re-querying Gemini)
@@ -724,6 +738,10 @@ class MapViewModel(
 
                     if (hasCachedPois) {
                         val counts = computeDynamicVibePoiCounts(gpsAreaPoisCache)
+                        // Chunk cached POIs into batches of 3 to restore pagination
+                        val batches = gpsAreaPoisCache.chunked(3)
+                        poiBatchesCache.clear()
+                        poiBatchesCache.addAll(batches)
                         _uiState.value = state.copy(
                             areaName = gpsAreaNameCache!!,
                             latitude = coords.latitude,
@@ -732,13 +750,18 @@ class MapViewModel(
                             gpsLongitude = coords.longitude,
                             showMyLocation = false,
                             cameraMoveId = state.cameraMoveId + 1,
-                            pois = gpsAreaPoisCache,
+                            pois = batches.first(),
                             dynamicVibePoiCounts = counts,
                             activeDynamicVibe = null,
                             isSearchingArea = false,
                             isEnrichingArea = false,
                             geocodingSelectedPlace = null,
                             isGeocodingInitiatedSearch = false,
+                            poiBatches = batches,
+                            allDiscoveredPois = gpsAreaPoisCache,
+                            activeBatchIndex = 0,
+                            showAllMode = false,
+                            isBackgroundFetching = false,
                         )
                     } else {
                         _uiState.value = state.copy(
@@ -1133,9 +1156,11 @@ class MapViewModel(
                                 _uiState.value = s.copy(
                                     pois = pois,
                                     dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
-                                    allDiscoveredPois = pois,
+                                    // Only set allDiscoveredPois if not already populated by BackgroundBatchReady
+                                    allDiscoveredPois = if (s.allDiscoveredPois.size > pois.size) s.allDiscoveredPois else pois,
                                     isLoadingVibes = false,
-                                    isEnrichingArea = false,
+                                    // Only clear enriching if no background batches are in flight
+                                    isEnrichingArea = s.isBackgroundFetching,
                                 )
                             }
                             // Update selectedPoi if open, so shimmer clears without user closing card
@@ -1259,9 +1284,9 @@ class MapViewModel(
                                 _uiState.value = s.copy(
                                     pois = pois,
                                     dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
-                                    allDiscoveredPois = pois,
+                                    allDiscoveredPois = if (s.allDiscoveredPois.size > pois.size) s.allDiscoveredPois else pois,
                                     isLoadingVibes = false,
-                                    isEnrichingArea = false,
+                                    isEnrichingArea = s.isBackgroundFetching,
                                 )
                             }
                         }
