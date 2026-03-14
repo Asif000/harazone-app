@@ -1,6 +1,7 @@
 package com.harazone.ui.map
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -219,6 +220,19 @@ actual fun MapComposable(
                 // Insert below all other layers so markers appear on top
                 style.insertLayer(layer, atIndex = 0u)
             }
+        }
+    }
+
+    // Cleanup on disposal — break retain cycle: MLNMapView → MapDelegate → lambdas → remember state
+    DisposableEffect(Unit) {
+        onDispose {
+            mapView.delegate = null
+            if (currentAnnotations.isNotEmpty()) {
+                @Suppress("UNCHECKED_CAST")
+                mapView.removeAnnotations(currentAnnotations as List<*>)
+            }
+            currentAnnotations.clear()
+            annotationPoiMap.clear()
         }
     }
 
