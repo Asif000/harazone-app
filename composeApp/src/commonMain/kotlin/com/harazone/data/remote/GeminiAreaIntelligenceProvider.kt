@@ -87,7 +87,7 @@ internal class GeminiAreaIntelligenceProvider(
         // Stage 1 — fast pin call (returns vibes + POIs)
         launch {
             try {
-                val prompt = promptBuilder.buildPinOnlyPrompt(areaName, isNewUser = context.isNewUser)
+                val prompt = promptBuilder.buildPinOnlyPrompt(areaName, isNewUser = context.isNewUser, languageTag = context.preferredLanguage)
                 val requestBody = buildRequestBody(prompt)
                 val fullText = StringBuilder()
                 var hasEmitted = false
@@ -145,7 +145,7 @@ internal class GeminiAreaIntelligenceProvider(
                 val stage1Names = stage1Result.names
                 val stage1Vibes = stage1Result.vibes
                 val prompt = if (stage1Names.isNotEmpty() && stage1Vibes.isNotEmpty()) {
-                    promptBuilder.buildDynamicVibeEnrichmentPrompt(areaName, stage1Vibes.map { it.label }, stage1Names)
+                    promptBuilder.buildDynamicVibeEnrichmentPrompt(areaName, stage1Vibes.map { it.label }, stage1Names, languageTag = context.preferredLanguage)
                 } else if (stage1Names.isNotEmpty()) {
                     promptBuilder.buildEnrichmentPrompt(areaName, stage1Names, context)
                 } else {
@@ -222,13 +222,13 @@ internal class GeminiAreaIntelligenceProvider(
                 // Batch 1
                 ensureActive()
                 val batch1Pois = streamAndParsePois(
-                    promptBuilder.buildBackgroundBatchPrompt(areaName, stage1Names, stage1VibeLabels)
+                    promptBuilder.buildBackgroundBatchPrompt(areaName, stage1Names, stage1VibeLabels, languageTag = context.preferredLanguage)
                 )
                 send(BucketUpdate.BackgroundBatchReady(batch1Pois, batchIndex = 1))
                 if (batch1Pois.isNotEmpty()) {
                     ensureActive()
                     val enriched1Prompt = promptBuilder.buildDynamicVibeEnrichmentPrompt(
-                        areaName, stage1VibeLabels, batch1Pois.map { it.name }
+                        areaName, stage1VibeLabels, batch1Pois.map { it.name }, languageTag = context.preferredLanguage
                     )
                     val (_, enriched1Pois) = streamAndParseEnrichment(enriched1Prompt)
                     send(BucketUpdate.BackgroundEnrichmentComplete(enriched1Pois, batchIndex = 1))
@@ -238,13 +238,13 @@ internal class GeminiAreaIntelligenceProvider(
                 ensureActive()
                 val allExcluded = stage1Names + batch1Pois.map { it.name }
                 val batch2Pois = streamAndParsePois(
-                    promptBuilder.buildBackgroundBatchPrompt(areaName, allExcluded, stage1VibeLabels)
+                    promptBuilder.buildBackgroundBatchPrompt(areaName, allExcluded, stage1VibeLabels, languageTag = context.preferredLanguage)
                 )
                 send(BucketUpdate.BackgroundBatchReady(batch2Pois, batchIndex = 2))
                 if (batch2Pois.isNotEmpty()) {
                     ensureActive()
                     val enriched2Prompt = promptBuilder.buildDynamicVibeEnrichmentPrompt(
-                        areaName, stage1VibeLabels, batch2Pois.map { it.name }
+                        areaName, stage1VibeLabels, batch2Pois.map { it.name }, languageTag = context.preferredLanguage
                     )
                     val (_, enriched2Pois) = streamAndParseEnrichment(enriched2Prompt)
                     send(BucketUpdate.BackgroundEnrichmentComplete(enriched2Pois, batchIndex = 2))

@@ -252,7 +252,7 @@ class GeminiPromptBuilderTest {
     @Test
     fun buildChatSystemContext_layer4_fresh_engagement() {
         val result = chatContext(level = EngagementLevel.FRESH)
-        assertTrue(result.contains("Save any places that catch your eye"))
+        assertTrue(result.contains("encouraging the user to save places"))
     }
 
     @Test

@@ -15,6 +15,7 @@
     <string name="chat_return_continue">Continue</string>
     <string name="chat_return_start_fresh">Start Fresh</string>
     <string name="chat_suggestion_hint">Tap a suggestion below to start exploring</string>
+    <string name="chat_ask_anything">Ask me anything about %1$s</string>
     <string name="chat_poi_save">Save</string>
     <string name="chat_poi_saved">Saved</string>
     <string name="chat_poi_directions">Directions</string>
@@ -27,7 +28,7 @@
     <string name="poi_card_share">Share</string>
     <string name="poi_card_directions">Directions</string>
     <string name="poi_card_ask_ai">Ask AI</string>
-    <string name="poi_card_hours">Hours: %s</string>
+    <string name="poi_card_hours">Hours: %1$s</string>
     <string name="poi_card_vibe_insights">Vibe Insights</string>
     <string name="poi_card_more_details">More details</string>
     <string name="poi_card_less_details">Less</string>
@@ -46,8 +47,8 @@
     <string name="map_no_maps_app">No maps app available</string>
     <string name="map_sharing_coming_soon">Sharing coming soon</string>
     <plurals name="saved_places_nearby">
-        <item quantity="one">%d saved place nearby</item>
-        <item quantity="other">%d saved places nearby</item>
+        <item quantity="one">%1$d saved place nearby</item>
+        <item quantity="other">%1$d saved places nearby</item>
     </plurals>
 
     <!-- Saved Places -->
@@ -90,6 +91,8 @@
     <string name="onboarding_tip3_body">on the right to filter by what excites you</string>
     <string name="onboarding_tip4_title">Chat with me</string>
     <string name="onboarding_tip4_body">anytime — ask about hidden gems, safety, food, anything</string>
+    <string name="onboarding_title">I\'m your AI travel guide!</string>
+    <string name="onboarding_dismiss">Let\'s go!</string>
     <string name="onboarding_footer">The more you explore, the smarter I get</string>
 
     <!-- Chat Pill Labels -->
@@ -103,4 +106,34 @@
     <string name="pill_get_outside">Get me outside</string>
     <string name="pill_day_trip">Plan a day trip from my saves</string>
     <string name="pill_find_patterns">Find patterns in my saves</string>
+    <string name="pill_safe_at_night">Safe at night?</string>
+    <string name="pill_veggie_options">Veggie options?</string>
+    <string name="pill_famous_events">Famous events?</string>
+    <string name="pill_whats_nearby">What\'s nearby?</string>
+    <string name="pill_whats_on_tonight">What\'s on tonight in %1$s?</string>
+    <string name="pill_surprise_me_in">Surprise me in %1$s</string>
+    <string name="pill_tell_me_more_about">Tell me more about %1$s</string>
+    <string name="pill_is_worth_visiting">Is this worth visiting?</string>
+    <string name="pill_what_am_i_missing">What am I missing?</string>
+
+    <!-- FAB Menu -->
+    <string name="fab_saved_places">Saved Places</string>
+    <string name="fab_saved_places_count">Saved Places (%1$d)</string>
+    <string name="fab_settings">Settings</string>
+
+    <!-- AI Search Bar ghost phrases -->
+    <string name="ghost_vibe_here">What\'s the vibe here?</string>
+    <string name="ghost_hidden_gems">Hidden gems nearby?</string>
+    <string name="ghost_safe_walk">Safe to walk at night?</string>
+    <string name="ghost_best_time">Best time to visit?</string>
+
+    <!-- Batch Nav -->
+    <string name="batch_all">All</string>
+
+    <!-- Top Context Bar -->
+    <string name="visit_first">First visit</string>
+
+    <!-- Time -->
+    <string name="time_am">AM</string>
+    <string name="time_pm">PM</string>
 </resources>

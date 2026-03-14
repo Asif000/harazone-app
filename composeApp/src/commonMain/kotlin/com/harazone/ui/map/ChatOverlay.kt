@@ -264,18 +264,27 @@ internal fun ChatOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(chatState.persistentPills) { pill ->
-                        val pillDisplayLabel = when (pill.label) {
-                            "New topic"                     -> stringResource(Res.string.pill_new_topic)
-                            "Areas to avoid"                -> stringResource(Res.string.pill_areas_to_avoid)
-                            "Best time to go"               -> stringResource(Res.string.pill_best_time)
-                            "Tell me more"                  -> stringResource(Res.string.pill_tell_me_more)
-                            "Surprise me"                   -> stringResource(Res.string.pill_surprise_me)
-                            "Best food right now"           -> stringResource(Res.string.pill_best_food)
-                            "Show me hidden gems"           -> stringResource(Res.string.pill_hidden_gems)
-                            "Get me outside"                -> stringResource(Res.string.pill_get_outside)
-                            "Plan a day trip from my saves" -> stringResource(Res.string.pill_day_trip)
-                            "Find patterns in my saves"     -> stringResource(Res.string.pill_find_patterns)
-                            else                            -> pill.label
+                        val pillDisplayLabel = when {
+                            pill.label == "New topic"                     -> stringResource(Res.string.pill_new_topic)
+                            pill.label == "Areas to avoid"                -> stringResource(Res.string.pill_areas_to_avoid)
+                            pill.label == "Best time to go"               -> stringResource(Res.string.pill_best_time)
+                            pill.label == "Tell me more"                  -> stringResource(Res.string.pill_tell_me_more)
+                            pill.label == "Surprise me"                   -> stringResource(Res.string.pill_surprise_me)
+                            pill.label == "Best food right now"           -> stringResource(Res.string.pill_best_food)
+                            pill.label == "Show me hidden gems"           -> stringResource(Res.string.pill_hidden_gems)
+                            pill.label == "Get me outside"                -> stringResource(Res.string.pill_get_outside)
+                            pill.label == "Plan a day trip from my saves" -> stringResource(Res.string.pill_day_trip)
+                            pill.label == "Find patterns in my saves"     -> stringResource(Res.string.pill_find_patterns)
+                            pill.label == "Safe at night?"                -> stringResource(Res.string.pill_safe_at_night)
+                            pill.label == "Veggie options?"               -> stringResource(Res.string.pill_veggie_options)
+                            pill.label == "Famous events?"                -> stringResource(Res.string.pill_famous_events)
+                            pill.label == "What's nearby?"                -> stringResource(Res.string.pill_whats_nearby)
+                            pill.label == "Is this worth visiting?"       -> stringResource(Res.string.pill_is_worth_visiting)
+                            pill.label == "What am I missing?"            -> stringResource(Res.string.pill_what_am_i_missing)
+                            pill.label.startsWith("What's on tonight")    -> stringResource(Res.string.pill_whats_on_tonight, pill.label.substringAfter("in ").trimEnd('?'))
+                            pill.label.startsWith("Surprise me in")       -> stringResource(Res.string.pill_surprise_me_in, pill.label.substringAfter("in "))
+                            pill.label.startsWith("Tell me more about")   -> stringResource(Res.string.pill_tell_me_more_about, pill.label.substringAfter("about "))
+                            else                                          -> pill.label
                         }
                         if (pill.label == "New topic") {
                             SuggestionChip(
@@ -331,7 +340,7 @@ private fun EmptyStateText(areaName: String) {
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            "Ask me anything about $areaName",
+            stringResource(Res.string.chat_ask_anything, areaName),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

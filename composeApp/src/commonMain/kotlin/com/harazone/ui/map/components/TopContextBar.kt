@@ -27,6 +27,8 @@ import com.harazone.ui.components.currentHour
 import com.harazone.ui.components.currentMinute
 import com.harazone.ui.components.currentTimeMillis
 import com.harazone.ui.theme.MapFloatingUiDark
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @Composable
 fun TopContextBar(
@@ -50,8 +52,9 @@ fun TopContextBar(
             overflow = TextOverflow.Ellipsis,
         )
         BulletSeparator()
+        val displayVisitTag = if (visitTag == "First visit") stringResource(Res.string.visit_first) else visitTag
         Text(
-            text = visitTag,
+            text = displayVisitTag,
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.6f),
             maxLines = 1,
@@ -68,8 +71,10 @@ fun TopContextBar(
             ShimmerPlaceholder()
         }
         BulletSeparator()
+        val amLabel = stringResource(Res.string.time_am)
+        val pmLabel = stringResource(Res.string.time_pm)
         Text(
-            text = formatCurrentTime(weather?.utcOffsetSeconds),
+            text = formatCurrentTime(weather?.utcOffsetSeconds, amLabel, pmLabel),
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.6f),
             maxLines = 1,
@@ -104,7 +109,7 @@ private fun ShimmerPlaceholder() {
     )
 }
 
-private fun formatCurrentTime(utcOffsetSeconds: Int?): String {
+private fun formatCurrentTime(utcOffsetSeconds: Int?, amLabel: String = "AM", pmLabel: String = "PM"): String {
     val hour: Int
     val minute: Int
     if (utcOffsetSeconds != null) {
@@ -118,7 +123,7 @@ private fun formatCurrentTime(utcOffsetSeconds: Int?): String {
         hour = currentHour()
         minute = currentMinute()
     }
-    val amPm = if (hour < 12) "AM" else "PM"
+    val amPm = if (hour < 12) amLabel else pmLabel
     val displayHour = when {
         hour == 0 -> 12
         hour > 12 -> hour - 12

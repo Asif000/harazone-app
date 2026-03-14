@@ -500,7 +500,7 @@ private fun InlineBatchNav(
 ) {
     val isFirstSlot = batchIndex == 0
     val isLastSlot = batchIndex == batchTotal - 1
-    val label = if (isLastSlot) "All" else "${batchIndex + 1}/$batchTotal"
+    val label = if (isLastSlot) stringResource(Res.string.batch_all) else "${batchIndex + 1}/$batchTotal"
 
     Row(
         verticalAlignment = Alignment.CenterVertically,

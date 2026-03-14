@@ -9,7 +9,7 @@ import com.harazone.domain.model.TasteProfile
 
 internal class GeminiPromptBuilder {
 
-    fun buildPinOnlyPrompt(areaName: String, isNewUser: Boolean = false): String {
+    fun buildPinOnlyPrompt(areaName: String, isNewUser: Boolean = false, languageTag: String = "en"): String {
         val newUserHint = if (isNewUser) {
             "\n- NEW USER MODE: Return 3 POIs that showcase the DIVERSITY of this area — one food/drink, one culture/arts, one outdoor/activity. No taste profile yet."
         } else ""
@@ -20,11 +20,11 @@ Rules:
 - vibes: 4-6 most distinctive dimensions of THIS area.
 - pois: 3 best POIs. Each "v" MUST exactly match a vibe label.
 - t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-- GPS to 4 decimal places.$newUserHint
+- GPS to 4 decimal places.$newUserHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 
-    fun buildBackgroundBatchPrompt(areaName: String, excludeNames: List<String>, vibeLabels: List<String>): String {
+    fun buildBackgroundBatchPrompt(areaName: String, excludeNames: List<String>, vibeLabels: List<String>, languageTag: String = "en"): String {
         val vibeList = vibeLabels.joinToString(", ")
         val excludeList = excludeNames.joinToString(", ")
         return """
@@ -35,7 +35,7 @@ Rules:
 - Do NOT include any of these places: $excludeList
 - Each POI "v" field MUST exactly match one of these vibe labels — character-for-character, same case: $vibeList
 - t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-- GPS to 4 decimal places. Skip any POI you cannot place accurately.
+- GPS to 4 decimal places. Skip any POI you cannot place accurately.${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 
@@ -112,7 +112,7 @@ IMPORTANT:
         """.trimIndent()
     }
 
-    fun buildDynamicVibeEnrichmentPrompt(areaName: String, vibeLabels: List<String>, poiNames: List<String>): String {
+    fun buildDynamicVibeEnrichmentPrompt(areaName: String, vibeLabels: List<String>, poiNames: List<String>, languageTag: String = "en"): String {
         val vibeList = vibeLabels.joinToString(", ")
         val poiList = poiNames.joinToString(", ")
         return """
@@ -132,7 +132,7 @@ Rules:
 - Each vibe label MUST exactly match the labels above — character-for-character, same case.
 - Each POI "v" field is the single dominant vibe. "vs" is the full list of vibes this POI belongs to.
 - "w" field is required for every POI — one sentence on why it is special.
-- GPS to 4 decimal places. t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+- GPS to 4 decimal places. t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels, highlights, content, and 'w' fields MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 
@@ -230,7 +230,7 @@ VOICE: Mischievous. "Okay, you're not going to believe this, but...""""
     }
 
     private fun engagementBlock(level: EngagementLevel): String = when (level) {
-        EngagementLevel.FRESH -> "ENGAGEMENT: This user is new — they have no saves yet. Ask ONE follow-up question after your response. Be warm and inviting. Briefly explain your reasoning so they understand what to expect. End every first response with: Save any places that catch your eye — I learn your taste from what you keep."
+        EngagementLevel.FRESH -> "ENGAGEMENT: This user is new — they have no saves yet. Ask ONE follow-up question after your response. Be warm and inviting. Briefly explain your reasoning so they understand what to expect. End every first response by encouraging the user to save places they like, so you can learn their taste. Write this encouragement in the same language as the rest of your response."
         EngagementLevel.LIGHT -> "ENGAGEMENT: This user has started saving places. Reference their taste lightly where relevant — mention patterns you notice. Keep it conversational, not clinical."
         EngagementLevel.REGULAR -> "ENGAGEMENT: This user knows what they like. Be confident. Skip unnecessary explanation. Connect recommendations directly to their preferences without over-explaining."
         EngagementLevel.POWER -> "ENGAGEMENT: This user is deeply engaged — they have saved many places. Reference their saved places by name when relevant. Anticipate their needs. Make proactive nudges. Be brief — they don't need hand-holding."

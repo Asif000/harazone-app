@@ -33,13 +33,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.harazone.ui.theme.MapFloatingUiDark
 import kotlinx.coroutines.delay
-
-private val ghostPhrases = listOf(
-    "What's the vibe here?",
-    "Hidden gems nearby?",
-    "Safe to walk at night?",
-    "Best time to visit?",
-)
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @Composable
 fun AISearchBar(
@@ -47,6 +42,12 @@ fun AISearchBar(
     chatIsOpen: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val ghostPhrases = listOf(
+        stringResource(Res.string.ghost_vibe_here),
+        stringResource(Res.string.ghost_hidden_gems),
+        stringResource(Res.string.ghost_safe_walk),
+        stringResource(Res.string.ghost_best_time),
+    )
     var phraseIndex by remember { mutableStateOf(0) }
 
     LaunchedEffect(chatIsOpen) {

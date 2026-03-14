@@ -82,9 +82,9 @@ fun OnboardingBubble(
 ) {
     val localizedFallback = OnboardingTipsData(
         avatar_emoji = "\u2728",
-        title = "I'm your AI travel guide!",
+        title = stringResource(Res.string.onboarding_title),
         footer_text = stringResource(Res.string.onboarding_footer),
-        dismiss_label = "Let's go!",
+        dismiss_label = stringResource(Res.string.onboarding_dismiss),
         tips = listOf(
             OnboardingTip("\uD83D\uDC46", stringResource(Res.string.onboarding_tip1_title), stringResource(Res.string.onboarding_tip1_body)),
             OnboardingTip("\uD83D\uDD16", stringResource(Res.string.onboarding_tip2_title), stringResource(Res.string.onboarding_tip2_body)),

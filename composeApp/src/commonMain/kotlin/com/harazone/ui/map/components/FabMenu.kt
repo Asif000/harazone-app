@@ -37,6 +37,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.harazone.ui.theme.MapSurfaceDark
+import org.jetbrains.compose.resources.stringResource
+import areadiscovery.composeapp.generated.resources.*
 
 @Composable
 fun FabMenu(
@@ -62,12 +64,12 @@ fun FabMenu(
                 modifier = Modifier.padding(bottom = 8.dp),
             ) {
                 FabMenuItem(
-                    label = if (savedCount > 0) "Saved Places ($savedCount)" else "Saved Places",
+                    label = if (savedCount > 0) stringResource(Res.string.fab_saved_places_count, savedCount) else stringResource(Res.string.fab_saved_places),
                     icon = Icons.Default.Bookmark,
                     onClick = onSavedPlaces,
                 )
                 FabMenuItem(
-                    label = "Settings",
+                    label = stringResource(Res.string.fab_settings),
                     icon = Icons.Default.Settings,
                     onClick = onSettings,
                 )
