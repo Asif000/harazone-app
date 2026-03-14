@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -90,20 +91,12 @@ fun ExpandablePoiCard(
     val vibeColor = (activeVibe ?: poiVibe ?: Vibe.DEFAULT).toColor()
     val hasSiblings = siblingPois.size > 1
 
-    val rootModifier = if (fullscreen) {
-        modifier
-            .fillMaxWidth(0.92f)
-            .fillMaxHeight(0.80f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MapSurfaceDark.copy(alpha = 0.97f))
-            .border(1.dp, vibeColor.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
-    } else {
-        modifier
-            .fillMaxWidth(0.9f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MapSurfaceDark.copy(alpha = 0.97f))
-            .border(1.dp, vibeColor.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
-    }
+    val shape = if (fullscreen) RoundedCornerShape(0.dp) else RoundedCornerShape(16.dp)
+    val rootModifier = modifier
+        .then(if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth(0.9f))
+        .clip(shape)
+        .background(MapSurfaceDark.copy(alpha = 0.97f))
+        .then(if (fullscreen) Modifier else Modifier.border(1.dp, vibeColor.copy(alpha = 0.12f), shape))
 
     if (hasSiblings) {
         val pagerState = rememberPagerState(
@@ -160,8 +153,8 @@ fun ExpandablePoiCard(
             }
         }
     } else {
-        val scrollModifier = if (fullscreen) rootModifier else rootModifier.verticalScroll(rememberScrollState())
-        Column(modifier = scrollModifier) {
+        val scrollModifier = rootModifier.verticalScroll(rememberScrollState())
+        Column(modifier = scrollModifier, verticalArrangement = Arrangement.Top) {
             PoiCardContent(
                 poi = poi,
                 activeVibe = activeVibe,

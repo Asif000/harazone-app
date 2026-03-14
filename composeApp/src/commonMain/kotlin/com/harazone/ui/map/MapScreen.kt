@@ -366,7 +366,12 @@ private fun ReadyContent(
                         snackbarHostState.showSnackbar("Sharing coming soon")
                     }
                 },
-                modifier = Modifier.align(Alignment.Center),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(
+                        top = statusBarPadding + 56.dp,
+                        bottom = navBarPadding + 56.dp,
+                    ),
                 fullscreen = true,
                 siblingPois = if (state.showAllMode) emptyList() else state.pois.take(3),
                 siblingIndex = state.pois.take(3).indexOfFirst { it.name == state.selectedPoi?.name }.coerceAtLeast(0),
