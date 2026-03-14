@@ -8,6 +8,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import platform.CoreLocation.CLGeocoder
 import platform.CoreLocation.CLLocation
 import platform.CoreLocation.CLLocationManager
@@ -32,106 +33,133 @@ class IosLocationProvider : LocationProvider {
     override suspend fun getCurrentLocation(): Result<GpsCoordinates> =
         locationMutex.withLock {
             withContext(Dispatchers.Main) {
-                suspendCancellableCoroutine { cont ->
-                    val manager = CLLocationManager()
-                    manager.desiredAccuracy = kCLLocationAccuracyBest
-                    activeManager = manager
+                // Phase 1: Ensure permission — no timeout. On first launch the user sees the iOS
+                // dialog; we wait however long that takes before starting the GPS fix.
+                val authorized = ensurePermission()
+                if (!authorized) return@withContext Result.failure(Exception("Location permission denied"))
 
-                    // On iOS 14+, assigning manager.delegate triggers locationManagerDidChangeAuthorization
-                    // synchronously if status is already determined. This flag prevents double startUpdatingLocation().
-                    var locationUpdateStarted = false
+                // Phase 2: Fetch location with its own timeout, independent of the permission wait.
+                withTimeoutOrNull(LOCATION_FIX_TIMEOUT_MS) {
+                    fetchLocation()
+                } ?: Result.failure(Exception("Location fix timed out"))
+            }
+        }
 
-                    val delegate = object : NSObject(), CLLocationManagerDelegateProtocol {
+    /**
+     * Suspends until location permission is resolved. Returns true if granted, false if denied.
+     * Never times out — the iOS permission dialog can stay on screen as long as the user needs.
+     */
+    private suspend fun ensurePermission(): Boolean =
+        suspendCancellableCoroutine { cont ->
+            val manager = CLLocationManager()
+            activeManager = manager
 
-                        // iOS 14+ callback — fires immediately on delegate assignment if status already determined
-                        override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
-                            if (cont.isCompleted) return
-                            when (manager.authorizationStatus) {
-                                kCLAuthorizationStatusAuthorizedWhenInUse,
-                                kCLAuthorizationStatusAuthorizedAlways -> {
-                                    if (!locationUpdateStarted) {
-                                        locationUpdateStarted = true
-                                        manager.startUpdatingLocation()
-                                    }
-                                }
-                                kCLAuthorizationStatusDenied,
-                                kCLAuthorizationStatusRestricted -> {
-                                    activeDelegate = null
-                                    activeManager = null
-                                    cont.resume(Result.failure(Exception("Location permission denied")))
-                                }
-                                else -> { /* notDetermined — wait for user to respond to dialog */ }
-                            }
-                        }
-
-                        override fun locationManager(
-                            manager: CLLocationManager,
-                            didUpdateLocations: List<*>
-                        ) {
-                            if (cont.isCompleted) return
-                            val location = didUpdateLocations.firstOrNull() as? CLLocation
-                            if (location != null) {
-                                manager.stopUpdatingLocation()
-                                activeDelegate = null
-                                activeManager = null
-                                cont.resume(Result.success(
-                                    GpsCoordinates(
-                                        latitude = location.coordinate.useContents { latitude },
-                                        longitude = location.coordinate.useContents { longitude }
-                                    )
-                                ))
-                            }
-                        }
-
-                        override fun locationManager(
-                            manager: CLLocationManager,
-                            didFailWithError: platform.Foundation.NSError
-                        ) {
-                            if (cont.isCompleted) return
-                            manager.stopUpdatingLocation()
+            val delegate = object : NSObject(), CLLocationManagerDelegateProtocol {
+                override fun locationManagerDidChangeAuthorization(manager: CLLocationManager) {
+                    if (cont.isCompleted) return
+                    when (manager.authorizationStatus) {
+                        kCLAuthorizationStatusAuthorizedWhenInUse,
+                        kCLAuthorizationStatusAuthorizedAlways -> {
                             activeDelegate = null
                             activeManager = null
-                            AppLogger.e { "CLLocationManager failed: ${didFailWithError.localizedDescription}" }
-                            cont.resume(Result.failure(Exception(didFailWithError.localizedDescription)))
+                            cont.resume(true)
                         }
-                    }
-
-                    activeDelegate = delegate
-                    // This assignment may trigger locationManagerDidChangeAuthorization synchronously
-                    // (iOS 14+ fires it immediately when status is already determined).
-                    manager.delegate = delegate
-
-                    // Secondary gate — runs after delegate assignment.
-                    // If locationManagerDidChangeAuthorization already ran synchronously (authorized case),
-                    // locationUpdateStarted will be true and the authorized branch is skipped.
-                    if (!locationUpdateStarted) {
-                        when (manager.authorizationStatus) {
-                            kCLAuthorizationStatusAuthorizedWhenInUse,
-                            kCLAuthorizationStatusAuthorizedAlways -> {
-                                locationUpdateStarted = true
-                                manager.startUpdatingLocation()
-                            }
-                            kCLAuthorizationStatusNotDetermined -> {
-                                // Show permission dialog. locationManagerDidChangeAuthorization will
-                                // call startUpdatingLocation() once user responds.
-                                manager.requestWhenInUseAuthorization()
-                            }
-                            else -> {
-                                if (!cont.isCompleted) {
-                                    activeDelegate = null
-                                    activeManager = null
-                                    cont.resume(Result.failure(Exception("Location permission denied")))
-                                }
-                            }
+                        kCLAuthorizationStatusDenied,
+                        kCLAuthorizationStatusRestricted -> {
+                            activeDelegate = null
+                            activeManager = null
+                            cont.resume(false)
                         }
+                        else -> { /* notDetermined — wait for user response */ }
                     }
+                }
+            }
 
-                    cont.invokeOnCancellation {
+            activeDelegate = delegate
+            // Assigning delegate triggers locationManagerDidChangeAuthorization synchronously on
+            // iOS 14+ if status is already determined, resolving the coroutine immediately.
+            manager.delegate = delegate
+
+            // Secondary gate — in case the synchronous callback already resolved the coroutine.
+            if (!cont.isCompleted) {
+                when (manager.authorizationStatus) {
+                    kCLAuthorizationStatusAuthorizedWhenInUse,
+                    kCLAuthorizationStatusAuthorizedAlways -> {
+                        activeDelegate = null
+                        activeManager = null
+                        cont.resume(true)
+                    }
+                    kCLAuthorizationStatusNotDetermined -> {
+                        // Show permission dialog. locationManagerDidChangeAuthorization will fire
+                        // once the user responds.
+                        manager.requestWhenInUseAuthorization()
+                    }
+                    else -> {
+                        activeDelegate = null
+                        activeManager = null
+                        cont.resume(false)
+                    }
+                }
+            }
+
+            cont.invokeOnCancellation {
+                activeDelegate = null
+                activeManager = null
+            }
+        }
+
+    /**
+     * Fetches a single GPS fix. Assumes permission is already granted.
+     * Caller is responsible for applying a timeout.
+     */
+    @OptIn(ExperimentalForeignApi::class)
+    private suspend fun fetchLocation(): Result<GpsCoordinates> =
+        suspendCancellableCoroutine { cont ->
+            val manager = CLLocationManager()
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            activeManager = manager
+
+            val delegate = object : NSObject(), CLLocationManagerDelegateProtocol {
+                override fun locationManager(
+                    manager: CLLocationManager,
+                    didUpdateLocations: List<*>
+                ) {
+                    if (cont.isCompleted) return
+                    val location = didUpdateLocations.firstOrNull() as? CLLocation
+                    if (location != null) {
                         manager.stopUpdatingLocation()
                         activeDelegate = null
                         activeManager = null
+                        cont.resume(Result.success(
+                            GpsCoordinates(
+                                latitude = location.coordinate.useContents { latitude },
+                                longitude = location.coordinate.useContents { longitude }
+                            )
+                        ))
                     }
                 }
+
+                override fun locationManager(
+                    manager: CLLocationManager,
+                    didFailWithError: platform.Foundation.NSError
+                ) {
+                    if (cont.isCompleted) return
+                    manager.stopUpdatingLocation()
+                    activeDelegate = null
+                    activeManager = null
+                    AppLogger.e { "CLLocationManager failed: ${didFailWithError.localizedDescription}" }
+                    cont.resume(Result.failure(Exception(didFailWithError.localizedDescription)))
+                }
+            }
+
+            activeDelegate = delegate
+            manager.delegate = delegate
+            manager.startUpdatingLocation()
+
+            cont.invokeOnCancellation {
+                manager.stopUpdatingLocation()
+                activeDelegate = null
+                activeManager = null
             }
         }
 
@@ -154,4 +182,9 @@ class IosLocationProvider : LocationProvider {
                 }
             }
         }
+
+    companion object {
+        // Timeout applied only to the GPS fix phase, after permission is already granted.
+        private const val LOCATION_FIX_TIMEOUT_MS = 10_000L
+    }
 }
