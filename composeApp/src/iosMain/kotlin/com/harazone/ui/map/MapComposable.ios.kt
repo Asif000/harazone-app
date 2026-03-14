@@ -246,6 +246,7 @@ actual fun MapComposable(
 // Delegate
 // ---------------------------------------------------------------------------
 
+@Suppress("CONFLICTING_OVERLOADS")
 @OptIn(ExperimentalForeignApi::class)
 private class MapDelegate(
     val annotationPoiMap: MutableMap<MLNPointAnnotation, POI>,
@@ -272,7 +273,7 @@ private class MapDelegate(
             val point = annotation.coordinate.useContents {
                 mapView.convertCoordinate(
                     CLLocationCoordinate2DMake(latitude, longitude),
-                    toPointTo = mapView,
+                    toPointToView = mapView,
                 )
             }
             val x = point.useContents { x.toFloat() }
