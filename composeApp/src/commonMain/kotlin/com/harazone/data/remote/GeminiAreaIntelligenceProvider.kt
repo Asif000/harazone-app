@@ -87,7 +87,7 @@ internal class GeminiAreaIntelligenceProvider(
         // Stage 1 — fast pin call (returns vibes + POIs)
         launch {
             try {
-                val prompt = promptBuilder.buildPinOnlyPrompt(areaName)
+                val prompt = promptBuilder.buildPinOnlyPrompt(areaName, isNewUser = context.isNewUser)
                 val requestBody = buildRequestBody(prompt)
                 val fullText = StringBuilder()
                 var hasEmitted = false

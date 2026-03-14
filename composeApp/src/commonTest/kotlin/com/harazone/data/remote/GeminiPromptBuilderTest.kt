@@ -354,4 +354,24 @@ class GeminiPromptBuilderTest {
         val result = chatContext()
         assertTrue(result.contains("CONTEXT SHIFTS"))
     }
+
+    // --- buildPinOnlyPrompt isNewUser tests ---
+
+    @Test
+    fun buildPinOnlyPrompt_isNewUser_includesDiversityHint() {
+        val prompt = builder.buildPinOnlyPrompt("Shoreditch", isNewUser = true)
+        assertTrue(prompt.contains("NEW USER MODE"))
+    }
+
+    @Test
+    fun buildPinOnlyPrompt_returningUser_noDiversityHint() {
+        val prompt = builder.buildPinOnlyPrompt("Shoreditch", isNewUser = false)
+        assertFalse(prompt.contains("NEW USER MODE"))
+    }
+
+    @Test
+    fun buildPinOnlyPrompt_defaultIsNotNewUser() {
+        val prompt = builder.buildPinOnlyPrompt("Shoreditch")
+        assertFalse(prompt.contains("NEW USER MODE"))
+    }
 }

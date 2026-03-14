@@ -2185,6 +2185,45 @@ class MapViewModelTest {
         assertTrue(state.pois.isEmpty())
         assertEquals(0, state.activeBatchIndex)
     }
+
+    // --- Onboarding bubble tests ---
+
+    @Test
+    fun onOnboardingBubbleDismissed_clearsStateAndPersists() = runTest(testDispatcher) {
+        val prefs = com.harazone.fakes.FakeUserPreferencesRepository()
+        val viewModel = createViewModel(userPreferencesRepository = prefs)
+        val ready = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        viewModel.onOnboardingBubbleDismissed()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(after.showOnboardingBubble)
+        assertTrue(prefs.getColdStartSeen())
+    }
+
+    @Test
+    fun onReturnVisit_noBubble() = runTest(testDispatcher) {
+        val prefs = com.harazone.fakes.FakeUserPreferencesRepository()
+        prefs.setColdStartSeen()
+        val viewModel = createViewModel(
+            userPreferencesRepository = prefs,
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(
+                        listOf(DynamicVibe("Food", "\uD83C\uDF5C")),
+                        listOf(POI("Test", "food", "desc", Confidence.HIGH, 40.71, -74.00)),
+                    ),
+                    BucketUpdate.PortraitComplete(emptyList()),
+                    BucketUpdate.BackgroundFetchComplete,
+                ),
+            ),
+        )
+        testScheduler.advanceTimeBy(3000)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.showOnboardingBubble)
+    }
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {

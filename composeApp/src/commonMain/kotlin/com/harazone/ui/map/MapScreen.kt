@@ -54,7 +54,7 @@ import com.harazone.ui.components.AlertBanner
 import com.harazone.ui.components.ContentNoteBanner
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.ui.map.components.AISearchBar
-import com.harazone.ui.map.components.ColdStartPickerOverlay
+import com.harazone.ui.map.components.OnboardingBubble
 import com.harazone.ui.map.components.ExpandablePoiCard
 import com.harazone.ui.map.components.FloatingPoiCard
 import com.harazone.ui.map.components.GeocodingSearchBar
@@ -274,6 +274,7 @@ private fun ReadyContent(
                 onSavedVibeSelected = { viewModel.onSavedVibeSelected() },
                 onLongPressVibe = { viewModel.togglePin(it) },
                 onExploreRetry = { viewModel.retryAreaFetch() },
+                showCalloutDot = state.showOnboardingBubble,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(end = 8.dp, bottom = navBarPadding + 88.dp),
@@ -561,13 +562,11 @@ private fun ReadyContent(
             )
         }
 
-        // Cold start picker overlay
-        if (state.showColdStartPicker) {
-            ColdStartPickerOverlay(
-                onConfirm = { viewModel.onColdStartConfirmed(it) },
-                onSkip = { viewModel.onColdStartSkipped() },
-            )
-        }
+        // Onboarding bubble — first launch only
+        OnboardingBubble(
+            visible = state.showOnboardingBubble,
+            onDismiss = { viewModel.onOnboardingBubbleDismissed() },
+        )
 
         // Must be LAST PlatformBackHandler in ReadyContent — last-composed = highest priority
         PlatformBackHandler(enabled = chatState.isOpen) {

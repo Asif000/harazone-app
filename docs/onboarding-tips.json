@@ -1,0 +1,29 @@
+{
+  "_comment": "Cold start onboarding bubble tips. Max 5 shown. Update when adding new user-facing features.",
+  "avatar_emoji": "✨",
+  "title": "I'm your AI travel guide!",
+  "footer_text": "The more you explore, the smarter I get",
+  "dismiss_label": "Let's go!",
+  "tips": [
+    {
+      "icon": "👆",
+      "action": "Tap pins",
+      "description": "to discover what makes each place special"
+    },
+    {
+      "icon": "🔖",
+      "action": "Save places",
+      "description": "you like — I'll learn your taste and recommend better spots"
+    },
+    {
+      "icon": "🎨",
+      "action": "Tap vibes",
+      "description": "on the right to filter by what excites you"
+    },
+    {
+      "icon": "💬",
+      "action": "Chat with me",
+      "description": "anytime — ask about hidden gems, safety, food, anything"
+    }
+  ]
+}

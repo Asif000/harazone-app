@@ -4,5 +4,6 @@ data class AreaContext(
     val timeOfDay: String,
     val dayOfWeek: String,
     val visitCount: Int,
-    val preferredLanguage: String
+    val preferredLanguage: String,
+    val isNewUser: Boolean = false,
 )

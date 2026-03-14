@@ -43,7 +43,7 @@ sealed class MapUiState {
         val dynamicVibes: List<DynamicVibe> = emptyList(),
         val isLoadingVibes: Boolean = false,
         val isOfflineVibes: Boolean = false,
-        val showColdStartPicker: Boolean = false,
+        val showOnboardingBubble: Boolean = false,
         val poiBatches: List<List<POI>> = emptyList(),
         val allDiscoveredPois: List<POI> = emptyList(),
         val activeBatchIndex: Int = 0,

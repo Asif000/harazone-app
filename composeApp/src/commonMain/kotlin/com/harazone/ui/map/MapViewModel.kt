@@ -977,21 +977,10 @@ class MapViewModel(
         _uiState.value = current.copy(dynamicVibes = chipRow)
     }
 
-    fun onColdStartConfirmed(labels: List<String>) {
-        pinnedVibeLabels = labels
-        viewModelScope.launch {
-            userPreferencesRepository.setPinnedVibes(labels)
-            userPreferencesRepository.setColdStartSeen()
-        }
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        val chipRow = buildChipRowVibes(currentDynamicVibes, current.areaName)
-        _uiState.value = current.copy(showColdStartPicker = false, dynamicVibes = chipRow)
-    }
-
-    fun onColdStartSkipped() {
+    fun onOnboardingBubbleDismissed() {
         viewModelScope.launch { userPreferencesRepository.setColdStartSeen() }
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(showColdStartPicker = false)
+        _uiState.value = current.copy(showOnboardingBubble = false)
     }
 
     fun onNextBatch() {
@@ -1076,7 +1065,7 @@ class MapViewModel(
         onComplete: suspend (pois: List<POI>, finalAreaName: String) -> Unit,
         onError: suspend (Exception) -> Unit,
     ) {
-        val context = areaContextFactory.create()
+        val context = areaContextFactory.create().copy(isNewUser = pendingColdStart)
         try {
             var pois = emptyList<POI>()
             var stage1Pois = emptyList<POI>()
@@ -1101,6 +1090,14 @@ class MapViewModel(
                             val counts = computeDynamicVibePoiCounts(update.pois, chipRow)
                             poiBatchesCache.clear()
                             poiBatchesCache.add(update.pois)
+                            if (pendingColdStart) {
+                                pendingColdStart = false
+                                viewModelScope.launch {
+                                    delay(2000)
+                                    val s2 = _uiState.value as? MapUiState.Ready ?: return@launch
+                                    _uiState.value = s2.copy(showOnboardingBubble = true)
+                                }
+                            }
                             _uiState.value = s.copy(
                                 pois = update.pois,
                                 dynamicVibes = chipRow,
@@ -1109,7 +1106,6 @@ class MapViewModel(
                                 isOfflineVibes = update.fromCache,
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
-                                showColdStartPicker = if (pendingColdStart) { pendingColdStart = false; true } else s.showColdStartPicker,
                                 poiBatches = listOf(update.pois),
                                 allDiscoveredPois = update.pois,
                                 activeBatchIndex = 0,

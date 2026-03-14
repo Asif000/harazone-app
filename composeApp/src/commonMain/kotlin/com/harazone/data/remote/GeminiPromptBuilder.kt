@@ -9,7 +9,10 @@ import com.harazone.domain.model.TasteProfile
 
 internal class GeminiPromptBuilder {
 
-    fun buildPinOnlyPrompt(areaName: String): String {
+    fun buildPinOnlyPrompt(areaName: String, isNewUser: Boolean = false): String {
+        val newUserHint = if (isNewUser) {
+            "\n- NEW USER MODE: Return 3 POIs that showcase the DIVERSITY of this area — one food/drink, one culture/arts, one outdoor/activity. No taste profile yet."
+        } else ""
         return """
 Area: "$areaName". Return JSON only, no other text.
 Schema: {"vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art"}]}
@@ -17,7 +20,7 @@ Rules:
 - vibes: 4-6 most distinctive dimensions of THIS area.
 - pois: 3 best POIs. Each "v" MUST exactly match a vibe label.
 - t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-- GPS to 4 decimal places.
+- GPS to 4 decimal places.$newUserHint
         """.trimIndent()
     }
 

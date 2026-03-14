@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.harazone.domain.model.DynamicVibe
+import com.harazone.ui.components.CalloutDot
 import com.harazone.ui.components.rememberReduceMotion
 
 fun computeVibeSizeDp(count: Int, minCount: Int, maxCount: Int): Float =
@@ -66,6 +67,7 @@ fun VibeRail(
     onSavedVibeSelected: () -> Unit = {},
     onLongPressVibe: (DynamicVibe) -> Unit = {},
     onExploreRetry: () -> Unit = {},
+    showCalloutDot: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     // REGRESSION: horizontalAlignment MUST be End — orbs right-align against the map edge.
@@ -76,12 +78,17 @@ fun VibeRail(
         modifier = modifier,
     ) {
         // Saved orb — pinned, not reordered
-        SavedVibeOrb(
-            isActive = savedVibeActive,
-            isFilterActive = activeDynamicVibe != null,
-            totalAreaSaveCount = totalAreaSaveCount,
-            onClick = onSavedVibeSelected,
-        )
+        Box {
+            SavedVibeOrb(
+                isActive = savedVibeActive,
+                isFilterActive = activeDynamicVibe != null,
+                totalAreaSaveCount = totalAreaSaveCount,
+                onClick = onSavedVibeSelected,
+            )
+            if (showCalloutDot) {
+                CalloutDot(modifier = Modifier.align(Alignment.TopEnd).padding(end = 0.dp))
+            }
+        }
 
         HorizontalDivider(
             thickness = 1.dp,
@@ -106,20 +113,25 @@ fun VibeRail(
                 val maxCount = dynamicVibePoiCounts.values.maxOrNull() ?: 0
                 val isFilterActive = activeDynamicVibe != null || savedVibeActive
 
-                for (vibe in vibes) {
+                for ((index, vibe) in vibes.withIndex()) {
                     val count = dynamicVibePoiCounts[vibe.label] ?: 0
                     val sizeDp = computeVibeSizeDp(count, minCount, maxCount).dp
                     val isPinned = vibe.label in pinnedVibeLabels
-                    DynamicVibeOrb(
-                        vibe = vibe,
-                        isActive = activeDynamicVibe?.label == vibe.label,
-                        isFilterActive = isFilterActive,
-                        poiCount = count,
-                        sizeDp = sizeDp,
-                        isPinned = isPinned,
-                        onClick = { onVibeSelected(vibe) },
-                        onLongClick = { onLongPressVibe(vibe) },
-                    )
+                    Box {
+                        DynamicVibeOrb(
+                            vibe = vibe,
+                            isActive = activeDynamicVibe?.label == vibe.label,
+                            isFilterActive = isFilterActive,
+                            poiCount = count,
+                            sizeDp = sizeDp,
+                            isPinned = isPinned,
+                            onClick = { onVibeSelected(vibe) },
+                            onLongClick = { onLongPressVibe(vibe) },
+                        )
+                        if (showCalloutDot && index == 0) {
+                            CalloutDot(modifier = Modifier.align(Alignment.TopEnd).padding(end = 0.dp))
+                        }
+                    }
                 }
             }
         }
