@@ -62,6 +62,7 @@ class MapViewModel(
         areaFetchJob?.cancel()
         areaFetchJob = null
         cameraIdleJob?.cancel()
+        onboardingBubbleJob?.cancel()
         cameraIdleJob = null
         geocodingJob?.cancel()
         geocodingJob = null
@@ -81,6 +82,7 @@ class MapViewModel(
     var pinnedVibeLabels: List<String> = emptyList()
         private set
     private var pendingColdStart = false
+    private var onboardingBubbleJob: Job? = null
     private val poiBatchesCache: MutableList<List<POI>> = mutableListOf()
 
     // Cache for GPS home area — avoids re-querying Gemini on return-to-location
@@ -1092,7 +1094,8 @@ class MapViewModel(
                             poiBatchesCache.add(update.pois)
                             if (pendingColdStart) {
                                 pendingColdStart = false
-                                viewModelScope.launch {
+                                onboardingBubbleJob?.cancel()
+                                onboardingBubbleJob = viewModelScope.launch {
                                     delay(2000)
                                     val s2 = _uiState.value as? MapUiState.Ready ?: return@launch
                                     _uiState.value = s2.copy(showOnboardingBubble = true)

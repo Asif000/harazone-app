@@ -1,5 +1,5 @@
 {
-  "_comment": "Cold start onboarding bubble tips. Max 5 shown. Update when adding new user-facing features.",
+  "_comment": "Canonical source. Bundled copy at composeApp/src/commonMain/composeResources/files/onboarding-tips.json must be kept in sync.",
   "avatar_emoji": "✨",
   "title": "I'm your AI travel guide!",
   "footer_text": "The more you explore, the smarter I get",

@@ -91,7 +91,7 @@ internal class ChatViewModel(
             }
             if (conversationHistory.isNotEmpty() && current.bubbles.isNotEmpty()) {
                 // A pill was already tapped — clear pills
-                _uiState.value = current.copy(isOpen = true, intentPills = emptyList())
+                _uiState.value = current.copy(isOpen = true)
             } else {
                 // No pill tapped yet — preserve pills
                 _uiState.value = current.copy(isOpen = true)
@@ -129,11 +129,9 @@ internal class ChatViewModel(
             areaName = areaName,
             vibeName = vibeName,
             bubbles = emptyList(),
-            followUpChips = emptyList(),
-            poiCards = emptyList(),
+                        poiCards = emptyList(),
             showSkeletons = false,
             savedPoiIds = _uiState.value.savedPoiIds,
-            intentPills = pillsFor(entryPoint, areaName),
             persistentPills = pillsFor(entryPoint, areaName),
             inputText = preFillFor(entryPoint),
             contextBanner = bannerFor(entryPoint),
@@ -169,8 +167,7 @@ internal class ChatViewModel(
             )
             _uiState.value = _uiState.value.copy(
                 inputText = pill.message,
-                intentPills = emptyList(),
-                persistentPills = emptyList(),
+                                persistentPills = emptyList(),
                 depthLevel = 0,
             )
             sendMessage()
@@ -224,8 +221,7 @@ internal class ChatViewModel(
                 id = aiBubbleId, role = MessageRole.AI, content = "", isStreaming = true,
             ),
             isStreaming = true,
-            followUpChips = emptyList(),
-            inputText = "",
+                        inputText = "",
             lastUserQuery = query,
             showSkeletons = true,
         )
@@ -275,8 +271,7 @@ internal class ChatViewModel(
                             ) else it
                         },
                         isStreaming = false,
-                        followUpChips = emptyList(),
-                        showSkeletons = false,
+                                                showSkeletons = false,
                     )
                 }
                 .collect { token ->
@@ -297,8 +292,7 @@ internal class ChatViewModel(
                                 ) else it
                             },
                             isStreaming = false,
-                            followUpChips = emptyList(),
-                            persistentPills = computePersistentPills(selectedIntent, query, _uiState.value.depthLevel),
+                                                        persistentPills = computePersistentPills(selectedIntent, query, _uiState.value.depthLevel),
                             showSkeletons = false,
                             poiCards = deduped + s.poiCards,
                         )
@@ -502,40 +496,6 @@ internal class ChatViewModel(
         return results
     }
 
-    // F11: Use word boundary matching to avoid false positives (e.g., "on" in "information")
-    private fun computeFollowUpChips(query: String, intent: ChatIntent?, level: EngagementLevel, depthLevel: Int): List<String> {
-        if (depthLevel >= 3) {
-            return listOf("🔄 New topic") + computeFollowUpChipsByKeyword(query).take(1)
-        }
-        if (level == EngagementLevel.FRESH) {
-            return when (intent) {
-                ChatIntent.TONIGHT -> listOf("Just me tonight", "With friends")
-                ChatIntent.DISCOVER -> listOf("On foot, no rush")
-                ChatIntent.HUNGRY -> listOf("I'll eat anything", "Something quick")
-                ChatIntent.OUTSIDE -> listOf("Just a casual walk")
-                ChatIntent.SURPRISE, null -> emptyList()
-            }
-        }
-        return computeFollowUpChipsByKeyword(query)
-    }
-
-    private fun computeFollowUpChipsByKeyword(query: String): List<String> {
-        val q = query.lowercase()
-        return when {
-            q.containsAnyWord("safe", "crime", "danger", "night") -> listOf("Is it safe at night?", "What areas to avoid?")
-            q.containsAnyWord("food", "eat", "restaurant", "drink", "brunch") -> listOf("Best time to visit?", "Vegetarian options?")
-            q.containsAnyWord("history", "historic", "old", "founded", "built") -> listOf("When was it built?", "Any famous events here?")
-            q.containsAnyWord("cost", "price", "expensive", "cheap", "budget") -> listOf("Budget tips?", "Free things to do?")
-            q.containsAnyWord("event", "tonight", "happening", "going on") -> listOf("How busy will it be?", "Best way to get there?")
-            else -> listOf("Tell me more", "What's nearby?")
-        }
-    }
-
-    // TODO(BACKLOG-LOW): \b word boundaries may break with non-Latin scripts — revisit for Localisation Phase A
-    private fun String.containsAnyWord(vararg terms: String) = terms.any { term ->
-        this.contains("\\b${Regex.escape(term)}\\b".toRegex())
-    }
-
     fun tapPersistentPill(pill: ContextualPill) {
         if (_uiState.value.isStreaming) return
         if (selectedIntent == null) selectedIntent = pill.intent
@@ -574,6 +534,10 @@ internal class ChatViewModel(
         }
     }
 
+    private fun String.containsAnyWord(vararg terms: String) = terms.any { term ->
+        this.contains("\\b${Regex.escape(term)}\\b".toRegex())
+    }
+
     fun resetToIntentPills() {
         chatJob?.cancel()
         conversationHistory = mutableListOf()
@@ -585,11 +549,9 @@ internal class ChatViewModel(
         val areaName = _uiState.value.areaName
         _uiState.value = _uiState.value.copy(
             bubbles = emptyList(),
-            followUpChips = emptyList(),
-            poiCards = emptyList(),
+                        poiCards = emptyList(),
             showSkeletons = false,
             isStreaming = false,
-            intentPills = pillsFor(currentEntryPoint, areaName),
             persistentPills = pillsFor(currentEntryPoint, areaName),
             inputText = preFillFor(currentEntryPoint),
             contextBanner = bannerFor(currentEntryPoint),

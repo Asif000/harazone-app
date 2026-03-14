@@ -2189,6 +2189,39 @@ class MapViewModelTest {
     // --- Onboarding bubble tests ---
 
     @Test
+    fun onFirstLaunch_showsOnboardingBubbleAfterDelay() = runTest(testDispatcher) {
+        val prefs = com.harazone.fakes.FakeUserPreferencesRepository()
+        // cold_start_seen defaults to false → pendingColdStart = true
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val viewModel = createViewModel(
+            userPreferencesRepository = prefs,
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = suspendingRepo,
+        )
+        // Init completed, pendingColdStart is true. Now emit VibesReady.
+        suspendingRepo.completeCall(0, listOf(
+            BucketUpdate.VibesReady(
+                listOf(DynamicVibe("Food", "\uD83C\uDF5C")),
+                listOf(POI("Test", "food", "desc", Confidence.HIGH, 40.71, -74.00)),
+            ),
+            BucketUpdate.PortraitComplete(emptyList()),
+            BucketUpdate.BackgroundFetchComplete,
+        ))
+        // Before delay: bubble should NOT be visible
+        val stateBefore = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(stateBefore.showOnboardingBubble)
+
+        // Advance past the 2-second delay
+        testScheduler.advanceTimeBy(2100)
+
+        val stateAfter = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(stateAfter.showOnboardingBubble)
+    }
+
+    @Test
     fun onOnboardingBubbleDismissed_clearsStateAndPersists() = runTest(testDispatcher) {
         val prefs = com.harazone.fakes.FakeUserPreferencesRepository()
         val viewModel = createViewModel(userPreferencesRepository = prefs)

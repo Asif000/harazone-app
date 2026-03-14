@@ -98,7 +98,7 @@ internal fun ChatOverlay(
     val totalItems = chatState.bubbles.size +
         (if (chatState.showSkeletons) 1 else 0)
     // Scroll when content changes OR when overlay reopens with new context
-    val scrollKey = Triple(chatState.bubbles.size, chatState.poiCards.size, chatState.isStreaming)
+    val scrollKey = Pair(chatState.bubbles.size, chatState.isStreaming)
     LaunchedEffect(scrollKey, chatState.isOpen) {
         if (totalItems > 0) {
             listState.animateScrollToItem(maxOf(0, totalItems - 1))
@@ -293,62 +293,6 @@ internal fun ChatOverlay(
                 onInputChange = { viewModel.updateInput(it) },
                 onSend = { viewModel.sendMessage() },
             )
-        }
-    }
-}
-
-@Composable
-private fun EmptyState(
-    areaName: String,
-    intentPills: List<ContextualPill>,
-    onPillTap: (ContextualPill) -> Unit,
-) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 40.dp),
-    ) {
-        // Orb graphic
-        Box(
-            modifier = Modifier
-                .size(52.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(IndigoGradient),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("AI", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(16.dp))
-        Text(
-            "Ask me anything about $areaName",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "What are you in the mood for?",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(20.dp))
-        @OptIn(ExperimentalLayoutApi::class)
-        FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            intentPills.forEach { pill ->
-                SuggestionChip(
-                    onClick = { onPillTap(pill) },
-                    label = { Text("${pill.emoji} ${pill.label}", fontSize = 13.sp) },
-                    colors = SuggestionChipDefaults.suggestionChipColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                )
-            }
         }
     }
 }

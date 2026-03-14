@@ -76,7 +76,7 @@ class ChatViewModelTest {
 
         assertTrue(vm.uiState.value.isOpen)
         assertTrue(vm.uiState.value.bubbles.isEmpty())
-        assertEquals(5, vm.uiState.value.intentPills.size)
+        assertEquals(5, vm.uiState.value.persistentPills.size)
 
         // tapIntentPill injects system context and sends opening message
         vm.tapIntentPill(discoverPill())
@@ -233,10 +233,9 @@ class ChatViewModelTest {
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), DynamicVibe(label = "Safety", icon = ""))
 
-        val pills = vm.uiState.value.intentPills
+        val pills = vm.uiState.value.persistentPills
         assertEquals(5, pills.size)
         assertEquals(ChatIntent.TONIGHT, pills[0].intent)
-        assertTrue(vm.uiState.value.followUpChips.isEmpty())
     }
 
     @Test
@@ -728,7 +727,7 @@ Enjoy!"""
         val vm = createViewModel()
         vm.openChat("Test Area", emptyList(), null, entryPoint = ChatEntryPoint.SavesSheet)
 
-        val labels = vm.uiState.value.intentPills.map { it.label }
+        val labels = vm.uiState.value.persistentPills.map { it.label }
         assertTrue(labels.contains("Plan a day trip from my saves"))
     }
 
@@ -810,7 +809,7 @@ Enjoy!"""
 
         val state = vm.uiState.value
         assertTrue(state.bubbles.isEmpty())
-        assertTrue(state.intentPills.isNotEmpty())
+        assertTrue(state.persistentPills.isNotEmpty())
         assertEquals(0, state.depthLevel)
     }
 
