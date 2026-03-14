@@ -100,7 +100,15 @@ fun GeocodingSearchBar(
 
         when {
             spinning -> SpinningState(showCancel, onCancelLoad)
-            selected -> SelectedState(selectedPlace ?: "", onClear)
+            selected -> SelectedState(
+                selectedPlace = selectedPlace ?: "",
+                onClear = onClear,
+                showBatchNav = showBatchNav,
+                batchIndex = batchIndex,
+                batchTotal = batchTotal,
+                onPrevBatch = onPrevBatch,
+                onNextBatch = onNextBatch,
+            )
             active -> ActiveState(
                 query = query,
                 suggestions = suggestions,
@@ -423,7 +431,15 @@ private fun RecentPlaceRow(
 }
 
 @Composable
-private fun SelectedState(selectedPlace: String, onClear: () -> Unit) {
+private fun SelectedState(
+    selectedPlace: String,
+    onClear: () -> Unit,
+    showBatchNav: Boolean = false,
+    batchIndex: Int = 0,
+    batchTotal: Int = 0,
+    onPrevBatch: () -> Unit = {},
+    onNextBatch: () -> Unit = {},
+) {
     Surface(
         shape = RoundedCornerShape(50),
         color = MapFloatingUiDark.copy(alpha = 0.90f),
@@ -451,6 +467,15 @@ private fun SelectedState(selectedPlace: String, onClear: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            if (showBatchNav) {
+                Spacer(Modifier.width(4.dp))
+                InlineBatchNav(
+                    batchIndex = batchIndex,
+                    batchTotal = batchTotal,
+                    onPrevBatch = onPrevBatch,
+                    onNextBatch = onNextBatch,
+                )
+            }
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = Icons.Default.Close,

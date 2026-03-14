@@ -186,9 +186,10 @@ internal class AreaRepositoryImpl(
             aiProvider.streamAreaPortrait(areaName, context).collect { update ->
                 when (update) {
                     is BucketUpdate.VibesReady -> {
-                        // Apply client-side quality gate: drop vibes with fewer than 2 POIs
+                        // Apply client-side quality gate: drop vibes with no matching POIs
+                        val minCount = if (update.pois.size <= 3) 1 else 2
                         val qualityVibes = update.vibes.filter { dv ->
-                            update.pois.count { it.vibe == dv.label } >= 2
+                            update.pois.count { it.vibe == dv.label } >= minCount
                         }
                         emit(BucketUpdate.VibesReady(vibes = qualityVibes, pois = update.pois, fromCache = false))
                         if (update.pois.isNotEmpty()) writePoisToCache(update.pois, areaName, language)
@@ -221,6 +222,10 @@ internal class AreaRepositoryImpl(
                     }
                     is BucketUpdate.DynamicVibeComplete -> {
                         emit(update)
+                    }
+                    is BucketUpdate.BackgroundEnrichmentComplete -> {
+                        val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                        emit(BucketUpdate.BackgroundEnrichmentComplete(enriched, update.batchIndex))
                     }
                     else -> {
                         emit(update)

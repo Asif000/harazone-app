@@ -160,7 +160,8 @@ fun ExpandablePoiCard(
             }
         }
     } else {
-        Column(modifier = rootModifier.verticalScroll(rememberScrollState())) {
+        val scrollModifier = if (fullscreen) rootModifier else rootModifier.verticalScroll(rememberScrollState())
+        Column(modifier = scrollModifier) {
             PoiCardContent(
                 poi = poi,
                 activeVibe = activeVibe,

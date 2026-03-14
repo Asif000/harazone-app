@@ -12,15 +12,12 @@ internal class GeminiPromptBuilder {
     fun buildPinOnlyPrompt(areaName: String): String {
         return """
 Area: "$areaName". Return JSON only, no other text.
-Schema: {"vibes":[{"label":"Street Art","icon":"🎨"},...],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art"},...]}
+Schema: {"vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art"}]}
 Rules:
-- vibes: 4-6 most distinctive dimensions of THIS area. Each vibe must have 3+ real POIs in this list.
-- pois: 3 best POIs — your most curated, confident picks. Each POI "v" field MUST exactly match one of the vibe labels you returned — character-for-character, same case.
-- ONLY return vibes where at least 2 of the 3 POIs will be tagged with that vibe label.
-- t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-- GPS to 4 decimal places. Skip any POI you cannot place accurately.
-Example:
-{"vibes":[{"label":"Street Art","icon":"🎨"},{"label":"Craft Beer","icon":"🍺"}],"pois":[{"n":"Brick Lane Murals","t":"arts","lat":51.5215,"lng":-0.0714,"v":"Street Art"},{"n":"Howling Hops","t":"food","lat":51.5469,"lng":-0.0507,"v":"Craft Beer"}]}
+- vibes: 4-6 most distinctive dimensions of THIS area.
+- pois: 3 best POIs. Each "v" MUST exactly match a vibe label.
+- t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+- GPS to 4 decimal places.
         """.trimIndent()
     }
 
