@@ -550,6 +550,7 @@ private fun ReadyContent(
                             insight = saved.whySpecial,
                             imageUrl = saved.imageUrl,
                             rating = saved.rating,
+                            userNote = saved.userNote,
                         )
                     )
                 },

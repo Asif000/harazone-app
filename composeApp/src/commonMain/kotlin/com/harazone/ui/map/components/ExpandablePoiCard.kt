@@ -312,6 +312,20 @@ private fun PoiCardContent(
                 )
             }
 
+            // User note (from saved places)
+            if (poi.userNote != null) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "\u270F\uFE0F ${poi.userNote}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+
             Spacer(Modifier.height(12.dp))
 
             // Action chips
