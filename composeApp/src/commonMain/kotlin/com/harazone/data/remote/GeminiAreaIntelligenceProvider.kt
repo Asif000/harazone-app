@@ -25,6 +25,7 @@ import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flow
@@ -80,7 +81,7 @@ internal class GeminiAreaIntelligenceProvider(
 
         AppLogger.d { "GeminiAreaIntelligenceProvider: streaming portrait for '$areaName'" }
 
-        data class Stage1Result(val names: List<String>, val vibes: List<DynamicVibe>)
+        data class Stage1Result(val names: List<String>, val vibes: List<DynamicVibe>, val vibeLabels: List<String>)
         val stage1Deferred = CompletableDeferred<Stage1Result>()
 
         // Stage 1 — fast pin call (returns vibes + POIs)
@@ -117,7 +118,7 @@ internal class GeminiAreaIntelligenceProvider(
                     throw result.exceptionOrNull()!!
                 }
                 val (dynamicVibes, pois) = responseParser.parseStage1Response(fullText.toString())
-                stage1Deferred.complete(Stage1Result(pois.map { it.name }, dynamicVibes))
+                stage1Deferred.complete(Stage1Result(pois.map { it.name }, dynamicVibes, dynamicVibes.map { it.label }))
                 if (pois.isNotEmpty()) {
                     if (dynamicVibes.isNotEmpty()) {
                         send(BucketUpdate.VibesReady(vibes = dynamicVibes, pois = pois))
@@ -140,7 +141,7 @@ internal class GeminiAreaIntelligenceProvider(
         // Stage 2 — enrich call (waits for Stage 1 names)
         launch {
             try {
-                val stage1Result = try { stage1Deferred.await() } catch (e: Exception) { Stage1Result(emptyList(), emptyList()) }
+                val stage1Result = try { stage1Deferred.await() } catch (e: Exception) { Stage1Result(emptyList(), emptyList(), emptyList()) }
                 val stage1Names = stage1Result.names
                 val stage1Vibes = stage1Result.vibes
                 val prompt = if (stage1Names.isNotEmpty() && stage1Vibes.isNotEmpty()) {
@@ -207,6 +208,53 @@ internal class GeminiAreaIntelligenceProvider(
             } catch (e: Exception) {
                 AppLogger.e(e) { "Stage 2 failed for '$areaName'" }
                 throw mapToDomainErrorException(e)
+            }
+        }
+
+        // Stage 3 — background batch pipeline (silent, 2 batches of 3 POIs each)
+        launch {
+            try {
+                val stage1Result = stage1Deferred.await()
+                val stage1Names = stage1Result.names
+                val stage1VibeLabels = stage1Result.vibeLabels
+                if (stage1Names.isEmpty() || stage1VibeLabels.isEmpty()) return@launch
+
+                // Batch 1
+                ensureActive()
+                val batch1Pois = streamAndParsePois(
+                    promptBuilder.buildBackgroundBatchPrompt(areaName, stage1Names, stage1VibeLabels)
+                )
+                send(BucketUpdate.BackgroundBatchReady(batch1Pois, batchIndex = 1))
+                if (batch1Pois.isNotEmpty()) {
+                    ensureActive()
+                    val enriched1Prompt = promptBuilder.buildDynamicVibeEnrichmentPrompt(
+                        areaName, stage1VibeLabels, batch1Pois.map { it.name }
+                    )
+                    val (_, enriched1Pois) = streamAndParseEnrichment(enriched1Prompt)
+                    send(BucketUpdate.BackgroundEnrichmentComplete(enriched1Pois, batchIndex = 1))
+                }
+
+                // Batch 2
+                ensureActive()
+                val allExcluded = stage1Names + batch1Pois.map { it.name }
+                val batch2Pois = streamAndParsePois(
+                    promptBuilder.buildBackgroundBatchPrompt(areaName, allExcluded, stage1VibeLabels)
+                )
+                send(BucketUpdate.BackgroundBatchReady(batch2Pois, batchIndex = 2))
+                if (batch2Pois.isNotEmpty()) {
+                    ensureActive()
+                    val enriched2Prompt = promptBuilder.buildDynamicVibeEnrichmentPrompt(
+                        areaName, stage1VibeLabels, batch2Pois.map { it.name }
+                    )
+                    val (_, enriched2Pois) = streamAndParseEnrichment(enriched2Prompt)
+                    send(BucketUpdate.BackgroundEnrichmentComplete(enriched2Pois, batchIndex = 2))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(e) { "Background batch failed silently" }
+            } finally {
+                trySend(BucketUpdate.BackgroundFetchComplete)
             }
         }
     }
@@ -280,6 +328,53 @@ internal class GeminiAreaIntelligenceProvider(
                 else -> mapToDomainErrorException(RuntimeException("Unexpected error", error))
             }
         }
+    }
+
+    private suspend fun streamAndParsePois(prompt: String): List<POI> {
+        val apiKey = apiKeyProvider.geminiApiKey
+        val requestBody = buildRequestBody(prompt)
+        val fullText = StringBuilder()
+        httpClient.sse(
+            urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
+            request = {
+                method = io.ktor.http.HttpMethod.Post
+                parameter("alt", "sse")
+                parameter("key", apiKey)
+                contentType(io.ktor.http.ContentType.Application.Json)
+                setBody(requestBody)
+            }
+        ) {
+            incoming.collect { event ->
+                val data = event.data ?: return@collect
+                val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
+                fullText.append(text)
+            }
+        }
+        val (_, pois) = responseParser.parseStage1Response(fullText.toString())
+        return pois
+    }
+
+    private suspend fun streamAndParseEnrichment(prompt: String): Pair<List<com.harazone.domain.model.DynamicVibeContent>, List<POI>> {
+        val apiKey = apiKeyProvider.geminiApiKey
+        val requestBody = buildRequestBody(prompt)
+        val fullText = StringBuilder()
+        httpClient.sse(
+            urlString = "$BASE_URL/$GEMINI_MODEL:streamGenerateContent",
+            request = {
+                method = io.ktor.http.HttpMethod.Post
+                parameter("alt", "sse")
+                parameter("key", apiKey)
+                contentType(io.ktor.http.ContentType.Application.Json)
+                setBody(requestBody)
+            }
+        ) {
+            incoming.collect { event ->
+                val data = event.data ?: return@collect
+                val text = responseParser.extractTextFromSseEvent(data) ?: return@collect
+                fullText.append(text)
+            }
+        }
+        return responseParser.parseDynamicVibeResponse(fullText.toString())
     }
 
     private fun buildRequestBody(prompt: String): String = json.encodeToString(

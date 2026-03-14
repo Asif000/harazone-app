@@ -44,6 +44,11 @@ sealed class MapUiState {
         val isLoadingVibes: Boolean = false,
         val isOfflineVibes: Boolean = false,
         val showColdStartPicker: Boolean = false,
+        val poiBatches: List<List<POI>> = emptyList(),
+        val allDiscoveredPois: List<POI> = emptyList(),
+        val activeBatchIndex: Int = 0,
+        val isBackgroundFetching: Boolean = false,
+        val showAllMode: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

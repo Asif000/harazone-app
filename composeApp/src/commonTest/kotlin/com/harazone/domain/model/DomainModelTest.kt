@@ -152,6 +152,9 @@ class DomainModelTest {
                 is BucketUpdate.PinsReady -> "pins"
                 is BucketUpdate.VibesReady -> "vibes"
                 is BucketUpdate.DynamicVibeComplete -> "vibe_complete"
+                is BucketUpdate.BackgroundBatchReady -> "bg_batch"
+                is BucketUpdate.BackgroundEnrichmentComplete -> "bg_enrich"
+                BucketUpdate.BackgroundFetchComplete -> "bg_complete"
             }
         }
         assertEquals(listOf("delta", "complete", "portrait", "pins", "vibes"), types)

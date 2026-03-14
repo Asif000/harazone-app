@@ -56,6 +56,7 @@ import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.ui.map.components.AISearchBar
 import com.harazone.ui.map.components.ColdStartPickerOverlay
 import com.harazone.ui.map.components.ExpandablePoiCard
+import com.harazone.ui.map.components.FloatingPoiCard
 import com.harazone.ui.map.components.GeocodingSearchBar
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.ui.map.components.FabMenu
@@ -163,7 +164,7 @@ private fun ReadyContent(
                 longitude = state.longitude,
                 zoomLevel = 14.0,
                 cameraMoveId = state.cameraMoveId,
-                pois = if (state.savedVibeFilter) emptyList() else state.pois,
+                pois = if (state.savedVibeFilter) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
                 activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled on map
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
@@ -198,6 +199,26 @@ private fun ReadyContent(
             )
         }
 
+        // Floating POI card strip (3 compact cards at bottom)
+        if (!state.showListView && !state.showAllMode && state.pois.isNotEmpty() && state.selectedPoi == null) {
+            Row(
+                verticalAlignment = Alignment.Top,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = navBarPadding + 140.dp, start = 8.dp, end = 72.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                state.pois.take(3).forEach { poi ->
+                    FloatingPoiCard(
+                        poi = poi,
+                        isSaved = poi.savedId in state.savedPoiIds,
+                        onTap = { viewModel.selectPoi(poi) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+        }
+
         // Top context bar
         TopContextBar(
             areaName = state.areaName,
@@ -225,6 +246,12 @@ private fun ReadyContent(
             recentPlaces = state.recentPlaces,
             onRecentSelected = { viewModel.onRecentSelected(it) },
             onClearRecents = { viewModel.onClearRecents() },
+            showBatchNav = state.poiBatches.size > 1 && !state.isSearchingArea,
+            batchIndex = if (state.showAllMode) state.poiBatches.size else state.activeBatchIndex,
+            batchTotal = MapViewModel.MAX_BATCH_SLOTS,
+            onPrevBatch = { viewModel.onPrevBatch() },
+            onNextBatch = { viewModel.onNextBatch() },
+            onSearchDeeper = { viewModel.onSearchDeeper() },
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 56.dp)
@@ -253,7 +280,10 @@ private fun ReadyContent(
             )
         }
 
-        // Back button: dismiss POI card > FAB (priority order)
+        // Back button: Show All mode > POI card > FAB (priority order)
+        PlatformBackHandler(enabled = state.showAllMode && state.selectedPoi == null) {
+            viewModel.onPrevBatch()
+        }
         PlatformBackHandler(enabled = state.selectedPoi != null) {
             viewModel.clearPoiSelection()
             if (returnToChat[0]) {
@@ -323,20 +353,25 @@ private fun ReadyContent(
                         }
                     } else {
                         chatViewModel.openChat(
-                            state.areaName, state.pois, state.activeDynamicVibe,
+                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
                             entryPoint = ChatEntryPoint.PoiCard(state.selectedPoi!!),
                         )
                     }
                 },
-                isSaved = state.selectedPoi.savedId in state.savedPoiIds,
-                onSave = { viewModel.savePoi(state.selectedPoi, state.areaName) },
-                onUnsave = { viewModel.unsavePoi(state.selectedPoi) },
+                isSaved = state.selectedPoi?.savedId in state.savedPoiIds,
+                onSave = { state.selectedPoi?.let { viewModel.savePoi(it, state.areaName) } },
+                onUnsave = { state.selectedPoi?.let { viewModel.unsavePoi(it) } },
                 onShareClick = {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar("Sharing coming soon")
                     }
                 },
                 modifier = Modifier.align(Alignment.Center),
+                fullscreen = true,
+                siblingPois = if (state.showAllMode) emptyList() else state.pois.take(3),
+                siblingIndex = state.pois.take(3).indexOfFirst { it.name == state.selectedPoi?.name }.coerceAtLeast(0),
+                onSiblingSelected = { idx -> state.pois.getOrNull(idx)?.let { viewModel.selectPoi(it) } },
+                siblingIsSaved = { p -> p.savedId in state.savedPoiIds },
             )
         }
 
@@ -344,7 +379,7 @@ private fun ReadyContent(
         // Cross-reference current-area POIs against savedPoiIds for accurate nearby count.
         // NOTE: state.savedPois contains ALL saves across all areas; the .count filter IS the area-scoping
         // — do not simplify to savedPoiIds.size (that would count saves from every area ever visited).
-        val savedNearbyCount = state.pois.count { it.savedId in state.savedPoiIds }
+        val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.savedPoiIds }
         AnimatedVisibility(
             visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded,
             enter = fadeIn(),
@@ -426,7 +461,7 @@ private fun ReadyContent(
 
         // AI search bar — tapping opens the ChatOverlay directly
         AISearchBar(
-            onTap = { chatViewModel.openChat(state.areaName, state.pois, state.activeDynamicVibe) },
+            onTap = { chatViewModel.openChat(state.areaName, state.allDiscoveredPois, state.activeDynamicVibe) },
             chatIsOpen = chatState.isOpen,
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -449,7 +484,7 @@ private fun ReadyContent(
                     chatViewModel.closeChat()
                     returnToChat[0] = true
                     // Prefer enriched POI from map (has image, rating, vibe) over chat card
-                    val enriched = state.pois.firstOrNull { it.name.equals(card.name, ignoreCase = true) }
+                    val enriched = state.allDiscoveredPois.firstOrNull { it.name.equals(card.name, ignoreCase = true) }
                     val fallbackPoi = POI(
                         name = card.name,
                         type = card.type,
@@ -483,12 +518,12 @@ private fun ReadyContent(
                     viewModel.closeSavesSheet()
                     if (poi != null) {
                         chatViewModel.openChat(
-                            state.areaName, state.pois, state.activeDynamicVibe,
+                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
                             entryPoint = ChatEntryPoint.SavedCard(poi.name),
                         )
                     } else {
                         chatViewModel.openChat(
-                            state.areaName, state.pois, state.activeDynamicVibe,
+                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
                             entryPoint = ChatEntryPoint.SavesSheet,
                         )
                     }

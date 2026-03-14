@@ -2,6 +2,8 @@ package com.harazone.ui.map.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,6 +17,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
@@ -26,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -68,6 +73,12 @@ fun GeocodingSearchBar(
     recentPlaces: List<RecentPlace> = emptyList(),
     onRecentSelected: (RecentPlace) -> Unit = {},
     onClearRecents: () -> Unit = {},
+    showBatchNav: Boolean = false,
+    batchIndex: Int = 0,
+    batchTotal: Int = 0,
+    onPrevBatch: () -> Unit = {},
+    onNextBatch: () -> Unit = {},
+    onSearchDeeper: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val spinning = isSearchingArea
@@ -120,13 +131,29 @@ fun GeocodingSearchBar(
                 requestFocus = isFieldFocused && query.isBlank() && suggestions.isEmpty(),
                 onFocusChanged = { isFieldFocused = it },
             )
-            else -> IdleState(onTap = { isFieldFocused = true })
+            else -> IdleState(
+                onTap = { isFieldFocused = true },
+                showBatchNav = showBatchNav,
+                batchIndex = batchIndex,
+                batchTotal = batchTotal,
+                onPrevBatch = onPrevBatch,
+                onNextBatch = onNextBatch,
+                onSearchDeeper = onSearchDeeper,
+            )
         }
     }
 }
 
 @Composable
-private fun IdleState(onTap: () -> Unit) {
+private fun IdleState(
+    onTap: () -> Unit,
+    showBatchNav: Boolean = false,
+    batchIndex: Int = 0,
+    batchTotal: Int = 0,
+    onPrevBatch: () -> Unit = {},
+    onNextBatch: () -> Unit = {},
+    onSearchDeeper: () -> Unit = {},
+) {
     Surface(
         shape = RoundedCornerShape(50),
         color = MapFloatingUiDark.copy(alpha = 0.90f),
@@ -150,7 +177,16 @@ private fun IdleState(onTap: () -> Unit) {
                 text = "Search a place or refresh area",
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.5f),
+                modifier = Modifier.weight(1f),
             )
+            if (showBatchNav) {
+                InlineBatchNav(
+                    batchIndex = batchIndex,
+                    batchTotal = batchTotal,
+                    onPrevBatch = onPrevBatch,
+                    onNextBatch = onNextBatch,
+                )
+            }
         }
     }
 }
@@ -425,6 +461,49 @@ private fun SelectedState(selectedPlace: String, onClear: () -> Unit) {
                     .clickable { onClear() },
             )
         }
+    }
+}
+
+@Composable
+private fun InlineBatchNav(
+    batchIndex: Int,
+    batchTotal: Int,
+    onPrevBatch: () -> Unit,
+    onNextBatch: () -> Unit,
+) {
+    val isFirstSlot = batchIndex == 0
+    val isLastSlot = batchIndex == batchTotal - 1
+    val label = if (isLastSlot) "All" else "${batchIndex + 1}/$batchTotal"
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
+            .padding(horizontal = 2.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Default.ChevronLeft,
+            contentDescription = "Previous batch",
+            tint = if (isFirstSlot) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.8f),
+            modifier = Modifier
+                .size(24.dp)
+                .clickable(enabled = !isFirstSlot) { onPrevBatch() },
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = Color.White.copy(alpha = 0.9f),
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 3.dp),
+        )
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = "Next batch",
+            tint = if (isLastSlot) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.8f),
+            modifier = Modifier
+                .size(24.dp)
+                .clickable(enabled = !isLastSlot) { onNextBatch() },
+        )
     }
 }
 

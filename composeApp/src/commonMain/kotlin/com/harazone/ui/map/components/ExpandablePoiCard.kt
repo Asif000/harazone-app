@@ -15,11 +15,14 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -40,10 +43,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.Vibe
+import kotlinx.coroutines.flow.drop
 import com.harazone.ui.theme.MapSurfaceDark
 import com.harazone.ui.theme.toColor
 
@@ -73,18 +79,124 @@ fun ExpandablePoiCard(
     onUnsave: () -> Unit,
     onShareClick: () -> Unit,
     modifier: Modifier = Modifier,
+    fullscreen: Boolean = false,
+    siblingPois: List<POI> = emptyList(),
+    siblingIndex: Int = 0,
+    onSiblingSelected: (Int) -> Unit = {},
+    siblingIsSaved: (POI) -> Boolean = { false },
 ) {
     var expanded by remember { mutableStateOf(false) }
     val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
     val vibeColor = (activeVibe ?: poiVibe ?: Vibe.DEFAULT).toColor()
+    val hasSiblings = siblingPois.size > 1
 
-    Column(
-        modifier = modifier
+    val rootModifier = if (fullscreen) {
+        modifier
+            .fillMaxWidth(0.92f)
+            .fillMaxHeight(0.80f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(MapSurfaceDark.copy(alpha = 0.97f))
+            .border(1.dp, vibeColor.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+    } else {
+        modifier
             .fillMaxWidth(0.9f)
             .clip(RoundedCornerShape(16.dp))
             .background(MapSurfaceDark.copy(alpha = 0.97f))
             .border(1.dp, vibeColor.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
-            .verticalScroll(rememberScrollState()),
+    }
+
+    if (hasSiblings) {
+        val pagerState = rememberPagerState(
+            initialPage = siblingIndex.coerceIn(0, siblingPois.size - 1),
+            pageCount = { siblingPois.size },
+        )
+        LaunchedEffect(pagerState) {
+            snapshotFlow { pagerState.currentPage }
+                .drop(1)
+                .collect { page -> onSiblingSelected(page) }
+        }
+
+        Column(modifier = rootModifier) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f),
+            ) { page ->
+                val pagePoi = siblingPois[page]
+                var pageExpanded by remember { mutableStateOf(false) }
+                PoiCardContent(
+                    poi = pagePoi,
+                    activeVibe = activeVibe,
+                    vibeColor = vibeColor,
+                    onDismiss = onDismiss,
+                    onDirectionsClick = onDirectionsClick,
+                    onAskAiClick = onAskAiClick,
+                    isSaved = siblingIsSaved(pagePoi),
+                    onSave = onSave,
+                    onUnsave = onUnsave,
+                    onShareClick = onShareClick,
+                    expanded = pageExpanded,
+                    onExpandToggle = { pageExpanded = !pageExpanded },
+                )
+            }
+            // Dot indicators
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+            ) {
+                repeat(siblingPois.size) { idx ->
+                    Box(
+                        modifier = Modifier
+                            .padding(horizontal = 3.dp)
+                            .size(5.dp)
+                            .background(
+                                if (idx == pagerState.currentPage) Color.White
+                                else Color.White.copy(alpha = 0.3f),
+                                CircleShape,
+                            ),
+                    )
+                }
+            }
+        }
+    } else {
+        Column(modifier = rootModifier.verticalScroll(rememberScrollState())) {
+            PoiCardContent(
+                poi = poi,
+                activeVibe = activeVibe,
+                vibeColor = vibeColor,
+                onDismiss = onDismiss,
+                onDirectionsClick = onDirectionsClick,
+                onAskAiClick = onAskAiClick,
+                isSaved = isSaved,
+                onSave = onSave,
+                onUnsave = onUnsave,
+                onShareClick = onShareClick,
+                expanded = expanded,
+                onExpandToggle = { expanded = !expanded },
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PoiCardContent(
+    poi: POI,
+    activeVibe: Vibe?,
+    vibeColor: Color,
+    onDismiss: () -> Unit,
+    onDirectionsClick: (Double, Double, String) -> Unit,
+    onAskAiClick: () -> Unit,
+    isSaved: Boolean,
+    onSave: () -> Unit,
+    onUnsave: () -> Unit,
+    onShareClick: () -> Unit,
+    expanded: Boolean,
+    onExpandToggle: () -> Unit,
+) {
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState()),
     ) {
         Box(
             modifier = Modifier
@@ -314,7 +426,7 @@ fun ExpandablePoiCard(
                 }
             }
 
-            TextButton(onClick = { expanded = !expanded }) {
+            TextButton(onClick = onExpandToggle) {
                 Text(
                     if (expanded) "Less" else "More details",
                     color = vibeColor,

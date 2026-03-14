@@ -34,6 +34,9 @@ class MockAreaIntelligenceProviderTest {
                     is BucketUpdate.PinsReady -> {}
                     is BucketUpdate.VibesReady -> {}
                     is BucketUpdate.DynamicVibeComplete -> {}
+                    is BucketUpdate.BackgroundBatchReady -> {}
+                    is BucketUpdate.BackgroundEnrichmentComplete -> {}
+                    BucketUpdate.BackgroundFetchComplete -> {}
                 }
             }
             assertEquals(BucketType.entries.toSet(), emittedBucketTypes)
@@ -86,6 +89,9 @@ class MockAreaIntelligenceProviderTest {
                     is BucketUpdate.PinsReady -> {}
                     is BucketUpdate.VibesReady -> {}
                     is BucketUpdate.DynamicVibeComplete -> {}
+                    is BucketUpdate.BackgroundBatchReady -> {}
+                    is BucketUpdate.BackgroundEnrichmentComplete -> {}
+                    BucketUpdate.BackgroundFetchComplete -> {}
                 }
             }
             assertEquals(

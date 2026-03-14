@@ -65,6 +65,7 @@ class MapViewModel(
         cameraIdleJob = null
         geocodingJob?.cancel()
         geocodingJob = null
+        poiBatchesCache.clear()
     }
 
     private var pendingLat: Double = 0.0
@@ -80,6 +81,7 @@ class MapViewModel(
     var pinnedVibeLabels: List<String> = emptyList()
         private set
     private var pendingColdStart = false
+    private val poiBatchesCache: MutableList<List<POI>> = mutableListOf()
 
     // Cache for GPS home area — avoids re-querying Gemini on return-to-location
     private var gpsAreaNameCache: String? = null
@@ -172,9 +174,17 @@ class MapViewModel(
     fun switchDynamicVibe(vibe: DynamicVibe) {
         val current = _uiState.value as? MapUiState.Ready ?: return
         val newVibe = if (current.activeDynamicVibe?.label == vibe.label) null else vibe
+        val visiblePois = if (current.showAllMode) {
+            computeVisiblePois(current.allDiscoveredPois, newVibe)
+        } else if (poiBatchesCache.isNotEmpty()) {
+            computeVisiblePois(poiBatchesCache.getOrElse(current.activeBatchIndex) { emptyList() }, newVibe)
+        } else {
+            computeVisiblePois(current.pois, newVibe)
+        }
         _uiState.value = current.copy(
             activeDynamicVibe = newVibe,
             savedVibeFilter = false,
+            pois = visiblePois,
         )
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.label ?: "all")))
     }
@@ -975,6 +985,78 @@ class MapViewModel(
         _uiState.value = current.copy(showColdStartPicker = false)
     }
 
+    fun onNextBatch() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        if (current.showAllMode) return
+        val nextIndex = current.activeBatchIndex + 1
+        if (nextIndex < poiBatchesCache.size) {
+            val visible = computeVisiblePois(poiBatchesCache[nextIndex], current.activeDynamicVibe)
+            _uiState.value = current.copy(
+                activeBatchIndex = nextIndex,
+                pois = visible,
+                selectedPoi = null,
+            )
+        } else {
+            // Enter Show All mode
+            val allPois = if (current.activeDynamicVibe != null) {
+                computeVisiblePois(current.allDiscoveredPois, current.activeDynamicVibe)
+            } else {
+                current.allDiscoveredPois
+            }
+            _uiState.value = current.copy(
+                showAllMode = true,
+                pois = allPois,
+                selectedPoi = null,
+            )
+        }
+    }
+
+    fun onPrevBatch() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        if (current.showAllMode) {
+            val lastIdx = poiBatchesCache.size - 1
+            val visible = computeVisiblePois(poiBatchesCache.getOrElse(lastIdx) { emptyList() }, current.activeDynamicVibe)
+            _uiState.value = current.copy(
+                showAllMode = false,
+                activeBatchIndex = lastIdx.coerceAtLeast(0),
+                pois = visible,
+                selectedPoi = null,
+            )
+        } else if (current.activeBatchIndex > 0) {
+            val newIndex = current.activeBatchIndex - 1
+            val visible = computeVisiblePois(poiBatchesCache[newIndex], current.activeDynamicVibe)
+            _uiState.value = current.copy(
+                activeBatchIndex = newIndex,
+                pois = visible,
+                selectedPoi = null,
+            )
+        }
+    }
+
+    fun onSearchDeeper() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(
+            activeBatchIndex = 0,
+            showAllMode = false,
+            isBackgroundFetching = false,
+            poiBatches = emptyList(),
+            allDiscoveredPois = emptyList(),
+            pois = emptyList(),
+        )
+        poiBatchesCache.clear()
+        retryAreaFetch()
+    }
+
+    private fun computeVisiblePois(batch: List<POI>, activeVibe: DynamicVibe?): List<POI> {
+        if (activeVibe == null) return batch
+        val label = activeVibe.label
+        return batch.filter { poi ->
+            poi.vibes.any { it.equals(label, ignoreCase = true) } ||
+                poi.vibe.equals(label, ignoreCase = true) ||
+                poi.vibe.split(",").any { it.trim().equals(label, ignoreCase = true) }
+        }
+    }
+
     fun retryAreaFetch() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         onGeocodingSubmitEmpty()
@@ -990,6 +1072,7 @@ class MapViewModel(
             var pois = emptyList<POI>()
             var stage1Pois = emptyList<POI>()
             var fetchFailed = false
+            var stage2Complete = false
             getAreaPortrait(areaName, context)
                 .catch { e ->
                     AppLogger.e(e) { "Portrait fetch failed for '$areaName'" }
@@ -1007,6 +1090,8 @@ class MapViewModel(
                             currentDynamicVibes = update.vibes
                             val chipRow = buildChipRowVibes(update.vibes, areaName)
                             val counts = computeDynamicVibePoiCounts(update.pois, chipRow)
+                            poiBatchesCache.clear()
+                            poiBatchesCache.add(update.pois)
                             _uiState.value = s.copy(
                                 pois = update.pois,
                                 dynamicVibes = chipRow,
@@ -1016,16 +1101,28 @@ class MapViewModel(
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
                                 showColdStartPicker = if (pendingColdStart) { pendingColdStart = false; true } else s.showColdStartPicker,
+                                poiBatches = listOf(update.pois),
+                                allDiscoveredPois = update.pois,
+                                activeBatchIndex = 0,
+                                isBackgroundFetching = true,
+                                showAllMode = false,
                             )
                         }
                         is BucketUpdate.PinsReady -> {
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect
                             stage1Pois = update.pois
+                            poiBatchesCache.clear()
+                            poiBatchesCache.add(update.pois)
                             _uiState.value = s.copy(
                                 pois = update.pois,
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
                                 isLoadingVibes = false,
+                                poiBatches = listOf(update.pois),
+                                allDiscoveredPois = update.pois,
+                                activeBatchIndex = 0,
+                                isBackgroundFetching = true,
+                                showAllMode = false,
                             )
                         }
                         is BucketUpdate.DynamicVibeComplete -> {
@@ -1056,6 +1153,63 @@ class MapViewModel(
                                     _uiState.value = s2.copy(selectedPoi = updatedSelected)
                                 }
                             }
+                            // Fire onComplete immediately — don't wait for background batches
+                            if (!stage2Complete) {
+                                stage2Complete = true
+                                onComplete(pois.ifEmpty { stage1Pois }, areaName)
+                            }
+                        }
+                        is BucketUpdate.BackgroundBatchReady -> {
+                            if (update.pois.isEmpty()) return@collect
+                            // Pad cache to correct index if a prior batch was empty/skipped
+                            while (poiBatchesCache.size < update.batchIndex) {
+                                poiBatchesCache.add(emptyList())
+                            }
+                            if (update.batchIndex < poiBatchesCache.size) {
+                                poiBatchesCache[update.batchIndex] = update.pois
+                            } else {
+                                poiBatchesCache.add(update.pois)
+                            }
+                            val allPois = poiBatchesCache.flatten()
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                            _uiState.value = s.copy(
+                                poiBatches = poiBatchesCache.toList(),
+                                allDiscoveredPois = allPois,
+                                dynamicVibePoiCounts = computeDynamicVibePoiCounts(allPois),
+                            )
+                        }
+                        is BucketUpdate.BackgroundEnrichmentComplete -> {
+                            if (update.batchIndex < 1 || update.batchIndex >= poiBatchesCache.size) return@collect
+                            val existingBatch = poiBatchesCache[update.batchIndex]
+                            val enrichMap = update.pois.associateBy { it.name.trim().lowercase() }
+                            val merged = existingBatch.map { existing ->
+                                val enriched = enrichMap[existing.name.trim().lowercase()]
+                                if (enriched != null) existing.copy(
+                                    vibe = enriched.vibe.ifEmpty { existing.vibe },
+                                    vibes = enriched.vibes.ifEmpty { existing.vibes },
+                                    insight = enriched.insight.ifEmpty { existing.insight },
+                                    rating = enriched.rating ?: existing.rating,
+                                    hours = enriched.hours ?: existing.hours,
+                                    liveStatus = enriched.liveStatus ?: existing.liveStatus,
+                                    imageUrl = enriched.imageUrl ?: existing.imageUrl,
+                                    wikiSlug = enriched.wikiSlug ?: existing.wikiSlug,
+                                ) else existing
+                            }
+                            poiBatchesCache[update.batchIndex] = merged
+                            val allPois = poiBatchesCache.flatten()
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                            _uiState.value = s.copy(
+                                poiBatches = poiBatchesCache.toList(),
+                                allDiscoveredPois = allPois,
+                                dynamicVibePoiCounts = computeDynamicVibePoiCounts(allPois),
+                            )
+                        }
+                        is BucketUpdate.BackgroundFetchComplete -> {
+                            val s = _uiState.value as? MapUiState.Ready ?: return@collect
+                            // Only clear if we still have batches (guards against stale event after onSearchDeeper)
+                            if (s.poiBatches.isNotEmpty()) {
+                                _uiState.value = s.copy(isBackgroundFetching = false)
+                            }
                         }
                         else -> { /* ContentDelta, BucketComplete, ContentAvailabilityNote — ignored */ }
                     }
@@ -1063,7 +1217,7 @@ class MapViewModel(
             if (fetchFailed) return
             // If Stage 1 already delivered pins, treat as success even if Stage 2 enrichment was empty
             if (pois.isNotEmpty() || stage1Pois.isNotEmpty()) {
-                onComplete(pois.ifEmpty { stage1Pois }, areaName)
+                if (!stage2Complete) onComplete(pois.ifEmpty { stage1Pois }, areaName)
                 return
             }
             // Retry with broader query only if both stages produced nothing
@@ -1144,6 +1298,7 @@ class MapViewModel(
     }
 
     companion object {
+        internal const val MAX_BATCH_SLOTS = 4 // 3 POI batches + 1 Show All slot
         private const val WEATHER_STALE_MS = 5 * 60 * 1000L // 5 minutes
         private const val GPS_CACHE_STALE_MS = 30 * 60 * 1000L // 30 minutes
         // TODO(BACKLOG-LOW): Generic location error message — detect permission denial vs GPS off and show specific guidance

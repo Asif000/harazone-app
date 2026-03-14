@@ -15,12 +15,27 @@ Area: "$areaName". Return JSON only, no other text.
 Schema: {"vibes":[{"label":"Street Art","icon":"🎨"},...],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art"},...]}
 Rules:
 - vibes: 4-6 most distinctive dimensions of THIS area. Each vibe must have 3+ real POIs in this list.
-- pois: 8 best POIs. Each POI "v" field MUST exactly match one of the vibe labels you returned — character-for-character, same case.
-- ONLY return vibes where at least 3 of the 8 POIs will be tagged with that vibe label.
+- pois: 3 best POIs — your most curated, confident picks. Each POI "v" field MUST exactly match one of the vibe labels you returned — character-for-character, same case.
+- ONLY return vibes where at least 2 of the 3 POIs will be tagged with that vibe label.
 - t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 - GPS to 4 decimal places. Skip any POI you cannot place accurately.
 Example:
 {"vibes":[{"label":"Street Art","icon":"🎨"},{"label":"Craft Beer","icon":"🍺"}],"pois":[{"n":"Brick Lane Murals","t":"arts","lat":51.5215,"lng":-0.0714,"v":"Street Art"},{"n":"Howling Hops","t":"food","lat":51.5469,"lng":-0.0507,"v":"Craft Beer"}]}
+        """.trimIndent()
+    }
+
+    fun buildBackgroundBatchPrompt(areaName: String, excludeNames: List<String>, vibeLabels: List<String>): String {
+        val vibeList = vibeLabels.joinToString(", ")
+        val excludeList = excludeNames.joinToString(", ")
+        return """
+Area: "$areaName". Return JSON only, no other text.
+Schema: {"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Vibe Label"},...]}
+Rules:
+- pois: 3 best POIs that are DIFFERENT from the ones already found.
+- Do NOT include any of these places: $excludeList
+- Each POI "v" field MUST exactly match one of these vibe labels — character-for-character, same case: $vibeList
+- t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+- GPS to 4 decimal places. Skip any POI you cannot place accurately.
         """.trimIndent()
     }
 

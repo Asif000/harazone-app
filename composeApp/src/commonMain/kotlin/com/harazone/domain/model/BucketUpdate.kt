@@ -31,4 +31,16 @@ sealed class BucketUpdate {
     data class DynamicVibeComplete(
         val content: DynamicVibeContent,
     ) : BucketUpdate()
+
+    data class BackgroundBatchReady(
+        val pois: List<POI>,
+        val batchIndex: Int,
+    ) : BucketUpdate()
+
+    data class BackgroundEnrichmentComplete(
+        val pois: List<POI>,
+        val batchIndex: Int,
+    ) : BucketUpdate()
+
+    data object BackgroundFetchComplete : BucketUpdate()
 }

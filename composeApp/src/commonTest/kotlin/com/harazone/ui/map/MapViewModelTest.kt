@@ -444,8 +444,8 @@ class MapViewModelTest {
         // Filter to CHARACTER — should include Place A (has "character,whats_on")
         viewModel.switchDynamicVibe(DynamicVibe(label = "CHARACTER", icon = ""))
         assertEquals("CHARACTER", (viewModel.uiState.value as MapUiState.Ready).activeDynamicVibe?.label)
-        // POIs list stays the same — filtering happens in MapComposable/POIListView
-        assertEquals(2, (viewModel.uiState.value as MapUiState.Ready).pois.size)
+        // POIs list filtered — Place A matches "CHARACTER" via comma-separated vibe field
+        assertEquals(1, (viewModel.uiState.value as MapUiState.Ready).pois.size)
     }
 
     @Test
@@ -1940,6 +1940,250 @@ class MapViewModelTest {
         val afterSwitch = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertFalse(afterSwitch.savedVibeFilter)
         assertEquals("CHARACTER", afterSwitch.activeDynamicVibe?.label)
+    }
+
+    // --- Batch Pipeline Tests ---
+
+    private val batchVibes = listOf(
+        DynamicVibe(label = "Nightlife", icon = "🌙"),
+        DynamicVibe(label = "History", icon = "📜"),
+    )
+
+    private fun makePoi(name: String, vibe: String = "Nightlife", vibes: List<String> = listOf(vibe)) = POI(
+        name = name, type = "food", description = "desc", confidence = Confidence.HIGH,
+        latitude = 1.0, longitude = 2.0, vibe = vibe, vibes = vibes,
+    )
+
+    private val batch0Pois = listOf(makePoi("A"), makePoi("B"), makePoi("C", "History", listOf("History")))
+    private val batch1Pois = listOf(makePoi("D"), makePoi("E"), makePoi("F"))
+    private val batch2Pois = listOf(makePoi("G"), makePoi("H"), makePoi("I"))
+
+    @Test
+    fun backgroundFetchSetsIsBackgroundFetching() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundBatchReady(batch1Pois, 1),
+                    BucketUpdate.BackgroundBatchReady(batch2Pois, 2),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.isBackgroundFetching)
+        assertEquals(3, state.poiBatches.size)
+    }
+
+    @Test
+    fun batchNavForwardEntersShowAllAtEnd() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundBatchReady(batch1Pois, 1),
+                    BucketUpdate.BackgroundBatchReady(batch2Pois, 2),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        viewModel.onNextBatch()
+        viewModel.onNextBatch()
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(2, state2.activeBatchIndex)
+        viewModel.onNextBatch()
+        val state3 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state3.showAllMode)
+        assertEquals(9, state3.pois.size)
+    }
+
+    @Test
+    fun vibeFilterComputedClientSideFromCurrentBatch() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        viewModel.switchDynamicVibe(DynamicVibe(label = "Nightlife", icon = "🌙"))
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(2, state.pois.size)
+    }
+
+    @Test
+    fun savedPinsPersistedAcrossBatchNavigation() = runTest(testDispatcher) {
+        val savedRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundBatchReady(batch1Pois, 1),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+            savedPoiRepository = savedRepo,
+        )
+        viewModel.savePoi(batch0Pois[0], "Manhattan, New York")
+        val savedId = batch0Pois[0].savedId
+        viewModel.onNextBatch()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(savedId in state.savedPoiIds)
+    }
+
+    @Test
+    fun backgroundFetchCompleteAlwaysClearsFlag() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(state.isBackgroundFetching)
+    }
+
+    @Test
+    fun onSearchDeeperResetsAllBatchState() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundBatchReady(batch1Pois, 1),
+                    BucketUpdate.BackgroundBatchReady(batch2Pois, 2),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        viewModel.onNextBatch()
+        viewModel.onNextBatch()
+        viewModel.onSearchDeeper()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(0, state.activeBatchIndex)
+        assertFalse(state.showAllMode)
+        assertFalse(state.isBackgroundFetching)
+    }
+
+    @Test
+    fun backgroundEnrichmentMergesIntoCorrectBatch() = runTest(testDispatcher) {
+        val enrichedD = makePoi("D").copy(rating = 4.8f)
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundBatchReady(batch1Pois, 1),
+                    BucketUpdate.BackgroundEnrichmentComplete(listOf(enrichedD), 1),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val dPoi = state.poiBatches[1].first { it.name == "D" }
+        assertEquals(4.8f, dPoi.rating)
+        assertNull(state.poiBatches[0].first { it.name == "A" }.rating)
+    }
+
+    @Test
+    fun emptyBackgroundBatchIsSkipped() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundBatchReady(emptyList(), 1),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, state.poiBatches.size)
+    }
+
+    @Test
+    fun onNextBatchWritesPoisToState() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.BackgroundBatchReady(batch1Pois, 1),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        viewModel.onNextBatch()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, state.activeBatchIndex)
+        assertEquals(batch1Pois.map { it.name }, state.pois.map { it.name })
+    }
+
+    @Test
+    fun vibeFilterEmptyBatchDoesNotAutoAdvance() = runTest(testDispatcher) {
+        val historyBatch = listOf(
+            makePoi("X", "History", listOf("History")),
+            makePoi("Y", "History", listOf("History")),
+            makePoi("Z", "History", listOf("History")),
+        )
+        val nightlifeBatch = listOf(
+            makePoi("P", "Nightlife", listOf("Nightlife")),
+            makePoi("Q", "Nightlife", listOf("Nightlife")),
+            makePoi("R", "Nightlife", listOf("Nightlife")),
+        )
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, historyBatch),
+                    BucketUpdate.BackgroundBatchReady(nightlifeBatch, 1),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        viewModel.switchDynamicVibe(DynamicVibe(label = "Nightlife", icon = "🌙"))
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.pois.isEmpty())
+        assertEquals(0, state.activeBatchIndex)
     }
 }
 
