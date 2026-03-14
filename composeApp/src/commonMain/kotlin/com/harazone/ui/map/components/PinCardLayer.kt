@@ -75,8 +75,8 @@ fun PinCardLayer(
             if (heroPinOffset != null) {
                 val heroCardX = (heroPinOffset.x - heroPx / 2f).coerceAtLeast(8f)
                 val pinY = heroPinOffset.y
-                val isAbove = pinY > screenHeightPx * 0.25f
-                val heroCardY = if (isAbove) {
+                val shouldPlaceCardAbove = pinY > screenHeightPx * 0.25f
+                val heroCardY = if (shouldPlaceCardAbove) {
                     (pinY - heroHeightPx - chipGapPx).coerceAtLeast(0f)
                 } else {
                     pinY + pinHeightPx + chipGapPx
@@ -88,7 +88,7 @@ fun PinCardLayer(
                 val pinAnchorX = heroPinOffset.x
                 val pinAnchorY: Float
                 val ctrlY: Float
-                if (isAbove) {
+                if (shouldPlaceCardAbove) {
                     // Card is above pin: line from card bottom-center down to pin top
                     cardAnchorY = heroCardY + heroHeightPx
                     pinAnchorY  = pinY
