@@ -3,8 +3,8 @@ package com.harazone.ui.map
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
-import com.harazone.domain.model.Vibe
 import com.harazone.ui.theme.AreaDiscoveryTheme
 
 @Preview(showBackground = true)
@@ -17,16 +17,24 @@ private fun POIListViewPreview() {
                 POI("Lakeside Nature Reserve", "nature", "Trails through ancient woodland", Confidence.MEDIUM, 40.7829, -73.9654, vibe = "character"),
                 POI("Family-Run Bakery", "food", "Three generations of sourdough", Confidence.LOW, 40.7306, -73.9866, vibe = "cost"),
             ),
-            activeVibe = null,
-            onVibeSelected = {},
+            dynamicVibes = listOf(
+                DynamicVibe("Cafes", "\u2615", emptyList()),
+                DynamicVibe("Landmarks", "\ud83c\udfdb\ufe0f", emptyList()),
+            ),
+            activeDynamicVibe = null,
+            onDynamicVibeSelected = {},
             onPoiClick = {},
+            onSaveTapped = {},
+            onUnsaveTapped = {},
+            onNavigateTapped = {},
+            onChatTapped = {},
         )
     }
 }
 
 @Preview(showBackground = true)
 @Composable
-private fun POIListViewWithThumbnailPreview() {
+private fun POIListViewWithImagePreview() {
     AreaDiscoveryTheme {
         POIListView(
             pois = listOf(
@@ -48,9 +56,14 @@ private fun POIListViewWithThumbnailPreview() {
                     imageUrl = "https://picsum.photos/201",
                 ),
             ),
-            activeVibe = null,
-            onVibeSelected = {},
+            dynamicVibes = emptyList(),
+            activeDynamicVibe = null,
+            onDynamicVibeSelected = {},
             onPoiClick = {},
+            onSaveTapped = {},
+            onUnsaveTapped = {},
+            onNavigateTapped = {},
+            onChatTapped = {},
         )
     }
 }
@@ -61,9 +74,14 @@ private fun POIListViewEmptyPreview() {
     AreaDiscoveryTheme {
         POIListView(
             pois = emptyList(),
-            activeVibe = null,
-            onVibeSelected = {},
+            dynamicVibes = emptyList(),
+            activeDynamicVibe = null,
+            onDynamicVibeSelected = {},
             onPoiClick = {},
+            onSaveTapped = {},
+            onUnsaveTapped = {},
+            onNavigateTapped = {},
+            onChatTapped = {},
         )
     }
 }

@@ -12,99 +12,105 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.filled.Bookmark
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import coil3.compose.LocalPlatformContext
-import coil3.compose.SubcomposeAsyncImage
-import coil3.request.ImageRequest
-import coil3.size.Size
-import kotlin.math.roundToInt
+import coil3.compose.AsyncImage
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
-import com.harazone.domain.model.Vibe
-import com.harazone.ui.theme.MapSurfaceDark
+import com.harazone.ui.theme.MapFloatingUiDark
 import com.harazone.ui.theme.spacing
-import com.harazone.ui.theme.toColor
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
+
+private val CardScrimGradient = Brush.verticalGradient(
+    listOf(Color.Black.copy(0.1f), Color.Black.copy(0.75f))
+)
 
 @Composable
 fun POIListView(
     pois: List<POI>,
-    activeVibe: Vibe?,
-    onVibeSelected: (Vibe) -> Unit,
+    dynamicVibes: List<DynamicVibe>,
+    activeDynamicVibe: DynamicVibe?,
+    onDynamicVibeSelected: (DynamicVibe) -> Unit,
     onPoiClick: (POI) -> Unit,
+    onSaveTapped: (POI) -> Unit,
+    onUnsaveTapped: (POI) -> Unit,
+    onNavigateTapped: (POI) -> Unit,
+    onChatTapped: (POI) -> Unit,
     modifier: Modifier = Modifier,
     savedPoiIds: Set<String> = emptySet(),
 ) {
-    val filteredPois = if (activeVibe != null) {
-        pois.filter { it.vibe.contains(activeVibe.name, ignoreCase = true) }
-    } else {
-        pois
-    }
-
     Column(modifier = modifier) {
-        // Vibe chip strip
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
-        ) {
-            items(Vibe.entries.toList()) { vibe ->
-                FilterChip(
-                    selected = vibe == activeVibe,
-                    onClick = { onVibeSelected(vibe) },
-                    label = { Text(vibe.displayName) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = vibe.toColor().copy(alpha = 0.8f),
-                        selectedLabelColor = Color.White,
-                    ),
-                )
+        // Dynamic vibe chip strip
+        if (dynamicVibes.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = MaterialTheme.spacing.md, vertical = MaterialTheme.spacing.sm),
+            ) {
+                items(dynamicVibes, key = { it.label }) { vibe ->
+                    FilterChip(
+                        selected = vibe.label == activeDynamicVibe?.label,
+                        onClick = { onDynamicVibeSelected(vibe) },
+                        label = { Text("${vibe.icon} ${vibe.label}") },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                            selectedLabelColor = Color.White,
+                        ),
+                    )
+                }
             }
         }
 
-        if (filteredPois.isEmpty()) {
+        if (pois.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = stringResource(Res.string.poi_list_empty),
+                    text = if (activeDynamicVibe != null)
+                        stringResource(Res.string.poi_list_empty_vibe, activeDynamicVibe.label)
+                    else
+                        stringResource(Res.string.poi_list_empty),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
-                items(filteredPois, key = { "${it.name}_${it.type}" }) { poi ->
+                items(pois, key = { it.savedId }) { poi ->
+                    val isSaved = poi.savedId in savedPoiIds
                     PoiListCard(
                         poi = poi,
+                        isSaved = isSaved,
                         onClick = { onPoiClick(poi) },
-                        isSaved = poi.savedId in savedPoiIds,
+                        onSaveToggled = { if (isSaved) onUnsaveTapped(poi) else onSaveTapped(poi) },
+                        onNavigateTapped = { onNavigateTapped(poi) },
+                        onChatTapped = { onChatTapped(poi) },
                     )
                 }
                 item { Spacer(Modifier.height(MaterialTheme.spacing.sm)) }
@@ -114,123 +120,140 @@ fun POIListView(
 }
 
 @Composable
-private fun PoiListCard(poi: POI, onClick: () -> Unit, isSaved: Boolean = false) {
-    Card(
+private fun PoiListCard(
+    poi: POI,
+    isSaved: Boolean,
+    onClick: () -> Unit,
+    onSaveToggled: () -> Unit,
+    onNavigateTapped: () -> Unit,
+    onChatTapped: () -> Unit,
+) {
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 4.dp)
+            .height(120.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(MapFloatingUiDark)
             .clickable(onClick = onClick)
-            .semantics(mergeDescendants = true) {
-                contentDescription = "${poi.name}, ${poi.type}"
-            },
-        colors = CardDefaults.cardColors(containerColor = MapSurfaceDark),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        border = if (isSaved) BorderStroke(3.dp, Color(0xFFFFD700)) else null,
+            .semantics { contentDescription = "${poi.name}, ${poi.type}" },
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            if (!poi.imageUrl.isNullOrBlank()) {
-                val sizePx = with(LocalDensity.current) { 56.dp.toPx().roundToInt() }
-                // TODO(BACKLOG-MEDIUM): SubcomposeAsyncImage overhead in LazyColumn — switch to AsyncImage with custom Painter for placeholder/error
-                SubcomposeAsyncImage(
-                    model = ImageRequest.Builder(LocalPlatformContext.current)
-                        .data(poi.imageUrl)
-                        .size(Size(sizePx, sizePx))
-                        .build(),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(56.dp)
-                        .clip(RoundedCornerShape(8.dp)),
-                    loading = { ThumbnailPlaceholder() },
-                    error = { ThumbnailPlaceholder() },
+        // Background image
+        if (poi.imageUrl != null) {
+            AsyncImage(
+                model = poi.imageUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        // Dark gradient scrim
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(CardScrimGradient)
+        )
+        // Content overlay
+        Box(Modifier.fillMaxSize().padding(12.dp)) {
+            Column(Modifier.align(Alignment.TopStart)) {
+                Text(
+                    text = poi.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.width(12.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
+                val capitalizedType = poi.type.replaceFirstChar { it.uppercaseChar() }
+                val subtitle = if (poi.vibe.isNotBlank())
+                    "$capitalizedType \u00B7 ${poi.vibe}"
+                else
+                    capitalizedType
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                )
+                if (poi.insight.isNotBlank()) {
+                    Text(
+                        text = poi.insight,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.8f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                // Rating + live status row
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (poi.rating != null) {
                         Text(
-                            text = poi.name,
-                            style = MaterialTheme.typography.titleSmall,
+                            "\u2B50 ${"%.1f".format(poi.rating)}",
+                            style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
                         )
-                        Text(
-                            text = poi.type.replaceFirstChar { it.uppercaseChar() },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.6f),
-                        )
-                    }
-                    if (poi.rating != null) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Star,
-                                contentDescription = null,
-                                tint = Color(0xFFFFD700),
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Spacer(Modifier.width(2.dp))
-                            Text(
-                                text = "${poi.rating}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.White,
-                            )
-                        }
                     }
                     if (poi.liveStatus != null) {
-                        Spacer(Modifier.width(8.dp))
-                        val statusColor = when (poi.liveStatus.lowercase()) {
-                            "open" -> Color(0xFF4CAF50)
-                            "busy" -> Color(0xFFFF9800)
-                            else -> Color(0xFF9E9E9E)
-                        }
+                        val statusColor = liveStatusToColor(resolveStatus(poi.liveStatus, poi.hours)).toComposeColor()
+                        Box(
+                            Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(statusColor)
+                        )
                         Text(
-                            text = poi.liveStatus.replaceFirstChar { it.uppercaseChar() },
+                            poi.liveStatus.replaceFirstChar { it.uppercaseChar() },
                             style = MaterialTheme.typography.labelSmall,
                             color = statusColor,
                         )
                     }
-                    if (isSaved) {
-                        Spacer(Modifier.width(8.dp))
+                }
+            }
+            // Icon CTAs
+            Row(
+                modifier = Modifier.align(Alignment.BottomEnd),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                IconButton(
+                    onClick = onSaveToggled,
+                    modifier = Modifier.semantics {
+                        contentDescription = if (isSaved) "Saved" else "Save"
+                    },
+                ) {
+                    Icon(
+                        imageVector = if (isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = null,
+                        tint = if (isSaved) Color(0xFFFFD700) else Color.White,
+                    )
+                }
+                if (poi.latitude != null && poi.longitude != null) {
+                    IconButton(
+                        onClick = onNavigateTapped,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Navigate to ${poi.name}"
+                        },
+                    ) {
                         Icon(
-                            Icons.Filled.Bookmark,
-                            contentDescription = "Saved",
-                            tint = Color(0xFFFFD700),
-                            modifier = Modifier.size(18.dp),
+                            imageVector = Icons.Default.Navigation,
+                            contentDescription = null,
+                            tint = Color.White,
                         )
                     }
                 }
-                if (poi.insight.isNotEmpty()) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = poi.insight,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color.White.copy(alpha = 0.7f),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                IconButton(
+                    onClick = onChatTapped,
+                    modifier = Modifier.semantics {
+                        contentDescription = "Ask AI about ${poi.name}"
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.ChatBubbleOutline,
+                        contentDescription = null,
+                        tint = Color.White,
                     )
                 }
             }
         }
-    }
-}
-
-// TODO(BACKLOG-LOW): ThumbnailPlaceholder uses fillMaxSize with no intrinsic size — fragile implicit contract. Should accept modifier param.
-@Composable
-private fun ThumbnailPlaceholder() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.White.copy(alpha = 0.08f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.Default.Place,
-            contentDescription = null,
-            tint = Color.White.copy(alpha = 0.3f),
-            modifier = Modifier.size(24.dp),
-        )
     }
 }

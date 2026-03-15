@@ -223,18 +223,33 @@ private fun ReadyContent(
         screenHeightPx = coords.size.height.toFloat()
     }) {
         // Base: map or list
-        // TODO(BACKLOG-MEDIUM): POIListView needs polish pass — list rows lack save CTAs, tap opens
-        //   ExpandablePoiCard but save state isn't visible inline. Should show save icon per row,
-        //   wire isSaved/onSave/onUnsave same as map pin card.
         if (state.showListView) {
             POIListView(
                 pois = state.pois,
-                activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled in list view
-                onVibeSelected = { },
+                dynamicVibes = state.dynamicVibes,
+                activeDynamicVibe = state.activeDynamicVibe,
+                onDynamicVibeSelected = viewModel::switchDynamicVibe,
                 onPoiClick = { viewModel.selectPoi(it) },
+                onSaveTapped = { poi -> viewModel.savePoi(poi, state.areaName) },
+                onUnsaveTapped = { poi -> viewModel.unsavePoi(poi) },
+                onNavigateTapped = { poi ->
+                    if (poi.latitude != null && poi.longitude != null) {
+                        val handled = onNavigateToMaps(poi.latitude, poi.longitude, poi.name)
+                        if (!handled) {
+                            coroutineScope.launch {
+                                snackbarHostState.showSnackbar(noMapsAppMessage)
+                            }
+                        }
+                    }
+                },
+                onChatTapped = { poi ->
+                    chatViewModel.openChat(
+                        state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
+                        entryPoint = ChatEntryPoint.PoiCard(poi),
+                    )
+                },
                 modifier = Modifier
                     .fillMaxSize()
-                    // TODO(BACKLOG-LOW): Magic number 112.dp for POI list top padding — should be named or derived
                     .padding(top = statusBarPadding + 112.dp),
                 savedPoiIds = state.savedPoiIds,
             )
@@ -383,7 +398,8 @@ private fun ReadyContent(
             )
         }
 
-        // Back button: Show All mode > POI card > FAB (priority order)
+        // Back button: List view > Show All mode > POI card > FAB (priority order)
+        PlatformBackHandler(enabled = state.showListView) { viewModel.toggleListView() }
         PlatformBackHandler(enabled = state.showAllMode && state.selectedPoi == null) {
             viewModel.onPrevBatch()
         }

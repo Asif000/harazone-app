@@ -6,6 +6,7 @@
     <string name="search_clear_history">Limpar histórico</string>
     <string name="search_refreshing">Atualizando área…</string>
     <string name="poi_list_empty">Nenhum lugar encontrado nesta área</string>
+    <string name="poi_list_empty_vibe">Nenhum %1$s encontrado nesta área</string>
 
     <!-- Chat Overlay -->
     <string name="chat_input_hint">Pergunte sobre esta área</string>
