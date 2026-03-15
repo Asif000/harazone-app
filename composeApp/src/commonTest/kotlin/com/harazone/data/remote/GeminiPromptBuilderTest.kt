@@ -185,6 +185,38 @@ class GeminiPromptBuilderTest {
         assertFalse(prompt.contains("\"sources\""))
     }
 
+    // --- Land-only coordinate instruction tests ---
+
+    @Test
+    fun buildPinOnlyPrompt_includesLandCoordinateInstruction() {
+        val prompt = builder.buildPinOnlyPrompt("Cayucos, CA")
+        assertTrue(prompt.contains("LAND COORDINATES ONLY"))
+        assertTrue(prompt.contains("never in water"))
+        assertTrue(prompt.contains("ocean"))
+        assertTrue(prompt.contains("coastal"))
+        assertTrue(prompt.contains("inland"))
+        assertTrue(prompt.contains("city center coordinates as fallback"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_includesLandCoordinateInstruction() {
+        val prompt = builder.buildAreaPortraitPrompt("Cayucos, CA", testContext)
+        assertTrue(prompt.contains("LAND COORDINATES ONLY"))
+        assertTrue(prompt.contains("never in water"))
+        assertTrue(prompt.contains("ocean"))
+        assertTrue(prompt.contains("coastal"))
+        assertTrue(prompt.contains("inland"))
+        assertTrue(prompt.contains("city center coordinates as fallback"))
+    }
+
+    @Test
+    fun buildChatSystemContext_includesLandCoordinateInstruction() {
+        val result = chatContext()
+        assertTrue(result.contains("LAND COORDINATES ONLY"))
+        assertTrue(result.contains("never in water"))
+        assertTrue(result.contains("ocean"))
+    }
+
     // --- Updated old buildChatSystemContext tests (new signature) ---
 
     @Test
