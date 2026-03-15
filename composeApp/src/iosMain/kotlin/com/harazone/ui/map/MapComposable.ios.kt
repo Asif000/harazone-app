@@ -140,13 +140,15 @@ actual fun MapComposable(
         )
     }
 
-    // Selection ring update — only re-render the 2 affected pins
+    // Selection ring update — remove+re-add all annotations to trigger imageForAnnotation.
+    // With MLNPointAnnotation there is no way to update a single pin's image without re-adding
+    // (unlike MLNSymbolStyleLayer where style.addImage() suffices). With 3 pins this is negligible.
+    // Targeted 2-pin update would require migrating to MLNShapeSource + MLNSymbolStyleLayer,
+    // which is blocked by K/N interop issues (see tech-spec-ios-custom-pins-symbol-layer.md).
     LaunchedEffect(selectedPinIndex) {
         delegate.selectedPinIndex = selectedPinIndex
         delegate.currentPois = currentPois.value
-        // Clear image cache so imageForAnnotation returns fresh images
         delegate.clearImageCache()
-        // Re-add only to trigger imageForAnnotation for changed pins
         if (currentAnnotations.isNotEmpty() && styleLoaded.value) {
             @Suppress("UNCHECKED_CAST")
             mapView.removeAnnotations(currentAnnotations.toList() as List<*>)
@@ -384,6 +386,10 @@ private fun PinStatusColor.toUIColor(): UIColor = when (this) {
 
 // ---------------------------------------------------------------------------
 // Tap handler — @ObjCAction bridge for annotation selection
+// Uses coordinate hit-test (44pt radius) instead of MLNShapeSource's visibleFeatures(at:)
+// because we use MLNPointAnnotation, not MLNSymbolStyleLayer. With 3 pins the fixed radius
+// is sufficient. visibleFeatures would require the MLNShapeSource migration blocked by K/N
+// interop issues (UIGraphicsImageRenderer, NSString.drawAtPoint, MLNShapeSource.setFeatures).
 // ---------------------------------------------------------------------------
 
 @OptIn(ExperimentalForeignApi::class)
