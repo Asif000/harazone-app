@@ -448,14 +448,12 @@ private fun ReadyContent(
                         }
                     }
                 },
-                onShowOnMap = {
+                onShowOnMap = { lat, lng ->
                     chatViewModel.closeChat()
                     viewModel.clearPoiSelection()
                     returnToChat[0] = false
                     returnToSaves[0] = false
-                    state.selectedPoi.latitude?.let { lat ->
-                        state.selectedPoi.longitude?.let { lng -> viewModel.flyToCoords(lat, lng) }
-                    }
+                    viewModel.flyToCoords(lat, lng)
                 },
                 onDismiss = dismissDetail,
                 onNavigateToMaps = onNavigateToMaps,

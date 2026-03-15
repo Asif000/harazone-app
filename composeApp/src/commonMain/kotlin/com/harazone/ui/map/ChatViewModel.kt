@@ -62,6 +62,7 @@ internal class ChatViewModel(
 
     companion object {
         private const val MAX_HISTORY_TURNS = 20 // 20 messages = ~10 back-and-forth turns
+        internal const val LABEL_NEW_TOPIC = "New topic"
     }
 
     init {
@@ -516,7 +517,7 @@ internal class ChatViewModel(
         val areaName = _uiState.value.areaName
         if (depthLevel >= 3) {
             return listOf(
-                ContextualPill("New topic", "Let's change topic", ChatIntent.DISCOVER, "🔄"),
+                ContextualPill(LABEL_NEW_TOPIC, "Let's change topic", ChatIntent.DISCOVER, "🔄"),
             ) + computeContextualPills(lastQuery, areaName).take(2)
         }
         return computeContextualPills(lastQuery, areaName).take(3)

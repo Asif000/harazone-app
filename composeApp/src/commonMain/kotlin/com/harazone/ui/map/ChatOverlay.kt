@@ -265,7 +265,7 @@ internal fun ChatOverlay(
                 ) {
                     items(chatState.persistentPills) { pill ->
                         val pillDisplayLabel = pillDisplayLabel(pill)
-                        if (pill.label == "New topic") {
+                        if (pill.label == ChatViewModel.LABEL_NEW_TOPIC) {
                             SuggestionChip(
                                 onClick = { viewModel.resetToIntentPills() },
                                 label = { Text("${pill.emoji} $pillDisplayLabel", fontSize = 13.sp) },
@@ -685,7 +685,7 @@ internal fun ChatInputBar(
 
 @Composable
 internal fun pillDisplayLabel(pill: ContextualPill): String = when {
-    pill.label == "New topic"                     -> stringResource(Res.string.pill_new_topic)
+    pill.label == ChatViewModel.LABEL_NEW_TOPIC                     -> stringResource(Res.string.pill_new_topic)
     pill.label == "Areas to avoid"                -> stringResource(Res.string.pill_areas_to_avoid)
     pill.label == "Best time to go"               -> stringResource(Res.string.pill_best_time)
     pill.label == "Tell me more"                  -> stringResource(Res.string.pill_tell_me_more)

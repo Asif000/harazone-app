@@ -137,4 +137,7 @@
     <!-- Time -->
     <string name="time_am">AM</string>
     <string name="time_pm">PM</string>
+
+    <!-- Accessibility -->
+    <string name="action_close">Fechar</string>
 </resources>

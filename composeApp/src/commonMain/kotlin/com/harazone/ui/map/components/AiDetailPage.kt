@@ -78,7 +78,7 @@ internal fun AiDetailPage(
     onSave: () -> Unit,
     onUnsave: () -> Unit,
     onDirectionsClick: (Double, Double, String) -> Unit,
-    onShowOnMap: () -> Unit,
+    onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
     onNavigateToMaps: (Double, Double, String) -> Boolean,
     onDirectionsFailed: () -> Unit,
@@ -166,7 +166,7 @@ internal fun AiDetailPage(
                                     if (!handled) onDirectionsFailed()
                                 },
                                 onShowOnMap = {
-                                    onShowOnMap()
+                                    onShowOnMap(card.lat, card.lng)
                                 },
                             )
                         }
@@ -184,7 +184,7 @@ internal fun AiDetailPage(
                         ) {
                             items(chatState.persistentPills) { pill ->
                                 val label = pillDisplayLabel(pill)
-                                if (pill.label == "New topic") {
+                                if (pill.label == ChatViewModel.LABEL_NEW_TOPIC) {
                                     SuggestionChip(
                                         onClick = { chatViewModel.resetToIntentPills() },
                                         label = { Text("${pill.emoji} $label", fontSize = 13.sp) },
@@ -230,7 +230,7 @@ private fun PoiDetailHeader(
     onSave: () -> Unit,
     onUnsave: () -> Unit,
     onDirectionsClick: (Double, Double, String) -> Unit,
-    onShowOnMap: () -> Unit,
+    onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
@@ -280,7 +280,7 @@ private fun PoiDetailHeader(
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close",
+                    contentDescription = stringResource(Res.string.action_close),
                     tint = Color.White,
                     modifier = Modifier.size(18.dp),
                 )
@@ -427,7 +427,7 @@ private fun PoiDetailHeader(
                     )
                 }
                 AssistChip(
-                    onClick = onShowOnMap,
+                    onClick = { if (poi.latitude != null && poi.longitude != null) onShowOnMap(poi.latitude!!, poi.longitude!!) },
                     label = { Text("\uD83D\uDCCD ${stringResource(Res.string.chat_poi_show_on_map)}") },
                     colors = chipColors,
                     border = chipBorder,

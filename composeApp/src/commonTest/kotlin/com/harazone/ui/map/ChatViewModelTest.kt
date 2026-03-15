@@ -1001,7 +1001,7 @@ Enjoy!"""
         vm.sendMessage("Q3")
 
         assertEquals(3, vm.uiState.value.depthLevel)
-        val newTopicPill = vm.uiState.value.persistentPills.find { it.label == "New topic" }
+        val newTopicPill = vm.uiState.value.persistentPills.find { it.label == ChatViewModel.LABEL_NEW_TOPIC }
         assertTrue(newTopicPill != null, "At depthLevel >= 3, persistent pills should include 'New topic'")
     }
 
