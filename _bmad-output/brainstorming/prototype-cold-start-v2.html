@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Cold Start v2: AI Showcase + Onboarding Bubble</title>
+<style>
+  :root {
+    --bg-dark:#0d1b2a;--ui-dark:rgba(20,14,28,0.92);--ui-dark-solid:#1a1224;
+    --accent:#4ecdc4;--accent-glow:rgba(78,205,196,0.35);
+    --gold:#FFD700;--gold-light:#FFE26A;
+    --text-primary:#fafafa;--text-secondary:rgba(255,255,255,0.6);--text-dim:rgba(255,255,255,0.35);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);--ease-out:cubic-bezier(0.16,1,0.3,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text-primary);overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
+
+  .page-header{text-align:center;padding:20px 16px 10px;font-size:12px;color:#888;letter-spacing:1px;text-transform:uppercase}
+  .page-header h1{font-size:18px;color:#fff;letter-spacing:0;text-transform:none;margin-bottom:4px}
+  .page-header p{font-size:11px;color:#666;text-transform:none;letter-spacing:0;max-width:500px;margin:0 auto;line-height:1.4}
+
+  /* Phone frame */
+  .phone{width:375px;border-radius:32px;border:2px solid #333;overflow:hidden;position:relative;height:750px;background:var(--bg-dark);flex-shrink:0;margin:0 auto}
+
+  /* Map */
+  .map{position:absolute;inset:0;background:var(--bg-dark)}
+  .map::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 35% 45%,#1b2838 0%,transparent 50%),radial-gradient(circle at 65% 55%,#162230 0%,transparent 40%);pointer-events:none}
+  .map::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%),linear-gradient(90deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%);background-size:60px 60px;opacity:0.2;pointer-events:none}
+
+  /* Search bar */
+  .search-row{position:absolute;top:50px;left:12px;right:12px;z-index:100;height:44px;border-radius:14px;background:var(--ui-dark);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 12px;gap:8px}
+  .search-icon{font-size:13px;opacity:0.45}
+  .search-text{flex:1;font-size:12px;color:var(--text-primary);font-weight:500}
+  .search-actions{display:flex;gap:3px;align-items:center;flex-shrink:0;transition:all 0.4s}
+  .search-btn{width:30px;height:30px;border-radius:9px;background:rgba(78,205,196,0.15);border:none;color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .batch-nav{display:flex;align-items:center;gap:1px;background:rgba(255,255,255,0.04);border-radius:8px;padding:2px}
+  .bn-btn{width:26px;height:26px;border-radius:7px;border:none;background:transparent;color:var(--text-dim);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .bn-btn.disabled{opacity:0.2;pointer-events:none}
+  .bn-counter{font-size:10px;color:var(--text-secondary);padding:0 4px;font-weight:600}
+
+  /* Vibe rail */
+  .vibe-rail{position:absolute;bottom:85px;right:8px;z-index:28;display:flex;flex-direction:column;gap:4px;align-items:center}
+  .saved-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;margin-bottom:2px}
+  .saved-orb{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--gold-light),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(255,215,0,0.3);opacity:0.4}
+  .saved-label{font-size:8px;color:var(--gold);margin-top:1px;font-weight:500;opacity:0.4}
+  .vibe-divider{width:22px;height:1px;background:rgba(255,255,255,0.12);margin:2px 0}
+  .vibe-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;transition:all 0.4s}
+  .vibe-orb{border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35);display:flex;align-items:center;justify-content:center;transition:all 0.3s}
+  .vibe-orb.active{border:2px solid #fff;box-shadow:0 0 12px var(--accent-glow)}
+  .vibe-orb-label{font-size:8px;color:rgba(255,255,255,0.8);margin-top:1px;text-align:center;max-width:48px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vibe-count-badge{position:absolute;top:-2px;right:-2px;min-width:13px;height:13px;border-radius:7px;background:#4a7cf7;color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #0a0c10;padding:0 2px;opacity:0;transition:opacity 0.3s}
+
+  /* Pins */
+  .pin{position:absolute;z-index:20;display:flex;flex-direction:column;align-items:center;transition:all 0.45s var(--ease-spring);cursor:pointer}
+  .pin.hidden{opacity:0;transform:translate(-50%,-50%) scale(0);pointer-events:none}
+  .pin.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .pin-marker{width:34px;height:34px;border-radius:50%;background:var(--accent);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 10px var(--accent-glow);transition:all 0.3s}
+  .pin:active .pin-marker{transform:scale(1.15)}
+  .pin-label{margin-top:2px;font-size:9px;font-weight:600;color:#fff;background:rgba(0,0,0,0.75);padding:2px 6px;border-radius:4px;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+
+  /* Float card */
+  .poi-float-card{position:absolute;z-index:25;width:160px;border-radius:12px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);padding:10px 12px;cursor:pointer;transition:all 0.4s var(--ease-spring);pointer-events:all}
+  .poi-float-card.hidden{opacity:0;transform:scale(0.85) translateY(8px);pointer-events:none}
+  .poi-float-card.visible{opacity:1;transform:scale(1) translateY(0)}
+  .pfc-header{display:flex;align-items:center;gap:6px}
+  .pfc-emoji{font-size:17px}
+  .pfc-name{font-size:12px;font-weight:600;line-height:1.25}
+  .pfc-vibe{margin-top:4px;font-size:9px;color:var(--accent);font-weight:600}
+  .pfc-why{margin-top:3px;font-size:10px;color:var(--text-secondary);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pfc-meta{margin-top:5px;display:flex;gap:8px;font-size:9px;color:var(--text-dim);flex-wrap:wrap}
+
+  /* Bottom bar */
+  .bottom-bar{position:absolute;bottom:0;left:0;right:0;z-index:80;padding:0 12px 20px;display:flex;align-items:flex-end;justify-content:space-between}
+  .ai-bar{height:36px;border-radius:18px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer;max-width:140px}
+  .ai-bar-icon{font-size:12px}
+  .ai-bar-text{font-size:10px;color:var(--text-secondary);white-space:nowrap;overflow:hidden}
+  @keyframes ghostCycle{0%,100%{opacity:0.5}50%{opacity:0.8}}
+  .ghost-text{animation:ghostCycle 3s ease-in-out infinite}
+  .bottom-right{display:flex;gap:6px;align-items:flex-end}
+  .toggle-btn{height:32px;border-radius:16px;background:var(--ui-dark);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;overflow:hidden}
+  .toggle-seg{padding:0 11px;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-dim);border:none;background:transparent;cursor:pointer}
+  .toggle-seg.active{color:var(--accent)}
+  .fab{width:44px;height:44px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:23px;color:#111;font-weight:300;cursor:pointer;box-shadow:0 3px 16px var(--accent-glow)}
+  .my-loc{position:absolute;bottom:68px;left:12px;z-index:65;width:32px;height:32px;border-radius:50%;background:var(--ui-dark);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+
+  /* Map shimmer */
+  .map-shimmer{position:absolute;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;transition:opacity 0.5s}
+  .map-shimmer.hidden{opacity:0;pointer-events:none}
+  .shimmer-text{font-size:13px;color:var(--text-dim);animation:shimmerFade 1.5s ease-in-out infinite}
+  .shimmer-dots{display:flex;gap:6px}
+  .shimmer-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:0.3;animation:shimmerDot 1.2s ease-in-out infinite}
+  .shimmer-dot:nth-child(2){animation-delay:0.2s}
+  .shimmer-dot:nth-child(3){animation-delay:0.4s}
+  @keyframes shimmerFade{0%,100%{opacity:0.4}50%{opacity:1}}
+  @keyframes shimmerDot{0%,100%{opacity:0.2;transform:scale(0.8)}50%{opacity:1;transform:scale(1.2)}}
+
+  .toast{position:absolute;top:104px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:300;background:var(--accent);color:#111;padding:6px 14px;border-radius:12px;font-size:10px;font-weight:600;opacity:0;pointer-events:none;transition:all 0.35s var(--ease-spring);white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* ========== ONBOARDING BUBBLE ========== */
+  .onboard-scrim{position:absolute;inset:0;z-index:200;background:rgba(0,0,0,0.5);backdrop-filter:blur(2px);opacity:0;pointer-events:none;transition:opacity 0.4s}
+  .onboard-scrim.show{opacity:1;pointer-events:all}
+
+  .onboard-bubble{position:absolute;bottom:72px;left:14px;right:14px;z-index:210;background:var(--ui-dark-solid);border:1px solid rgba(78,205,196,0.25);border-radius:20px;padding:20px 18px 16px;opacity:0;transform:translateY(20px);pointer-events:none;transition:all 0.5s var(--ease-spring)}
+  .onboard-bubble.show{opacity:1;transform:translateY(0);pointer-events:all}
+
+  .onboard-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2a7c76);display:flex;align-items:center;justify-content:center;font-size:20px;margin-bottom:10px;box-shadow:0 2px 12px var(--accent-glow)}
+
+  .onboard-title{font-size:15px;font-weight:700;margin-bottom:6px;line-height:1.3}
+
+  .onboard-tips{display:flex;flex-direction:column;gap:8px;margin:10px 0 14px}
+  .onboard-tip{display:flex;align-items:flex-start;gap:10px;font-size:12px;color:var(--text-secondary);line-height:1.4}
+  .onboard-tip-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+  .onboard-tip-text{flex:1}
+  .onboard-tip-text strong{color:var(--text-primary);font-weight:600}
+
+  .onboard-footer{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:4px}
+  .onboard-dismiss{background:var(--accent);color:#111;border:none;padding:10px 20px;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+  .onboard-dismiss:active{transform:scale(0.95)}
+  .onboard-subtle{font-size:10px;color:var(--text-dim);line-height:1.3}
+
+  /* Pointer callouts (small arrows pointing to UI elements) */
+  .callout{position:absolute;z-index:205;opacity:0;transition:all 0.4s var(--ease-spring);pointer-events:none}
+  .callout.show{opacity:1}
+  .callout-dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent-glow);animation:calloutPulse 1.5s ease-in-out infinite}
+  .callout-ring{position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--accent);opacity:0.4;animation:calloutRing 1.5s ease-in-out infinite}
+  @keyframes calloutPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.3)}}
+  @keyframes calloutRing{0%,100%{transform:scale(1);opacity:0.4}50%{transform:scale(1.8);opacity:0}}
+
+  /* Replay */
+  .replay-bar{text-align:center;padding:12px 16px 24px}
+  .replay-btn{background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);color:var(--accent);padding:10px 24px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s}
+  .replay-btn:hover{background:rgba(78,205,196,0.25)}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Cold Start v2 — AI Showcase + Onboarding Bubble</h1>
+  <p>No picker. AI auto-drops 3 diverse pins. Then a friendly bubble teaches the user what the app does and how it learns from them. One tap to dismiss.</p>
+</div>
+
+<div class="phone" id="phone">
+  <div class="map" id="map"></div>
+  <div class="toast" id="toast"></div>
+
+  <div class="search-row">
+    <span class="search-icon">🔍</span>
+    <span class="search-text">Shoreditch, London</span>
+    <div class="search-actions" id="searchActions" style="opacity:0;pointer-events:none">
+      <div class="batch-nav">
+        <button class="bn-btn disabled">◀</button>
+        <span class="bn-counter">1/4</span>
+        <button class="bn-btn">▶</button>
+      </div>
+      <button class="search-btn">↻</button>
+    </div>
+  </div>
+
+  <!-- Shimmer loading -->
+  <div class="map-shimmer" id="shimmer">
+    <div class="shimmer-dots"><div class="shimmer-dot"></div><div class="shimmer-dot"></div><div class="shimmer-dot"></div></div>
+    <div class="shimmer-text">Discovering Shoreditch...</div>
+  </div>
+
+  <!-- Vibe rail — skeleton on load -->
+  <div class="vibe-rail" id="vibeRail">
+    <div class="saved-orb-wrap"><div class="saved-orb">🔖</div><span class="saved-label">Saved</span></div>
+    <div class="vibe-divider"></div>
+    <div class="vibe-orb-wrap" id="vs0"><div class="vibe-orb" style="width:38px;height:38px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━━</div></div>
+    <div class="vibe-orb-wrap" id="vs1"><div class="vibe-orb" style="width:34px;height:34px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.2s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━━</div></div>
+    <div class="vibe-orb-wrap" id="vs2"><div class="vibe-orb" style="width:34px;height:34px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.4s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━━</div></div>
+    <div class="vibe-orb-wrap" id="vs3"><div class="vibe-orb" style="width:30px;height:30px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.6s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━</div></div>
+    <div class="vibe-orb-wrap" id="vs4"><div class="vibe-orb" style="width:30px;height:30px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.8s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━</div></div>
+  </div>
+
+  <div class="my-loc">📍</div>
+  <div class="bottom-bar">
+    <div class="ai-bar"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text" id="aiText">Exploring for you...</span></div>
+    <div class="bottom-right">
+      <div class="toggle-btn"><button class="toggle-seg active">🗺️</button><button class="toggle-seg">📋</button></div>
+      <div class="fab">+</div>
+    </div>
+  </div>
+
+  <!-- Onboarding scrim -->
+  <div class="onboard-scrim" id="scrim" onclick="dismissOnboard()"></div>
+
+  <!-- Onboarding bubble -->
+  <div class="onboard-bubble" id="bubble">
+    <div class="onboard-avatar">✨</div>
+    <div class="onboard-title">I'm your AI travel guide!</div>
+    <div class="onboard-tips">
+      <div class="onboard-tip">
+        <span class="onboard-tip-icon">👆</span>
+        <span class="onboard-tip-text"><strong>Tap pins</strong> to discover what makes each place special</span>
+      </div>
+      <div class="onboard-tip">
+        <span class="onboard-tip-icon">🔖</span>
+        <span class="onboard-tip-text"><strong>Save places</strong> you like — I'll learn your taste and recommend better spots</span>
+      </div>
+      <div class="onboard-tip">
+        <span class="onboard-tip-icon">🎨</span>
+        <span class="onboard-tip-text"><strong>Tap vibes</strong> on the right to filter by what excites you</span>
+      </div>
+      <div class="onboard-tip">
+        <span class="onboard-tip-icon">💬</span>
+        <span class="onboard-tip-text"><strong>Chat with me</strong> anytime — ask about hidden gems, safety, food, anything</span>
+      </div>
+    </div>
+    <div class="onboard-footer">
+      <span class="onboard-subtle">The more you explore, the smarter I get</span>
+      <button class="onboard-dismiss" onclick="dismissOnboard()">Let's go!</button>
+    </div>
+  </div>
+
+  <!-- Callout dots (appear with bubble to highlight UI elements) -->
+  <div class="callout" id="calloutVibes" style="right:52px;bottom:200px"><div class="callout-dot"></div><div class="callout-ring"></div></div>
+  <div class="callout" id="calloutAI" style="left:50px;bottom:28px"><div class="callout-dot"></div><div class="callout-ring"></div></div>
+  <div class="callout" id="calloutSaved" style="right:18px;bottom:350px"><div class="callout-dot"></div><div class="callout-ring"></div></div>
+</div>
+
+<div class="replay-bar">
+  <button class="replay-btn" onclick="replay()">↻ Replay Animation</button>
+</div>
+
+<script>
+const vibeData = [
+  {emoji:'🎨',label:'Street Art',size:38,count:3},
+  {emoji:'☕',label:'Cafe',size:34,count:2},
+  {emoji:'🎵',label:'Music',size:34,count:2},
+  {emoji:'🍜',label:'Food',size:30,count:1},
+  {emoji:'🏛️',label:'History',size:30,count:1}
+];
+
+const pois = [
+  {emoji:'🎨',name:'Rivington Murals',vibe:'Street Art',why:'Banksy started here. New murals weekly from global artists.',rating:'4.8',hours:'Always open',dist:'120m',x:24,y:32,cs:'right'},
+  {emoji:'☕',name:'Cafe Lumiere',vibe:'Cafe Scene',why:'Victorian warehouse roaster. Oat flat white is legendary.',rating:'4.6',hours:'7am–6pm',dist:'200m',x:54,y:52,cs:'left'},
+  {emoji:'🎵',name:'Jazz Cellar',vibe:'Live Music',why:'Underground speakeasy. Thursday jams draw musicians.',rating:'4.7',hours:'8pm–2am',dist:'350m',x:34,y:72,cs:'right'}
+];
+
+function runSequence() {
+  // Phase 1: shimmer for ~2.5s (AI working)
+  setTimeout(() => {
+    // Phase 2: pins + vibes arrive
+    document.getElementById('shimmer').classList.add('hidden');
+
+    // Fill vibes
+    vibeData.forEach((v, i) => {
+      const el = document.getElementById('vs' + i);
+      el.innerHTML = `
+        <div class="vibe-orb${i===0?' active':''}" style="width:${v.size}px;height:${v.size}px;font-size:${v.size > 34 ? 16 : v.size > 30 ? 14 : 12}px">${v.emoji}</div>
+        <div class="vibe-orb-label" style="${i===0?'color:#fff;font-weight:700':''}">${v.label}</div>
+        <div class="vibe-count-badge" style="opacity:1">${v.count}</div>
+      `;
+      if (i > 0) el.style.opacity = '0.45';
+    });
+
+    // Show batch nav
+    const sa = document.getElementById('searchActions');
+    sa.style.opacity = '1';
+    sa.style.pointerEvents = 'all';
+    sa.style.transition = 'opacity 0.4s';
+
+    // Drop pins
+    const map = document.getElementById('map');
+    pois.forEach((poi, i) => {
+      setTimeout(() => {
+        const pin = document.createElement('div');
+        pin.className = 'pin hidden';
+        pin.style.left = poi.x + '%';
+        pin.style.top = poi.y + '%';
+        pin.innerHTML = `<div class="pin-marker">${poi.emoji}</div><div class="pin-label">${poi.name}</div>`;
+        map.appendChild(pin);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          pin.classList.remove('hidden');
+          pin.classList.add('visible');
+        }));
+
+        // Float card
+        setTimeout(() => {
+          const card = document.createElement('div');
+          card.className = 'poi-float-card hidden';
+          if (poi.cs === 'left') {
+            card.style.right = (100 - poi.x + 3) + '%';
+            card.style.top = (poi.y - 3) + '%';
+          } else {
+            card.style.left = (poi.x + 3) + '%';
+            card.style.top = (poi.y - 3) + '%';
+          }
+          card.innerHTML = `
+            <div class="pfc-header"><span class="pfc-emoji">${poi.emoji}</span><span class="pfc-name">${poi.name}</span></div>
+            <div class="pfc-vibe">${poi.vibe}</div>
+            <div class="pfc-why">${poi.why}</div>
+            <div class="pfc-meta"><span>⭐ ${poi.rating}</span><span>🕐 ${poi.hours}</span><span>📍 ${poi.dist}</span></div>
+          `;
+          map.appendChild(card);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            card.classList.remove('hidden');
+            card.classList.add('visible');
+          }));
+        }, 150);
+      }, i * 380);
+    });
+
+    document.getElementById('aiText').textContent = 'What catches your eye?';
+    showToast('3 places to start!');
+
+    // Phase 3: After pins settle, show onboarding bubble (~2s after pins)
+    setTimeout(() => {
+      document.getElementById('scrim').classList.add('show');
+      document.getElementById('bubble').classList.add('show');
+      document.getElementById('calloutVibes').classList.add('show');
+      document.getElementById('calloutAI').classList.add('show');
+      document.getElementById('calloutSaved').classList.add('show');
+    }, 2000);
+
+  }, 2500);
+}
+
+function dismissOnboard() {
+  document.getElementById('scrim').classList.remove('show');
+  document.getElementById('bubble').classList.remove('show');
+  document.getElementById('calloutVibes').classList.remove('show');
+  document.getElementById('calloutAI').classList.remove('show');
+  document.getElementById('calloutSaved').classList.remove('show');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function replay() {
+  // Reset everything
+  const map = document.getElementById('map');
+  map.querySelectorAll('.pin, .poi-float-card').forEach(el => el.remove());
+  document.getElementById('shimmer').classList.remove('hidden');
+  document.getElementById('searchActions').style.opacity = '0';
+  document.getElementById('searchActions').style.pointerEvents = 'none';
+  document.getElementById('aiText').textContent = 'Exploring for you...';
+  dismissOnboard();
+
+  // Reset skeleton vibes
+  vibeData.forEach((v, i) => {
+    const el = document.getElementById('vs' + i);
+    el.innerHTML = `<div class="vibe-orb" style="width:${v.size}px;height:${v.size}px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out ${i*0.2}s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">${v.size > 32 ? '━━━' : '━━'}</div>`;
+    el.style.opacity = '1';
+  });
+
+  setTimeout(() => runSequence(), 400);
+}
+
+// Go
+runSequence();
+</script>
+</body>
+</html>

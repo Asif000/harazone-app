@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — 3-Pin Refresh Flow</title>
+<style>
+  :root {
+    --bg-dark: #0d1b2a;
+    --ui-dark: rgba(20, 14, 28, 0.92);
+    --ui-dark-solid: #1a1224;
+    --accent: #4ecdc4;
+    --accent-glow: rgba(78, 205, 196, 0.35);
+    --saved: #ff6b6b;
+    --text-primary: #fafafa;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+    background: #000;
+    color: var(--text-primary);
+    max-width: 390px;
+    margin: 0 auto;
+    height: 100vh; height: 100dvh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* === MAP BACKGROUND === */
+  .map {
+    position: absolute; inset: 0; background: var(--bg-dark);
+    z-index: 0;
+  }
+  .map::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 35% 45%, #1b2838 0%, transparent 50%),
+      radial-gradient(circle at 65% 55%, #162230 0%, transparent 40%);
+  }
+  .map::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      linear-gradient(0deg, transparent 49.5%, #1a2a3a 49.5%, #1a2a3a 50.5%, transparent 50.5%),
+      linear-gradient(90deg, transparent 49.5%, #1a2a3a 49.5%, #1a2a3a 50.5%, transparent 50.5%);
+    background-size: 70px 70px;
+    opacity: 0.25;
+  }
+
+  /* === TOP SEARCH BAR === */
+  .search-bar {
+    position: absolute; top: 52px; left: 16px; right: 16px; z-index: 100;
+    height: 48px; border-radius: 24px;
+    background: var(--ui-dark);
+    backdrop-filter: blur(20px);
+    display: flex; align-items: center; padding: 0 16px; gap: 10px;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.3s var(--ease-out);
+    cursor: pointer;
+  }
+  .search-bar:hover { border-color: rgba(255,255,255,0.15); }
+  .search-bar.active {
+    border-radius: 16px 16px 0 0;
+    border-color: var(--accent);
+    border-bottom-color: rgba(255,255,255,0.05);
+  }
+  .search-icon { font-size: 16px; opacity: 0.5; flex-shrink: 0; }
+  .search-text {
+    flex: 1; font-size: 14px; color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .search-text.has-value { color: var(--text-primary); font-weight: 500; }
+  .search-action {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: none;
+    color: var(--text-secondary); font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: all 0.2s; flex-shrink: 0;
+  }
+  .search-action:active { background: rgba(255,255,255,0.15); transform: scale(0.9); }
+
+  /* Search dropdown */
+  .search-dropdown {
+    position: absolute; top: 48px; left: 0; right: 0; z-index: 99;
+    background: var(--ui-dark);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
+    max-height: 0; overflow: hidden;
+    transition: max-height 0.3s var(--ease-out);
+  }
+  .search-dropdown.open { max-height: 240px; }
+  .search-item {
+    padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer; transition: background 0.15s;
+  }
+  .search-item:active { background: rgba(255,255,255,0.05); }
+  .search-item-icon { font-size: 14px; opacity: 0.4; }
+  .search-item-text { font-size: 13px; }
+  .search-item-sub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+
+  /* === VIBE RAIL === */
+  .vibe-rail {
+    position: absolute; top: 112px; left: 0; right: 0; z-index: 50;
+    display: flex; gap: 8px; padding: 0 16px;
+    overflow-x: auto; scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .vibe-rail::-webkit-scrollbar { display: none; }
+  .vibe-chip {
+    flex-shrink: 0; height: 34px; border-radius: 17px;
+    background: var(--ui-dark);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1);
+    display: flex; align-items: center; gap: 5px;
+    padding: 0 12px; font-size: 12px; font-weight: 500;
+    cursor: pointer; transition: all 0.25s var(--ease-out);
+    white-space: nowrap;
+  }
+  .vibe-chip:active { transform: scale(0.95); }
+  .vibe-chip.active {
+    background: var(--accent);
+    color: #111; border-color: var(--accent);
+  }
+  .vibe-chip .emoji { font-size: 14px; }
+  .vibe-chip .count {
+    background: rgba(255,255,255,0.15); padding: 1px 6px;
+    border-radius: 8px; font-size: 10px; font-weight: 600;
+  }
+  .vibe-chip.active .count { background: rgba(0,0,0,0.2); }
+
+  /* === MAP PINS === */
+  .pin {
+    position: absolute; z-index: 20;
+    display: flex; flex-direction: column; align-items: center;
+    transition: all 0.45s var(--ease-spring);
+    cursor: pointer;
+  }
+  .pin.hidden { opacity: 0; transform: translate(-50%, -50%) scale(0); pointer-events: none; }
+  .pin.visible { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .pin.saved .pin-marker { background: var(--saved); border-color: var(--saved); box-shadow: 0 2px 12px rgba(255,107,107,0.4); }
+  .pin.dimmed { opacity: 0.35; transition: opacity 0.3s; }
+  .pin-marker {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--accent); border: 2.5px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 3px 14px var(--accent-glow);
+    transition: all 0.3s;
+  }
+  .pin:active .pin-marker { transform: scale(1.15); }
+  .pin-label {
+    margin-top: 4px; font-size: 10px; font-weight: 600;
+    color: #fff; background: rgba(0,0,0,0.75);
+    padding: 2px 8px; border-radius: 6px;
+    white-space: nowrap; max-width: 100px;
+    overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  }
+  .pin-why {
+    margin-top: 2px; font-size: 9px;
+    color: var(--text-secondary); background: rgba(0,0,0,0.6);
+    padding: 2px 7px; border-radius: 5px;
+    max-width: 120px; text-align: center;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* === BOTTOM CARD STRIP === */
+  .card-strip {
+    position: absolute; bottom: 88px; left: 0; right: 0; z-index: 60;
+    display: flex; gap: 10px; padding: 0 16px;
+    overflow-x: auto; scrollbar-width: none;
+    transition: all 0.4s var(--ease-out);
+  }
+  .card-strip::-webkit-scrollbar { display: none; }
+  .poi-card {
+    flex-shrink: 0; width: 180px; border-radius: 14px;
+    background: var(--ui-dark);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.08);
+    padding: 12px; cursor: pointer;
+    transition: all 0.4s var(--ease-spring);
+    position: relative; overflow: hidden;
+  }
+  .poi-card.entering {
+    opacity: 0; transform: translateY(30px) scale(0.9);
+  }
+  .poi-card.visible {
+    opacity: 1; transform: translateY(0) scale(1);
+  }
+  .poi-card:active { transform: scale(0.96); border-color: var(--accent); }
+  .poi-card-header { display: flex; align-items: center; gap: 8px; }
+  .poi-card-emoji { font-size: 22px; }
+  .poi-card-name { font-size: 13px; font-weight: 600; line-height: 1.2; }
+  .poi-card-vibe {
+    margin-top: 6px; font-size: 10px; color: var(--accent);
+    font-weight: 500;
+  }
+  .poi-card-why {
+    margin-top: 4px; font-size: 11px; color: var(--text-secondary);
+    line-height: 1.35; display: -webkit-box;
+    -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .poi-card-save {
+    position: absolute; top: 8px; right: 8px;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: none;
+    font-size: 12px; cursor: pointer; display: flex;
+    align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .poi-card-save:active { transform: scale(1.2); }
+  .poi-card-save.saved { background: rgba(255,107,107,0.2); }
+
+  /* === REFRESH BUTTON (Option A style) === */
+  .refresh-area {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    z-index: 70; display: flex; align-items: center; gap: 12px;
+  }
+  .refresh-btn {
+    height: 44px; border-radius: 22px; border: none;
+    background: var(--accent);
+    color: #111; font-size: 13px; font-weight: 600;
+    padding: 0 20px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 20px var(--accent-glow);
+    transition: all 0.25s var(--ease-spring);
+    position: relative;
+  }
+  .refresh-btn:active { transform: scale(0.94); }
+  .refresh-btn.empty {
+    background: rgba(255,255,255,0.1);
+    color: var(--text-secondary);
+    box-shadow: none; border: 1px solid rgba(255,255,255,0.1);
+  }
+  .refresh-btn .badge {
+    background: rgba(0,0,0,0.25); padding: 2px 7px;
+    border-radius: 10px; font-size: 11px; font-weight: 700;
+  }
+  .refresh-btn.empty .badge { background: rgba(255,255,255,0.1); }
+  .refresh-back {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12);
+    color: var(--text-secondary); font-size: 14px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(8px); transition: all 0.2s;
+  }
+  .refresh-back:active { background: rgba(255,255,255,0.15); transform: scale(0.9); }
+  .refresh-back.disabled { opacity: 0; pointer-events: none; }
+
+  /* === AI SEARCH BAR (bottom left) === */
+  .ai-bar {
+    position: absolute; bottom: 24px; left: 16px; z-index: 65;
+    height: 40px; border-radius: 20px;
+    background: var(--ui-dark);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; gap: 8px;
+    padding: 0 14px; cursor: pointer;
+    transition: all 0.2s;
+    max-width: 155px;
+  }
+  .ai-bar:active { border-color: rgba(255,255,255,0.2); transform: scale(0.97); }
+  .ai-bar-icon { font-size: 14px; }
+  .ai-bar-text { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; }
+
+  /* === MY LOCATION === */
+  .my-loc {
+    position: absolute; bottom: 74px; left: 16px; z-index: 65;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--ui-dark);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; cursor: pointer; transition: all 0.2s;
+  }
+  .my-loc:active { transform: scale(0.9); }
+
+  /* === FAB (bottom right) === */
+  .fab {
+    position: absolute; bottom: 24px; right: 16px; z-index: 65;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--ui-dark);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; cursor: pointer; transition: all 0.2s;
+  }
+  .fab:active { transform: scale(0.9); }
+  .fab .save-count {
+    position: absolute; top: -4px; right: -4px;
+    background: var(--saved); color: #fff; font-size: 9px; font-weight: 700;
+    width: 18px; height: 18px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid var(--ui-dark-solid);
+  }
+
+  /* === DETAIL OVERLAY === */
+  .detail-overlay {
+    position: absolute; inset: 0; z-index: 200;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(4px);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .detail-overlay.open { opacity: 1; pointer-events: all; }
+  .detail-sheet {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: var(--ui-dark-solid);
+    border-radius: 20px 20px 0 0;
+    transform: translateY(100%);
+    transition: transform 0.4s var(--ease-out);
+    max-height: 75vh; overflow-y: auto;
+  }
+  .detail-overlay.open .detail-sheet { transform: translateY(0); }
+  .detail-handle {
+    width: 36px; height: 4px; border-radius: 2px;
+    background: rgba(255,255,255,0.2);
+    margin: 10px auto 0;
+  }
+  .detail-hero {
+    padding: 20px; display: flex; align-items: flex-start; gap: 14px;
+  }
+  .detail-emoji { font-size: 42px; }
+  .detail-info { flex: 1; }
+  .detail-name { font-size: 20px; font-weight: 700; }
+  .detail-vibe-tag {
+    display: inline-block; margin-top: 6px;
+    padding: 3px 10px; border-radius: 10px;
+    background: rgba(78,205,196,0.15); color: var(--accent);
+    font-size: 11px; font-weight: 600;
+  }
+  .detail-why {
+    padding: 0 20px 16px; font-size: 14px;
+    color: var(--text-secondary); line-height: 1.5;
+  }
+  .detail-meta {
+    padding: 0 20px 20px;
+    display: flex; gap: 16px; flex-wrap: wrap;
+  }
+  .detail-meta-item {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text-dim);
+  }
+  .detail-meta-item span { font-size: 14px; }
+  .detail-actions {
+    padding: 0 20px 28px; display: flex; gap: 10px;
+  }
+  .detail-action-btn {
+    flex: 1; height: 44px; border-radius: 12px; border: none;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    transition: all 0.2s;
+  }
+  .detail-action-btn:active { transform: scale(0.96); }
+  .detail-action-btn.primary {
+    background: var(--accent); color: #111;
+  }
+  .detail-action-btn.secondary {
+    background: rgba(255,255,255,0.08); color: var(--text-primary);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .detail-close {
+    position: absolute; top: 16px; right: 16px;
+    width: 32px; height: 32px; border-radius: 50%;
+    background: rgba(255,255,255,0.1); border: none;
+    color: #fff; font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .detail-close:active { background: rgba(255,255,255,0.2); }
+  .detail-swipe-dots {
+    display: flex; justify-content: center; gap: 6px; padding: 8px 0 4px;
+  }
+  .detail-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.2); transition: all 0.2s; cursor: pointer;
+  }
+  .detail-dot.active { background: var(--accent); width: 20px; border-radius: 4px; }
+
+  /* === TOAST === */
+  .toast {
+    position: absolute; top: 108px; left: 50%; transform: translateX(-50%) translateY(-20px);
+    z-index: 300; background: var(--accent); color: #111;
+    padding: 8px 18px; border-radius: 20px; font-size: 12px; font-weight: 600;
+    opacity: 0; pointer-events: none;
+    transition: all 0.35s var(--ease-spring);
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* === LOADING SHIMMER === */
+  .shimmer {
+    background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* Ghost text animation */
+  .ghost-text {
+    animation: ghostCycle 3s ease-in-out infinite;
+  }
+  @keyframes ghostCycle {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.8; }
+  }
+</style>
+</head>
+<body>
+
+<!-- MAP BACKGROUND -->
+<div class="map" id="map"></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- TOP SEARCH BAR -->
+<div class="search-bar" id="searchBar" onclick="toggleSearch()">
+  <span class="search-icon">🔍</span>
+  <span class="search-text has-value" id="searchText">Shoreditch, London</span>
+  <button class="search-action" onclick="event.stopPropagation(); refreshArea()">↻</button>
+</div>
+<div class="search-dropdown" id="searchDropdown">
+  <div class="search-item" onclick="selectPlace('Shibuya, Tokyo')">
+    <span class="search-item-icon">🕐</span>
+    <div><div class="search-item-text">Shibuya, Tokyo</div><div class="search-item-sub">Searched 2 days ago</div></div>
+  </div>
+  <div class="search-item" onclick="selectPlace('Kreuzberg, Berlin')">
+    <span class="search-item-icon">🕐</span>
+    <div><div class="search-item-text">Kreuzberg, Berlin</div><div class="search-item-sub">Searched 4 days ago</div></div>
+  </div>
+  <div class="search-item" onclick="selectPlace('Le Marais, Paris')">
+    <span class="search-item-icon">🕐</span>
+    <div><div class="search-item-text">Le Marais, Paris</div><div class="search-item-sub">Searched last week</div></div>
+  </div>
+  <div class="search-item" onclick="selectPlace('Gothic Quarter, Barcelona')">
+    <span class="search-item-icon">📍</span>
+    <div><div class="search-item-text">Gothic Quarter, Barcelona</div><div class="search-item-sub">1,240 km away</div></div>
+  </div>
+</div>
+
+<!-- VIBE RAIL -->
+<div class="vibe-rail" id="vibeRail">
+  <div class="vibe-chip active" onclick="toggleVibe(this)"><span class="emoji">🎨</span> Street Art <span class="count">3</span></div>
+  <div class="vibe-chip" onclick="toggleVibe(this)"><span class="emoji">☕</span> Cafe Scene <span class="count">2</span></div>
+  <div class="vibe-chip" onclick="toggleVibe(this)"><span class="emoji">🎵</span> Live Music <span class="count">2</span></div>
+  <div class="vibe-chip" onclick="toggleVibe(this)"><span class="emoji">🍜</span> Street Food <span class="count">1</span></div>
+  <div class="vibe-chip" onclick="toggleVibe(this)"><span class="emoji">🏛️</span> Hidden History <span class="count">1</span></div>
+</div>
+
+<!-- BOTTOM CARD STRIP -->
+<div class="card-strip" id="cardStrip"></div>
+
+<!-- REFRESH CONTROLS -->
+<div class="refresh-area" id="refreshArea">
+  <button class="refresh-back disabled" id="backBtn" onclick="navigateBatch(-1)">◀</button>
+  <button class="refresh-btn" id="refreshBtn" onclick="navigateBatch(1)">
+    Discover more <span class="badge" id="refreshBadge">6</span>
+  </button>
+</div>
+
+<!-- AI BAR -->
+<div class="ai-bar" onclick="showToast('Chat overlay would open')">
+  <span class="ai-bar-icon">✨</span>
+  <span class="ai-bar-text ghost-text">Hidden gems nearby?</span>
+</div>
+
+<!-- MY LOCATION -->
+<div class="my-loc" onclick="showToast('Returning to location...')">📍</div>
+
+<!-- FAB -->
+<div class="fab" onclick="showToast('Saved places')">
+  💾
+  <span class="save-count" id="saveCount">2</span>
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()">
+  <div class="detail-sheet" onclick="event.stopPropagation()">
+    <div class="detail-handle"></div>
+    <div class="detail-swipe-dots" id="detailDots"></div>
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div class="detail-hero">
+      <div class="detail-emoji" id="detailEmoji"></div>
+      <div class="detail-info">
+        <div class="detail-name" id="detailName"></div>
+        <div class="detail-vibe-tag" id="detailVibe"></div>
+      </div>
+    </div>
+    <div class="detail-why" id="detailWhy"></div>
+    <div class="detail-meta" id="detailMeta">
+      <div class="detail-meta-item"><span>⭐</span> <span id="detailRating">4.6</span></div>
+      <div class="detail-meta-item"><span>🕐</span> <span id="detailHours">Open until 11pm</span></div>
+      <div class="detail-meta-item"><span>📍</span> <span id="detailDist">350m away</span></div>
+    </div>
+    <div class="detail-actions">
+      <button class="detail-action-btn primary" onclick="savePoi()">💾 Save</button>
+      <button class="detail-action-btn secondary" onclick="showToast('Opening directions...'); closeDetail()">🧭 Navigate</button>
+      <button class="detail-action-btn secondary" onclick="showToast('Ask AI opening...'); closeDetail()">✨ Ask AI</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// === POI DATA: 3 batches of 3 ===
+const allBatches = [
+  [
+    { emoji:'🎨', name:'Rivington Street Murals', vibe:'Street Art', why:'Every surface is a canvas — Banksy started here. New murals appear weekly from global artists.', rating:'4.8', hours:'Always open', dist:'120m', x:30, y:38 },
+    { emoji:'☕', name:'Cafe Lumiere', vibe:'Cafe Scene', why:'Third-wave roaster in a converted Victorian warehouse. The oat flat white is legendary.', rating:'4.6', hours:'7am-6pm', dist:'200m', x:62, y:52 },
+    { emoji:'🎵', name:'Jazz Cellar', vibe:'Live Music', why:'Underground speakeasy vibe, no sign on the door. Thursday jam sessions draw session musicians from across London.', rating:'4.7', hours:'8pm-2am', dist:'350m', x:45, y:72 },
+  ],
+  [
+    { emoji:'🍜', name:'Smokestak', vibe:'Street Food', why:'Brisket smoked for 16 hours over oak. Queue forms at 11am. Worth every minute.', rating:'4.5', hours:'12pm-10pm', dist:'280m', x:72, y:35 },
+    { emoji:'📚', name:'Libreria', vibe:'Hidden History', why:'Bookshop organized by theme, not author. Mirrors on the ceiling make shelves feel infinite.', rating:'4.4', hours:'10am-8pm', dist:'180m', x:22, y:58 },
+    { emoji:'🎨', name:'Village Underground', vibe:'Street Art', why:'Tube carriages perched on a warehouse roof — Shoreditch\'s most photographed landmark.', rating:'4.3', hours:'Varies', dist:'400m', x:55, y:78 },
+  ],
+  [
+    { emoji:'🏛️', name:'Dennis Severs House', vibe:'Hidden History', why:'Step into an 18th-century Huguenot silk weaver\'s home. Candle-lit rooms, half-eaten meals. Time travel.', rating:'4.9', hours:'Mon & Wed 5-9pm', dist:'150m', x:38, y:30 },
+    { emoji:'☕', name:'Ozone Coffee', vibe:'Cafe Scene', why:'New Zealand-style brunch in a vast industrial space. The kimchi pancakes changed the game.', rating:'4.5', hours:'7:30am-5pm', dist:'320m', x:68, y:62 },
+    { emoji:'🎵', name:'Rough Trade East', vibe:'Live Music', why:'Indie record store that hosts intimate in-store gigs. Saw Arctic Monkeys here in 2006.', rating:'4.6', hours:'9am-9pm', dist:'250m', x:18, y:45 },
+  ],
+];
+
+// Saved pin
+const savedPin = { emoji:'❤️', name:'Dishoom (saved)', x:82, y:44, saved:true };
+
+let currentBatch = 0;
+let currentDetailIdx = 0;
+let saveCount = 2;
+let searchOpen = false;
+
+// === INIT ===
+renderBatch(0, true);
+updateRefreshUI();
+
+// === PINS ===
+function renderBatch(idx, initial) {
+  const map = document.getElementById('map');
+  // Remove old non-saved pins
+  map.querySelectorAll('.pin:not(.saved)').forEach(p => {
+    p.classList.remove('visible');
+    p.classList.add('hidden');
+    setTimeout(() => p.remove(), 450);
+  });
+  // Dim saved
+  map.querySelectorAll('.pin.saved').forEach(p => {
+    p.classList.add('dimmed');
+    setTimeout(() => p.classList.remove('dimmed'), 600);
+  });
+  // Ensure saved pin
+  if (!map.querySelector('.pin.saved')) {
+    const sp = createPin(savedPin, true);
+    map.appendChild(sp);
+    requestAnimationFrame(() => sp.classList.add('visible'));
+  }
+  // Drop new pins staggered
+  allBatches[idx].forEach((poi, i) => {
+    setTimeout(() => {
+      const pin = createPin(poi, false);
+      pin.onclick = () => openDetail(idx, i);
+      map.appendChild(pin);
+      requestAnimationFrame(() => requestAnimationFrame(() => pin.classList.add('visible')));
+    }, initial ? i * 250 : 150 + i * 200);
+  });
+  // Render cards
+  renderCards(idx, initial);
+}
+
+function createPin(poi, isSaved) {
+  const el = document.createElement('div');
+  el.className = 'pin hidden' + (isSaved ? ' saved' : '');
+  el.style.left = poi.x + '%';
+  el.style.top = poi.y + '%';
+  el.innerHTML = `
+    <div class="pin-marker">${poi.emoji}</div>
+    <div class="pin-label">${poi.name}</div>
+    ${!isSaved && poi.why ? `<div class="pin-why">${poi.why.substring(0, 40)}...</div>` : ''}
+  `;
+  return el;
+}
+
+// === CARDS ===
+function renderCards(idx, initial) {
+  const strip = document.getElementById('cardStrip');
+  // Remove old
+  strip.querySelectorAll('.poi-card').forEach(c => {
+    c.style.opacity = '0';
+    c.style.transform = 'translateY(20px) scale(0.9)';
+    setTimeout(() => c.remove(), 350);
+  });
+
+  allBatches[idx].forEach((poi, i) => {
+    setTimeout(() => {
+      const card = document.createElement('div');
+      card.className = 'poi-card entering';
+      card.onclick = () => openDetail(idx, i);
+      card.innerHTML = `
+        <button class="poi-card-save" onclick="event.stopPropagation(); saveFromCard(this)">🤍</button>
+        <div class="poi-card-header">
+          <span class="poi-card-emoji">${poi.emoji}</span>
+          <span class="poi-card-name">${poi.name}</span>
+        </div>
+        <div class="poi-card-vibe">${poi.vibe}</div>
+        <div class="poi-card-why">${poi.why}</div>
+      `;
+      strip.appendChild(card);
+      requestAnimationFrame(() => requestAnimationFrame(() => card.classList.replace('entering', 'visible')));
+    }, 200 + i * 150);
+  });
+}
+
+// === NAVIGATION ===
+function navigateBatch(dir) {
+  const newIdx = currentBatch + dir;
+  if (newIdx < 0 || newIdx >= allBatches.length) {
+    if (newIdx >= allBatches.length) {
+      showToast("You've explored all 9 places here! ✨");
+    }
+    return;
+  }
+  currentBatch = newIdx;
+  renderBatch(newIdx, false);
+  updateRefreshUI();
+}
+
+function updateRefreshUI() {
+  const remaining = (allBatches.length - currentBatch - 1) * 3;
+  const btn = document.getElementById('refreshBtn');
+  const badge = document.getElementById('refreshBadge');
+  const back = document.getElementById('backBtn');
+
+  if (remaining > 0) {
+    btn.className = 'refresh-btn';
+    btn.innerHTML = `Discover more <span class="badge">${remaining}</span>`;
+  } else {
+    btn.className = 'refresh-btn empty';
+    btn.innerHTML = `Search deeper... <span class="badge">✨</span>`;
+  }
+  back.className = 'refresh-back' + (currentBatch === 0 ? ' disabled' : '');
+}
+
+// === DETAIL ===
+function openDetail(batchIdx, poiIdx) {
+  if (searchOpen) toggleSearch();
+  currentDetailIdx = poiIdx;
+  const poi = allBatches[batchIdx][poiIdx];
+  document.getElementById('detailEmoji').textContent = poi.emoji;
+  document.getElementById('detailName').textContent = poi.name;
+  document.getElementById('detailVibe').textContent = poi.vibe;
+  document.getElementById('detailWhy').textContent = poi.why;
+  document.getElementById('detailRating').textContent = poi.rating;
+  document.getElementById('detailHours').textContent = poi.hours;
+  document.getElementById('detailDist').textContent = poi.dist;
+
+  // Swipe dots
+  const dots = document.getElementById('detailDots');
+  dots.innerHTML = '';
+  allBatches[batchIdx].forEach((_, i) => {
+    const d = document.createElement('div');
+    d.className = 'detail-dot' + (i === poiIdx ? ' active' : '');
+    d.onclick = (e) => { e.stopPropagation(); openDetail(batchIdx, i); };
+    dots.appendChild(d);
+  });
+
+  document.getElementById('detailOverlay').classList.add('open');
+}
+
+function closeDetail() {
+  document.getElementById('detailOverlay').classList.remove('open');
+}
+
+// === SEARCH ===
+function toggleSearch() {
+  searchOpen = !searchOpen;
+  document.getElementById('searchBar').classList.toggle('active', searchOpen);
+  document.getElementById('searchDropdown').classList.toggle('open', searchOpen);
+}
+
+function selectPlace(name) {
+  document.getElementById('searchText').textContent = name;
+  toggleSearch();
+  showToast('Loading ' + name + '...');
+  // Simulate area change
+  currentBatch = 0;
+  setTimeout(() => {
+    renderBatch(0, true);
+    updateRefreshUI();
+    showToast(name + ' loaded');
+  }, 800);
+}
+
+function refreshArea() {
+  showToast('Refreshing area...');
+  currentBatch = 0;
+  setTimeout(() => {
+    renderBatch(0, true);
+    updateRefreshUI();
+  }, 600);
+}
+
+// === SAVE ===
+function saveFromCard(btn) {
+  btn.textContent = '❤️';
+  btn.classList.add('saved');
+  saveCount++;
+  document.getElementById('saveCount').textContent = saveCount;
+  showToast('Saved!');
+}
+
+function savePoi() {
+  saveCount++;
+  document.getElementById('saveCount').textContent = saveCount;
+  showToast('Saved! ❤️');
+  closeDetail();
+}
+
+// === VIBE ===
+function toggleVibe(chip) {
+  const wasActive = chip.classList.contains('active');
+  document.querySelectorAll('.vibe-chip').forEach(c => c.classList.remove('active'));
+  if (!wasActive) chip.classList.add('active');
+}
+
+// === TOAST ===
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+</script>
+</body>
+</html>

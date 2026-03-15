@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Game UI Anchoring Patterns — Cross-Pollination Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0a1a; color: #e0e0e0; overflow: hidden; height: 100vh; }
+
+  .world {
+    position: relative; width: 100%; height: 100vh;
+    background: radial-gradient(ellipse at 50% 80%, #1a2a3a 0%, #0a0a1a 70%);
+    cursor: grab; overflow: hidden;
+  }
+  .world.dragging { cursor: grabbing; }
+
+  /* Ground plane grid */
+  .ground {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(100,200,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(100,200,255,0.04) 1px, transparent 1px);
+    background-size: 80px 80px;
+    pointer-events: none;
+  }
+
+  /* Characters (map pins equivalent) */
+  .character {
+    position: absolute; transform: translate(-50%, -100%);
+    z-index: 10; cursor: pointer; transition: filter 0.2s;
+  }
+  .character:hover { filter: brightness(1.3); }
+  .char-body {
+    width: 36px; height: 52px; border-radius: 18px 18px 8px 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; position: relative;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .char-shadow {
+    width: 30px; height: 8px; border-radius: 50%;
+    background: rgba(0,0,0,0.4); margin: 2px auto 0;
+  }
+  .character[data-type="warrior"] .char-body { background: linear-gradient(180deg, #c0392b, #96281b); }
+  .character[data-type="mage"] .char-body { background: linear-gradient(180deg, #8e44ad, #6c3483); }
+  .character[data-type="healer"] .char-body { background: linear-gradient(180deg, #27ae60, #1e8449); }
+
+  /* === PATTERN A: Health Bar + Name Plate (Classic MMO) === */
+  .nameplate {
+    position: absolute; z-index: 20; pointer-events: none;
+    display: flex; flex-direction: column; align-items: center;
+    transition: opacity 0.25s, transform 0.25s;
+  }
+  .nameplate.hidden { opacity: 0; transform: translateY(8px); }
+  .nameplate .np-name {
+    font-size: 11px; font-weight: 700; color: #fff;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.9);
+    margin-bottom: 3px; white-space: nowrap;
+  }
+  .nameplate .np-bar-bg {
+    width: 60px; height: 6px; border-radius: 3px;
+    background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1);
+    overflow: hidden;
+  }
+  .nameplate .np-bar-fill {
+    height: 100%; border-radius: 3px; transition: width 0.5s;
+  }
+  .nameplate .np-bar-fill.hp { background: linear-gradient(90deg, #e74c3c, #27ae60); }
+
+  /* === PATTERN B: Floating Info Card (RPG Inspect) === */
+  .inspect-card {
+    position: absolute; z-index: 25;
+    background: rgba(15, 15, 30, 0.95);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px; padding: 12px 16px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    min-width: 170px; max-width: 200px;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  .inspect-card.hidden { opacity: 0; transform: scale(0.85); pointer-events: none; }
+  .inspect-card .ic-class { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .inspect-card .ic-name { font-size: 14px; font-weight: 600; color: #fff; }
+  .inspect-card .ic-stat { font-size: 11px; color: #aaa; margin-top: 3px; }
+  .inspect-card .ic-stat span { color: #f1c40f; }
+
+  /* === PATTERN C: Callout Bubble (Tutorial/Onboarding) === */
+  .tutorial-callout {
+    position: absolute; z-index: 30;
+    background: rgba(52, 152, 219, 0.15);
+    border: 1px solid rgba(52, 152, 219, 0.4);
+    border-radius: 14px; padding: 12px 16px;
+    max-width: 220px; font-size: 12px; line-height: 1.5;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .tutorial-callout .tc-title { color: #3498db; font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+  .tutorial-callout .tc-arrow {
+    position: absolute; width: 12px; height: 12px;
+    background: rgba(52, 152, 219, 0.15);
+    border: 1px solid rgba(52, 152, 219, 0.4);
+    transform: rotate(45deg);
+  }
+  .tutorial-callout .tc-arrow.bottom { bottom: -7px; left: 50%; margin-left: -6px; border-top: none; border-left: none; }
+  .tutorial-callout .tc-arrow.top { top: -7px; left: 50%; margin-left: -6px; border-bottom: none; border-right: none; }
+  .tutorial-callout .tc-arrow.left { left: -7px; top: 50%; margin-top: -6px; border-top: none; border-right: none; }
+
+  /* Leader lines (SVG) */
+  .leader-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 15;
+  }
+  .leader-line { stroke-width: 1.5; fill: none; opacity: 0.5; }
+  .leader-line.dashed { stroke-dasharray: 5 3; }
+  .leader-line.glow { stroke-width: 3; opacity: 0.15; filter: blur(2px); }
+
+  /* Pulse ring on character when card shown */
+  .pulse-ring {
+    position: absolute; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.3);
+    animation: char-pulse 2s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes char-pulse {
+    0% { width: 40px; height: 40px; opacity: 0.6; margin: -20px 0 0 -20px; }
+    100% { width: 100px; height: 100px; opacity: 0; margin: -50px 0 0 -50px; }
+  }
+
+  /* Controls */
+  .controls-toggle {
+    position: fixed; top: 16px; left: 16px; z-index: 101;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(15, 15, 30, 0.95); border: 1px solid rgba(255,255,255,0.15);
+    color: #3498db; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(12px); transition: transform 0.3s;
+  }
+  .controls-toggle:hover { transform: scale(1.1); }
+  .controls-toggle.open { transform: rotate(180deg); }
+
+  .controls {
+    position: fixed; top: 16px; left: 68px; z-index: 100;
+    background: rgba(15, 15, 30, 0.95); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px; padding: 20px; min-width: 300px;
+    backdrop-filter: blur(12px);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform-origin: top left;
+  }
+  .controls.collapsed { transform: scale(0); opacity: 0; pointer-events: none; }
+  .controls h2 { font-size: 15px; color: #3498db; margin-bottom: 4px; }
+  .controls .subtitle { font-size: 11px; color: #666; margin-bottom: 14px; }
+  .controls h3 { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 8px; }
+
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn {
+    padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05); color: #e0e0e0; font-size: 12px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn:hover { background: rgba(255,255,255,0.1); }
+  .btn.active { background: rgba(52, 152, 219, 0.3); border-color: #3498db; color: #3498db; }
+
+  .scenario-btn {
+    padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02); color: #ccc; font-size: 12px;
+    cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; margin-bottom: 6px;
+  }
+  .scenario-btn:hover { background: rgba(52, 152, 219, 0.12); border-color: rgba(52, 152, 219, 0.3); }
+  .scenario-btn .sc-label { font-weight: 600; }
+  .scenario-btn .sc-desc { color: #666; font-size: 11px; }
+
+  .status-bar {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 100;
+    background: rgba(15, 15, 30, 0.9); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 10px 18px; font-size: 11px; color: #888;
+    text-align: center;
+  }
+  .status-bar .highlight { color: #3498db; font-weight: 600; }
+
+  .gesture-indicator {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 16px; color: rgba(255,255,255,0.25); font-weight: 600;
+    pointer-events: none; z-index: 50;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .gesture-indicator.visible { opacity: 1; }
+
+  /* Comparison label */
+  .pattern-label {
+    position: fixed; top: 16px; right: 16px; z-index: 100;
+    background: rgba(15, 15, 30, 0.9); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px; padding: 12px 16px; text-align: right;
+  }
+  .pattern-label .pl-name { font-size: 14px; font-weight: 700; color: #3498db; }
+  .pattern-label .pl-game { font-size: 11px; color: #888; }
+  .pattern-label .pl-desc { font-size: 11px; color: #666; margin-top: 4px; max-width: 220px; }
+</style>
+</head>
+<body>
+
+<div class="world" id="world">
+  <div class="ground" id="ground"></div>
+  <svg class="leader-svg" id="leaderSvg"></svg>
+  <div id="charsLayer"></div>
+  <div id="uiLayer"></div>
+</div>
+
+<button class="controls-toggle open" id="controlsToggle" onclick="toggleControls()">⚙</button>
+
+<div class="controls" id="controlsPanel">
+  <h2>Game UI Anchoring Lab</h2>
+  <div class="subtitle">Cross-pollination: game patterns → map cards</div>
+
+  <h3>UI Pattern</h3>
+  <div class="btn-row">
+    <button class="btn active" data-pattern="nameplate" onclick="setPattern('nameplate')">Nameplates</button>
+    <button class="btn" data-pattern="inspect" onclick="setPattern('inspect')">Inspect Cards</button>
+    <button class="btn" data-pattern="hybrid" onclick="setPattern('hybrid')">Hybrid</button>
+    <button class="btn" data-pattern="tutorial" onclick="setPattern('tutorial')">Tutorial</button>
+  </div>
+
+  <h3>Collision Resolution</h3>
+  <div class="btn-row">
+    <button class="btn active" data-collision="push" onclick="setCollision('push')">Push Apart</button>
+    <button class="btn" data-collision="priority" onclick="setCollision('priority')">Priority Fade</button>
+    <button class="btn" data-collision="cascade" onclick="setCollision('cascade')">Cascade</button>
+  </div>
+
+  <h3>Leader Lines</h3>
+  <div class="btn-row">
+    <button class="btn active" data-leader="curved" onclick="setLeader('curved')">Curved</button>
+    <button class="btn" data-leader="elbow" onclick="setLeader('elbow')">Elbow</button>
+    <button class="btn" data-leader="straight" onclick="setLeader('straight')">Straight</button>
+    <button class="btn" data-leader="none" onclick="setLeader('none')">None</button>
+  </div>
+
+  <h3>Scenarios</h3>
+  <button class="scenario-btn" onclick="loadScenario('spread')">
+    <div class="sc-label">Spread — Open Field</div>
+    <div class="sc-desc">Characters well separated, cards have room</div>
+  </button>
+  <button class="scenario-btn" onclick="loadScenario('clustered')">
+    <div class="sc-label">Clustered — Battle Group</div>
+    <div class="sc-desc">Tight formation, collision stress test</div>
+  </button>
+  <button class="scenario-btn" onclick="loadScenario('vertical')">
+    <div class="sc-label">Column — Vertical Stack</div>
+    <div class="sc-desc">Characters stacked, overlap stress test</div>
+  </button>
+  <button class="scenario-btn" onclick="loadScenario('edge')">
+    <div class="sc-label">Edge — Screen Borders</div>
+    <div class="sc-desc">Characters near viewport edges, clipping test</div>
+  </button>
+</div>
+
+<div class="pattern-label" id="patternLabel">
+  <div class="pl-name">MMO Nameplates</div>
+  <div class="pl-game">World of Warcraft / FFXIV</div>
+  <div class="pl-desc">Minimal bar + name above character. Always visible. Push-apart on overlap.</div>
+</div>
+
+<div class="gesture-indicator" id="gestureIndicator">⟳ Panning... UI hidden</div>
+
+<div class="status-bar">
+  <span class="highlight">Game → Map Translation</span> ·
+  Character = Pin · Nameplate = Mini Card · Inspect = Full Card ·
+  Drag to pan · Cards settle on release
+</div>
+
+<script>
+// State
+let pattern = 'nameplate';
+let collisionMode = 'push';
+let leaderMode = 'curved';
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let currentOffsetX = 0, currentOffsetY = 0;
+let settleTimeout = null;
+
+// Characters (= POI pins)
+const chars = [
+  { id: 0, name: 'Trattoria Roma', type: 'warrior', emoji: '🍕', cls: 'Food', hp: 0.85, stat1: '★★★★½', stat2: '0.3 km · Italian', baseX: 0.45, baseY: 0.40, priority: 1 },
+  { id: 1, name: 'Temple of Arts', type: 'mage', emoji: '🎭', cls: 'Culture', hp: 0.95, stat1: '★★★★★', stat2: '0.5 km · Museum', baseX: 0.30, baseY: 0.58, priority: 2 },
+  { id: 2, name: 'Riverside Park', type: 'healer', emoji: '🌿', cls: 'Nature', hp: 0.70, stat1: '★★★★', stat2: '0.8 km · Park', baseX: 0.65, baseY: 0.55, priority: 3 },
+];
+
+const scenarios = {
+  spread: [ { baseX: 0.45, baseY: 0.38 }, { baseX: 0.25, baseY: 0.58 }, { baseX: 0.68, baseY: 0.52 } ],
+  clustered: [ { baseX: 0.43, baseY: 0.47 }, { baseX: 0.48, baseY: 0.50 }, { baseX: 0.45, baseY: 0.54 } ],
+  vertical: [ { baseX: 0.45, baseY: 0.28 }, { baseX: 0.45, baseY: 0.48 }, { baseX: 0.45, baseY: 0.68 } ],
+  edge: [ { baseX: 0.07, baseY: 0.3 }, { baseX: 0.88, baseY: 0.5 }, { baseX: 0.45, baseY: 0.88 } ],
+};
+
+const patternInfo = {
+  nameplate: { name: 'MMO Nameplates', game: 'World of Warcraft / FFXIV', desc: 'Minimal bar + name above character. Always visible. Push-apart on overlap. Map equivalent: mini chip at pin.' },
+  inspect: { name: 'RPG Inspect Cards', game: 'Diablo / Destiny', desc: 'Rich info card anchored above character with leader line. Auto-flip at edges. Map equivalent: full floating card at pin.' },
+  hybrid: { name: 'Hybrid: Plate + Inspect', game: 'Genshin Impact / Elden Ring', desc: 'Nameplates always visible. Tap/hover one to expand into full inspect card. Others stay as plates. Map equivalent: mini chips + expandable hero card.' },
+  tutorial: { name: 'Tutorial Callouts', game: 'Any game onboarding', desc: 'Callout bubbles with arrows pointing to UI elements. Measured position, auto-flip. Map equivalent: onboarding bubble anchoring.' },
+};
+
+function getCharScreenPos(c) {
+  return { x: c.baseX * window.innerWidth + currentOffsetX, y: c.baseY * window.innerHeight + currentOffsetY };
+}
+
+function getVibeColor(type) {
+  return type === 'warrior' ? '#e74c3c' : type === 'mage' ? '#9b59b6' : '#27ae60';
+}
+
+function renderChars() {
+  const layer = document.getElementById('charsLayer');
+  layer.innerHTML = '';
+  chars.forEach(c => {
+    const pos = getCharScreenPos(c);
+    const el = document.createElement('div');
+    el.className = 'character';
+    el.dataset.type = c.type;
+    el.style.left = pos.x + 'px';
+    el.style.top = pos.y + 'px';
+    el.innerHTML = `<div class="char-body">${c.emoji}</div><div class="char-shadow"></div>`;
+    layer.appendChild(el);
+  });
+}
+
+function computePositions() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const positions = [];
+
+  chars.forEach(c => {
+    const pin = getCharScreenPos(c);
+    let cardW, cardH;
+
+    if (pattern === 'nameplate') { cardW = 80; cardH = 28; }
+    else if (pattern === 'tutorial') { cardW = 200; cardH = 60; }
+    else { cardW = 180; cardH = 80; }
+
+    const gap = pattern === 'nameplate' ? 8 : 20;
+    let cardX = pin.x - cardW / 2;
+    let cardY = pin.y - 60 - gap - cardH; // above
+    let side = 'above';
+
+    // Auto-flip if clipped
+    if (cardY < 16) { cardY = pin.y + 16; side = 'below'; }
+
+    // Clamp horizontal
+    cardX = Math.max(12, Math.min(w - cardW - 12, cardX));
+    cardY = Math.max(12, Math.min(h - cardH - 12, cardY));
+
+    positions.push({ c, x: cardX, y: cardY, w: cardW, h: cardH, pinX: pin.x, pinY: pin.y - 52, side, visible: true, opacity: 1 });
+  });
+
+  // Collision
+  if (collisionMode === 'push') resolveCollisionsPush(positions);
+  else if (collisionMode === 'priority') resolveCollisionsPriority(positions);
+  else if (collisionMode === 'cascade') resolveCollisionsCascade(positions);
+
+  return positions;
+}
+
+function rectsOverlap(a, b) {
+  return !(a.x + a.w + 6 < b.x || b.x + b.w + 6 < a.x || a.y + a.h + 6 < b.y || b.y + b.h + 6 < a.y);
+}
+
+function resolveCollisionsPush(positions) {
+  for (let iter = 0; iter < 25; iter++) {
+    let moved = false;
+    for (let i = 0; i < positions.length; i++) {
+      for (let j = i + 1; j < positions.length; j++) {
+        if (!positions[i].visible || !positions[j].visible) continue;
+        if (rectsOverlap(positions[i], positions[j])) {
+          const dy = (positions[i].y + positions[i].h/2) - (positions[j].y + positions[j].h/2);
+          const dx = (positions[i].x + positions[i].w/2) - (positions[j].x + positions[j].w/2);
+          positions[i].y += (dy >= 0 ? 6 : -6);
+          positions[i].x += (Math.abs(dx) < 30 ? (dx >= 0 ? 4 : -4) : 0);
+          positions[j].y -= (dy >= 0 ? 6 : -6);
+          positions[j].x -= (Math.abs(dx) < 30 ? (dx >= 0 ? 4 : -4) : 0);
+          const w = window.innerWidth, h = window.innerHeight;
+          positions.forEach(p => { p.x = Math.max(12, Math.min(w-p.w-12, p.x)); p.y = Math.max(12, Math.min(h-p.h-12, p.y)); });
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+}
+
+function resolveCollisionsPriority(positions) {
+  // Higher priority (lower number) stays full opacity, overlapping lower priority fades
+  for (let i = 0; i < positions.length; i++) {
+    for (let j = i + 1; j < positions.length; j++) {
+      if (rectsOverlap(positions[i], positions[j])) {
+        // Lower priority index = higher priority
+        if (positions[i].c.priority < positions[j].c.priority) {
+          positions[j].opacity = 0.3;
+          positions[j].y += 10; // slight nudge
+        } else {
+          positions[i].opacity = 0.3;
+          positions[i].y += 10;
+        }
+      }
+    }
+  }
+}
+
+function resolveCollisionsCascade(positions) {
+  // Waterfall: each subsequent card offsets right and down
+  for (let i = 1; i < positions.length; i++) {
+    for (let j = 0; j < i; j++) {
+      if (rectsOverlap(positions[i], positions[j])) {
+        positions[i].x = positions[j].x + 20;
+        positions[i].y = positions[j].y + positions[j].h + 8;
+        const w = window.innerWidth, h = window.innerHeight;
+        positions[i].x = Math.max(12, Math.min(w-positions[i].w-12, positions[i].x));
+        positions[i].y = Math.max(12, Math.min(h-positions[i].h-12, positions[i].y));
+      }
+    }
+  }
+}
+
+function renderUI(animated = true) {
+  const layer = document.getElementById('uiLayer');
+  layer.innerHTML = '';
+  if (isDragging) return;
+
+  const positions = computePositions();
+
+  if (pattern === 'hybrid') {
+    renderHybrid(layer, positions, animated);
+  } else if (pattern === 'tutorial') {
+    renderTutorial(layer, positions, animated);
+  } else {
+    positions.forEach((pos, idx) => {
+      if (pattern === 'nameplate') renderNameplate(layer, pos, idx, animated);
+      else renderInspectCard(layer, pos, idx, animated);
+    });
+  }
+
+  renderLeaderLines(positions);
+}
+
+function renderNameplate(layer, pos, idx, animated) {
+  const el = document.createElement('div');
+  el.className = 'nameplate' + (pos.visible ? '' : ' hidden');
+  el.style.left = (pos.x) + 'px';
+  el.style.top = (pos.y) + 'px';
+  el.style.width = pos.w + 'px';
+  el.style.opacity = pos.opacity;
+
+  const color = getVibeColor(pos.c.type);
+  el.innerHTML = `
+    <div class="np-name">${pos.c.name}</div>
+    <div class="np-bar-bg"><div class="np-bar-fill hp" style="width: ${pos.c.hp * 100}%; background: ${color};"></div></div>
+  `;
+
+  if (animated) {
+    el.style.opacity = '0'; el.style.transform = 'translateY(8px)';
+    setTimeout(() => { el.style.opacity = String(pos.opacity); el.style.transform = 'translateY(0)'; }, 80 + idx * 60);
+  }
+  layer.appendChild(el);
+}
+
+function renderInspectCard(layer, pos, idx, animated) {
+  const el = document.createElement('div');
+  el.className = 'inspect-card' + (pos.visible ? '' : ' hidden');
+  el.style.left = pos.x + 'px';
+  el.style.top = pos.y + 'px';
+  el.style.opacity = pos.opacity;
+
+  const color = getVibeColor(pos.c.type);
+  el.innerHTML = `
+    <div class="ic-class" style="color: ${color}">${pos.c.cls}</div>
+    <div class="ic-name">${pos.c.name}</div>
+    <div class="ic-stat"><span>${pos.c.stat1}</span></div>
+    <div class="ic-stat">${pos.c.stat2}</div>
+  `;
+
+  if (animated) {
+    el.style.opacity = '0'; el.style.transform = 'scale(0.85) translateY(8px)';
+    setTimeout(() => { el.style.opacity = String(pos.opacity); el.style.transform = 'scale(1) translateY(0)'; }, 100 + idx * 80);
+  }
+  layer.appendChild(el);
+}
+
+function renderHybrid(layer, positions, animated) {
+  // All get nameplates, first one also gets inspect card
+  positions.forEach((pos, idx) => {
+    // Mini nameplate for all
+    const npPos = { ...pos, w: 80, h: 28, y: pos.pinY - 36 };
+    npPos.x = pos.pinX - 40;
+    npPos.x = Math.max(12, Math.min(window.innerWidth - npPos.w - 12, npPos.x));
+    renderNameplate(layer, npPos, idx, animated);
+  });
+
+  // Hero inspect card for first (highest priority)
+  const hero = positions[0];
+  const cardEl = document.createElement('div');
+  cardEl.className = 'inspect-card';
+  cardEl.style.left = hero.x + 'px';
+  cardEl.style.top = hero.y + 'px';
+  cardEl.style.border = `1px solid ${getVibeColor(hero.c.type)}40`;
+
+  const color = getVibeColor(hero.c.type);
+  cardEl.innerHTML = `
+    <div class="ic-class" style="color: ${color}">${hero.c.cls} · SELECTED</div>
+    <div class="ic-name">${hero.c.name}</div>
+    <div class="ic-stat"><span>${hero.c.stat1}</span></div>
+    <div class="ic-stat">${hero.c.stat2}</div>
+  `;
+
+  if (animated) {
+    cardEl.style.opacity = '0'; cardEl.style.transform = 'scale(0.85)';
+    setTimeout(() => { cardEl.style.opacity = '1'; cardEl.style.transform = 'scale(1)'; }, 200);
+  }
+  layer.appendChild(cardEl);
+
+  // Pulse ring on hero character
+  const heroPos = getCharScreenPos(hero.c);
+  const ring = document.createElement('div');
+  ring.className = 'pulse-ring';
+  ring.style.left = heroPos.x + 'px';
+  ring.style.top = (heroPos.y - 26) + 'px';
+  ring.style.borderColor = color + '60';
+  layer.appendChild(ring);
+}
+
+function renderTutorial(layer, positions, animated) {
+  // Simulate tutorial callouts pointing to characters as if they're UI elements
+  const tutorials = [
+    { target: 0, title: 'Vibes Rail', text: 'Swipe through different vibes to explore the area.', arrowSide: 'right' },
+    { target: 1, title: 'AI Search', text: 'Ask about places, history, or local tips.', arrowSide: 'right' },
+    { target: 2, title: 'Saved Places', text: 'Your bookmarked discoveries live here.', arrowSide: 'left' },
+  ];
+
+  tutorials.forEach((t, idx) => {
+    const pos = positions[t.target];
+    const el = document.createElement('div');
+    el.className = 'tutorial-callout';
+
+    let calloutX, calloutY, arrowHTML;
+    if (t.arrowSide === 'right') {
+      calloutX = pos.pinX - 240;
+      calloutY = pos.pinY - 30;
+      arrowHTML = `<div class="tc-arrow" style="right: -7px; top: 20px; left: auto; border-bottom: none; border-left: none;"></div>`;
+    } else {
+      calloutX = pos.pinX + 40;
+      calloutY = pos.pinY - 30;
+      arrowHTML = `<div class="tc-arrow left"></div>`;
+    }
+
+    el.style.left = Math.max(12, calloutX) + 'px';
+    el.style.top = calloutY + 'px';
+    el.innerHTML = `<div class="tc-title">${t.title}</div><div>${t.text}</div>${arrowHTML}`;
+
+    if (animated) {
+      el.style.opacity = '0'; el.style.transform = 'translateY(6px)';
+      setTimeout(() => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }, 150 + idx * 120);
+    }
+    layer.appendChild(el);
+
+    // Pulsing dot on target
+    const dot = document.createElement('div');
+    dot.style.cssText = `
+      position: absolute; width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(52,152,219,0.8); z-index: 26;
+      left: ${pos.pinX - 7}px; top: ${pos.pinY - 7}px;
+      animation: char-pulse 2s ease-out infinite;
+      pointer-events: none;
+    `;
+    layer.appendChild(dot);
+  });
+}
+
+function renderLeaderLines(positions) {
+  const svg = document.getElementById('leaderSvg');
+  svg.innerHTML = '';
+  if (leaderMode === 'none' || isDragging) return;
+  if (pattern === 'tutorial' || pattern === 'nameplate') return; // nameplates are too close for lines
+
+  positions.forEach(pos => {
+    if (!pos.visible || pos.opacity < 0.5) return;
+    const cardCX = pos.x + pos.w / 2;
+    const cardEdgeY = pos.side === 'above' ? pos.y + pos.h : pos.y;
+    const pinX = pos.pinX;
+    const pinY = pos.pinY;
+    const color = getVibeColor(pos.c.type);
+
+    // Glow line (background)
+    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    glow.setAttribute('class', 'leader-line glow');
+    glow.setAttribute('stroke', color);
+
+    const main = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    main.setAttribute('class', 'leader-line dashed');
+    main.setAttribute('stroke', color);
+
+    let d;
+    if (leaderMode === 'curved') {
+      const midY = (cardEdgeY + pinY) / 2;
+      d = `M ${cardCX} ${cardEdgeY} C ${cardCX} ${midY}, ${pinX} ${midY}, ${pinX} ${pinY}`;
+    } else if (leaderMode === 'elbow') {
+      const elbowY = cardEdgeY + (pinY - cardEdgeY) * 0.3;
+      d = `M ${cardCX} ${cardEdgeY} L ${cardCX} ${elbowY} L ${pinX} ${elbowY} L ${pinX} ${pinY}`;
+    } else {
+      d = `M ${cardCX} ${cardEdgeY} L ${pinX} ${pinY}`;
+    }
+
+    glow.setAttribute('d', d);
+    main.setAttribute('d', d);
+    svg.appendChild(glow);
+    svg.appendChild(main);
+  });
+}
+
+// Pan handling
+const world = document.getElementById('world');
+
+world.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.controls') || e.target.closest('.controls-toggle') || e.target.closest('.pattern-label')) return;
+  isDragging = true;
+  dragStartX = e.clientX - currentOffsetX;
+  dragStartY = e.clientY - currentOffsetY;
+  world.classList.add('dragging');
+  document.getElementById('uiLayer').innerHTML = '';
+  document.getElementById('leaderSvg').innerHTML = '';
+  document.getElementById('gestureIndicator').classList.add('visible');
+  clearTimeout(settleTimeout);
+});
+
+world.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  currentOffsetX = e.clientX - dragStartX;
+  currentOffsetY = e.clientY - dragStartY;
+  document.getElementById('ground').style.transform = `translate(${currentOffsetX % 80}px, ${currentOffsetY % 80}px)`;
+  renderChars();
+});
+
+world.addEventListener('mouseup', () => {
+  if (!isDragging) return;
+  isDragging = false;
+  world.classList.remove('dragging');
+  document.getElementById('gestureIndicator').classList.remove('visible');
+  settleTimeout = setTimeout(() => renderUI(true), 200);
+});
+
+world.addEventListener('mouseleave', () => {
+  if (!isDragging) return;
+  isDragging = false;
+  world.classList.remove('dragging');
+  document.getElementById('gestureIndicator').classList.remove('visible');
+  settleTimeout = setTimeout(() => renderUI(true), 200);
+});
+
+// Controls
+function toggleControls() {
+  document.getElementById('controlsPanel').classList.toggle('collapsed');
+  document.getElementById('controlsToggle').classList.toggle('open');
+}
+
+function setPattern(mode) {
+  pattern = mode;
+  document.querySelectorAll('[data-pattern]').forEach(b => b.classList.toggle('active', b.dataset.pattern === mode));
+  const info = patternInfo[mode];
+  document.getElementById('patternLabel').innerHTML = `
+    <div class="pl-name">${info.name}</div>
+    <div class="pl-game">${info.game}</div>
+    <div class="pl-desc">${info.desc}</div>
+  `;
+  renderUI(true);
+}
+
+function setCollision(mode) {
+  collisionMode = mode;
+  document.querySelectorAll('[data-collision]').forEach(b => b.classList.toggle('active', b.dataset.collision === mode));
+  renderUI(false);
+}
+
+function setLeader(mode) {
+  leaderMode = mode;
+  document.querySelectorAll('[data-leader]').forEach(b => b.classList.toggle('active', b.dataset.leader === mode));
+  renderUI(false);
+}
+
+function loadScenario(name) {
+  const sc = scenarios[name];
+  currentOffsetX = 0; currentOffsetY = 0;
+  document.getElementById('ground').style.transform = 'translate(0,0)';
+  chars.forEach((c, i) => { c.baseX = sc[i].baseX; c.baseY = sc[i].baseY; });
+  renderChars();
+  renderUI(true);
+}
+
+window.addEventListener('resize', () => { renderChars(); renderUI(false); });
+
+// Init
+renderChars();
+renderUI(true);
+</script>
+</body>
+</html>

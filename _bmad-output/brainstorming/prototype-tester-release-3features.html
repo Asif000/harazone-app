@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Tester Release: 3 Features</title>
+<style>
+  :root {
+    --bg-dark:#0d1b2a;--ui-dark:rgba(20,14,28,0.92);--ui-dark-solid:#1a1224;
+    --accent:#4ecdc4;--accent-glow:rgba(78,205,196,0.35);
+    --gold:#FFD700;--gold-light:#FFE26A;
+    --green:#66bb6a;--red:#ef5350;--orange:#ffa726;
+    --text-primary:#fafafa;--text-secondary:rgba(255,255,255,0.6);--text-dim:rgba(255,255,255,0.35);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);--ease-out:cubic-bezier(0.16,1,0.3,1);
+    --vibe-art:#e040fb;--vibe-cafe:#ff7043;--vibe-music:#42a5f5;--vibe-food:#66bb6a;--vibe-history:#ab47bc;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text-primary);overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
+
+  .page-header{text-align:center;padding:20px 16px 6px;font-size:12px;color:#888;letter-spacing:1px;text-transform:uppercase}
+  .page-header h1{font-size:18px;color:#fff;letter-spacing:0;text-transform:none;margin-bottom:4px}
+  .page-header p{font-size:11px;color:#666;text-transform:none;letter-spacing:0;max-width:600px;margin:0 auto;line-height:1.4}
+
+  .feature-tabs{display:flex;gap:6px;padding:10px 16px 6px;flex-wrap:wrap;justify-content:center}
+  .feature-tab{padding:10px 18px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);font-size:12px;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;white-space:nowrap;font-weight:500}
+  .feature-tab:active{transform:scale(0.95)}
+  .feature-tab.active{background:rgba(78,205,196,0.15);border-color:rgba(78,205,196,0.3);color:var(--accent);font-weight:600}
+
+  .feature-desc{text-align:center;padding:4px 16px 12px;font-size:11px;color:#666;max-width:500px;margin:0 auto;line-height:1.4;min-height:32px}
+
+  .phone{width:375px;border-radius:32px;border:2px solid #333;overflow:hidden;position:relative;flex-shrink:0;height:750px}
+  .phone.map-mode{background:var(--bg-dark)}
+  .phone.list-mode{background:#111}
+
+  .map{position:absolute;inset:0;background:var(--bg-dark)}
+  .map::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 35% 45%,#1b2838 0%,transparent 50%),radial-gradient(circle at 65% 55%,#162230 0%,transparent 40%);pointer-events:none}
+  .map::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%),linear-gradient(90deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%);background-size:60px 60px;opacity:0.2;pointer-events:none}
+
+  .search-row{position:absolute;top:50px;left:12px;right:12px;z-index:100;height:44px;border-radius:14px;background:var(--ui-dark);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 12px;gap:8px}
+  .search-icon{font-size:13px;opacity:0.45}
+  .search-text{flex:1;font-size:12px;color:var(--text-primary);font-weight:500}
+  .search-actions{display:flex;gap:4px;align-items:center}
+  .now-toggle{display:flex;align-items:center;gap:3px;padding:4px 10px;border-radius:8px;border:1px solid rgba(78,205,196,0.25);background:rgba(78,205,196,0.08);font-size:9px;color:var(--accent);font-weight:600;cursor:pointer;transition:all 0.2s}
+  .now-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:nowPulse 2s ease-in-out infinite}
+  @keyframes nowPulse{0%,100%{opacity:0.6}50%{opacity:1}}
+  .search-btn{width:30px;height:30px;border-radius:9px;background:rgba(78,205,196,0.15);border:none;color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+
+  /* ===== CONTEXT TICKER (below search) ===== */
+  .context-ticker{position:absolute;top:100px;left:12px;right:12px;z-index:95;height:28px;border-radius:10px;background:rgba(20,14,28,0.85);backdrop-filter:blur(12px);border:1px solid rgba(78,205,196,0.12);display:flex;align-items:center;padding:0 10px;gap:6px;overflow:hidden}
+  .ticker-icon{font-size:11px;flex-shrink:0}
+  .ticker-text{font-size:10px;color:var(--text-secondary);white-space:nowrap;flex:1;overflow:hidden}
+  .ticker-text strong{color:var(--accent);font-weight:600}
+  .ticker-divider{width:1px;height:14px;background:rgba(255,255,255,0.1);flex-shrink:0}
+  .ticker-stat{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-dim);flex-shrink:0;white-space:nowrap}
+  .ticker-stat-dot{width:5px;height:5px;border-radius:50%}
+  .ticker-fade{position:absolute;right:0;top:0;bottom:0;width:30px;background:linear-gradient(to right,transparent,rgba(20,14,28,0.85));border-radius:0 10px 10px 0;pointer-events:none}
+
+  /* ===== PINS ===== */
+  .pin{position:absolute;z-index:20;display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:all 0.45s var(--ease-spring)}
+  .pin.hidden{opacity:0;transform:translate(-50%,-50%) scale(0);pointer-events:none}
+  .pin.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .pin.ghost{opacity:0.35;filter:grayscale(0.5)}
+  .pin.selected{z-index:25;transform:translate(-50%,-50%) scale(1.2)}
+  .pin.selected .pin-marker{box-shadow:0 0 0 3px #fff,0 0 20px var(--accent-glow)}
+  @keyframes pinBounce{0%{transform:translate(-50%,-50%) scale(1.2)}50%{transform:translate(-50%,-50%) scale(1.35)}100%{transform:translate(-50%,-50%) scale(1.2)}}
+  .pin.selected.bounce{animation:pinBounce 0.4s var(--ease-spring)}
+  .pin-marker{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;transition:all 0.3s;position:relative}
+  .pin.ghost .pin-marker{background:#2a2e35!important;border-color:#555!important;box-shadow:none!important;border-style:dashed}
+  .pin-label{margin-top:3px;font-size:9px;font-weight:600;color:#fff;background:rgba(0,0,0,0.7);padding:2px 7px;border-radius:4px;white-space:nowrap;max-width:85px;overflow:hidden;text-overflow:ellipsis;opacity:1;transition:opacity 0.3s}
+  .pin-status{position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;border:2px solid var(--bg-dark)}
+  .pin-status.open{background:var(--green)}
+  .pin-status.closed{background:var(--red)}
+  .pin-status.closing{background:var(--orange);animation:closingPulse 1.5s ease-in-out infinite}
+  @keyframes closingPulse{0%,100%{opacity:0.7}50%{opacity:1}}
+
+  /* Pin activity ring — pulsing outer ring for "something happening now" */
+  @keyframes activityPulse{0%{transform:scale(1);opacity:0.6}50%{transform:scale(1.5);opacity:0}100%{transform:scale(1);opacity:0}}
+  .pin-activity-ring{position:absolute;inset:-4px;border-radius:50%;border:2px solid;opacity:0;pointer-events:none}
+  .pin-activity-ring.active{animation:activityPulse 2s ease-out infinite}
+
+  /* Pin micro-badge (top-left, shows contextual icon) */
+  .pin-micro{position:absolute;top:-4px;left:-4px;width:16px;height:16px;border-radius:50%;background:var(--ui-dark-solid);border:1.5px solid rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:8px;opacity:0;transition:opacity 0.3s 0.5s}
+  .pin-micro.show{opacity:1}
+
+  /* ===== BOTTOM CAROUSEL ===== */
+  .carousel-wrap{position:absolute;bottom:62px;left:0;right:0;z-index:70;pointer-events:none}
+  .carousel{display:flex;gap:10px;padding:0 calc(50% - 140px);overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;pointer-events:all}
+  .carousel::-webkit-scrollbar{display:none}
+
+  .carousel-card{flex-shrink:0;width:280px;border-radius:16px;background:var(--ui-dark-solid);border:1px solid rgba(255,255,255,0.1);overflow:hidden;scroll-snap-align:center;cursor:pointer;transition:all 0.3s var(--ease-spring);position:relative}
+  .carousel-card:active{transform:scale(0.97)}
+  .carousel-card.active-card{border-color:rgba(78,205,196,0.4);box-shadow:0 4px 24px rgba(78,205,196,0.15)}
+  .carousel-card.ghost-card{opacity:0.4}
+
+  .cc-stripe{height:3px;width:100%}
+  .cc-stripe.open{background:var(--green)}
+  .cc-stripe.closing{background:var(--orange)}
+  .cc-stripe.closed{background:var(--red)}
+
+  .cc-body{padding:10px 14px 12px;display:flex;gap:10px}
+  .cc-emoji{font-size:28px;flex-shrink:0;width:36px;height:36px;display:flex;align-items:center;justify-content:center}
+  .cc-info{flex:1;min-width:0}
+  .cc-top{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+  .cc-name{font-size:13px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .cc-status{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:8px;font-weight:600;flex-shrink:0}
+  .cc-status.open{background:rgba(102,187,106,0.15);color:var(--green)}
+  .cc-status.closing{background:rgba(255,167,38,0.15);color:var(--orange)}
+  .cc-status.closed{background:rgba(239,83,80,0.15);color:var(--red)}
+  .cc-vibe{font-size:9px;font-weight:600;margin-bottom:3px}
+  .cc-insight{font-size:10px;color:var(--text-secondary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .cc-bottom{padding:6px 14px 10px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(255,255,255,0.05)}
+  .cc-meta{display:flex;gap:8px;font-size:9px;color:var(--text-dim)}
+  .cc-ctas{display:flex;gap:5px}
+  .cc-cta{height:26px;padding:0 10px;border-radius:7px;border:none;font-size:9px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;transition:all 0.15s}
+  .cc-cta.primary{background:var(--accent);color:#111}
+  .cc-cta.secondary{background:rgba(255,255,255,0.08);color:var(--text-secondary);border:1px solid rgba(255,255,255,0.1)}
+
+  .carousel-dots{display:flex;justify-content:center;gap:5px;padding:8px 0 0;pointer-events:none}
+  .carousel-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.15);transition:all 0.3s}
+  .carousel-dot.active{background:var(--accent);width:16px;border-radius:3px}
+
+  /* ===== RELAUNCH GREETING ===== */
+  .relaunch-card{position:absolute;top:138px;left:12px;right:60px;z-index:90;border-radius:16px;background:var(--ui-dark-solid);border:1px solid rgba(78,205,196,0.2);padding:14px 16px;opacity:0;transform:translateY(-12px);transition:all 0.5s var(--ease-spring);pointer-events:none}
+  .relaunch-card.show{opacity:1;transform:translateY(0);pointer-events:all}
+  .relaunch-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .relaunch-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2a7c76);display:flex;align-items:center;justify-content:center;font-size:14px}
+  .relaunch-title{font-size:12px;font-weight:600;flex:1}
+  .relaunch-close{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-dim);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .relaunch-items{display:flex;flex-direction:column;gap:6px}
+  .relaunch-item{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-secondary);line-height:1.3;cursor:pointer;padding:4px 6px;border-radius:8px;transition:background 0.15s}
+  .relaunch-item:active{background:rgba(255,255,255,0.05)}
+  .relaunch-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .relaunch-dot.green{background:var(--green)}
+  .relaunch-dot.orange{background:var(--orange)}
+  .relaunch-dot.blue{background:#42a5f5}
+  .relaunch-dot.red{background:var(--red)}
+
+  /* ===== AI WHISPER (unified ambient notification) ===== */
+  .whisper{position:absolute;z-index:72;left:12px;right:60px;border-radius:14px;background:var(--ui-dark-solid);border:1px solid rgba(255,255,255,0.08);padding:10px 14px;display:flex;align-items:center;gap:10px;opacity:0;transform:translateY(16px);transition:all 0.5s var(--ease-spring);pointer-events:none}
+  .whisper.show{opacity:1;transform:translateY(0);pointer-events:all}
+  .whisper.urgent{border-color:rgba(255,167,38,0.3)}
+  .whisper.discovery{border-color:rgba(78,205,196,0.3)}
+  .whisper-icon{font-size:20px;flex-shrink:0}
+  .whisper-body{flex:1}
+  .whisper-text{font-size:11px;color:var(--text-secondary);line-height:1.35}
+  .whisper-text strong{color:var(--text-primary);font-weight:600}
+  .whisper-tag{display:inline-block;font-size:8px;font-weight:600;padding:1px 5px;border-radius:3px;margin-top:3px}
+  .whisper-tag.time{background:rgba(255,167,38,0.15);color:var(--orange)}
+  .whisper-tag.fact{background:rgba(78,205,196,0.15);color:var(--accent)}
+  .whisper-tag.trending{background:rgba(224,64,251,0.15);color:var(--vibe-art)}
+  .whisper-dismiss{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-dim);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .whisper-progress{position:absolute;bottom:0;left:0;height:2px;border-radius:0 0 14px 14px;transition:width linear}
+  .whisper-progress.urgent{background:var(--orange)}
+  .whisper-progress.discovery{background:var(--accent)}
+  .whisper-progress.trending{background:var(--vibe-art)}
+
+  /* ===== VIBE RAIL ===== */
+  .vibe-rail{position:absolute;bottom:195px;right:8px;z-index:28;display:flex;flex-direction:column;gap:4px;align-items:center}
+  .saved-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;margin-bottom:2px}
+  .saved-orb{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--gold-light),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(255,215,0,0.3);opacity:0.4}
+  .saved-label{font-size:8px;color:var(--gold);margin-top:1px;font-weight:500;opacity:0.4}
+  .vibe-divider{width:22px;height:1px;background:rgba(255,255,255,0.12);margin:2px 0}
+  .vibe-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center}
+  .vibe-orb{border-radius:50%;display:flex;align-items:center;justify-content:center;transition:all 0.3s}
+  .vibe-orb.active{border:2px solid #fff;box-shadow:0 0 12px var(--accent-glow)}
+  .vibe-orb-label{font-size:8px;color:rgba(255,255,255,0.8);margin-top:1px;text-align:center}
+  .vibe-count-badge{position:absolute;top:-2px;right:-2px;min-width:13px;height:13px;border-radius:7px;background:#4a7cf7;color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #0a0c10;padding:0 2px}
+
+  /* ===== BOTTOM BAR ===== */
+  .bottom-bar{position:absolute;bottom:0;left:0;right:0;z-index:80;padding:0 12px 20px;display:flex;align-items:flex-end;justify-content:space-between}
+  .ai-bar{height:36px;border-radius:18px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer;max-width:160px}
+  .ai-bar-icon{font-size:12px}
+  .ai-bar-text{font-size:10px;color:var(--text-secondary);white-space:nowrap;overflow:hidden}
+  @keyframes ghostCycle{0%,100%{opacity:0.5}50%{opacity:0.8}}
+  .ghost-text{animation:ghostCycle 3s ease-in-out infinite}
+  .bottom-right{display:flex;gap:6px;align-items:flex-end}
+  .toggle-btn{height:32px;border-radius:16px;background:var(--ui-dark);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;overflow:hidden}
+  .toggle-seg{padding:0 11px;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-dim);border:none;background:transparent;cursor:pointer}
+  .toggle-seg.active{color:var(--accent)}
+  .fab{width:44px;height:44px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:23px;color:#111;font-weight:300;cursor:pointer;box-shadow:0 3px 16px var(--accent-glow)}
+  .my-loc{position:absolute;bottom:195px;left:12px;z-index:65;width:32px;height:32px;border-radius:50%;background:var(--ui-dark);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+
+  .sub-tabs{display:flex;gap:4px;padding:2px 16px 10px;flex-wrap:wrap;justify-content:center}
+  .sub-tab{padding:5px 12px;border-radius:8px;border:1px solid rgba(255,255,255,0.08);background:transparent;font-size:10px;color:var(--text-dim);cursor:pointer;transition:all 0.2s}
+  .sub-tab.active{background:rgba(255,255,255,0.08);color:var(--text-secondary);border-color:rgba(255,255,255,0.15)}
+
+  .hidden{display:none!important}
+  .scene-label{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:150;padding:4px 12px;border-radius:8px;background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.25);font-size:10px;color:var(--accent);font-weight:600;opacity:0;transition:all 0.4s;pointer-events:none;white-space:nowrap}
+  .scene-label.show{opacity:1}
+
+  /* ===== LIST VIEW ===== */
+  .list-view{position:absolute;inset:0;background:#111;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .list-header{position:sticky;top:0;z-index:10;padding:50px 16px 12px;background:linear-gradient(to bottom,#111 80%,transparent)}
+  .list-search{height:40px;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 12px;gap:8px}
+  .list-search-icon{font-size:12px;opacity:0.4}
+  .list-search-text{font-size:12px;color:var(--text-dim)}
+  .list-vibe-tabs{display:flex;gap:6px;padding:8px 16px;overflow-x:auto;scrollbar-width:none}
+  .list-vibe-tabs::-webkit-scrollbar{display:none}
+  .list-vibe-tab{display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.04);font-size:11px;color:var(--text-secondary);white-space:nowrap;cursor:pointer;transition:all 0.2s;flex-shrink:0}
+  .list-vibe-tab.active{border-color:var(--accent);background:rgba(78,205,196,0.1);color:var(--accent);font-weight:600}
+  .list-vibe-tab .tab-dot{width:8px;height:8px;border-radius:50%}
+  .list-section-label{padding:12px 16px 6px;font-size:10px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px}
+  .list-card{margin:6px 12px;border-radius:16px;overflow:hidden;cursor:pointer;position:relative;transition:all 0.2s}
+  .list-card:active{transform:scale(0.98)}
+  .list-card-bg{height:140px;background-size:cover;background-position:center;position:relative}
+  .list-card-bg::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.85) 0%,rgba(0,0,0,0.2) 50%,rgba(0,0,0,0.1) 100%)}
+  .list-card-emoji-overlay{position:absolute;top:10px;right:10px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,0.5);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;font-size:18px;z-index:2}
+  .list-card-status-badge{position:absolute;top:10px;left:10px;display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:9px;font-weight:600;z-index:2;backdrop-filter:blur(8px)}
+  .list-card-status-badge.open{background:rgba(102,187,106,0.25);color:var(--green)}
+  .list-card-status-badge.closing{background:rgba(255,167,38,0.25);color:var(--orange)}
+  .list-card-status-badge.closed{background:rgba(239,83,80,0.25);color:var(--red)}
+  .list-card-content{position:absolute;bottom:0;left:0;right:0;padding:12px 14px;z-index:2}
+  .list-card-vibe{font-size:9px;font-weight:600;margin-bottom:2px}
+  .list-card-name{font-size:15px;font-weight:700;line-height:1.2;margin-bottom:3px}
+  .list-card-why{font-size:11px;color:var(--text-secondary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .list-card-bottom{padding:8px 14px 10px;background:rgba(26,18,36,0.95);display:flex;align-items:center;justify-content:space-between}
+  .list-card-meta{display:flex;gap:10px;font-size:10px;color:var(--text-dim)}
+  .list-card-ctas{display:flex;gap:6px}
+  .list-cta{height:28px;padding:0 12px;border-radius:8px;border:none;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:3px;transition:all 0.15s}
+  .list-cta.save{background:rgba(255,215,0,0.12);color:var(--gold);border:1px solid rgba(255,215,0,0.2)}
+  .list-cta.save.saved{background:rgba(255,215,0,0.25);color:var(--gold)}
+  .list-cta.detail{background:rgba(78,205,196,0.12);color:var(--accent);border:1px solid rgba(78,205,196,0.2)}
+
+  /* ===== CHAT DETAIL PAGE ===== */
+  .chat-detail{position:absolute;inset:0;background:#0a0a0f;z-index:200;display:flex;flex-direction:column;overflow:hidden}
+  .chat-detail-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:70px}
+
+  /* POI Header Card (sticky) */
+  .cd-header{position:sticky;top:0;z-index:10;background:#0a0a0f;padding:44px 0 0}
+  .cd-topbar{display:flex;align-items:center;padding:8px 12px;gap:8px}
+  .cd-back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-primary);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .cd-topbar-title{flex:1;font-size:13px;font-weight:600;text-align:center}
+  .cd-topbar-actions{display:flex;gap:6px}
+  .cd-action-btn{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-secondary);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+  .cd-poi-card{margin:0 12px 8px;border-radius:16px;background:var(--ui-dark-solid);border:1px solid rgba(255,255,255,0.1);overflow:hidden}
+  .cd-poi-stripe{height:3px;width:100%}
+  .cd-poi-stripe.open{background:var(--green)}
+  .cd-poi-stripe.closing{background:var(--orange)}
+  .cd-poi-stripe.closed{background:var(--red)}
+  .cd-poi-body{padding:12px 16px}
+  .cd-poi-top{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+  .cd-poi-emoji{font-size:32px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border-radius:12px;background:rgba(255,255,255,0.05)}
+  .cd-poi-info{flex:1}
+  .cd-poi-name{font-size:16px;font-weight:700}
+  .cd-poi-vibe{font-size:10px;font-weight:600;margin-top:1px}
+  .cd-poi-status{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:6px;font-size:9px;font-weight:600}
+  .cd-poi-status.open{background:rgba(102,187,106,0.15);color:var(--green)}
+  .cd-poi-status.closing{background:rgba(255,167,38,0.15);color:var(--orange)}
+  .cd-poi-status.closed{background:rgba(239,83,80,0.15);color:var(--red)}
+  .cd-poi-meta{display:flex;gap:10px;font-size:10px;color:var(--text-dim);margin-top:6px;flex-wrap:wrap}
+  .cd-poi-actions{display:flex;gap:6px;margin-top:8px}
+  .cd-poi-act{height:28px;padding:0 12px;border-radius:8px;border:none;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px}
+  .cd-poi-act.save{background:rgba(255,215,0,0.12);color:var(--gold);border:1px solid rgba(255,215,0,0.2)}
+  .cd-poi-act.save.saved{background:rgba(255,215,0,0.25)}
+  .cd-poi-act.directions{background:rgba(78,205,196,0.12);color:var(--accent);border:1px solid rgba(78,205,196,0.2)}
+  .cd-poi-act.share{background:rgba(255,255,255,0.06);color:var(--text-secondary);border:1px solid rgba(255,255,255,0.1)}
+
+  /* Chat messages */
+  .cd-chat{padding:8px 12px 0}
+  .cd-msg{margin-bottom:10px;max-width:88%;animation:msgFadeIn 0.3s var(--ease-spring)}
+  @keyframes msgFadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .cd-msg.ai{margin-right:auto}
+  .cd-msg.user{margin-left:auto}
+  .cd-msg-bubble{padding:10px 14px;border-radius:16px;font-size:12px;line-height:1.5}
+  .cd-msg.ai .cd-msg-bubble{background:rgba(78,205,196,0.1);border:1px solid rgba(78,205,196,0.15);border-bottom-left-radius:4px;color:var(--text-secondary)}
+  .cd-msg.ai .cd-msg-bubble strong{color:var(--text-primary)}
+  .cd-msg.user .cd-msg-bubble{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.12);border-bottom-right-radius:4px;color:var(--text-primary)}
+  .cd-msg-label{font-size:9px;color:var(--text-dim);margin-bottom:3px;display:flex;align-items:center;gap:4px}
+  .cd-msg.ai .cd-msg-label{padding-left:4px}
+  .cd-msg.user .cd-msg-label{text-align:right;justify-content:flex-end;padding-right:4px}
+
+  /* Quick action pills */
+  .cd-pills{display:flex;gap:6px;padding:8px 12px;flex-wrap:wrap}
+  .cd-pill{padding:6px 12px;border-radius:16px;border:1px solid rgba(78,205,196,0.2);background:rgba(78,205,196,0.06);font-size:10px;color:var(--accent);cursor:pointer;transition:all 0.15s;white-space:nowrap}
+  .cd-pill:active{transform:scale(0.95);background:rgba(78,205,196,0.15)}
+
+  /* Chat input bar */
+  .cd-input-bar{position:absolute;bottom:0;left:0;right:0;padding:8px 12px 24px;background:linear-gradient(to top,#0a0a0f 70%,transparent);display:flex;gap:8px;align-items:center;z-index:10}
+  .cd-input{flex:1;height:38px;border-radius:19px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);padding:0 14px;font-size:12px;color:var(--text-primary);outline:none}
+  .cd-input::placeholder{color:var(--text-dim)}
+  .cd-send{width:38px;height:38px;border-radius:50%;background:var(--accent);border:none;color:#111;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+  /* Insight card inside chat */
+  .cd-insight-card{margin:6px 0;padding:8px 12px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:6px}
+  .cd-insight-card .ic-icon{font-size:14px}
+  .cd-insight-card strong{color:var(--text-secondary)}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Tester Release — 3 Features</h1>
+  <p>Ambient Info Layer (live dashboard), Pin + Carousel, List View Refresh.</p>
+</div>
+
+<div class="feature-tabs" id="featureTabs">
+  <div class="feature-tab active" onclick="showFeature('ambient',this)">1. Ambient Layer</div>
+  <div class="feature-tab" onclick="showFeature('carousel',this)">2. Pin + Carousel</div>
+  <div class="feature-tab" onclick="showFeature('listview',this)">3. List View</div>
+  <div class="feature-tab" onclick="showFeature('chatdetail',this)">4. AI Detail Page</div>
+</div>
+
+<div class="sub-tabs" id="subTabs"></div>
+<div class="feature-desc" id="featureDesc"></div>
+
+<div class="phone map-mode" id="phone">
+  <div class="scene-label" id="sceneLabel"></div>
+
+  <div id="mapView">
+    <div class="map" id="map"></div>
+
+    <div class="search-row">
+      <span class="search-icon">🔍</span>
+      <span class="search-text">Shoreditch, London</span>
+      <div class="search-actions">
+        <div class="now-toggle" id="nowToggle">
+          <div class="now-dot"></div>
+          <span>Now</span>
+        </div>
+        <button class="search-btn">↻</button>
+      </div>
+    </div>
+
+    <!-- Context ticker — live area dashboard -->
+    <div class="context-ticker" id="contextTicker">
+      <span class="ticker-icon" id="tickerIcon">📍</span>
+      <span class="ticker-text" id="tickerText"><strong>4 open</strong> nearby · Sunset in 18 min · Jazz at 9pm</span>
+      <div class="ticker-divider"></div>
+      <div class="ticker-stat"><div class="ticker-stat-dot" style="background:var(--green)"></div>4</div>
+      <div class="ticker-stat"><div class="ticker-stat-dot" style="background:var(--orange)"></div>1</div>
+      <div class="ticker-stat"><div class="ticker-stat-dot" style="background:var(--red)"></div>1</div>
+    </div>
+
+    <!-- Relaunch greeting -->
+    <div class="relaunch-card" id="relaunchCard">
+      <div class="relaunch-header">
+        <div class="relaunch-avatar">✨</div>
+        <div class="relaunch-title">Since you've been away...</div>
+        <button class="relaunch-close" onclick="hideRelaunch()">✕</button>
+      </div>
+      <div class="relaunch-items">
+        <div class="relaunch-item"><div class="relaunch-dot green"></div><strong>Jazz Cellar</strong> just opened for tonight</div>
+        <div class="relaunch-item"><div class="relaunch-dot orange"></div>🌅 Sunset in 18 min — rooftop has the best view</div>
+        <div class="relaunch-item"><div class="relaunch-dot red"></div><strong>Cafe Lumiere</strong> closing in 45 min — grab a table</div>
+        <div class="relaunch-item"><div class="relaunch-dot blue"></div>📸 New mural spotted on Rivington Street</div>
+      </div>
+    </div>
+
+    <!-- AI Whisper notifications (unified system) -->
+    <div class="whisper" id="whisper" style="bottom:200px">
+      <span class="whisper-icon" id="whisperIcon">🎵</span>
+      <div class="whisper-body">
+        <div class="whisper-text" id="whisperText"><strong>Jazz Cellar</strong> opens in 30 min — live trio tonight at 9pm</div>
+        <div class="whisper-tag time" id="whisperTag">⏰ TIME-SENSITIVE</div>
+      </div>
+      <button class="whisper-dismiss" onclick="hideWhisper()">✕</button>
+      <div class="whisper-progress urgent" id="whisperProgress"></div>
+    </div>
+
+    <!-- Carousel -->
+    <div class="carousel-wrap hidden" id="carouselWrap">
+      <div class="carousel" id="carousel"></div>
+      <div class="carousel-dots" id="carouselDots"></div>
+    </div>
+
+    <!-- Vibe rail -->
+    <div class="vibe-rail" id="vibeRail">
+      <div class="saved-orb-wrap"><div class="saved-orb">🔖</div><span class="saved-label">Saved</span></div>
+      <div class="vibe-divider"></div>
+      <div class="vibe-orb-wrap"><div class="vibe-orb active" style="width:38px;height:38px;font-size:16px;background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35)">🎨</div><div class="vibe-orb-label" style="color:#fff;font-weight:700">Street Art</div><div class="vibe-count-badge">3</div></div>
+      <div class="vibe-orb-wrap" style="opacity:0.45"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px;background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35)">☕</div><div class="vibe-orb-label">Cafe</div><div class="vibe-count-badge">2</div></div>
+      <div class="vibe-orb-wrap" style="opacity:0.45"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px;background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35)">🎵</div><div class="vibe-orb-label">Music</div><div class="vibe-count-badge">2</div></div>
+    </div>
+
+    <div class="my-loc" id="myLoc">📍</div>
+    <div class="bottom-bar">
+      <div class="ai-bar"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text" id="aiText">What catches your eye?</span></div>
+      <div class="bottom-right">
+        <div class="toggle-btn">
+          <button class="toggle-seg active" onclick="switchToMap()">🗺️</button>
+          <button class="toggle-seg" onclick="switchToList()">📋</button>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CHAT DETAIL PAGE -->
+  <div id="chatDetailContainer" class="hidden">
+    <div class="chat-detail">
+      <div class="chat-detail-scroll" id="chatScroll">
+        <div class="cd-header">
+          <div class="cd-topbar">
+            <button class="cd-back" onclick="closeChatDetail()">←</button>
+            <div class="cd-topbar-title" id="cdTitle">Cafe Lumiere</div>
+            <div class="cd-topbar-actions">
+              <button class="cd-action-btn">📍</button>
+              <button class="cd-action-btn">⋯</button>
+            </div>
+          </div>
+          <div class="cd-poi-card" id="cdPoiCard"></div>
+        </div>
+        <div class="cd-chat" id="cdChat"></div>
+        <div class="cd-pills" id="cdPills"></div>
+      </div>
+      <div class="cd-input-bar">
+        <input class="cd-input" id="cdInput" placeholder="Ask about this place..." onkeydown="if(event.key==='Enter')sendUserMsg()">
+        <button class="cd-send" onclick="sendUserMsg()">↑</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div id="listViewContainer" class="hidden">
+    <div class="list-view" id="listScroll">
+      <div class="list-header">
+        <div class="list-search">
+          <span class="list-search-icon">🔍</span>
+          <span class="list-search-text">Search in Shoreditch...</span>
+        </div>
+      </div>
+      <div class="list-vibe-tabs" id="listVibeTabs">
+        <div class="list-vibe-tab active" onclick="filterListVibe(this,'all')">✨ All</div>
+        <div class="list-vibe-tab" onclick="filterListVibe(this,'art')">🎨 Street Art</div>
+        <div class="list-vibe-tab" onclick="filterListVibe(this,'cafe')">☕ Cafe</div>
+        <div class="list-vibe-tab" onclick="filterListVibe(this,'music')">🎵 Music</div>
+        <div class="list-vibe-tab" onclick="filterListVibe(this,'food')">🍜 Food</div>
+        <div class="list-vibe-tab" onclick="filterListVibe(this,'history')">🏛️ History</div>
+      </div>
+      <div class="list-section-label" id="listSectionLabel">All vibes — 6 places</div>
+      <div id="listCards"></div>
+      <div style="height:80px"></div>
+    </div>
+    <div style="position:absolute;bottom:0;left:0;right:0;z-index:80;padding:0 12px 20px;display:flex;align-items:flex-end;justify-content:space-between">
+      <div class="ai-bar"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text">Ask about this area...</span></div>
+      <div class="bottom-right">
+        <div class="toggle-btn">
+          <button class="toggle-seg" onclick="switchToMap()">🗺️</button>
+          <button class="toggle-seg active" onclick="switchToList()">📋</button>
+        </div>
+        <div class="fab">+</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const pois = [
+  {id:'murals',emoji:'🎨',name:'Rivington Murals',vibe:'Street Art',vibeKey:'art',vibeColor:'var(--vibe-art)',vibeHex:'#e040fb',why:'Banksy started here. New murals every week — the wall is a living gallery.',rating:'4.8',hours:'Always open',dist:'120m',price:'Free',x:24,y:32,status:'open',insight:'New Banksy-school piece appeared yesterday',microIcon:'🆕',activity:true,bgGrad:'linear-gradient(135deg,#2d1b69,#1a0a3e)'},
+  {id:'cafe',emoji:'☕',name:'Cafe Lumiere',vibe:'Cafe Scene',vibeKey:'cafe',vibeColor:'var(--vibe-cafe)',vibeHex:'#ff7043',why:'Victorian warehouse roaster. The oat flat white is legendary among locals.',rating:'4.6',hours:'7am–6pm',dist:'200m',price:'$$',x:54,y:52,status:'closing',insight:'Closes in 45 min — grab a table now',microIcon:'⏰',activity:true,bgGrad:'linear-gradient(135deg,#3e1f0d,#261305)'},
+  {id:'jazz',emoji:'🎵',name:'Jazz Cellar',vibe:'Live Music',vibeKey:'music',vibeColor:'var(--vibe-music)',vibeHex:'#42a5f5',why:'Underground speakeasy vibes. Thursday jam sessions are a local institution.',rating:'4.7',hours:'8pm–2am',dist:'350m',price:'$$$',x:34,y:72,status:'closed',insight:'Opens at 8pm — live trio tonight',microIcon:'🎶',activity:false,bgGrad:'linear-gradient(135deg,#0d2240,#071428)'},
+  {id:'ramen',emoji:'🍜',name:'Tonkotsu East',vibe:'Food',vibeKey:'food',vibeColor:'var(--vibe-food)',vibeHex:'#66bb6a',why:'12-hour pork bone broth. The black garlic ramen is worth the queue.',rating:'4.5',hours:'11:30am–10pm',dist:'280m',price:'$$',x:62,y:35,status:'open',insight:'No queue right now — usually 20 min wait',microIcon:'🔥',activity:true,bgGrad:'linear-gradient(135deg,#1a3a1a,#0d1f0d)'},
+  {id:'church',emoji:'🏛️',name:'Christ Church',vibe:'History',vibeKey:'history',vibeColor:'var(--vibe-history)',vibeHex:'#ab47bc',why:'Hawksmoor masterpiece. The crypt tours run Saturdays — genuinely eerie.',rating:'4.4',hours:'9am–5pm',dist:'400m',price:'Free',x:45,y:18,status:'open',insight:'Free organ recital at 4pm today',microIcon:'🎵',activity:true,bgGrad:'linear-gradient(135deg,#2a1540,#1a0d28)'},
+  {id:'vinyl',emoji:'🎵',name:'Rough Trade East',vibe:'Live Music',vibeKey:'music',vibeColor:'var(--vibe-music)',vibeHex:'#42a5f5',why:'Iconic record shop. In-store gigs most evenings — free, no ticket needed.',rating:'4.6',hours:'10am–9pm',dist:'180m',price:'$',x:70,y:62,status:'open',insight:'In-store acoustic set at 6:30pm',microIcon:'🎤',activity:true,bgGrad:'linear-gradient(135deg,#1a2d4a,#0d1828)'},
+];
+
+const statusLabels = {open:'Open now',closed:'Closed',closing:'Closing soon'};
+let currentFeature = 'ambient';
+let currentSubScene = '';
+let whisperTimer = null;
+let selectedPinIdx = 0;
+let scrolling = false;
+
+// ===== PINS =====
+function clearMap() {
+  document.getElementById('map').querySelectorAll('.pin').forEach(el => el.remove());
+}
+
+function dropPins(subset, ghostClosed, interactive, showMicro) {
+  clearMap();
+  const map = document.getElementById('map');
+
+  subset.forEach((poi, i) => {
+    const isGhost = ghostClosed && poi.status === 'closed';
+    const pin = document.createElement('div');
+    pin.className = 'pin hidden' + (isGhost ? ' ghost' : '');
+    pin.id = 'pin-' + i;
+    pin.style.left = poi.x + '%';
+    pin.style.top = poi.y + '%';
+    pin.innerHTML = `
+      <div class="pin-marker" style="background:${poi.vibeColor};border:2px solid ${poi.vibeColor};box-shadow:0 2px 10px ${poi.vibeHex}40">
+        ${poi.emoji}
+        <div class="pin-status ${poi.status}"></div>
+        <div class="pin-activity-ring ${poi.activity && !isGhost ? 'active' : ''}" style="border-color:${poi.vibeHex}"></div>
+        <div class="pin-micro ${showMicro && poi.activity ? 'show' : ''}">${poi.microIcon || ''}</div>
+      </div>
+      <div class="pin-label">${poi.name}</div>
+    `;
+    if (interactive) pin.onclick = () => selectPin(i);
+    map.appendChild(pin);
+    setTimeout(() => { pin.classList.remove('hidden'); pin.classList.add('visible'); }, i * 200);
+  });
+
+  if (interactive) {
+    const firstOpen = subset.findIndex(p => p.status !== 'closed');
+    setTimeout(() => selectPin(firstOpen >= 0 ? firstOpen : 0), subset.length * 200 + 100);
+  }
+}
+
+function selectPin(idx) {
+  selectedPinIdx = idx;
+  document.querySelectorAll('.pin').forEach((p, i) => {
+    p.classList.remove('selected','bounce');
+    if (i === idx) { p.classList.add('selected','bounce'); setTimeout(() => p.classList.remove('bounce'), 400); }
+  });
+  scrollCarouselTo(idx);
+  updateDots(idx);
+}
+
+// ===== CAROUSEL =====
+function buildCarousel(subset) {
+  const carousel = document.getElementById('carousel');
+  const dots = document.getElementById('carouselDots');
+  carousel.innerHTML = ''; dots.innerHTML = '';
+
+  subset.forEach((poi, i) => {
+    const isGhost = poi.status === 'closed';
+    const card = document.createElement('div');
+    card.className = 'carousel-card' + (isGhost ? ' ghost-card' : '') + (i === 0 ? ' active-card' : '');
+    card.id = 'cc-' + i;
+    card.innerHTML = `
+      <div class="cc-stripe ${poi.status}"></div>
+      <div class="cc-body">
+        <div class="cc-emoji">${poi.emoji}</div>
+        <div class="cc-info">
+          <div class="cc-top"><div class="cc-name">${poi.name}</div><span class="cc-status ${poi.status}">● ${statusLabels[poi.status]}</span></div>
+          <div class="cc-vibe" style="color:${poi.vibeColor}">${poi.vibe}</div>
+          <div class="cc-insight">💡 ${poi.insight}</div>
+        </div>
+      </div>
+      <div class="cc-bottom">
+        <div class="cc-meta"><span>⭐ ${poi.rating}</span><span>📍 ${poi.dist}</span><span>💰 ${poi.price}</span><span>🕐 ${poi.hours}</span></div>
+        <div class="cc-ctas"><button class="cc-cta primary">Details</button><button class="cc-cta secondary">🔖</button></div>
+      </div>
+    `;
+    card.onclick = () => selectPin(i);
+    carousel.appendChild(card);
+    const dot = document.createElement('div');
+    dot.className = 'carousel-dot' + (i === 0 ? ' active' : '');
+    dots.appendChild(dot);
+  });
+
+  carousel.addEventListener('scroll', () => {
+    if (scrolling) return;
+    const idx = Math.round(carousel.scrollLeft / 290);
+    if (idx !== selectedPinIdx && idx >= 0 && idx < subset.length) {
+      selectedPinIdx = idx;
+      document.querySelectorAll('.pin').forEach((p, i) => {
+        p.classList.remove('selected','bounce');
+        if (i === idx) { p.classList.add('selected','bounce'); setTimeout(() => p.classList.remove('bounce'), 400); }
+      });
+      document.querySelectorAll('.carousel-card').forEach((c, i) => c.classList.toggle('active-card', i === idx));
+      updateDots(idx);
+    }
+  });
+  document.getElementById('carouselWrap').classList.remove('hidden');
+}
+
+function scrollCarouselTo(idx) {
+  scrolling = true;
+  const carousel = document.getElementById('carousel');
+  const card = document.getElementById('cc-' + idx);
+  if (card) carousel.scrollTo({ left: card.offsetLeft - carousel.offsetWidth / 2 + card.offsetWidth / 2, behavior: 'smooth' });
+  document.querySelectorAll('.carousel-card').forEach((c, i) => c.classList.toggle('active-card', i === idx));
+  setTimeout(() => { scrolling = false; }, 400);
+}
+function updateDots(idx) { document.querySelectorAll('.carousel-dot').forEach((d, i) => d.classList.toggle('active', i === idx)); }
+
+// ===== AMBIENT: RELAUNCH =====
+function showRelaunch() { document.getElementById('relaunchCard').classList.add('show'); }
+function hideRelaunch() { document.getElementById('relaunchCard').classList.remove('show'); }
+
+// ===== AMBIENT: AI WHISPER (unified notification system) =====
+const whispers = [
+  {icon:'⏰', text:'<strong>Cafe Lumiere</strong> closing in 45 min — grab a table before last call', tag:'⏰ TIME-SENSITIVE', tagClass:'time', progressClass:'urgent', type:'urgent'},
+  {icon:'🎵', text:'<strong>Jazz Cellar</strong> opens in 30 min — live trio tonight, no cover charge', tag:'⏰ OPENING SOON', tagClass:'time', progressClass:'urgent', type:'urgent'},
+  {icon:'🌅', text:'<strong>Sunset in 18 min</strong> — Ace Hotel rooftop has the best view from here', tag:'⏰ TIME-SENSITIVE', tagClass:'time', progressClass:'urgent', type:'urgent'},
+  {icon:'🔥', text:'<strong>Tonkotsu East</strong> has no queue right now — usually 20 min wait at this hour', tag:'🔥 TRENDING', tagClass:'trending', progressClass:'trending', type:'discovery'},
+  {icon:'📸', text:'<strong>Rivington Murals</strong> — new Banksy-school piece appeared yesterday on the south wall', tag:'💡 AI INSIGHT', tagClass:'fact', progressClass:'discovery', type:'discovery'},
+  {icon:'🎤', text:'<strong>Rough Trade</strong> — free acoustic set starts at 6:30pm, usually standing room only', tag:'⏰ EVENT SOON', tagClass:'time', progressClass:'urgent', type:'urgent'},
+  {icon:'🏛️', text:'<strong>Christ Church</strong> — free organ recital at 4pm today. The acoustics are incredible', tag:'💡 AI INSIGHT', tagClass:'fact', progressClass:'discovery', type:'discovery'},
+  {icon:'☔', text:'Light rain expected in 1 hour — <strong>Cafe Lumiere</strong> is a cozy backup if you\'re outdoors', tag:'🌤️ WEATHER', tagClass:'time', progressClass:'urgent', type:'urgent'},
+];
+let whisperIdx = 0;
+
+function showWhisper() {
+  const el = document.getElementById('whisper');
+  const w = whispers[whisperIdx % whispers.length];
+  document.getElementById('whisperIcon').textContent = w.icon;
+  document.getElementById('whisperText').innerHTML = w.text;
+  const tag = document.getElementById('whisperTag');
+  tag.textContent = w.tag;
+  tag.className = 'whisper-tag ' + w.tagClass;
+  const progress = document.getElementById('whisperProgress');
+  progress.className = 'whisper-progress ' + w.progressClass;
+  progress.style.transition = 'none'; progress.style.width = '100%';
+  el.className = 'whisper ' + w.type;
+  el.classList.add('show');
+  requestAnimationFrame(() => requestAnimationFrame(() => { progress.style.transition = 'width 7s linear'; progress.style.width = '0%'; }));
+  whisperTimer = setTimeout(() => { hideWhisper(); whisperIdx++; setTimeout(() => { if (currentSubScene === 'whispers' || currentSubScene === 'all') showWhisper(); }, 2000); }, 7000);
+}
+function hideWhisper() { document.getElementById('whisper').classList.remove('show'); if (whisperTimer) clearTimeout(whisperTimer); }
+
+// ===== TICKER =====
+const tickerMessages = [
+  {icon:'📍', text:'<strong>4 open</strong> nearby · Sunset 18 min · Jazz at 9pm'},
+  {icon:'🔥', text:'<strong>Tonkotsu</strong> no queue · <strong>Cafe</strong> closing 45m · New mural today'},
+  {icon:'🎵', text:'<strong>2 live events</strong> tonight · Acoustic 6:30 · Jazz trio 9pm'},
+  {icon:'🌤️', text:'16°C partly cloudy · Rain in 1hr · <strong>3 indoor options</strong> nearby'},
+  {icon:'📊', text:'<strong>Peak time</strong> for Street Art · Quiet at Tonkotsu · Cafe winding down'},
+];
+let tickerIdx = 0;
+let tickerTimer = null;
+
+function cycleTicker() {
+  tickerIdx = (tickerIdx + 1) % tickerMessages.length;
+  const t = tickerMessages[tickerIdx];
+  const ticker = document.getElementById('contextTicker');
+  ticker.style.opacity = '0';
+  setTimeout(() => {
+    document.getElementById('tickerIcon').textContent = t.icon;
+    document.getElementById('tickerText').innerHTML = t.text;
+    ticker.style.opacity = '1';
+  }, 300);
+}
+function startTicker() { stopTicker(); tickerTimer = setInterval(cycleTicker, 5000); }
+function stopTicker() { if (tickerTimer) clearInterval(tickerTimer); tickerTimer = null; }
+
+// ===== LIST VIEW =====
+function buildListCards(filterVibe) {
+  const container = document.getElementById('listCards');
+  container.innerHTML = '';
+  const filtered = filterVibe === 'all' ? pois : pois.filter(p => p.vibeKey === filterVibe);
+  const groups = {};
+  filtered.forEach(poi => { if (!groups[poi.vibe]) groups[poi.vibe] = []; groups[poi.vibe].push(poi); });
+  const vibeOrder = ['Street Art','Cafe Scene','Live Music','Food','History'];
+  let first = true;
+  vibeOrder.forEach(vibe => {
+    if (!groups[vibe]) return;
+    if (filterVibe === 'all' && !first) {
+      const label = document.createElement('div');
+      label.className = 'list-section-label';
+      label.textContent = vibe + ' — ' + groups[vibe].length + (groups[vibe].length === 1 ? ' place' : ' places');
+      container.appendChild(label);
+    }
+    first = false;
+    groups[vibe].forEach(poi => {
+      const card = document.createElement('div');
+      card.className = 'list-card';
+      card.innerHTML = `
+        <div class="list-card-bg" style="background:${poi.bgGrad}">
+          <div class="list-card-emoji-overlay">${poi.emoji}</div>
+          <div class="list-card-status-badge ${poi.status}">● ${statusLabels[poi.status]}</div>
+          <div class="list-card-content">
+            <div class="list-card-vibe" style="color:${poi.vibeColor}">${poi.vibe}</div>
+            <div class="list-card-name">${poi.name}</div>
+            <div class="list-card-why">${poi.why}</div>
+          </div>
+        </div>
+        <div class="list-card-bottom">
+          <div class="list-card-meta"><span>⭐ ${poi.rating}</span><span>📍 ${poi.dist}</span><span>💰 ${poi.price}</span><span>🕐 ${poi.hours}</span></div>
+          <div class="list-card-ctas">
+            <button class="list-cta save" onclick="event.stopPropagation();this.classList.toggle('saved');this.innerHTML=this.classList.contains('saved')?'🔖 Saved':'🔖 Save'">🔖 Save</button>
+            <button class="list-cta detail">Details →</button>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  });
+  document.getElementById('listSectionLabel').textContent = filterVibe === 'all' ? 'All vibes — ' + filtered.length + ' places' : (filtered[0]?.vibe || filterVibe) + ' — ' + filtered.length + ' places';
+}
+function filterListVibe(el, vibe) {
+  document.querySelectorAll('.list-vibe-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  buildListCards(vibe);
+}
+
+// ===== VIEW SWITCHING =====
+function switchToMap() {
+  document.getElementById('mapView').classList.remove('hidden');
+  document.getElementById('listViewContainer').classList.add('hidden');
+  document.getElementById('phone').className = 'phone map-mode';
+}
+function switchToList() { showFeature('listview', document.querySelectorAll('.feature-tab')[2]); }
+function hideCarousel() { document.getElementById('carouselWrap').classList.add('hidden'); }
+
+// ===== FEATURE SWITCHING =====
+function showFeature(feature, tab) {
+  currentFeature = feature;
+  document.querySelectorAll('.feature-tab').forEach(t => t.classList.remove('active'));
+  if (tab) tab.classList.add('active');
+
+  hideRelaunch(); hideWhisper(); whisperIdx = 0; hideCarousel(); stopTicker();
+  document.getElementById('contextTicker').classList.add('hidden');
+  document.getElementById('chatDetailContainer').classList.add('hidden');
+
+  const desc = document.getElementById('featureDesc');
+  const subTabs = document.getElementById('subTabs');
+
+  if (feature === 'listview') {
+    document.getElementById('phone').className = 'phone list-mode';
+    document.getElementById('mapView').classList.add('hidden');
+    document.getElementById('listViewContainer').classList.remove('hidden');
+    buildListCards('all');
+    desc.textContent = 'Full-width cards with gradient backgrounds, status badges, vibe tabs (active first), inline save/detail CTAs.';
+    subTabs.innerHTML = '';
+  } else {
+    document.getElementById('phone').className = 'phone map-mode';
+    document.getElementById('mapView').classList.remove('hidden');
+    document.getElementById('listViewContainer').classList.add('hidden');
+
+    if (feature === 'ambient') {
+      desc.textContent = 'Live dashboard: context ticker, activity rings on pins, micro-badges, AI whisper notifications, relaunch greeting.';
+      subTabs.innerHTML = `
+        <div class="sub-tab active" onclick="showAmbientScene('live')">Live Dashboard</div>
+        <div class="sub-tab" onclick="showAmbientScene('relaunch')">Relaunch</div>
+        <div class="sub-tab" onclick="showAmbientScene('whispers')">AI Whispers</div>
+        <div class="sub-tab" onclick="showAmbientScene('all')">All Together</div>
+      `;
+      showAmbientScene('live');
+    } else if (feature === 'carousel') {
+      desc.textContent = 'Clean emoji pins (label on select). Bottom carousel with snap-scroll. Tap pin ↔ swipe card. Two-way binding.';
+      subTabs.innerHTML = '';
+      document.getElementById('contextTicker').classList.remove('hidden');
+      startTicker();
+      dropPins(pois, true, true, false);
+      buildCarousel(pois);
+    } else if (feature === 'chatdetail') {
+      document.getElementById('phone').className = 'phone map-mode';
+      document.getElementById('mapView').classList.add('hidden');
+      desc.textContent = 'AI-native detail page: POI header + AI intro + chat thread + quick action pills. Tap a place to try.';
+      subTabs.innerHTML = pois.map(p => `<div class="sub-tab${p.id==='cafe'?' active':''}" onclick="openChatDetail('${p.id}');document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));this.classList.add('active')">${p.emoji} ${p.name}</div>`).join('');
+      openChatDetail('cafe');
+    }
+  }
+}
+
+function showAmbientScene(scene) {
+  currentSubScene = scene;
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  if (event && event.target) event.target.classList.add('active');
+  hideRelaunch(); hideWhisper(); whisperIdx = 0; hideCarousel(); stopTicker();
+
+  const label = document.getElementById('sceneLabel');
+  const ticker = document.getElementById('contextTicker');
+
+  switch(scene) {
+    case 'live':
+      label.textContent = 'LIVE DASHBOARD — Ticker + rings + micro-badges + carousel';
+      label.classList.add('show');
+      ticker.classList.remove('hidden');
+      startTicker();
+      dropPins(pois, true, true, true);
+      buildCarousel(pois);
+      setTimeout(() => label.classList.remove('show'), 3000);
+      break;
+    case 'relaunch':
+      label.textContent = 'RELAUNCH — "Since you\'ve been away..." with status updates';
+      label.classList.add('show');
+      ticker.classList.remove('hidden');
+      startTicker();
+      dropPins(pois, true, true, true);
+      buildCarousel(pois);
+      setTimeout(() => { showRelaunch(); label.classList.remove('show'); }, 800);
+      break;
+    case 'whispers':
+      label.textContent = 'AI WHISPERS — Time-sensitive alerts + AI insights + trending';
+      label.classList.add('show');
+      ticker.classList.remove('hidden');
+      startTicker();
+      dropPins(pois, true, true, true);
+      buildCarousel(pois);
+      setTimeout(() => { showWhisper(); label.classList.remove('show'); }, 1000);
+      break;
+    case 'all':
+      label.textContent = 'FULL AMBIENT EXPERIENCE';
+      label.classList.add('show');
+      ticker.classList.remove('hidden');
+      startTicker();
+      dropPins(pois, true, true, true);
+      buildCarousel(pois);
+      setTimeout(() => { showRelaunch(); label.classList.remove('show'); }, 600);
+      setTimeout(() => showWhisper(), 4000);
+      break;
+  }
+}
+
+// ===== CHAT DETAIL PAGE =====
+const aiIntros = {
+  murals: `<strong>Welcome to the Rivington Murals</strong> — one of Shoreditch's most dynamic street art corridors.\n\nThis wall has been a canvas since the early 2000s. Banksy's first London piece appeared here, and the tradition stuck. New work goes up almost weekly — the south wall got a fresh Banksy-school piece just yesterday.\n\nThe art changes constantly, so what you see today won't be here next month. That's part of the magic.`,
+  cafe: `<strong>Cafe Lumiere is a Shoreditch institution</strong> — housed in a converted Victorian warehouse with the original brick and timber beams.\n\nThey roast on-site (you'll smell it from the street) and the oat flat white has a genuine cult following. The space fills up fast after 3pm, but right now there are tables available.\n\n⚠️ <strong>Heads up: they close in 45 minutes.</strong> If you want a table, now's the moment.`,
+  jazz: `<strong>The Jazz Cellar is a proper underground speakeasy</strong> — down a narrow staircase behind an unmarked door on the high street.\n\nThursday jam sessions are legendary. Local musicians drop in, and you never quite know who'll show up. No cover charge, but get there by 8:30 or you'll be standing.\n\n🎵 <strong>Tonight: live trio at 9pm.</strong> Opens in 30 minutes.`,
+  ramen: `<strong>Tonkotsu East does one thing and does it perfectly</strong> — 12-hour pork bone broth ramen.\n\nThe black garlic ramen is the move. Rich, creamy, deeply savoury — it's worth the queue that usually builds by 6pm. Right now? No queue at all, which is rare.\n\n🔥 <strong>Unusually quiet for this hour</strong> — if you're going, go now.`,
+  church: `<strong>Christ Church Spitalfields is a Hawksmoor masterpiece</strong> — one of London's most architecturally significant churches, built 1714–1729.\n\nThe interior is breathtaking: soaring columns, original wooden galleries, and acoustics that make you understand why they hold recitals here. The crypt tours on Saturdays are genuinely eerie.\n\n🎵 <strong>Free organ recital at 4pm today</strong> — the acoustics in here are something else.`,
+  vinyl: `<strong>Rough Trade East is more than a record shop</strong> — it's a cultural hub that's been championing independent music since 2007.\n\nBrowse vinyl across every genre, catch free in-store gigs most evenings, and grab a coffee from the in-house cafe. The staff actually know music, which is rarer than you'd think.\n\n🎤 <strong>Free acoustic set at 6:30pm tonight</strong> — usually standing room only by 6:15.`
+};
+
+const aiFollowUps = {
+  'What should I order?': `Great question! Here's what locals recommend:\n\n🥇 <strong>The signature</strong> — whatever they're known for, it's the signature for a reason\n🥈 <strong>The seasonal special</strong> — changes weekly, usually the most creative item\n💡 <strong>Insider tip:</strong> Ask the staff what they'd order themselves — they always have a favourite that's not on the "best of" lists`,
+  'How busy is it?': `Based on typical patterns for this time:\n\n📊 <strong>Right now:</strong> Moderate — a few tables/spots available\n⏰ <strong>In 1 hour:</strong> Gets busier, expect to wait\n🕐 <strong>Best time:</strong> Early afternoon on weekdays is the sweet spot\n\n💡 The vibe changes completely depending on when you go. Daytime is chill, evening has more energy.`,
+  'Walk me there': `📍 <strong>Walking directions:</strong>\n\nFrom your current location, it's about a 3-minute walk:\n\n1. Head east on the main road\n2. Turn left at the first junction\n3. You'll see it on your right\n\n🚶 <strong>Distance:</strong> ~200m\n⏱️ <strong>Time:</strong> 2-3 min walk`,
+  'Similar places?': `Based on the vibe and what people who liked this also enjoyed:\n\n✨ <strong>Same energy:</strong>\n• A similar spot 2 streets over — quieter, different character\n• Another favourite in the next neighbourhood\n\n🔄 <strong>Different vibe, same quality:</strong>\n• Something unexpected nearby that pairs well with this visit\n\n💡 Want me to add any of these to your map?`,
+  'Best time to visit?': `Here's the breakdown:\n\n🌅 <strong>Morning (before 11am):</strong> Quiet, contemplative, great for photos\n☀️ <strong>Afternoon (2-5pm):</strong> Sweet spot — alive but not packed\n🌙 <strong>Evening (after 6pm):</strong> Peak energy, social atmosphere\n\n💡 <strong>Pro tip:</strong> The golden hour light (about 40 minutes before sunset) transforms this spot completely. Today that's around 6:45pm.`
+};
+
+let currentChatPoi = null;
+
+function openChatDetail(poiId) {
+  const poi = pois.find(p => p.id === poiId) || pois[0];
+  currentChatPoi = poi;
+
+  // Header
+  document.getElementById('cdTitle').textContent = poi.name;
+  document.getElementById('cdPoiCard').innerHTML = `
+    <div class="cd-poi-stripe ${poi.status}"></div>
+    <div class="cd-poi-body">
+      <div class="cd-poi-top">
+        <div class="cd-poi-emoji">${poi.emoji}</div>
+        <div class="cd-poi-info">
+          <div class="cd-poi-name">${poi.name}</div>
+          <div class="cd-poi-vibe" style="color:${poi.vibeColor}">${poi.vibe}</div>
+        </div>
+        <span class="cd-poi-status ${poi.status}">● ${statusLabels[poi.status]}</span>
+      </div>
+      <div class="cd-poi-meta">
+        <span>⭐ ${poi.rating}</span>
+        <span>📍 ${poi.dist}</span>
+        <span>💰 ${poi.price}</span>
+        <span>🕐 ${poi.hours}</span>
+      </div>
+      <div class="cd-poi-actions">
+        <button class="cd-poi-act save" onclick="this.classList.toggle('saved');this.innerHTML=this.classList.contains('saved')?'🔖 Saved':'🔖 Save'">🔖 Save</button>
+        <button class="cd-poi-act directions">📍 Directions</button>
+        <button class="cd-poi-act share">↗ Share</button>
+      </div>
+    </div>
+  `;
+
+  // Chat — AI intro
+  const chat = document.getElementById('cdChat');
+  const introText = (aiIntros[poi.id] || aiIntros.murals).replace(/\n/g, '<br>');
+  chat.innerHTML = `
+    <div class="cd-msg ai">
+      <div class="cd-msg-label">✨ AreaDiscovery AI</div>
+      <div class="cd-msg-bubble">${introText}</div>
+    </div>
+  `;
+
+  // Quick pills
+  const pills = document.getElementById('cdPills');
+  const pillTexts = poi.status === 'closed'
+    ? ['When does it open?', 'Similar places?', 'Best time to visit?', 'Walk me there']
+    : ['What should I order?', 'How busy is it?', 'Walk me there', 'Similar places?', 'Best time to visit?'];
+  pills.innerHTML = pillTexts.map(t => `<div class="cd-pill" onclick="handlePill(this,'${t}')">${t}</div>`).join('');
+
+  // Show
+  document.getElementById('chatDetailContainer').classList.remove('hidden');
+  document.getElementById('mapView').classList.add('hidden');
+  document.getElementById('listViewContainer').classList.add('hidden');
+
+  setTimeout(() => {
+    document.getElementById('chatScroll').scrollTop = 0;
+  }, 50);
+}
+
+function closeChatDetail() {
+  document.getElementById('chatDetailContainer').classList.add('hidden');
+  // Return to previous view
+  if (currentFeature === 'chatdetail') {
+    document.getElementById('mapView').classList.remove('hidden');
+  } else if (currentFeature === 'listview') {
+    document.getElementById('listViewContainer').classList.remove('hidden');
+  } else {
+    document.getElementById('mapView').classList.remove('hidden');
+  }
+}
+
+function handlePill(el, text) {
+  el.remove();
+  addUserMsg(text);
+  const response = aiFollowUps[text] || `That's a great question about <strong>${currentChatPoi.name}</strong>! Let me look into that for you...`;
+  setTimeout(() => addAiMsg(response.replace(/\n/g, '<br>')), 600);
+}
+
+function addUserMsg(text) {
+  const chat = document.getElementById('cdChat');
+  const msg = document.createElement('div');
+  msg.className = 'cd-msg user';
+  msg.innerHTML = `<div class="cd-msg-label">You</div><div class="cd-msg-bubble">${text}</div>`;
+  chat.appendChild(msg);
+  scrollChatBottom();
+}
+
+function addAiMsg(html) {
+  const chat = document.getElementById('cdChat');
+  const msg = document.createElement('div');
+  msg.className = 'cd-msg ai';
+  msg.innerHTML = `<div class="cd-msg-label">✨ AreaDiscovery AI</div><div class="cd-msg-bubble">${html}</div>`;
+  chat.appendChild(msg);
+  scrollChatBottom();
+}
+
+function sendUserMsg() {
+  const input = document.getElementById('cdInput');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  addUserMsg(text);
+  setTimeout(() => {
+    addAiMsg(`That's an interesting question about <strong>${currentChatPoi.name}</strong>! Based on what I know about this place and its surroundings, I'd suggest exploring it in person — some things are better experienced than described. 😊<br><br>Is there anything specific you'd like to know?`);
+  }, 800);
+}
+
+function scrollChatBottom() {
+  const scroll = document.getElementById('chatScroll');
+  setTimeout(() => { scroll.scrollTop = scroll.scrollHeight; }, 100);
+}
+
+// ===== FEATURE SWITCHING (update for chatdetail) =====
+
+</script>
+</body>
+</html>

@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Ambient Real-Time Info Layer</title>
+<style>
+  :root {
+    --bg-dark:#0d1b2a;--ui-dark:rgba(20,14,28,0.92);--ui-dark-solid:#1a1224;
+    --accent:#4ecdc4;--accent-glow:rgba(78,205,196,0.35);
+    --gold:#FFD700;--gold-light:#FFE26A;
+    --green:#66bb6a;--red:#ef5350;--orange:#ffa726;
+    --text-primary:#fafafa;--text-secondary:rgba(255,255,255,0.6);--text-dim:rgba(255,255,255,0.35);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);--ease-out:cubic-bezier(0.16,1,0.3,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text-primary);overflow-x:hidden;display:flex;flex-direction:column;align-items:center}
+
+  .page-header{text-align:center;padding:20px 16px 6px;font-size:12px;color:#888;letter-spacing:1px;text-transform:uppercase}
+  .page-header h1{font-size:18px;color:#fff;letter-spacing:0;text-transform:none;margin-bottom:4px}
+  .page-header p{font-size:11px;color:#666;text-transform:none;letter-spacing:0;max-width:600px;margin:0 auto;line-height:1.4}
+
+  /* Scene selector */
+  .scene-tabs{display:flex;gap:6px;padding:10px 16px 14px;flex-wrap:wrap;justify-content:center}
+  .scene-tab{padding:8px 16px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);font-size:11px;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;white-space:nowrap}
+  .scene-tab:active{transform:scale(0.95)}
+  .scene-tab.active{background:rgba(78,205,196,0.15);border-color:rgba(78,205,196,0.3);color:var(--accent);font-weight:600}
+
+  /* Phone frame */
+  .phone{width:375px;border-radius:32px;border:2px solid #333;overflow:hidden;position:relative;height:750px;background:var(--bg-dark);flex-shrink:0}
+
+  /* Map */
+  .map{position:absolute;inset:0;background:var(--bg-dark)}
+  .map::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 35% 45%,#1b2838 0%,transparent 50%),radial-gradient(circle at 65% 55%,#162230 0%,transparent 40%);pointer-events:none}
+  .map::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%),linear-gradient(90deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%);background-size:60px 60px;opacity:0.2;pointer-events:none}
+
+  /* Search bar */
+  .search-row{position:absolute;top:50px;left:12px;right:12px;z-index:100;height:44px;border-radius:14px;background:var(--ui-dark);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 12px;gap:8px}
+  .search-icon{font-size:13px;opacity:0.45}
+  .search-text{flex:1;font-size:12px;color:var(--text-primary);font-weight:500}
+  .search-actions{display:flex;gap:4px;align-items:center}
+  .now-toggle{display:flex;align-items:center;gap:3px;padding:4px 10px;border-radius:8px;border:1px solid rgba(78,205,196,0.25);background:rgba(78,205,196,0.08);font-size:9px;color:var(--accent);font-weight:600;cursor:pointer;transition:all 0.2s}
+  .now-toggle.off{border-color:rgba(255,255,255,0.1);background:transparent;color:var(--text-dim)}
+  .now-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:nowPulse 2s ease-in-out infinite}
+  .now-toggle.off .now-dot{background:var(--text-dim);animation:none}
+  @keyframes nowPulse{0%,100%{opacity:0.6}50%{opacity:1}}
+  .search-btn{width:30px;height:30px;border-radius:9px;background:rgba(78,205,196,0.15);border:none;color:var(--accent);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .batch-nav{display:flex;align-items:center;gap:1px;background:rgba(255,255,255,0.04);border-radius:8px;padding:2px}
+  .bn-btn{width:26px;height:26px;border-radius:7px;border:none;background:transparent;color:var(--text-dim);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .bn-btn.disabled{opacity:0.2;pointer-events:none}
+  .bn-counter{font-size:10px;color:var(--text-secondary);padding:0 4px;font-weight:600}
+
+  /* Pins with status badges */
+  .pin{position:absolute;z-index:20;display:flex;flex-direction:column;align-items:center;cursor:pointer;transition:all 0.45s var(--ease-spring)}
+  .pin.hidden{opacity:0;transform:translate(-50%,-50%) scale(0);pointer-events:none}
+  .pin.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .pin.ghost{opacity:0.3;filter:grayscale(0.5)}
+  .pin-marker{width:34px;height:34px;border-radius:50%;background:var(--accent);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 10px var(--accent-glow);transition:all 0.3s;position:relative}
+  .pin.ghost .pin-marker{background:#2a2e35;border-color:#444;box-shadow:none;border-style:dashed}
+  .pin-label{margin-top:2px;font-size:9px;font-weight:600;color:#fff;background:rgba(0,0,0,0.75);padding:2px 6px;border-radius:4px;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+  .pin.ghost .pin-label{opacity:0.5}
+
+  /* Status badge on pin */
+  .pin-status{position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;border:2px solid var(--bg-dark);display:flex;align-items:center;justify-content:center;font-size:6px}
+  .pin-status.open{background:var(--green)}
+  .pin-status.closed{background:var(--red)}
+  .pin-status.closing{background:var(--orange);animation:closingPulse 1.5s ease-in-out infinite}
+  @keyframes closingPulse{0%,100%{opacity:0.7}50%{opacity:1}}
+
+  /* Float card */
+  .poi-float-card{position:absolute;z-index:25;width:160px;border-radius:12px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);padding:10px 12px;cursor:pointer;transition:all 0.4s var(--ease-spring)}
+  .poi-float-card.hidden{opacity:0;transform:scale(0.85) translateY(8px);pointer-events:none}
+  .poi-float-card.visible{opacity:1;transform:scale(1) translateY(0)}
+  .pfc-header{display:flex;align-items:center;gap:6px}
+  .pfc-emoji{font-size:17px}
+  .pfc-name{font-size:12px;font-weight:600;line-height:1.25}
+  .pfc-vibe{margin-top:4px;font-size:9px;color:var(--accent);font-weight:600}
+  .pfc-why{margin-top:3px;font-size:10px;color:var(--text-secondary);line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pfc-meta{margin-top:5px;display:flex;gap:8px;font-size:9px;color:var(--text-dim);flex-wrap:wrap}
+  .pfc-hours-live{display:inline-flex;align-items:center;gap:3px;padding:2px 6px;border-radius:5px;font-size:8px;font-weight:600}
+  .pfc-hours-live.open{background:rgba(102,187,106,0.15);color:var(--green)}
+  .pfc-hours-live.closed{background:rgba(239,83,80,0.15);color:var(--red)}
+  .pfc-hours-live.closing{background:rgba(255,167,38,0.15);color:var(--orange)}
+
+  /* Vibe rail */
+  .vibe-rail{position:absolute;bottom:85px;right:8px;z-index:28;display:flex;flex-direction:column;gap:4px;align-items:center}
+  .saved-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;margin-bottom:2px}
+  .saved-orb{width:36px;height:36px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--gold-light),var(--gold));display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(255,215,0,0.3);opacity:0.4}
+  .saved-label{font-size:8px;color:var(--gold);margin-top:1px;font-weight:500;opacity:0.4}
+  .vibe-divider{width:22px;height:1px;background:rgba(255,255,255,0.12);margin:2px 0}
+  .vibe-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center}
+  .vibe-orb{border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35);display:flex;align-items:center;justify-content:center;transition:all 0.3s}
+  .vibe-orb.active{border:2px solid #fff;box-shadow:0 0 12px var(--accent-glow)}
+  .vibe-orb-label{font-size:8px;color:rgba(255,255,255,0.8);margin-top:1px;text-align:center}
+  .vibe-count-badge{position:absolute;top:-2px;right:-2px;min-width:13px;height:13px;border-radius:7px;background:#4a7cf7;color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #0a0c10;padding:0 2px}
+
+  /* Bottom bar */
+  .bottom-bar{position:absolute;bottom:0;left:0;right:0;z-index:80;padding:0 12px 20px;display:flex;align-items:flex-end;justify-content:space-between}
+  .ai-bar{height:36px;border-radius:18px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:6px;padding:0 12px;cursor:pointer;max-width:160px}
+  .ai-bar-icon{font-size:12px}
+  .ai-bar-text{font-size:10px;color:var(--text-secondary);white-space:nowrap;overflow:hidden}
+  @keyframes ghostCycle{0%,100%{opacity:0.5}50%{opacity:0.8}}
+  .ghost-text{animation:ghostCycle 3s ease-in-out infinite}
+  .bottom-right{display:flex;gap:6px;align-items:flex-end}
+  .toggle-btn{height:32px;border-radius:16px;background:var(--ui-dark);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;overflow:hidden}
+  .toggle-seg{padding:0 11px;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--text-dim);border:none;background:transparent;cursor:pointer}
+  .toggle-seg.active{color:var(--accent)}
+  .fab{width:44px;height:44px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:23px;color:#111;font-weight:300;cursor:pointer;box-shadow:0 3px 16px var(--accent-glow)}
+  .my-loc{position:absolute;bottom:68px;left:12px;z-index:65;width:32px;height:32px;border-radius:50%;background:var(--ui-dark);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer}
+
+  /* ========== RELAUNCH GREETING ========== */
+  .relaunch-card{position:absolute;top:104px;left:12px;right:60px;z-index:90;border-radius:16px;background:var(--ui-dark-solid);border:1px solid rgba(78,205,196,0.2);padding:14px 16px;opacity:0;transform:translateY(-12px);transition:all 0.5s var(--ease-spring);pointer-events:none}
+  .relaunch-card.show{opacity:1;transform:translateY(0);pointer-events:all}
+  .relaunch-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .relaunch-avatar{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2a7c76);display:flex;align-items:center;justify-content:center;font-size:14px}
+  .relaunch-title{font-size:12px;font-weight:600;flex:1}
+  .relaunch-time{font-size:9px;color:var(--text-dim)}
+  .relaunch-close{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-dim);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .relaunch-items{display:flex;flex-direction:column;gap:6px}
+  .relaunch-item{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text-secondary);line-height:1.3;cursor:pointer;padding:4px 6px;border-radius:8px;transition:background 0.15s}
+  .relaunch-item:active{background:rgba(255,255,255,0.05)}
+  .relaunch-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+  .relaunch-dot.green{background:var(--green)}
+  .relaunch-dot.orange{background:var(--orange)}
+  .relaunch-dot.blue{background:#42a5f5}
+
+  /* ========== INSIGHT BUBBLE (idle mode) ========== */
+  .insight-bubble{position:absolute;z-index:22;padding:8px 12px;border-radius:12px;background:rgba(78,205,196,0.12);backdrop-filter:blur(14px);border:1px solid rgba(78,205,196,0.45);font-size:10px;color:var(--text-primary);line-height:1.35;max-width:155px;opacity:0;transform:scale(0.85) translateY(4px);transition:all 0.45s var(--ease-spring);pointer-events:none;white-space:normal;box-shadow:0 4px 16px rgba(78,205,196,0.2)}
+  .insight-bubble.show{opacity:1;transform:scale(1) translateY(0)}
+  .insight-bubble::after{content:'';position:absolute;bottom:-6px;left:20px;border:6px solid transparent;border-top-color:rgba(78,205,196,0.12)}
+  .insight-icon{font-size:13px;margin-right:4px}
+
+  /* ========== HEARTBEAT CARD (ambient pulse) ========== */
+  .heartbeat-card{position:absolute;bottom:68px;left:12px;right:60px;z-index:75;border-radius:14px;background:var(--ui-dark-solid);border:1px solid rgba(255,255,255,0.08);padding:10px 14px;display:flex;align-items:center;gap:10px;opacity:0;transform:translateY(16px);transition:all 0.5s var(--ease-spring);pointer-events:none}
+  .heartbeat-card.show{opacity:1;transform:translateY(0);pointer-events:all}
+  .heartbeat-icon{font-size:20px;flex-shrink:0}
+  .heartbeat-text{flex:1;font-size:11px;color:var(--text-secondary);line-height:1.35}
+  .heartbeat-text strong{color:var(--text-primary);font-weight:600}
+  .heartbeat-dismiss{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text-dim);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .heartbeat-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--accent);border-radius:0 0 14px 14px;transition:width linear}
+
+  /* Scene label */
+  .scene-label{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:150;padding:4px 12px;border-radius:8px;background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.25);font-size:10px;color:var(--accent);font-weight:600;opacity:0;transition:all 0.4s;pointer-events:none;white-space:nowrap}
+  .scene-label.show{opacity:1}
+
+  .controls-bar{text-align:center;padding:8px 16px 20px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+  .ctrl-btn{background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);color:var(--accent);padding:8px 16px;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;transition:all 0.2s}
+  .ctrl-btn:hover{background:rgba(78,205,196,0.25)}
+  .ctrl-btn.active{background:var(--accent);color:#111}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Ambient Real-Time Info Layer</h1>
+  <p>4 features on one map: status badges on pins, relaunch greeting, idle insight bubbles, heartbeat notifications. Tap scenes below to see each in action.</p>
+</div>
+
+<div class="scene-tabs">
+  <div class="scene-tab active" onclick="showScene('status')">1. Status Badges + Now Filter</div>
+  <div class="scene-tab" onclick="showScene('relaunch')">2. Relaunch Greeting</div>
+  <div class="scene-tab" onclick="showScene('idle')">3. Idle Insight Bubbles</div>
+  <div class="scene-tab" onclick="showScene('heartbeat')">4. Heartbeat Pulses</div>
+  <div class="scene-tab" onclick="showScene('all')">All Together</div>
+</div>
+
+<div class="phone" id="phone">
+  <div class="map" id="map"></div>
+  <div class="scene-label" id="sceneLabel"></div>
+
+  <div class="search-row">
+    <span class="search-icon">🔍</span>
+    <span class="search-text">Shoreditch, London</span>
+    <div class="search-actions">
+      <div class="now-toggle" id="nowToggle" onclick="toggleNow()">
+        <div class="now-dot"></div>
+        <span>Now</span>
+      </div>
+      <div class="batch-nav">
+        <button class="bn-btn disabled">◀</button>
+        <span class="bn-counter">1/4</span>
+        <button class="bn-btn">▶</button>
+      </div>
+      <button class="search-btn">↻</button>
+    </div>
+  </div>
+
+  <!-- Relaunch greeting card -->
+  <div class="relaunch-card" id="relaunchCard">
+    <div class="relaunch-header">
+      <div class="relaunch-avatar">✨</div>
+      <div class="relaunch-title">Since you've been away...</div>
+      <span class="relaunch-time">45 min ago</span>
+      <button class="relaunch-close" onclick="hideRelaunch()">✕</button>
+    </div>
+    <div class="relaunch-items">
+      <div class="relaunch-item"><div class="relaunch-dot green"></div>Jazz Cellar just opened for tonight</div>
+      <div class="relaunch-item"><div class="relaunch-dot orange"></div>Sunset in 20 min — head to the rooftop</div>
+      <div class="relaunch-item"><div class="relaunch-dot blue"></div>Food truck popped up near Brick Lane</div>
+    </div>
+  </div>
+
+  <!-- Insight bubbles (positioned near pins) -->
+  <div class="insight-bubble" id="insight0" style="left:28%;top:22%"><span class="insight-icon">💡</span>Busiest at 7pm on weekends</div>
+  <div class="insight-bubble" id="insight1" style="left:42%;top:42%"><span class="insight-icon">🎫</span>Free entry on Tuesdays</div>
+  <div class="insight-bubble" id="insight2" style="left:18%;top:60%"><span class="insight-icon">🗣️</span>Locals call it "the tunnel"</div>
+  <div class="insight-bubble" id="insight3" style="left:50%;top:28%"><span class="insight-icon">📸</span>Best light at golden hour</div>
+
+  <!-- Heartbeat notification card -->
+  <div class="heartbeat-card" id="heartbeatCard">
+    <span class="heartbeat-icon" id="heartbeatIcon">🎵</span>
+    <span class="heartbeat-text" id="heartbeatText"><strong>Jazz Cellar</strong> opens in 30 min — live session tonight at 9pm</span>
+    <button class="heartbeat-dismiss" onclick="hideHeartbeat()">✕</button>
+    <div class="heartbeat-progress" id="heartbeatProgress"></div>
+  </div>
+
+  <!-- Vibe rail -->
+  <div class="vibe-rail">
+    <div class="saved-orb-wrap"><div class="saved-orb">🔖</div><span class="saved-label">Saved</span></div>
+    <div class="vibe-divider"></div>
+    <div class="vibe-orb-wrap"><div class="vibe-orb active" style="width:38px;height:38px;font-size:16px">🎨</div><div class="vibe-orb-label" style="color:#fff;font-weight:700">Street Art</div><div class="vibe-count-badge" style="opacity:1">3</div></div>
+    <div class="vibe-orb-wrap" style="opacity:0.45"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px">☕</div><div class="vibe-orb-label">Cafe</div><div class="vibe-count-badge" style="opacity:1">2</div></div>
+    <div class="vibe-orb-wrap" style="opacity:0.45"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px">🎵</div><div class="vibe-orb-label">Music</div><div class="vibe-count-badge" style="opacity:1">2</div></div>
+    <div class="vibe-orb-wrap" style="opacity:0.45"><div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🍜</div><div class="vibe-orb-label">Food</div><div class="vibe-count-badge" style="opacity:1">1</div></div>
+    <div class="vibe-orb-wrap" style="opacity:0.45"><div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🏛️</div><div class="vibe-orb-label">History</div><div class="vibe-count-badge" style="opacity:1">1</div></div>
+  </div>
+
+  <div class="my-loc">📍</div>
+  <div class="bottom-bar">
+    <div class="ai-bar"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text" id="aiText">What catches your eye?</span></div>
+    <div class="bottom-right">
+      <div class="toggle-btn"><button class="toggle-seg active">🗺️</button><button class="toggle-seg">📋</button></div>
+      <div class="fab">+</div>
+    </div>
+  </div>
+</div>
+
+<div class="controls-bar">
+  <button class="ctrl-btn" onclick="location.reload()">↻ Reset All</button>
+</div>
+
+<script>
+const pois = [
+  {emoji:'🎨',name:'Rivington Murals',vibe:'Street Art',why:'Banksy started here. New murals weekly.',rating:'4.8',hours:'Always open',dist:'120m',x:24,y:32,cs:'right',status:'open'},
+  {emoji:'☕',name:'Cafe Lumiere',vibe:'Cafe Scene',why:'Victorian warehouse roaster. Legendary oat flat white.',rating:'4.6',hours:'7am–6pm',dist:'200m',x:54,y:52,cs:'left',status:'closing'},
+  {emoji:'🎵',name:'Jazz Cellar',vibe:'Live Music',why:'Underground speakeasy. Thursday jams.',rating:'4.7',hours:'8pm–2am',dist:'350m',x:34,y:72,cs:'right',status:'closed'}
+];
+
+const statusLabels = {open:'Open',closed:'Closed',closing:'Closing soon'};
+let nowMode = true;
+let insightTimer = null;
+let heartbeatTimer = null;
+let heartbeatQueue = 0;
+
+function dropPins(ghostClosed) {
+  const map = document.getElementById('map');
+  map.querySelectorAll('.pin, .poi-float-card').forEach(el => el.remove());
+
+  pois.forEach((poi, i) => {
+    const isGhost = ghostClosed && poi.status === 'closed';
+
+    // Pin
+    const pin = document.createElement('div');
+    pin.className = 'pin hidden' + (isGhost ? ' ghost' : '');
+    pin.style.left = poi.x + '%';
+    pin.style.top = poi.y + '%';
+    pin.innerHTML = `
+      <div class="pin-marker">
+        ${poi.emoji}
+        <div class="pin-status ${poi.status}"></div>
+      </div>
+      <div class="pin-label">${poi.name}</div>
+    `;
+    map.appendChild(pin);
+
+    setTimeout(() => {
+      pin.classList.remove('hidden');
+      pin.classList.add('visible');
+
+      // Float card (not for ghost pins)
+      if (!isGhost) {
+        setTimeout(() => {
+          const card = document.createElement('div');
+          card.className = 'poi-float-card hidden';
+          if (poi.cs === 'left') {
+            card.style.right = (100 - poi.x + 3) + '%';
+            card.style.top = (poi.y - 3) + '%';
+          } else {
+            card.style.left = (poi.x + 3) + '%';
+            card.style.top = (poi.y - 3) + '%';
+          }
+
+          const statusClass = poi.status;
+          const statusText = statusLabels[poi.status];
+          card.innerHTML = `
+            <div class="pfc-header"><span class="pfc-emoji">${poi.emoji}</span><span class="pfc-name">${poi.name}</span></div>
+            <div class="pfc-vibe">${poi.vibe}</div>
+            <div class="pfc-why">${poi.why}</div>
+            <div class="pfc-meta">
+              <span>⭐ ${poi.rating}</span>
+              <span class="pfc-hours-live ${statusClass}">● ${statusText}</span>
+              <span>📍 ${poi.dist}</span>
+            </div>
+          `;
+          map.appendChild(card);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            card.classList.remove('hidden');
+            card.classList.add('visible');
+          }));
+        }, 150);
+      }
+    }, i * 300);
+  });
+}
+
+function toggleNow() {
+  nowMode = !nowMode;
+  const toggle = document.getElementById('nowToggle');
+  toggle.classList.toggle('off', !nowMode);
+  dropPins(nowMode);
+}
+
+function showRelaunch() {
+  document.getElementById('relaunchCard').classList.add('show');
+}
+function hideRelaunch() {
+  document.getElementById('relaunchCard').classList.remove('show');
+}
+
+// Insight bubbles — rotate one at a time
+let currentInsight = -1;
+function cycleInsights() {
+  // Hide previous
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('insight' + i).classList.remove('show');
+  }
+  currentInsight = (currentInsight + 1) % 4;
+  document.getElementById('insight' + currentInsight).classList.add('show');
+}
+
+function startInsights() {
+  stopInsights();
+  cycleInsights();
+  insightTimer = setInterval(cycleInsights, 4000);
+}
+function stopInsights() {
+  if (insightTimer) clearInterval(insightTimer);
+  insightTimer = null;
+  for (let i = 0; i < 4; i++) {
+    document.getElementById('insight' + i).classList.remove('show');
+  }
+  currentInsight = -1;
+}
+
+// Heartbeat notifications
+const heartbeats = [
+  {icon:'🎵', text:'<strong>Jazz Cellar</strong> opens in 30 min — live session tonight at 9pm'},
+  {icon:'🌅', text:'<strong>Sunset in 20 min</strong> — head to the Ace Hotel rooftop for the best view'},
+  {icon:'🛒', text:'<strong>Brick Lane Market</strong> is buzzing right now — 2 blocks east'},
+  {icon:'☔', text:'Light rain expected in 1 hour — <strong>Cafe Lumiere</strong> is a cozy backup'},
+];
+let heartbeatIdx = 0;
+
+function showHeartbeat() {
+  const card = document.getElementById('heartbeatCard');
+  const hb = heartbeats[heartbeatIdx % heartbeats.length];
+  document.getElementById('heartbeatIcon').textContent = hb.icon;
+  document.getElementById('heartbeatText').innerHTML = hb.text;
+
+  const progress = document.getElementById('heartbeatProgress');
+  progress.style.transition = 'none';
+  progress.style.width = '100%';
+
+  card.classList.add('show');
+
+  // Animate progress bar down
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    progress.style.transition = 'width 6s linear';
+    progress.style.width = '0%';
+  }));
+
+  // Auto dismiss after 6s
+  heartbeatTimer = setTimeout(() => {
+    hideHeartbeat();
+    heartbeatIdx++;
+    // Show next one after a gap
+    setTimeout(() => {
+      if (document.querySelector('.scene-tab:nth-child(4).active') || document.querySelector('.scene-tab:nth-child(5).active')) {
+        showHeartbeat();
+      }
+    }, 3000);
+  }, 6000);
+}
+
+function hideHeartbeat() {
+  document.getElementById('heartbeatCard').classList.remove('show');
+  if (heartbeatTimer) clearTimeout(heartbeatTimer);
+}
+
+// Scene management
+function showScene(scene) {
+  // Update tabs
+  document.querySelectorAll('.scene-tab').forEach(t => t.classList.remove('active'));
+  event.target.classList.add('active');
+
+  // Reset all
+  hideRelaunch();
+  stopInsights();
+  hideHeartbeat();
+  heartbeatIdx = 0;
+
+  const label = document.getElementById('sceneLabel');
+
+  switch(scene) {
+    case 'status':
+      label.textContent = 'STATUS BADGES — Green=open, Red=closed, Orange=closing soon';
+      label.classList.add('show');
+      nowMode = true;
+      document.getElementById('nowToggle').classList.remove('off');
+      dropPins(true);
+      setTimeout(() => label.classList.remove('show'), 3000);
+      break;
+
+    case 'relaunch':
+      label.textContent = 'RELAUNCH GREETING — "Since you\'ve been away..."';
+      label.classList.add('show');
+      nowMode = true;
+      document.getElementById('nowToggle').classList.remove('off');
+      dropPins(true);
+      setTimeout(() => {
+        showRelaunch();
+        label.classList.remove('show');
+      }, 800);
+      break;
+
+    case 'idle':
+      label.textContent = 'IDLE INSIGHTS — Bubbles appear after 60s of no interaction';
+      label.classList.add('show');
+      nowMode = false;
+      document.getElementById('nowToggle').classList.add('off');
+      dropPins(false);
+      setTimeout(() => {
+        startInsights();
+        label.classList.remove('show');
+      }, 1000);
+      break;
+
+    case 'heartbeat':
+      label.textContent = 'HEARTBEAT PULSES — Ambient notifications every few minutes';
+      label.classList.add('show');
+      nowMode = true;
+      document.getElementById('nowToggle').classList.remove('off');
+      dropPins(true);
+      setTimeout(() => {
+        showHeartbeat();
+        label.classList.remove('show');
+      }, 1000);
+      break;
+
+    case 'all':
+      label.textContent = 'ALL AMBIENT FEATURES TOGETHER';
+      label.classList.add('show');
+      nowMode = true;
+      document.getElementById('nowToggle').classList.remove('off');
+      dropPins(true);
+      setTimeout(() => {
+        showRelaunch();
+        label.classList.remove('show');
+      }, 600);
+      setTimeout(() => startInsights(), 2000);
+      setTimeout(() => showHeartbeat(), 5000);
+      break;
+  }
+}
+
+// Initial load
+dropPins(true);
+</script>
+</body>
+</html>

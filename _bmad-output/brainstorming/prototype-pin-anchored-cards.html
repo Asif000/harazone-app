@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pin-Anchored Hybrid Cards — AreaDiscovery Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; overflow: hidden; height: 100vh; }
+
+  .map-container {
+    position: relative; width: 100%; height: 100vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    cursor: grab; overflow: hidden;
+  }
+  .map-container.dragging { cursor: grabbing; }
+
+  .map-grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 60px 60px; pointer-events: none;
+  }
+
+  /* Map pin */
+  .pin {
+    position: absolute; width: 40px; height: 40px;
+    transform: translate(-50%, -50%);
+    z-index: 10; cursor: pointer; transition: transform 0.2s, filter 0.2s;
+  }
+  .pin:hover { transform: translate(-50%, -50%) scale(1.15); }
+  .pin.hero { transform: translate(-50%, -50%) scale(1.15); filter: brightness(1.2); }
+  .pin-dot {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; position: relative;
+    box-shadow: 0 0 20px rgba(255,255,255,0.2);
+  }
+  .pin-dot::after {
+    content: ''; position: absolute; bottom: -6px; left: 50%; transform: translateX(-50%);
+    width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent;
+  }
+  .pin[data-vibe="food"] .pin-dot { background: #e74c3c; }
+  .pin[data-vibe="food"] .pin-dot::after { border-top: 6px solid #e74c3c; }
+  .pin[data-vibe="culture"] .pin-dot { background: #9b59b6; }
+  .pin[data-vibe="culture"] .pin-dot::after { border-top: 6px solid #9b59b6; }
+  .pin[data-vibe="nature"] .pin-dot { background: #27ae60; }
+  .pin[data-vibe="nature"] .pin-dot::after { border-top: 6px solid #27ae60; }
+
+  .pin-label {
+    position: absolute; top: 48px; left: 50%; transform: translateX(-50%);
+    white-space: nowrap; font-size: 11px; font-weight: 600;
+    color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+    pointer-events: none;
+  }
+
+  /* Pulse ring on hero pin */
+  .pulse-ring {
+    position: absolute; border-radius: 50%; pointer-events: none; z-index: 9;
+    animation: pulse-expand 2s ease-out infinite;
+  }
+  @keyframes pulse-expand {
+    0% { width: 44px; height: 44px; opacity: 0.6; margin: -22px 0 0 -22px; }
+    100% { width: 90px; height: 90px; opacity: 0; margin: -45px 0 0 -45px; }
+  }
+
+  /* Mini chip (nameplate) — anchored near pin */
+  .mini-chip {
+    position: absolute; z-index: 20; cursor: pointer;
+    background: rgba(30, 30, 50, 0.9);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px; padding: 4px 12px 4px 8px;
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; gap: 6px;
+    white-space: nowrap;
+    transition: opacity 0.3s, transform 0.3s, border-color 0.3s;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+  .mini-chip:hover { border-color: rgba(255,255,255,0.3); transform: scale(1.05); }
+  .mini-chip.hidden { opacity: 0; transform: scale(0.8); pointer-events: none; }
+  .mini-chip .chip-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .mini-chip .chip-name { font-size: 11px; font-weight: 600; color: #ddd; }
+  .mini-chip .chip-rating { font-size: 10px; color: #f1c40f; }
+
+  /* Hero floating card — full detail */
+  .hero-card {
+    position: absolute; z-index: 25;
+    background: rgba(25, 25, 45, 0.95);
+    border-radius: 16px; padding: 14px 18px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    min-width: 180px; max-width: 210px;
+    transition: opacity 0.35s, transform 0.35s;
+    cursor: pointer;
+  }
+  .hero-card.hidden { opacity: 0; transform: scale(0.8) translateY(10px); pointer-events: none; }
+  .hero-card .card-vibe {
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 5px;
+  }
+  .hero-card .card-name { font-size: 15px; font-weight: 600; color: #fff; }
+  .hero-card .card-rating { font-size: 12px; color: #f1c40f; margin-top: 3px; }
+  .hero-card .card-detail { font-size: 11px; color: #aaa; margin-top: 3px; }
+  .hero-card .card-action {
+    margin-top: 8px; font-size: 10px; color: #3498db; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+  }
+
+  /* Status row on hero card */
+  .hero-card .card-status-row {
+    display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap;
+  }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.3px;
+  }
+  .status-pill.open { background: rgba(39, 174, 96, 0.15); color: #2ecc71; }
+  .status-pill.closed { background: rgba(231, 76, 60, 0.15); color: #e74c3c; }
+  .status-pill.closing { background: rgba(243, 156, 18, 0.15); color: #f39c12; }
+  .status-pill .status-dot {
+    width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+  }
+  .status-pill.open .status-dot { background: #2ecc71; animation: status-glow 2s ease-in-out infinite; }
+  .status-pill.closed .status-dot { background: #e74c3c; }
+  .status-pill.closing .status-dot { background: #f39c12; animation: status-glow 1.5s ease-in-out infinite; }
+  @keyframes status-glow { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  .status-pill.busy { background: rgba(155, 89, 182, 0.12); color: #bb8fce; }
+  .status-pill.price { background: rgba(255, 255, 255, 0.05); color: #aaa; }
+  .status-pill.walk { background: rgba(52, 152, 219, 0.12); color: #7fb3d8; }
+
+  /* Chip status dot (dual ring) */
+  .chip-status-ring {
+    width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .chip-status-ring .chip-status-fill {
+    width: 6px; height: 6px; border-radius: 50%;
+  }
+  .chip-status-ring .chip-status-fill.open { background: #2ecc71; animation: status-glow 2s ease-in-out infinite; }
+  .chip-status-ring .chip-status-fill.closed { background: #e74c3c; }
+  .chip-status-ring .chip-status-fill.closing { background: #f39c12; animation: status-glow 1.5s ease-in-out infinite; }
+
+  /* Closed chip dimming */
+  .mini-chip.place-closed { opacity: 0.5; }
+  .mini-chip.place-closed .chip-name { text-decoration: line-through; color: #888; }
+
+  /* Confidence stripe — reuse hero card left border */
+  .hero-card.status-open { border-left: 3px solid #2ecc71 !important; }
+  .hero-card.status-closed { border-left: 3px solid #e74c3c !important; }
+  .hero-card.status-closing { border-left: 3px solid #f39c12 !important; }
+
+  /* Leader line SVG */
+  .leader-svg {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none; z-index: 22;
+  }
+  .leader-line { stroke-width: 2; fill: none; stroke-dasharray: 6 4; opacity: 0.5; }
+  .leader-glow { stroke-width: 4; fill: none; opacity: 0.12; filter: blur(2px); }
+
+  /* Callout dot */
+  .callout-dot {
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
+    background: rgba(52, 152, 219, 0.9); z-index: 35;
+    animation: dot-pulse 2s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .callout-dot::before {
+    content: ''; position: absolute; inset: -5px; border-radius: 50%;
+    border: 2px solid rgba(52, 152, 219, 0.4);
+    animation: dot-ring 2s ease-in-out infinite;
+  }
+  @keyframes dot-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.2); } }
+  @keyframes dot-ring { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(2); opacity: 0; } }
+
+  /* Onboarding bubble with arrow */
+  .onboarding-bubble {
+    position: absolute; z-index: 34;
+    background: rgba(20, 20, 40, 0.95); border: 1px solid rgba(52, 152, 219, 0.35);
+    border-radius: 14px; padding: 14px 18px; max-width: 240px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    font-size: 12px; line-height: 1.5;
+    transition: opacity 0.3s, transform 0.3s;
+  }
+  .onboarding-bubble .bubble-title { font-weight: 700; color: #3498db; margin-bottom: 4px; font-size: 13px; }
+  .onboarding-bubble .bubble-arrow {
+    position: absolute; width: 10px; height: 10px;
+    background: rgba(20, 20, 40, 0.95);
+    border: 1px solid rgba(52, 152, 219, 0.35);
+    transform: rotate(45deg);
+  }
+  .onboarding-bubble .bubble-arrow.right { right: -6px; top: 50%; margin-top: -5px; border-left: none; border-bottom: none; }
+  .onboarding-bubble .bubble-arrow.left { left: -6px; top: 50%; margin-top: -5px; border-right: none; border-top: none; }
+  .onboarding-bubble .bubble-arrow.down { bottom: -6px; left: 50%; margin-left: -5px; border-top: none; border-left: none; }
+
+  /* Simulated AreaDiscovery UI */
+  .sim-vibe-rail {
+    position: fixed; right: 12px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 10px; z-index: 5;
+  }
+  .sim-vibe-orb {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; border: 2px solid rgba(255,255,255,0.15);
+    background: rgba(30, 30, 50, 0.8);
+  }
+  .sim-search-bar {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    width: 280px; height: 44px; border-radius: 22px;
+    background: rgba(30, 30, 50, 0.9); border: 1px solid rgba(255,255,255,0.15);
+    display: flex; align-items: center; padding: 0 16px;
+    font-size: 13px; color: #888; z-index: 5;
+  }
+  .sim-search-bar::before { content: '🔍'; margin-right: 8px; }
+  .sim-saved-fab {
+    position: fixed; right: 16px; bottom: 80px;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; z-index: 5;
+    box-shadow: 0 4px 16px rgba(243, 156, 18, 0.3);
+  }
+
+  /* Controls */
+  .controls-toggle {
+    position: fixed; top: 16px; left: 16px; z-index: 101;
+    width: 40px; height: 40px; border-radius: 50%;
+    background: rgba(20, 20, 40, 0.95); border: 1px solid rgba(255,255,255,0.15);
+    color: #3498db; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(12px); transition: transform 0.3s;
+  }
+  .controls-toggle:hover { transform: scale(1.1); }
+  .controls-toggle.open { transform: rotate(180deg); }
+
+  .controls {
+    position: fixed; top: 16px; left: 68px; z-index: 100;
+    background: rgba(20, 20, 40, 0.95); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px; padding: 20px; min-width: 280px;
+    backdrop-filter: blur(12px);
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform-origin: top left;
+  }
+  .controls.collapsed { transform: scale(0); opacity: 0; pointer-events: none; }
+  .controls h2 { font-size: 15px; color: #3498db; margin-bottom: 4px; }
+  .controls .subtitle { font-size: 11px; color: #666; margin-bottom: 14px; }
+  .controls h3 { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin: 14px 0 8px; }
+
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn {
+    padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.05); color: #e0e0e0; font-size: 12px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .btn:hover { background: rgba(255,255,255,0.1); }
+  .btn.active { background: rgba(52, 152, 219, 0.3); border-color: #3498db; color: #3498db; }
+
+  .preset-btn {
+    padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.02); color: #ccc; font-size: 12px;
+    cursor: pointer; transition: all 0.2s; width: 100%; text-align: left; margin-bottom: 6px;
+  }
+  .preset-btn:hover { background: rgba(52, 152, 219, 0.12); border-color: rgba(52, 152, 219, 0.3); }
+  .preset-btn .preset-label { font-weight: 600; }
+  .preset-btn .preset-desc { color: #666; font-size: 11px; }
+
+  .gesture-indicator {
+    position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 16px; color: rgba(255,255,255,0.25); font-weight: 600;
+    pointer-events: none; z-index: 50;
+    opacity: 0; transition: opacity 0.3s;
+  }
+  .gesture-indicator.visible { opacity: 1; }
+
+  .status-bar {
+    position: fixed; bottom: 16px; left: 16px; z-index: 100;
+    background: rgba(20, 20, 40, 0.9); border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 10px 14px; font-size: 11px; color: #888;
+    max-width: 360px;
+  }
+  .status-bar .highlight { color: #3498db; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="map-container" id="mapContainer">
+  <div class="map-grid" id="mapGrid"></div>
+  <svg class="leader-svg" id="leaderSvg"></svg>
+  <div id="pinsLayer"></div>
+  <div id="cardsLayer"></div>
+  <div id="calloutsLayer"></div>
+</div>
+
+<!-- Simulated AreaDiscovery UI -->
+<div class="sim-vibe-rail" id="vibeRail">
+  <div class="sim-vibe-orb" id="orb-food">🍕</div>
+  <div class="sim-vibe-orb" id="orb-culture">🎭</div>
+  <div class="sim-vibe-orb" id="orb-nature">🌿</div>
+</div>
+<div class="sim-search-bar" id="searchBar">Ask AI about this area...</div>
+<div class="sim-saved-fab" id="savedFab">⭐</div>
+
+<button class="controls-toggle open" id="controlsToggle" onclick="toggleControls()">⚙</button>
+
+<div class="controls" id="controlsPanel">
+  <h2>Hybrid Pin-Anchored Cards</h2>
+  <div class="subtitle">Mini chips on all pins · Hero card on nearest/tapped · Settle & show</div>
+
+  <h3>Hero Selection</h3>
+  <div class="btn-row">
+    <button class="btn active" data-hero="nearest" onclick="setHeroMode('nearest')">Nearest to Center</button>
+    <button class="btn" data-hero="click" onclick="setHeroMode('click')">Click to Select</button>
+  </div>
+
+  <h3>Chip Style</h3>
+  <div class="btn-row">
+    <button class="btn active" data-chip="full" onclick="setChipStyle('full')">Name + Rating</button>
+    <button class="btn" data-chip="minimal" onclick="setChipStyle('minimal')">Name Only</button>
+    <button class="btn" data-chip="dot" onclick="setChipStyle('dot')">Dot Only</button>
+  </div>
+
+  <h3>Status Info Style</h3>
+  <div class="btn-row">
+    <button class="btn active" data-status="pills" onclick="setStatusStyle('pills')">Status Pills</button>
+    <button class="btn" data-status="stripe" onclick="setStatusStyle('stripe')">Confidence Stripe</button>
+    <button class="btn" data-status="both" onclick="setStatusStyle('both')">Both</button>
+  </div>
+
+  <h3>Onboarding Dots</h3>
+  <div class="btn-row">
+    <button class="btn" data-onboarding="off" onclick="setOnboarding('off')">Off</button>
+    <button class="btn" data-onboarding="hardcoded" onclick="setOnboarding('hardcoded')">Hardcoded</button>
+    <button class="btn" data-onboarding="measured" onclick="setOnboarding('measured')">Measured (ON element)</button>
+  </div>
+
+  <h3>Scenarios</h3>
+  <button class="preset-btn" onclick="loadPreset('spread')">
+    <div class="preset-label">Spread Out</div>
+    <div class="preset-desc">3 pins well separated — ideal case</div>
+  </button>
+  <button class="preset-btn" onclick="loadPreset('clustered')">
+    <div class="preset-label">Clustered</div>
+    <div class="preset-desc">Tight cluster — chips push apart, hero card clear</div>
+  </button>
+  <button class="preset-btn" onclick="loadPreset('edge')">
+    <div class="preset-label">Edge Pins</div>
+    <div class="preset-desc">Near screen borders — auto-flip test</div>
+  </button>
+  <button class="preset-btn" onclick="loadPreset('vertical')">
+    <div class="preset-label">Vertical Stack</div>
+    <div class="preset-desc">Stacked vertically — chip collision test</div>
+  </button>
+</div>
+
+<div class="gesture-indicator" id="gestureIndicator">⟳ Panning... cards hidden</div>
+
+<div class="status-bar">
+  <span class="highlight">Hybrid Pattern</span> ·
+  Click pin/chip to select hero · Drag map = settle & show ·
+  Mini chips on non-hero pins · Leader line on hero only
+</div>
+
+<script>
+// State
+let heroMode = 'nearest'; // 'nearest' | 'click'
+let chipStyle = 'full';   // 'full' | 'minimal' | 'dot'
+let onboardingMode = 'off';
+let heroIndex = 0;
+let isDragging = false;
+let dragStartX = 0, dragStartY = 0;
+let currentOffsetX = 0, currentOffsetY = 0;
+let settleTimeout = null;
+
+const vibeColors = { food: '#e74c3c', culture: '#9b59b6', nature: '#27ae60' };
+
+let statusStyle = 'pills'; // 'pills' | 'stripe' | 'both'
+
+const pois = [
+  { id: 0, name: 'Trattoria Roma', vibe: 'food', emoji: '🍕', rating: '★★★★½', detail: '0.3 km · Italian',
+    status: 'open', statusText: 'Open now', closesAt: 'Closes 11pm', busy: 'Moderate', price: '$$', walkMin: 4, baseX: 0.45, baseY: 0.38 },
+  { id: 1, name: 'Temple of Arts', vibe: 'culture', emoji: '🎭', rating: '★★★★★', detail: '0.5 km · Museum',
+    status: 'closed', statusText: 'Closed', closesAt: 'Opens 9am', busy: null, price: '$', walkMin: 7, baseX: 0.28, baseY: 0.55 },
+  { id: 2, name: 'Riverside Park', vibe: 'nature', emoji: '🌿', rating: '★★★★', detail: '0.8 km · Park',
+    status: 'closing', statusText: 'Closing soon', closesAt: 'Closes 6pm', busy: 'Quiet', price: 'Free', walkMin: 11, baseX: 0.68, baseY: 0.58 },
+];
+
+const presets = {
+  spread: [ { baseX: 0.45, baseY: 0.35 }, { baseX: 0.25, baseY: 0.55 }, { baseX: 0.70, baseY: 0.58 } ],
+  clustered: [ { baseX: 0.44, baseY: 0.46 }, { baseX: 0.50, baseY: 0.49 }, { baseX: 0.47, baseY: 0.53 } ],
+  edge: [ { baseX: 0.08, baseY: 0.28 }, { baseX: 0.90, baseY: 0.50 }, { baseX: 0.45, baseY: 0.88 } ],
+  vertical: [ { baseX: 0.45, baseY: 0.28 }, { baseX: 0.45, baseY: 0.48 }, { baseX: 0.45, baseY: 0.68 } ],
+};
+
+function getPinPos(poi) {
+  return { x: poi.baseX * window.innerWidth + currentOffsetX, y: poi.baseY * window.innerHeight + currentOffsetY };
+}
+
+function findNearestToCenter() {
+  const cx = window.innerWidth / 2, cy = window.innerHeight / 2;
+  let best = 0, bestDist = Infinity;
+  pois.forEach((poi, i) => {
+    const p = getPinPos(poi);
+    const d = Math.hypot(p.x - cx, p.y - cy);
+    if (d < bestDist) { bestDist = d; best = i; }
+  });
+  return best;
+}
+
+function selectHero(index) {
+  heroIndex = index;
+  // Switch to click mode so renderAll doesn't override
+  heroMode = 'click';
+  document.querySelectorAll('[data-hero]').forEach(b => b.classList.toggle('active', b.dataset.hero === 'click'));
+  renderAll(true);
+}
+
+// === RENDERING ===
+
+function renderAll(animated = true) {
+  if (heroMode === 'nearest') heroIndex = findNearestToCenter();
+  renderPins();
+  renderCards(animated);
+  renderOnboarding();
+}
+
+function renderPins() {
+  const layer = document.getElementById('pinsLayer');
+  layer.innerHTML = '';
+  pois.forEach((poi, i) => {
+    const pos = getPinPos(poi);
+    const isHero = i === heroIndex;
+
+    const pin = document.createElement('div');
+    pin.className = 'pin' + (isHero ? ' hero' : '');
+    pin.dataset.vibe = poi.vibe;
+    pin.style.left = pos.x + 'px';
+    pin.style.top = pos.y + 'px';
+    pin.onclick = (e) => { e.stopPropagation(); selectHero(i); };
+    pin.innerHTML = `
+      <div class="pin-dot">${poi.emoji}</div>
+      <div class="pin-label">${poi.name}</div>
+    `;
+    layer.appendChild(pin);
+
+    // Pulse ring on hero
+    if (isHero && !isDragging) {
+      const ring = document.createElement('div');
+      ring.className = 'pulse-ring';
+      ring.style.left = pos.x + 'px';
+      ring.style.top = pos.y + 'px';
+      ring.style.borderColor = vibeColors[poi.vibe] + '50';
+      layer.appendChild(ring);
+    }
+  });
+}
+
+function renderCards(animated = true) {
+  const layer = document.getElementById('cardsLayer');
+  const svg = document.getElementById('leaderSvg');
+  layer.innerHTML = '';
+  svg.innerHTML = '';
+  if (isDragging) return;
+
+  const w = window.innerWidth, h = window.innerHeight;
+
+  // Compute chip positions for non-hero pins (for collision resolution)
+  const chipPositions = [];
+
+  pois.forEach((poi, i) => {
+    const pos = getPinPos(poi);
+
+    if (i === heroIndex) {
+      // === HERO CARD ===
+      const hasPills = statusStyle === 'pills' || statusStyle === 'both';
+      const cardW = 210, cardH = hasPills ? 150 : 110;
+      let cardX = pos.x - cardW / 2;
+      let cardY, side;
+
+      // Auto placement: above unless clipped
+      if (pos.y - 30 - 20 - cardH < 20) {
+        cardY = pos.y + 30 + 20;
+        side = 'below';
+      } else {
+        cardY = pos.y - 30 - 20 - cardH;
+        side = 'above';
+      }
+
+      cardX = Math.max(12, Math.min(w - cardW - 12, cardX));
+      cardY = Math.max(12, Math.min(h - cardH - 12, cardY));
+
+      const card = document.createElement('div');
+      const useStripe = statusStyle === 'stripe' || statusStyle === 'both';
+      const usePills = statusStyle === 'pills' || statusStyle === 'both';
+      card.className = 'hero-card' + (useStripe ? ` status-${poi.status}` : '');
+      card.style.left = cardX + 'px';
+      card.style.top = cardY + 'px';
+      if (!useStripe) card.style.borderLeft = `3px solid ${vibeColors[poi.vibe]}`;
+
+      // Build status pills HTML
+      let statusHTML = '';
+      if (usePills) {
+        const statusCls = poi.status === 'open' ? 'open' : poi.status === 'closed' ? 'closed' : 'closing';
+        statusHTML = `<div class="card-status-row">`;
+        statusHTML += `<span class="status-pill ${statusCls}"><span class="status-dot"></span>${poi.statusText}</span>`;
+        if (poi.busy) statusHTML += `<span class="status-pill busy">👥 ${poi.busy}</span>`;
+        statusHTML += `<span class="status-pill price">${poi.price}</span>`;
+        statusHTML += `<span class="status-pill walk">🚶 ${poi.walkMin} min</span>`;
+        statusHTML += `</div>`;
+      }
+
+      card.innerHTML = `
+        <div class="card-vibe" style="color: ${vibeColors[poi.vibe]}">${poi.vibe}</div>
+        <div class="card-name">${poi.name}</div>
+        <div class="card-rating">${poi.rating}</div>
+        <div class="card-detail">${poi.detail}</div>
+        ${statusHTML}
+        <div class="card-action">Tap to explore →</div>
+      `;
+
+      if (animated) {
+        card.style.opacity = '0';
+        card.style.transform = 'scale(0.85) translateY(10px)';
+        setTimeout(() => { card.style.opacity = '1'; card.style.transform = 'scale(1) translateY(0)'; }, 120);
+      }
+
+      layer.appendChild(card);
+
+      // Leader line (curved, hero only)
+      const cardCX = cardX + cardW / 2;
+      const cardEdgeY = side === 'above' ? cardY + cardH : cardY;
+      const pinY = pos.y - 20;
+      const midY = (cardEdgeY + pinY) / 2;
+      const color = vibeColors[poi.vibe];
+
+      const glow = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      glow.setAttribute('d', `M ${cardCX} ${cardEdgeY} C ${cardCX} ${midY}, ${pos.x} ${midY}, ${pos.x} ${pinY}`);
+      glow.setAttribute('class', 'leader-glow');
+      glow.setAttribute('stroke', color);
+      svg.appendChild(glow);
+
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      line.setAttribute('d', `M ${cardCX} ${cardEdgeY} C ${cardCX} ${midY}, ${pos.x} ${midY}, ${pos.x} ${pinY}`);
+      line.setAttribute('class', 'leader-line');
+      line.setAttribute('stroke', color);
+      svg.appendChild(line);
+
+    } else {
+      // === MINI CHIP ===
+      const chipW = chipStyle === 'dot' ? 14 : chipStyle === 'minimal' ? 80 : 120;
+      const chipH = chipStyle === 'dot' ? 14 : 28;
+      let chipX = pos.x - chipW / 2;
+      let chipY = pos.y - 30 - 8 - chipH; // above pin
+
+      // Auto-flip
+      if (chipY < 12) chipY = pos.y + 30 + 8;
+
+      chipX = Math.max(12, Math.min(w - chipW - 12, chipX));
+      chipY = Math.max(12, Math.min(h - chipH - 12, chipY));
+
+      chipPositions.push({ x: chipX, y: chipY, w: chipW, h: chipH, idx: i });
+    }
+  });
+
+  // Resolve chip collisions (push apart)
+  for (let iter = 0; iter < 15; iter++) {
+    let moved = false;
+    for (let a = 0; a < chipPositions.length; a++) {
+      for (let b = a + 1; b < chipPositions.length; b++) {
+        const ca = chipPositions[a], cb = chipPositions[b];
+        if (!(ca.x + ca.w + 4 < cb.x || cb.x + cb.w + 4 < ca.x || ca.y + ca.h + 4 < cb.y || cb.y + cb.h + 4 < ca.y)) {
+          const dy = (ca.y + ca.h/2) - (cb.y + cb.h/2);
+          const dx = (ca.x + ca.w/2) - (cb.x + cb.w/2);
+          ca.y += dy >= 0 ? 5 : -5;
+          ca.x += Math.abs(dx) < 20 ? (dx >= 0 ? 4 : -4) : 0;
+          cb.y -= dy >= 0 ? 5 : -5;
+          cb.x -= Math.abs(dx) < 20 ? (dx >= 0 ? 4 : -4) : 0;
+          chipPositions.forEach(p => { p.x = Math.max(12, Math.min(w-p.w-12, p.x)); p.y = Math.max(12, Math.min(h-p.h-12, p.y)); });
+          moved = true;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+
+  // Render chips
+  chipPositions.forEach((cp, idx) => {
+    const poi = pois[cp.idx];
+    const pos = getPinPos(poi);
+    const color = vibeColors[poi.vibe];
+
+    if (chipStyle === 'dot') {
+      const dot = document.createElement('div');
+      dot.style.cssText = `
+        position: absolute; width: 14px; height: 14px; border-radius: 50%;
+        background: ${color}; opacity: 0.7; z-index: 20; cursor: pointer;
+        left: ${cp.x}px; top: ${cp.y}px;
+        transition: opacity 0.3s, transform 0.3s;
+        box-shadow: 0 2px 8px ${color}40;
+      `;
+      dot.onclick = (e) => { e.stopPropagation(); selectHero(cp.idx); };
+      if (animated) {
+        dot.style.opacity = '0'; dot.style.transform = 'scale(0.5)';
+        setTimeout(() => { dot.style.opacity = '0.7'; dot.style.transform = 'scale(1)'; }, 60 + idx * 40);
+      }
+      layer.appendChild(dot);
+    } else {
+      const chip = document.createElement('div');
+      const isClosed = poi.status === 'closed';
+      chip.className = 'mini-chip' + (isClosed ? ' place-closed' : '');
+      chip.style.left = cp.x + 'px';
+      chip.style.top = cp.y + 'px';
+      chip.onclick = (e) => { e.stopPropagation(); selectHero(cp.idx); };
+
+      // Dual-ring dot: vibe color ring, status fill
+      let inner = `<div class="chip-status-ring" style="border: 2px solid ${color}"><div class="chip-status-fill ${poi.status}"></div></div>`;
+      inner += `<span class="chip-name">${poi.name}</span>`;
+      if (chipStyle === 'full') inner += `<span class="chip-rating">${poi.rating}</span>`;
+      chip.innerHTML = inner;
+
+      if (animated) {
+        chip.style.opacity = '0'; chip.style.transform = 'scale(0.8)';
+        setTimeout(() => { chip.style.opacity = '1'; chip.style.transform = 'scale(1)'; }, 60 + idx * 50);
+      }
+      layer.appendChild(chip);
+    }
+  });
+}
+
+// Onboarding
+function renderOnboarding() {
+  const layer = document.getElementById('calloutsLayer');
+  layer.innerHTML = '';
+  if (onboardingMode === 'off') return;
+
+  const targets = [];
+
+  if (onboardingMode === 'hardcoded') {
+    targets.push({ x: window.innerWidth - 48, y: window.innerHeight / 2 - 60, label: 'Vibes Rail', desc: 'Swipe vibes to explore', side: 'left' });
+    targets.push({ x: window.innerWidth - 20, y: window.innerHeight - 80, label: 'Saved Places', desc: 'Your bookmarks', side: 'left' });
+    targets.push({ x: 140, y: window.innerHeight - 32, label: 'AI Search', desc: 'Ask about this area', side: 'above' });
+  } else {
+    // Measured: dot ON the element edge
+    const rail = document.getElementById('vibeRail');
+    const fab = document.getElementById('savedFab');
+    const bar = document.getElementById('searchBar');
+
+    if (rail) {
+      const r = rail.getBoundingClientRect();
+      targets.push({ x: r.left, y: r.top + r.height / 2, label: 'Vibes Rail', desc: 'Swipe vibes to explore', side: 'left' });
+    }
+    if (fab) {
+      const r = fab.getBoundingClientRect();
+      targets.push({ x: r.left, y: r.top + r.height / 2, label: 'Saved Places', desc: 'Your bookmarks', side: 'left' });
+    }
+    if (bar) {
+      const r = bar.getBoundingClientRect();
+      targets.push({ x: r.left + r.width / 2, y: r.top, label: 'AI Search', desc: 'Ask about this area', side: 'above' });
+    }
+  }
+
+  targets.forEach((t, i) => {
+    // Dot ON the element
+    const dot = document.createElement('div');
+    dot.className = 'callout-dot';
+    dot.style.left = (t.x - 7) + 'px';
+    dot.style.top = (t.y - 7) + 'px';
+    dot.style.animationDelay = (i * 0.3) + 's';
+    layer.appendChild(dot);
+
+    // Bubble with arrow pointing to dot
+    const bubble = document.createElement('div');
+    bubble.className = 'onboarding-bubble';
+    let arrowHTML = '';
+
+    if (t.side === 'left') {
+      bubble.style.left = (t.x - 260) + 'px';
+      bubble.style.top = (t.y - 24) + 'px';
+      arrowHTML = '<div class="bubble-arrow right"></div>';
+    } else if (t.side === 'above') {
+      bubble.style.left = (t.x - 110) + 'px';
+      bubble.style.top = (t.y - 70) + 'px';
+      arrowHTML = '<div class="bubble-arrow down"></div>';
+    }
+
+    // Ensure bubble doesn't go off-screen left
+    const bubbleLeft = parseInt(bubble.style.left);
+    if (bubbleLeft < 12) {
+      bubble.style.left = (t.x + 24) + 'px';
+      arrowHTML = '<div class="bubble-arrow" style="left:-6px;top:50%;margin-top:-5px;border-right:none;border-top:none;"></div>';
+    }
+
+    bubble.innerHTML = `<div class="bubble-title">${t.label}</div><div>${t.desc}</div>${arrowHTML}`;
+
+    if (i > 0) {
+      bubble.style.opacity = '0';
+      bubble.style.transform = 'translateY(4px)';
+      setTimeout(() => { bubble.style.opacity = '1'; bubble.style.transform = 'translateY(0)'; }, 200 + i * 150);
+    }
+
+    layer.appendChild(bubble);
+  });
+}
+
+// === MAP DRAGGING ===
+const mc = document.getElementById('mapContainer');
+
+mc.addEventListener('mousedown', (e) => {
+  if (e.target.closest('.controls') || e.target.closest('.controls-toggle') ||
+      e.target.closest('.mini-chip') || e.target.closest('.hero-card') || e.target.closest('.pin')) return;
+  isDragging = true;
+  dragStartX = e.clientX - currentOffsetX;
+  dragStartY = e.clientY - currentOffsetY;
+  mc.classList.add('dragging');
+  document.getElementById('cardsLayer').innerHTML = '';
+  document.getElementById('leaderSvg').innerHTML = '';
+  document.getElementById('calloutsLayer').innerHTML = '';
+  document.getElementById('gestureIndicator').classList.add('visible');
+  clearTimeout(settleTimeout);
+});
+
+mc.addEventListener('mousemove', (e) => {
+  if (!isDragging) return;
+  currentOffsetX = e.clientX - dragStartX;
+  currentOffsetY = e.clientY - dragStartY;
+  document.getElementById('mapGrid').style.transform = `translate(${currentOffsetX % 60}px, ${currentOffsetY % 60}px)`;
+  renderPins();
+});
+
+function endDrag() {
+  if (!isDragging) return;
+  isDragging = false;
+  mc.classList.remove('dragging');
+  document.getElementById('gestureIndicator').classList.remove('visible');
+  settleTimeout = setTimeout(() => renderAll(true), 200);
+}
+
+mc.addEventListener('mouseup', endDrag);
+mc.addEventListener('mouseleave', endDrag);
+
+// === CONTROLS ===
+function toggleControls() {
+  document.getElementById('controlsPanel').classList.toggle('collapsed');
+  document.getElementById('controlsToggle').classList.toggle('open');
+}
+
+function setHeroMode(mode) {
+  heroMode = mode;
+  document.querySelectorAll('[data-hero]').forEach(b => b.classList.toggle('active', b.dataset.hero === mode));
+  renderAll(false);
+}
+
+function setChipStyle(style) {
+  chipStyle = style;
+  document.querySelectorAll('[data-chip]').forEach(b => b.classList.toggle('active', b.dataset.chip === style));
+  renderAll(false);
+}
+
+function setStatusStyle(style) {
+  statusStyle = style;
+  document.querySelectorAll('[data-status]').forEach(b => b.classList.toggle('active', b.dataset.status === style));
+  renderAll(false);
+}
+
+function setOnboarding(mode) {
+  onboardingMode = mode;
+  document.querySelectorAll('[data-onboarding]').forEach(b => b.classList.toggle('active', b.dataset.onboarding === mode));
+  renderOnboarding();
+}
+
+function loadPreset(name) {
+  currentOffsetX = 0; currentOffsetY = 0;
+  document.getElementById('mapGrid').style.transform = 'translate(0,0)';
+  pois.forEach((poi, i) => { poi.baseX = presets[name][i].baseX; poi.baseY = presets[name][i].baseY; });
+  renderAll(true);
+}
+
+window.addEventListener('resize', () => renderAll(false));
+
+// Init
+renderAll(true);
+</script>
+</body>
+</html>

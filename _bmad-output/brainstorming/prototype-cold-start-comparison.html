@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Cold Start: Vibe Rail Picker vs No Picker</title>
+<style>
+  :root {
+    --bg-dark:#0d1b2a;--ui-dark:rgba(20,14,28,0.92);--ui-dark-solid:#1a1224;
+    --accent:#4ecdc4;--accent-glow:rgba(78,205,196,0.35);--saved:#ff6b6b;
+    --gold:#FFD700;--gold-light:#FFE26A;
+    --text-primary:#fafafa;--text-secondary:rgba(255,255,255,0.6);--text-dim:rgba(255,255,255,0.35);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);--ease-out:cubic-bezier(0.16,1,0.3,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text-primary);overflow-x:hidden}
+
+  .page-header{text-align:center;padding:20px 16px 10px;font-size:12px;color:#888;letter-spacing:1px;text-transform:uppercase}
+  .page-header h1{font-size:18px;color:#fff;letter-spacing:0;text-transform:none;margin-bottom:4px}
+  .page-header p{font-size:11px;color:#666;text-transform:none;letter-spacing:0;max-width:700px;margin:0 auto;line-height:1.4}
+
+  .side-by-side{display:flex;gap:16px;padding:0 16px 24px;justify-content:center;flex-wrap:wrap}
+
+  /* Phone frame */
+  .phone{width:340px;border-radius:28px;border:2px solid #333;overflow:hidden;position:relative;height:680px;background:var(--bg-dark);flex-shrink:0}
+  .phone-label{text-align:center;padding:8px;font-size:11px;color:#888;font-weight:600;letter-spacing:0.5px;background:#111;border-bottom:1px solid #222}
+  .phone-sublabel{text-align:center;padding:3px 8px 5px;font-size:9px;color:#555;background:#111;border-bottom:1px solid #222;line-height:1.3}
+
+  /* Map */
+  .map{position:absolute;inset:52px 0 0 0;background:var(--bg-dark)}
+  .map::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 35% 45%,#1b2838 0%,transparent 50%),radial-gradient(circle at 65% 55%,#162230 0%,transparent 40%);pointer-events:none}
+  .map::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%),linear-gradient(90deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%);background-size:60px 60px;opacity:0.2;pointer-events:none}
+
+  /* Search bar */
+  .search-row{position:absolute;top:62px;left:10px;right:10px;z-index:100;height:40px;border-radius:12px;background:var(--ui-dark);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 10px;gap:6px}
+  .search-icon{font-size:12px;opacity:0.45}
+  .search-text{flex:1;font-size:11px;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .search-actions{display:flex;gap:3px;align-items:center;flex-shrink:0}
+  .search-btn{width:28px;height:28px;border-radius:8px;background:rgba(78,205,196,0.15);border:none;color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s}
+  .batch-nav{display:flex;align-items:center;gap:1px;background:rgba(255,255,255,0.04);border-radius:8px;padding:2px}
+  .bn-btn{width:24px;height:24px;border-radius:6px;border:none;background:transparent;color:var(--text-dim);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+  .bn-btn.disabled{opacity:0.2;pointer-events:none}
+  .bn-counter{font-size:9px;color:var(--text-secondary);padding:0 3px;font-weight:600;min-width:24px;text-align:center}
+
+  /* Vibe rail */
+  .vibe-rail{position:absolute;bottom:80px;right:6px;z-index:28;display:flex;flex-direction:column;gap:3px;align-items:center}
+  .saved-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;margin-bottom:1px}
+  .saved-orb{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--gold-light),var(--gold));display:flex;align-items:center;justify-content:center;font-size:15px;transition:all 0.2s;box-shadow:0 2px 8px rgba(255,215,0,0.3);opacity:0.4}
+  .saved-label{font-size:8px;color:var(--gold);margin-top:1px;font-weight:500;opacity:0.4}
+  .vibe-divider{width:20px;height:1px;background:rgba(255,255,255,0.12);margin:1px 0}
+  .vibe-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;transition:all 0.3s}
+  .vibe-orb{border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35);display:flex;align-items:center;justify-content:center;transition:all 0.3s}
+  .vibe-orb-label{font-size:8px;color:rgba(255,255,255,0.8);margin-top:1px;text-align:center;max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vibe-count-badge{position:absolute;top:-2px;right:-2px;min-width:12px;height:12px;border-radius:6px;background:#4a7cf7;color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #0a0c10;padding:0 2px;opacity:0;transition:opacity 0.3s}
+
+  /* Vibe rail cold-start pulsing */
+  .vibe-orb-wrap.cold-start .vibe-orb{
+    animation:vibePulse 1.8s ease-in-out infinite alternate;
+    box-shadow:0 0 12px var(--accent-glow);
+    border:2px solid rgba(78,205,196,0.4);
+  }
+  @keyframes vibePulse{
+    0%{transform:scale(1);box-shadow:0 0 8px var(--accent-glow)}
+    100%{transform:scale(1.12);box-shadow:0 0 18px var(--accent-glow)}
+  }
+  .vibe-orb.active{border:2px solid #fff;animation:none;box-shadow:0 0 12px var(--accent-glow)}
+
+  /* Tooltip nudge */
+  .vibe-tooltip{position:absolute;right:48px;top:50%;transform:translateY(-50%);background:var(--accent);color:#111;padding:5px 10px;border-radius:8px;font-size:10px;font-weight:600;white-space:nowrap;opacity:0;transition:all 0.4s var(--ease-spring);pointer-events:none}
+  .vibe-tooltip::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);border:5px solid transparent;border-left-color:var(--accent)}
+  .vibe-tooltip.show{opacity:1;transform:translateY(-50%) translateX(0)}
+
+  /* Pins */
+  .pin{position:absolute;z-index:20;display:flex;flex-direction:column;align-items:center;transition:all 0.45s var(--ease-spring);cursor:pointer}
+  .pin.hidden{opacity:0;transform:translate(-50%,-50%) scale(0);pointer-events:none}
+  .pin.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .pin-marker{width:32px;height:32px;border-radius:50%;background:var(--accent);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 10px var(--accent-glow);transition:all 0.3s}
+  .pin:active .pin-marker{transform:scale(1.15)}
+  .pin-label{margin-top:2px;font-size:8px;font-weight:600;color:#fff;background:rgba(0,0,0,0.75);padding:1px 5px;border-radius:4px;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis}
+
+  /* Float card */
+  .poi-float-card{position:absolute;z-index:25;width:150px;border-radius:12px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);padding:10px 11px;cursor:pointer;transition:all 0.4s var(--ease-spring);pointer-events:all}
+  .poi-float-card.hidden{opacity:0;transform:scale(0.85) translateY(8px);pointer-events:none}
+  .poi-float-card.visible{opacity:1;transform:scale(1) translateY(0)}
+  .pfc-compact{display:block;position:relative}
+  .pfc-compact-close{position:absolute;top:0;right:0;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:var(--text-dim);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .pfc-header{display:flex;align-items:center;gap:6px}
+  .pfc-emoji{font-size:16px}
+  .pfc-name{font-size:11px;font-weight:600;line-height:1.25}
+  .pfc-vibe{margin-top:4px;font-size:9px;color:var(--accent);font-weight:600}
+  .pfc-why{margin-top:3px;font-size:10px;color:var(--text-secondary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pfc-meta{margin-top:5px;display:flex;gap:8px;font-size:9px;color:var(--text-dim);flex-wrap:wrap}
+
+  /* Welcome overlay for option A */
+  .welcome-overlay{position:absolute;inset:52px 0 0 0;z-index:50;background:rgba(0,0,0,0.55);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;transition:opacity 0.5s;pointer-events:all}
+  .welcome-overlay.hidden{opacity:0;pointer-events:none}
+  .welcome-card{background:var(--ui-dark-solid);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:24px 20px;max-width:280px;text-align:center;transform:scale(1);transition:all 0.4s var(--ease-spring)}
+  .welcome-overlay.hidden .welcome-card{transform:scale(0.9)}
+  .welcome-title{font-size:20px;margin-bottom:2px}
+  .welcome-subtitle{font-size:14px;font-weight:600;margin-bottom:4px}
+  .welcome-desc{font-size:11px;color:var(--text-secondary);margin-bottom:16px;line-height:1.4}
+  .welcome-arrow{font-size:18px;margin-bottom:6px;animation:bounceRight 1.5s ease-in-out infinite}
+  .welcome-hint{font-size:10px;color:var(--accent);font-weight:600}
+  @keyframes bounceRight{0%,100%{transform:translateX(0)}50%{transform:translateX(8px)}}
+
+  /* Loading shimmer for map */
+  .map-shimmer{position:absolute;inset:0;z-index:15;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;transition:opacity 0.5s}
+  .map-shimmer.hidden{opacity:0;pointer-events:none}
+  .shimmer-text{font-size:12px;color:var(--text-dim);animation:shimmerFade 1.5s ease-in-out infinite}
+  .shimmer-dots{display:flex;gap:6px}
+  .shimmer-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:0.3;animation:shimmerDot 1.2s ease-in-out infinite}
+  .shimmer-dot:nth-child(2){animation-delay:0.2s}
+  .shimmer-dot:nth-child(3){animation-delay:0.4s}
+  @keyframes shimmerFade{0%,100%{opacity:0.4}50%{opacity:1}}
+  @keyframes shimmerDot{0%,100%{opacity:0.2;transform:scale(0.8)}50%{opacity:1;transform:scale(1.2)}}
+
+  /* Bottom bar */
+  .bottom-bar{position:absolute;bottom:0;left:0;right:0;z-index:80;padding:0 10px 18px;display:flex;align-items:flex-end;justify-content:space-between}
+  .ai-bar{height:34px;border-radius:17px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:5px;padding:0 10px;cursor:pointer;max-width:130px}
+  .ai-bar-icon{font-size:11px}
+  .ai-bar-text{font-size:9px;color:var(--text-secondary);white-space:nowrap;overflow:hidden}
+  @keyframes ghostCycle{0%,100%{opacity:0.5}50%{opacity:0.8}}
+  .ghost-text{animation:ghostCycle 3s ease-in-out infinite}
+  .bottom-right{display:flex;gap:5px;align-items:flex-end}
+  .toggle-btn{height:30px;border-radius:15px;background:var(--ui-dark);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;overflow:hidden}
+  .toggle-seg{padding:0 10px;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-dim);border:none;background:transparent;cursor:pointer}
+  .toggle-seg.active{color:var(--accent)}
+  .fab{width:42px;height:42px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;color:#111;font-weight:300;cursor:pointer;box-shadow:0 3px 16px var(--accent-glow)}
+  .my-loc{position:absolute;bottom:62px;left:10px;z-index:65;width:30px;height:30px;border-radius:50%;background:var(--ui-dark);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer}
+
+  .toast{position:absolute;top:100px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:300;background:var(--accent);color:#111;padding:5px 12px;border-radius:12px;font-size:9px;font-weight:600;opacity:0;pointer-events:none;transition:all 0.35s var(--ease-spring);white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  /* Replay button */
+  .replay-bar{text-align:center;padding:0 16px 20px}
+  .replay-btn{background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);color:var(--accent);padding:10px 24px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s}
+  .replay-btn:hover{background:rgba(78,205,196,0.25)}
+
+  /* Step indicator */
+  .step-indicator{position:absolute;top:108px;left:10px;right:10px;z-index:90;display:flex;gap:4px;justify-content:center}
+  .step-dot{height:3px;border-radius:2px;background:rgba(255,255,255,0.15);flex:1;max-width:60px;transition:all 0.4s}
+  .step-dot.active{background:var(--accent)}
+  .step-dot.done{background:rgba(78,205,196,0.4)}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Cold Start: Vibe Rail Picker vs No Picker</h1>
+  <p>Left: Vibe rail pulses as the picker — tap any vibe to get your first 3 pins. Teaches vibes by doing.<br>
+  Right: No picker at all — AI auto-drops 3 diverse "showcase" pins. Taste profile builds from behavior.</p>
+</div>
+
+<div class="side-by-side">
+
+<!-- ========== PHONE A: Vibe Rail AS Picker (#96) ========== -->
+<div class="phone" id="phoneA">
+  <div class="phone-label">OPTION A — VIBE RAIL IS THE PICKER</div>
+  <div class="phone-sublabel">Fresh install. Tap a pulsing vibe to start exploring.</div>
+  <div class="map" id="mapA"></div>
+  <div class="toast" id="toastA"></div>
+
+  <div class="step-indicator" id="stepsA">
+    <div class="step-dot active" id="stepA1"></div>
+    <div class="step-dot" id="stepA2"></div>
+    <div class="step-dot" id="stepA3"></div>
+  </div>
+
+  <div class="search-row">
+    <span class="search-icon">🔍</span>
+    <span class="search-text" id="searchTextA">Shoreditch, London</span>
+    <div class="search-actions" id="searchActionsA" style="opacity:0;pointer-events:none">
+      <div class="batch-nav">
+        <button class="bn-btn disabled">◀</button>
+        <span class="bn-counter">1/4</span>
+        <button class="bn-btn disabled">▶</button>
+      </div>
+      <button class="search-btn">↻</button>
+    </div>
+  </div>
+
+  <!-- Welcome overlay -->
+  <div class="welcome-overlay" id="welcomeA">
+    <div class="welcome-card">
+      <div class="welcome-title">👋</div>
+      <div class="welcome-subtitle">Welcome to Shoreditch!</div>
+      <div class="welcome-desc">Tap a vibe on the right to start discovering what makes this area special.</div>
+      <div class="welcome-arrow">👉</div>
+      <div class="welcome-hint">Pick a vibe that excites you</div>
+    </div>
+  </div>
+
+  <!-- Map shimmer (shown after vibe tap, before pins drop) -->
+  <div class="map-shimmer hidden" id="shimmerA">
+    <div class="shimmer-dots"><div class="shimmer-dot"></div><div class="shimmer-dot"></div><div class="shimmer-dot"></div></div>
+    <div class="shimmer-text">Finding the best spots...</div>
+  </div>
+
+  <!-- Vibe rail — all pulsing on cold start -->
+  <div class="vibe-rail" id="vibeRailA">
+    <div class="saved-orb-wrap"><div class="saved-orb">🔖</div><span class="saved-label">Saved</span></div>
+    <div class="vibe-divider"></div>
+    <div class="vibe-orb-wrap cold-start" onclick="pickVibe('A',0)">
+      <div class="vibe-orb" style="width:36px;height:36px;font-size:15px">🎨</div>
+      <div class="vibe-orb-label">Street Art</div>
+      <div class="vibe-count-badge">3</div>
+      <div class="vibe-tooltip show" id="tooltipA">Tap to explore!</div>
+    </div>
+    <div class="vibe-orb-wrap cold-start" onclick="pickVibe('A',1)">
+      <div class="vibe-orb" style="width:34px;height:34px;font-size:14px">☕</div>
+      <div class="vibe-orb-label">Cafe</div>
+      <div class="vibe-count-badge">2</div>
+    </div>
+    <div class="vibe-orb-wrap cold-start" onclick="pickVibe('A',2)">
+      <div class="vibe-orb" style="width:34px;height:34px;font-size:14px">🎵</div>
+      <div class="vibe-orb-label">Music</div>
+      <div class="vibe-count-badge">2</div>
+    </div>
+    <div class="vibe-orb-wrap cold-start" onclick="pickVibe('A',3)">
+      <div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🍜</div>
+      <div class="vibe-orb-label">Food</div>
+      <div class="vibe-count-badge">1</div>
+    </div>
+    <div class="vibe-orb-wrap cold-start" onclick="pickVibe('A',4)">
+      <div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🏛️</div>
+      <div class="vibe-orb-label">History</div>
+      <div class="vibe-count-badge">1</div>
+    </div>
+  </div>
+
+  <div class="my-loc">📍</div>
+  <div class="bottom-bar">
+    <div class="ai-bar"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text">Pick a vibe first!</span></div>
+    <div class="bottom-right">
+      <div class="toggle-btn"><button class="toggle-seg active">🗺️</button><button class="toggle-seg">📋</button></div>
+      <div class="fab">+</div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PHONE B: No Picker (#97) ========== -->
+<div class="phone" id="phoneB">
+  <div class="phone-label">OPTION B — NO PICKER (AI SHOWCASE)</div>
+  <div class="phone-sublabel">Fresh install. AI auto-drops 3 diverse hero pins. No user input needed.</div>
+  <div class="map" id="mapB"></div>
+  <div class="toast" id="toastB"></div>
+
+  <div class="step-indicator" id="stepsB">
+    <div class="step-dot active" id="stepB1"></div>
+    <div class="step-dot" id="stepB2"></div>
+    <div class="step-dot" id="stepB3"></div>
+  </div>
+
+  <div class="search-row">
+    <span class="search-icon">🔍</span>
+    <span class="search-text">Shoreditch, London</span>
+    <div class="search-actions" id="searchActionsB" style="opacity:0;pointer-events:none">
+      <div class="batch-nav">
+        <button class="bn-btn disabled">◀</button>
+        <span class="bn-counter">1/4</span>
+        <button class="bn-btn">▶</button>
+      </div>
+      <button class="search-btn">↻</button>
+    </div>
+  </div>
+
+  <!-- Map shimmer (shown immediately, AI is working) -->
+  <div class="map-shimmer" id="shimmerB">
+    <div class="shimmer-dots"><div class="shimmer-dot"></div><div class="shimmer-dot"></div><div class="shimmer-dot"></div></div>
+    <div class="shimmer-text">Discovering Shoreditch...</div>
+  </div>
+
+  <!-- Vibe rail — starts empty/skeleton, fills when Stage 1 returns -->
+  <div class="vibe-rail" id="vibeRailB">
+    <div class="saved-orb-wrap"><div class="saved-orb">🔖</div><span class="saved-label">Saved</span></div>
+    <div class="vibe-divider"></div>
+    <!-- Skeleton vibes — gray circles -->
+    <div class="vibe-orb-wrap" id="vbSkel0"><div class="vibe-orb" style="width:36px;height:36px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━━</div></div>
+    <div class="vibe-orb-wrap" id="vbSkel1"><div class="vibe-orb" style="width:34px;height:34px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.2s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━━</div></div>
+    <div class="vibe-orb-wrap" id="vbSkel2"><div class="vibe-orb" style="width:34px;height:34px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.4s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━━</div></div>
+    <div class="vibe-orb-wrap" id="vbSkel3"><div class="vibe-orb" style="width:30px;height:30px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.6s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━</div></div>
+    <div class="vibe-orb-wrap" id="vbSkel4"><div class="vibe-orb" style="width:30px;height:30px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out 0.8s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">━━</div></div>
+  </div>
+
+  <div class="my-loc">📍</div>
+  <div class="bottom-bar">
+    <div class="ai-bar" id="aiBarB"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text" id="aiBarTextB">Exploring for you...</span></div>
+    <div class="bottom-right">
+      <div class="toggle-btn"><button class="toggle-seg active">🗺️</button><button class="toggle-seg">📋</button></div>
+      <div class="fab">+</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="replay-bar">
+  <button class="replay-btn" onclick="replayAll()">↻ Replay Both Animations</button>
+</div>
+
+<script>
+// POI data
+const pois = {
+  streetArt: [
+    {emoji:'🎨',name:'Rivington Murals',vibe:'Street Art',why:'Banksy started here. New murals weekly from global artists.',rating:'4.8',hours:'Always open',dist:'120m',x:26,y:36,cs:'right'},
+    {emoji:'🎨',name:'Village Underground',vibe:'Street Art',why:'Tube carriages on a warehouse roof. Iconic.',rating:'4.3',hours:'Varies',dist:'400m',x:52,y:58,cs:'left'},
+    {emoji:'🖌️',name:'Brick Lane Walls',vibe:'Street Art',why:'The largest rotating street art canvas in East London.',rating:'4.6',hours:'Always open',dist:'200m',x:36,y:74,cs:'right'}
+  ],
+  diverse: [
+    {emoji:'🎨',name:'Rivington Murals',vibe:'Street Art',why:'Banksy started here. New murals weekly from global artists.',rating:'4.8',hours:'Always open',dist:'120m',x:26,y:36,cs:'right'},
+    {emoji:'☕',name:'Cafe Lumiere',vibe:'Cafe Scene',why:'Victorian warehouse roaster. Oat flat white is legendary.',rating:'4.6',hours:'7am–6pm',dist:'200m',x:52,y:58,cs:'left'},
+    {emoji:'🎵',name:'Jazz Cellar',vibe:'Live Music',why:'Underground speakeasy. Thursday jams draw musicians.',rating:'4.7',hours:'8pm–2am',dist:'350m',x:36,y:74,cs:'right'}
+  ]
+};
+
+const vibeData = [
+  {emoji:'🎨',label:'Street Art',size:36,count:3},
+  {emoji:'☕',label:'Cafe',size:34,count:2},
+  {emoji:'🎵',label:'Music',size:34,count:2},
+  {emoji:'🍜',label:'Food',size:30,count:1},
+  {emoji:'🏛️',label:'History',size:30,count:1}
+];
+
+// ========== PHONE A: Vibe Rail Picker ==========
+let phoneAState = 'waiting'; // waiting -> picked -> loaded
+
+function pickVibe(phone, idx) {
+  if (phoneAState !== 'waiting') return;
+  phoneAState = 'picked';
+
+  // Hide welcome overlay
+  document.getElementById('welcomeA').classList.add('hidden');
+
+  // Stop all pulsing, activate selected
+  const wraps = document.querySelectorAll('#vibeRailA .vibe-orb-wrap');
+  wraps.forEach((w, i) => {
+    w.classList.remove('cold-start');
+    if (i === idx) {
+      w.querySelector('.vibe-orb').classList.add('active');
+      w.querySelector('.vibe-orb-label').style.color = '#fff';
+      w.querySelector('.vibe-orb-label').style.fontWeight = '700';
+    } else {
+      w.style.opacity = '0.45';
+    }
+  });
+
+  // Hide tooltip
+  const tooltip = document.getElementById('tooltipA');
+  if (tooltip) tooltip.classList.remove('show');
+
+  // Step indicator
+  document.getElementById('stepA1').classList.remove('active');
+  document.getElementById('stepA1').classList.add('done');
+  document.getElementById('stepA2').classList.add('active');
+
+  // Show shimmer
+  document.getElementById('shimmerA').classList.remove('hidden');
+
+  // After "loading", drop pins
+  setTimeout(() => {
+    document.getElementById('shimmerA').classList.add('hidden');
+    document.getElementById('stepA2').classList.remove('active');
+    document.getElementById('stepA2').classList.add('done');
+    document.getElementById('stepA3').classList.add('active');
+
+    // Show batch nav
+    const sa = document.getElementById('searchActionsA');
+    sa.style.opacity = '1';
+    sa.style.pointerEvents = 'all';
+    sa.style.transition = 'opacity 0.4s';
+
+    // Show count badges
+    wraps.forEach(w => {
+      const badge = w.querySelector('.vibe-count-badge');
+      if (badge) badge.style.opacity = '1';
+    });
+
+    dropPins('A', pois.streetArt);
+    showToast('A', '3 places found!');
+    phoneAState = 'loaded';
+
+    // Update AI bar
+    document.querySelector('#phoneA .ai-bar-text').textContent = 'Tell me about street art...';
+
+    setTimeout(() => {
+      document.getElementById('stepA3').classList.remove('active');
+      document.getElementById('stepA3').classList.add('done');
+    }, 1500);
+  }, 2200);
+}
+
+// ========== PHONE B: No Picker (Auto) ==========
+function autoLoadB() {
+  // Step 1: shimmer already showing, vibes skeleton visible
+  document.getElementById('stepB1').classList.add('active');
+
+  // After 2.5s, Stage 1 returns — vibes + pins arrive together
+  setTimeout(() => {
+    document.getElementById('shimmerB').classList.add('hidden');
+    document.getElementById('stepB1').classList.remove('active');
+    document.getElementById('stepB1').classList.add('done');
+    document.getElementById('stepB2').classList.add('active');
+
+    // Replace skeleton vibes with real ones
+    const rail = document.getElementById('vibeRailB');
+    vibeData.forEach((v, i) => {
+      const skel = document.getElementById('vbSkel' + i);
+      skel.innerHTML = `
+        <div class="vibe-orb${i===0?' active':''}" style="width:${v.size}px;height:${v.size}px;font-size:${v.size > 32 ? 15 : v.size > 30 ? 14 : 12}px">${v.emoji}</div>
+        <div class="vibe-orb-label" style="${i===0?'color:#fff;font-weight:700':''}">${v.label}</div>
+        <div class="vibe-count-badge" style="opacity:1">${v.count}</div>
+      `;
+      if (i > 0) skel.style.opacity = '0.45';
+      skel.style.transition = 'all 0.4s';
+    });
+
+    // Show batch nav
+    const sb = document.getElementById('searchActionsB');
+    sb.style.opacity = '1';
+    sb.style.pointerEvents = 'all';
+    sb.style.transition = 'opacity 0.4s';
+
+    // Drop diverse pins
+    dropPins('B', pois.diverse);
+    showToast('B', '3 places to start!');
+
+    // Update AI bar
+    document.getElementById('aiBarTextB').textContent = 'What catches your eye?';
+
+    setTimeout(() => {
+      document.getElementById('stepB2').classList.remove('active');
+      document.getElementById('stepB2').classList.add('done');
+      document.getElementById('stepB3').classList.add('active');
+      setTimeout(() => {
+        document.getElementById('stepB3').classList.remove('active');
+        document.getElementById('stepB3').classList.add('done');
+      }, 1200);
+    }, 1500);
+  }, 2800);
+}
+
+// ========== Shared functions ==========
+function dropPins(id, poiList) {
+  const map = document.getElementById('map' + id);
+  poiList.forEach((poi, i) => {
+    setTimeout(() => {
+      // Pin
+      const pin = document.createElement('div');
+      pin.className = 'pin hidden';
+      pin.style.left = poi.x + '%';
+      pin.style.top = poi.y + '%';
+      pin.innerHTML = `<div class="pin-marker">${poi.emoji}</div><div class="pin-label">${poi.name}</div>`;
+      map.appendChild(pin);
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        pin.classList.remove('hidden');
+        pin.classList.add('visible');
+      }));
+
+      // Float card
+      setTimeout(() => {
+        const card = document.createElement('div');
+        card.className = 'poi-float-card hidden';
+        if (poi.cs === 'left') {
+          card.style.right = (100 - poi.x + 3) + '%';
+          card.style.top = (poi.y - 3) + '%';
+        } else {
+          card.style.left = (poi.x + 3) + '%';
+          card.style.top = (poi.y - 3) + '%';
+        }
+        card.innerHTML = `
+          <div class="pfc-compact">
+            <button class="pfc-compact-close" onclick="event.stopPropagation();this.closest('.poi-float-card').classList.remove('visible');this.closest('.poi-float-card').classList.add('hidden')">✕</button>
+            <div class="pfc-header"><span class="pfc-emoji">${poi.emoji}</span><span class="pfc-name">${poi.name}</span></div>
+            <div class="pfc-vibe">${poi.vibe}</div>
+            <div class="pfc-why">${poi.why}</div>
+            <div class="pfc-meta"><span>⭐ ${poi.rating}</span><span>🕐 ${poi.hours}</span><span>📍 ${poi.dist}</span></div>
+          </div>
+        `;
+        map.appendChild(card);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+          card.classList.remove('hidden');
+          card.classList.add('visible');
+        }));
+      }, 140);
+    }, i * 350);
+  });
+}
+
+function showToast(id, msg) {
+  const t = document.getElementById('toast' + id);
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+function clearPhone(id) {
+  const map = document.getElementById('map' + id);
+  map.querySelectorAll('.pin, .poi-float-card').forEach(el => el.remove());
+}
+
+function replayAll() {
+  // Reset Phone A
+  clearPhone('A');
+  phoneAState = 'waiting';
+  document.getElementById('welcomeA').classList.remove('hidden');
+  document.getElementById('shimmerA').classList.add('hidden');
+  document.getElementById('searchActionsA').style.opacity = '0';
+  document.getElementById('searchActionsA').style.pointerEvents = 'none';
+  const wrapsA = document.querySelectorAll('#vibeRailA .vibe-orb-wrap');
+  wrapsA.forEach(w => {
+    w.classList.add('cold-start');
+    w.style.opacity = '1';
+    const orb = w.querySelector('.vibe-orb');
+    if (orb) { orb.classList.remove('active'); }
+    const label = w.querySelector('.vibe-orb-label');
+    if (label) { label.style.color = ''; label.style.fontWeight = ''; }
+    const badge = w.querySelector('.vibe-count-badge');
+    if (badge) badge.style.opacity = '0';
+  });
+  const tooltipA = document.getElementById('tooltipA');
+  if (tooltipA) tooltipA.classList.add('show');
+  document.getElementById('stepA1').className = 'step-dot active';
+  document.getElementById('stepA2').className = 'step-dot';
+  document.getElementById('stepA3').className = 'step-dot';
+  document.querySelector('#phoneA .ai-bar-text').textContent = 'Pick a vibe first!';
+
+  // Reset Phone B
+  clearPhone('B');
+  document.getElementById('shimmerB').classList.remove('hidden');
+  document.getElementById('searchActionsB').style.opacity = '0';
+  document.getElementById('searchActionsB').style.pointerEvents = 'none';
+  document.getElementById('stepB1').className = 'step-dot';
+  document.getElementById('stepB2').className = 'step-dot';
+  document.getElementById('stepB3').className = 'step-dot';
+  document.getElementById('aiBarTextB').textContent = 'Exploring for you...';
+  // Reset skeleton vibes
+  vibeData.forEach((v, i) => {
+    const skel = document.getElementById('vbSkel' + i);
+    skel.innerHTML = `<div class="vibe-orb" style="width:${v.size}px;height:${v.size}px;background:rgba(255,255,255,0.06);animation:shimmerFade 1.5s ease-in-out ${i*0.2}s infinite"></div><div class="vibe-orb-label" style="opacity:0.2">${v.size > 32 ? '━━━' : '━━'}</div>`;
+    skel.style.opacity = '1';
+  });
+
+  // Re-launch Phone B auto
+  setTimeout(() => autoLoadB(), 500);
+}
+
+// Initial launch
+autoLoadB();
+</script>
+</body>
+</html>

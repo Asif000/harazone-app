@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refresh Navigation Prototypes</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; color: #fff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; overflow-x: hidden; }
+
+  .header {
+    text-align: center; padding: 24px 16px 8px;
+    font-size: 14px; color: #888; letter-spacing: 1px; text-transform: uppercase;
+  }
+  .header h1 { font-size: 20px; color: #fff; letter-spacing: 0; text-transform: none; margin-bottom: 4px; }
+
+  .proto-grid {
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 20px;
+    padding: 16px; max-width: 1200px; margin: 0 auto;
+  }
+
+  .proto-card {
+    background: #1a1a1a; border-radius: 20px; width: 340px; overflow: hidden;
+    border: 1px solid #333; position: relative;
+  }
+  .proto-card.active { border-color: #4ecdc4; }
+  .proto-label {
+    padding: 14px 16px 10px; font-size: 13px; color: #999;
+    border-bottom: 1px solid #222; display: flex; justify-content: space-between; align-items: center;
+  }
+  .proto-label strong { color: #fff; font-size: 15px; }
+  .proto-label .tag {
+    font-size: 10px; padding: 3px 8px; border-radius: 10px;
+    background: #4ecdc4; color: #111; font-weight: 600;
+  }
+
+  /* Fake map area */
+  .map-area {
+    width: 100%; height: 320px; background: #0d1b2a; position: relative; overflow: hidden;
+  }
+  .map-area::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 30% 40%, #1b2838 0%, transparent 50%),
+      radial-gradient(circle at 70% 60%, #162230 0%, transparent 40%),
+      linear-gradient(180deg, #0d1b2a, #0a1520);
+  }
+  /* Fake streets */
+  .map-area::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      linear-gradient(0deg, transparent 49%, #1a2a3a 49%, #1a2a3a 51%, transparent 51%),
+      linear-gradient(90deg, transparent 49%, #1a2a3a 49%, #1a2a3a 51%, transparent 51%);
+    background-size: 80px 80px;
+    opacity: 0.3;
+  }
+
+  /* POI Pins */
+  .pin {
+    position: absolute; z-index: 10; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    display: flex; flex-direction: column; align-items: center; cursor: pointer;
+  }
+  .pin.hidden { opacity: 0; transform: scale(0) translateY(20px); }
+  .pin.visible { opacity: 1; transform: scale(1) translateY(0); }
+  .pin.saved { z-index: 5; }
+  .pin.saved .pin-dot { background: #ff6b6b; border-color: #ff6b6b; }
+  .pin.dimmed .pin-dot { opacity: 0.4; }
+  .pin-dot {
+    width: 36px; height: 36px; border-radius: 50%; background: #4ecdc4;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; border: 2px solid #4ecdc4;
+    box-shadow: 0 2px 8px rgba(78, 205, 196, 0.4);
+  }
+  .pin-label {
+    margin-top: 3px; font-size: 9px; color: #fff; background: rgba(0,0,0,0.7);
+    padding: 2px 6px; border-radius: 4px; white-space: nowrap;
+    max-width: 90px; overflow: hidden; text-overflow: ellipsis;
+  }
+  .pin.saved .pin-label { background: rgba(255, 107, 107, 0.3); }
+
+  /* === OPTION A: Swipe Button === */
+  .refresh-swipe {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 20; display: flex; align-items: center; gap: 0;
+  }
+  .swipe-btn {
+    width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+    background: radial-gradient(circle at 40% 35%, #5df5e8, #4ecdc4);
+    box-shadow: 0 4px 20px rgba(78, 205, 196, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; color: #111; transition: all 0.2s;
+    position: relative;
+  }
+  .swipe-btn:active { transform: scale(0.92); }
+  .swipe-btn .arrow-hint {
+    position: absolute; font-size: 10px; color: rgba(255,255,255,0.5);
+  }
+  .swipe-btn .arrow-hint.left { left: -18px; }
+  .swipe-btn .arrow-hint.right { right: -18px; }
+  .swipe-counter {
+    position: absolute; top: -8px; right: -8px;
+    background: #ff6b6b; color: #fff; font-size: 10px; font-weight: 700;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #1a1a1a;
+  }
+  .swipe-position {
+    position: absolute; bottom: -20px; left: 50%; transform: translateX(-50%);
+    font-size: 11px; color: rgba(255,255,255,0.6); white-space: nowrap;
+  }
+
+  /* === OPTION B: Carousel Dots === */
+  .refresh-dots {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  }
+  .dots-row {
+    display: flex; gap: 6px; align-items: center;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.25);
+    cursor: pointer; transition: all 0.3s;
+  }
+  .dot.active { background: #4ecdc4; width: 10px; height: 10px; box-shadow: 0 0 8px rgba(78,205,196,0.6); }
+  .dot.seen { background: rgba(78, 205, 196, 0.4); }
+  .dot.locked { background: rgba(255,255,255,0.1); }
+  .dots-refresh-btn {
+    width: 48px; height: 48px; border-radius: 50%; border: none; cursor: pointer;
+    background: radial-gradient(circle at 40% 35%, #5df5e8, #4ecdc4);
+    box-shadow: 0 4px 16px rgba(78, 205, 196, 0.4);
+    font-size: 20px; color: #111; transition: all 0.2s;
+  }
+  .dots-refresh-btn:active { transform: scale(0.92); }
+
+  /* === OPTION C: Prev/Next Pair === */
+  .refresh-pair {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    z-index: 20; display: flex; align-items: center; gap: 8px;
+  }
+  .pair-btn {
+    width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(78,205,196,0.4);
+    background: rgba(78,205,196,0.1); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; color: #4ecdc4; transition: all 0.2s;
+    backdrop-filter: blur(8px);
+  }
+  .pair-btn:active { transform: scale(0.9); background: rgba(78,205,196,0.25); }
+  .pair-btn.disabled { opacity: 0.25; pointer-events: none; }
+  .pair-center {
+    padding: 8px 16px; background: rgba(0,0,0,0.6); border-radius: 20px;
+    font-size: 12px; color: rgba(255,255,255,0.7); backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .pair-center strong { color: #4ecdc4; }
+
+  /* === OPTION D: Discovery Orb === */
+  .refresh-orb-wrap {
+    position: absolute; bottom: 16px; right: 16px;
+    z-index: 20; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .orb {
+    width: 60px; height: 60px; border-radius: 50%; cursor: pointer;
+    background: radial-gradient(circle at 40% 35%, #5df5e8, #4ecdc4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; color: #111; position: relative; transition: all 0.3s;
+  }
+  .orb:active { transform: scale(0.88); }
+  .orb-ring {
+    position: absolute; inset: -4px; border-radius: 50%;
+    border: 3px solid transparent; transition: all 0.5s;
+  }
+  .orb-ring.loading {
+    border-color: rgba(78,205,196,0.2);
+    border-top-color: #4ecdc4;
+    animation: orbSpin 1s linear infinite;
+  }
+  .orb-ring.ready {
+    border-color: #4ecdc4;
+    animation: orbPulse 2s ease-in-out infinite;
+  }
+  .orb-ring.empty {
+    border-color: rgba(255,255,255,0.1);
+  }
+  @keyframes orbSpin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes orbPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(78,205,196,0.3); }
+    50% { box-shadow: 0 0 0 8px rgba(78,205,196,0); }
+  }
+  .orb-label {
+    font-size: 10px; color: rgba(255,255,255,0.5);
+    background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 8px;
+  }
+  /* Swipe hint for orb */
+  .orb-back {
+    position: absolute; bottom: 16px; right: 84px; z-index: 20;
+  }
+  .orb-back-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.5); font-size: 14px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    backdrop-filter: blur(8px); transition: all 0.2s;
+  }
+  .orb-back-btn:active { background: rgba(255,255,255,0.15); }
+  .orb-back-btn.disabled { opacity: 0; pointer-events: none; }
+
+  /* Completed state */
+  .complete-msg {
+    position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.8); color: #4ecdc4; padding: 8px 16px;
+    border-radius: 20px; font-size: 12px; white-space: nowrap;
+    opacity: 0; transition: opacity 0.4s; pointer-events: none;
+    backdrop-filter: blur(8px); border: 1px solid rgba(78,205,196,0.2);
+  }
+  .complete-msg.show { opacity: 1; }
+
+  /* Footer vote */
+  .vote-bar {
+    padding: 16px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin-top: 12px; margin-bottom: 24px;
+  }
+  .vote-btn {
+    padding: 10px 20px; border-radius: 12px; border: 1px solid #333;
+    background: #1a1a1a; color: #fff; cursor: pointer; font-size: 13px;
+    transition: all 0.2s;
+  }
+  .vote-btn:hover { border-color: #4ecdc4; background: rgba(78,205,196,0.1); }
+  .vote-btn.selected { border-color: #4ecdc4; background: #4ecdc4; color: #111; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Refresh Navigation Prototypes</h1>
+  Tap refresh to cycle through batches of 3 POIs. Each option shows a different back-navigation pattern.
+</div>
+
+<div class="proto-grid">
+
+  <!-- OPTION A: Swipe Button -->
+  <div class="proto-card" id="cardA">
+    <div class="proto-label">
+      <div><strong>A: Swipe Button</strong><br>Tap = next, swipe left = back</div>
+      <span class="tag">#82</span>
+    </div>
+    <div class="map-area" id="mapA">
+      <div class="complete-msg" id="completeA">You've seen all 9 places here ✨</div>
+      <div class="refresh-swipe">
+        <button class="swipe-btn" id="swipeBtnA" title="Tap for next, or use arrows">
+          🔄
+          <span class="arrow-hint left">◀</span>
+          <span class="arrow-hint right">▶</span>
+          <span class="swipe-counter" id="counterA">9</span>
+        </button>
+        <span class="swipe-position" id="posA">1 of 3</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION B: Carousel Dots -->
+  <div class="proto-card" id="cardB">
+    <div class="proto-label">
+      <div><strong>B: Carousel Dots</strong><br>Dots for each batch, tap to jump</div>
+      <span class="tag">#83</span>
+    </div>
+    <div class="map-area" id="mapB">
+      <div class="complete-msg" id="completeB">You've seen all 9 places here ✨</div>
+      <div class="refresh-dots">
+        <button class="dots-refresh-btn" id="dotsBtnB">🔄</button>
+        <div class="dots-row" id="dotsRowB"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION C: Prev/Next Pair -->
+  <div class="proto-card" id="cardC">
+    <div class="proto-label">
+      <div><strong>C: Prev / Next Pair</strong><br>Explicit directional buttons</div>
+    </div>
+    <div class="map-area" id="mapC">
+      <div class="complete-msg" id="completeC">You've seen all 9 places here ✨</div>
+      <div class="refresh-pair">
+        <button class="pair-btn disabled" id="prevC">◀</button>
+        <div class="pair-center"><strong id="posCNum">1</strong> of <span id="posCTotal">3</span></div>
+        <button class="pair-btn" id="nextC">▶</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OPTION D: Discovery Orb + Small Back -->
+  <div class="proto-card" id="cardD">
+    <div class="proto-label">
+      <div><strong>D: Discovery Orb</strong><br>Pulsing orb + subtle back button</div>
+      <span class="tag">#85</span>
+    </div>
+    <div class="map-area" id="mapD">
+      <div class="complete-msg" id="completeD">You've explored it all ✨</div>
+      <div class="orb-back">
+        <button class="orb-back-btn disabled" id="orbBackD">◀</button>
+      </div>
+      <div class="refresh-orb-wrap">
+        <div class="orb" id="orbD">
+          ✦
+          <div class="orb-ring ready" id="orbRingD"></div>
+        </div>
+        <span class="orb-label" id="orbLabelD">6 more</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="vote-bar">
+  <button class="vote-btn" onclick="vote(this,'A')">A — Swipe Button</button>
+  <button class="vote-btn" onclick="vote(this,'B')">B — Carousel Dots</button>
+  <button class="vote-btn" onclick="vote(this,'C')">C — Prev / Next</button>
+  <button class="vote-btn" onclick="vote(this,'D')">D — Discovery Orb</button>
+</div>
+
+<script>
+// POI data — 3 batches of 3
+const batches = [
+  [
+    { emoji: '☕', name: 'Cafe Lumière', x: 25, y: 35 },
+    { emoji: '🎨', name: 'Street Art Alley', x: 60, y: 55 },
+    { emoji: '🌳', name: 'Hidden Garden', x: 42, y: 75 },
+  ],
+  [
+    { emoji: '🍜', name: 'Ramen Corner', x: 72, y: 30 },
+    { emoji: '📚', name: 'Book Nook', x: 20, y: 60 },
+    { emoji: '🎵', name: 'Jazz Cellar', x: 55, y: 80 },
+  ],
+  [
+    { emoji: '🏛️', name: 'Old Library', x: 35, y: 25 },
+    { emoji: '🍷', name: 'Wine Bar', x: 70, y: 65 },
+    { emoji: '🌅', name: 'Sunset Point', x: 15, y: 45 },
+  ],
+];
+
+// Saved pin — always visible
+const savedPin = { emoji: '❤️', name: 'My Spot (saved)', x: 85, y: 42, saved: true };
+
+function createPins(mapEl, batchIdx, prevBatchIdx) {
+  // Remove non-saved pins
+  mapEl.querySelectorAll('.pin:not(.saved)').forEach(p => {
+    p.classList.remove('visible');
+    p.classList.add('hidden');
+    setTimeout(() => p.remove(), 400);
+  });
+
+  // Dim saved pins briefly
+  mapEl.querySelectorAll('.pin.saved').forEach(p => {
+    p.classList.add('dimmed');
+    setTimeout(() => p.classList.remove('dimmed'), 600);
+  });
+
+  // Add saved pin if not present
+  if (!mapEl.querySelector('.pin.saved')) {
+    const sp = makePin(savedPin, true);
+    mapEl.appendChild(sp);
+    requestAnimationFrame(() => sp.classList.add('visible'));
+  }
+
+  // Drop new pins staggered
+  const batch = batches[batchIdx];
+  batch.forEach((poi, i) => {
+    setTimeout(() => {
+      const pin = makePin(poi, false);
+      mapEl.appendChild(pin);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => pin.classList.add('visible'));
+      });
+    }, i * 200);
+  });
+}
+
+function makePin(poi, isSaved) {
+  const pin = document.createElement('div');
+  pin.className = 'pin hidden' + (isSaved ? ' saved' : '');
+  pin.style.left = poi.x + '%';
+  pin.style.top = poi.y + '%';
+  pin.style.transform = 'translate(-50%, -50%)';
+  pin.innerHTML = `
+    <div class="pin-dot">${poi.emoji}</div>
+    <div class="pin-label">${poi.name}</div>
+  `;
+  return pin;
+}
+
+// === State per prototype ===
+const state = { A: 0, B: 0, C: 0, D: 0 };
+const totalBatches = batches.length;
+
+// Init all maps
+['A','B','C','D'].forEach(id => {
+  createPins(document.getElementById('map' + id), 0, -1);
+});
+
+// Init dots for B
+function initDots() {
+  const row = document.getElementById('dotsRowB');
+  row.innerHTML = '';
+  for (let i = 0; i < totalBatches; i++) {
+    const d = document.createElement('div');
+    d.className = 'dot' + (i === 0 ? ' active' : i > 0 ? ' locked' : '');
+    d.onclick = () => jumpToB(i);
+    row.appendChild(d);
+  }
+}
+initDots();
+
+function updateDots(idx) {
+  const dots = document.querySelectorAll('#dotsRowB .dot');
+  dots.forEach((d, i) => {
+    d.className = 'dot';
+    if (i === idx) d.classList.add('active');
+    else if (i < idx) d.classList.add('seen');
+    else d.classList.add('locked');
+  });
+}
+
+function jumpToB(idx) {
+  if (idx === state.B) return;
+  const prev = state.B;
+  state.B = idx;
+  createPins(document.getElementById('mapB'), idx, prev);
+  updateDots(idx);
+}
+
+// === OPTION A: Swipe button ===
+document.getElementById('swipeBtnA').onclick = () => navigate('A', 1);
+
+// Add touch/click for left arrow area
+document.querySelector('#cardA .arrow-hint.left').onclick = (e) => {
+  e.stopPropagation();
+  navigate('A', -1);
+};
+document.querySelector('#cardA .arrow-hint.right').onclick = (e) => {
+  e.stopPropagation();
+  navigate('A', 1);
+};
+
+function navigate(id, dir) {
+  const newIdx = state[id] + dir;
+  if (newIdx < 0 || newIdx >= totalBatches) {
+    if (newIdx >= totalBatches) {
+      document.getElementById('complete' + id).classList.add('show');
+      setTimeout(() => document.getElementById('complete' + id).classList.remove('show'), 2000);
+    }
+    return;
+  }
+  const prev = state[id];
+  state[id] = newIdx;
+  createPins(document.getElementById('map' + id), newIdx, prev);
+  updateUI(id);
+}
+
+function updateUI(id) {
+  const idx = state[id];
+  const remaining = (totalBatches - idx - 1) * 3;
+
+  if (id === 'A') {
+    document.getElementById('posA').textContent = (idx + 1) + ' of ' + totalBatches;
+    document.getElementById('counterA').textContent = remaining;
+    document.getElementById('counterA').style.display = remaining > 0 ? 'flex' : 'none';
+  }
+  if (id === 'C') {
+    document.getElementById('posCNum').textContent = idx + 1;
+    document.getElementById('prevC').className = 'pair-btn' + (idx === 0 ? ' disabled' : '');
+    document.getElementById('nextC').className = 'pair-btn' + (idx >= totalBatches - 1 ? ' disabled' : '');
+  }
+  if (id === 'D') {
+    document.getElementById('orbLabelD').textContent = remaining > 0 ? remaining + ' more' : 'all seen';
+    document.getElementById('orbBackD').className = 'orb-back-btn' + (idx === 0 ? ' disabled' : '');
+    const ring = document.getElementById('orbRingD');
+    ring.className = 'orb-ring ' + (remaining > 0 ? 'ready' : 'empty');
+  }
+}
+
+// === OPTION B: Dots refresh button ===
+document.getElementById('dotsBtnB').onclick = () => {
+  const newIdx = state.B + 1;
+  if (newIdx >= totalBatches) {
+    document.getElementById('completeB').classList.add('show');
+    setTimeout(() => document.getElementById('completeB').classList.remove('show'), 2000);
+    return;
+  }
+  jumpToB(newIdx);
+};
+
+// === OPTION C: Prev/Next ===
+document.getElementById('prevC').onclick = () => navigate('C', -1);
+document.getElementById('nextC').onclick = () => navigate('C', 1);
+
+// === OPTION D: Orb ===
+document.getElementById('orbD').onclick = () => navigate('D', 1);
+document.getElementById('orbBackD').onclick = () => navigate('D', -1);
+
+// Init UI state
+['A','C','D'].forEach(updateUI);
+
+// Vote
+function vote(btn, option) {
+  document.querySelectorAll('.vote-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.querySelectorAll('.proto-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('card' + option).classList.add('active');
+}
+</script>
+</body>
+</html>

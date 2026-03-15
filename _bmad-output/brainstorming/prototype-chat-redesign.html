@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Chat Experience: Current vs Redesign</title>
+<style>
+  :root {
+    --bg-dark:#0d1b2a;--ui-dark:rgba(20,14,28,0.92);--ui-dark-solid:#1a1224;
+    --accent:#4ecdc4;--accent-glow:rgba(78,205,196,0.35);
+    --gold:#FFD700;--gold-light:#FFE26A;
+    --text-primary:#fafafa;--text-secondary:rgba(255,255,255,0.6);--text-dim:rgba(255,255,255,0.35);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);--ease-out:cubic-bezier(0.16,1,0.3,1);
+    --ai-bubble:#1c2a3a;--user-bubble:rgba(78,205,196,0.15);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text-primary);overflow-x:hidden}
+
+  .page-header{text-align:center;padding:20px 16px 10px;font-size:12px;color:#888;letter-spacing:1px;text-transform:uppercase}
+  .page-header h1{font-size:18px;color:#fff;letter-spacing:0;text-transform:none;margin-bottom:4px}
+  .page-header p{font-size:11px;color:#666;text-transform:none;letter-spacing:0;max-width:750px;margin:0 auto;line-height:1.4}
+
+  .side-by-side{display:flex;gap:16px;padding:0 16px 24px;justify-content:center;flex-wrap:wrap}
+
+  /* Phone frame */
+  .phone{width:360px;border-radius:32px;border:2px solid #333;overflow:hidden;position:relative;height:740px;background:var(--ui-dark-solid);flex-shrink:0;display:flex;flex-direction:column}
+  .phone-label{text-align:center;padding:8px;font-size:11px;color:#888;font-weight:600;letter-spacing:0.5px;background:#111;border-bottom:1px solid #222;flex-shrink:0}
+  .phone-sublabel{text-align:center;padding:3px 8px 5px;font-size:9px;color:#555;background:#111;border-bottom:1px solid #222;line-height:1.3;flex-shrink:0}
+
+  /* Chat header */
+  .chat-header{display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.06);flex-shrink:0;gap:10px}
+  .chat-back{font-size:16px;cursor:pointer;opacity:0.6}
+  .chat-title{flex:1;font-size:13px;font-weight:600}
+  .chat-area-tag{font-size:9px;color:var(--accent);font-weight:500}
+  .chat-new-btn{font-size:9px;color:var(--text-dim);border:1px solid rgba(255,255,255,0.1);border-radius:8px;padding:3px 8px;cursor:pointer;background:transparent}
+
+  /* Chat body */
+  .chat-body{flex:1;overflow-y:auto;padding:12px 12px 8px;display:flex;flex-direction:column;gap:10px}
+
+  /* Messages */
+  .msg{max-width:88%;display:flex;flex-direction:column;gap:4px;animation:msgIn 0.3s var(--ease-out)}
+  @keyframes msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .msg.ai{align-self:flex-start}
+  .msg.user{align-self:flex-end}
+  .msg-bubble{padding:10px 13px;border-radius:16px;font-size:12px;line-height:1.5;word-wrap:break-word}
+  .msg.ai .msg-bubble{background:var(--ai-bubble);border-bottom-left-radius:4px}
+  .msg.user .msg-bubble{background:var(--user-bubble);border:1px solid rgba(78,205,196,0.2);border-bottom-right-radius:4px}
+
+  /* Raw markdown (current/broken) */
+  .msg-raw{font-size:12px;line-height:1.5;white-space:pre-wrap}
+
+  /* POI card rail in chat */
+  .poi-rail{display:flex;gap:8px;overflow-x:auto;padding:4px 0;scrollbar-width:none;-ms-overflow-style:none}
+  .poi-rail::-webkit-scrollbar{display:none}
+  .poi-card{flex-shrink:0;width:170px;border-radius:12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);padding:10px 11px;cursor:pointer;transition:all 0.2s}
+  .poi-card:active{transform:scale(0.97);border-color:var(--accent)}
+  .poi-card-header{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+  .poi-card-emoji{font-size:18px}
+  .poi-card-name{font-size:11px;font-weight:600;line-height:1.2}
+  .poi-card-vibe{font-size:8px;color:var(--accent);font-weight:600;margin-bottom:3px}
+  .poi-card-why{font-size:9px;color:var(--text-secondary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .poi-card-meta{display:flex;gap:6px;margin-top:5px;font-size:8px;color:var(--text-dim)}
+  .poi-card-actions{display:flex;gap:4px;margin-top:6px}
+  .poi-card-action{font-size:8px;padding:3px 7px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:var(--text-secondary);cursor:pointer;transition:all 0.15s}
+  .poi-card-action:active{background:rgba(255,255,255,0.08)}
+  .poi-card-action.map-action{border-color:rgba(78,205,196,0.3);color:var(--accent)}
+
+  /* Intent pill rail */
+  .pill-rail{flex-shrink:0;padding:6px 12px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;border-top:1px solid rgba(255,255,255,0.04)}
+  .pill-rail::-webkit-scrollbar{display:none}
+  .pill{flex-shrink:0;padding:6px 12px;border-radius:14px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.04);font-size:10px;color:var(--text-secondary);cursor:pointer;transition:all 0.2s;white-space:nowrap}
+  .pill:active{background:rgba(78,205,196,0.15);border-color:rgba(78,205,196,0.3);color:var(--accent);transform:scale(0.95)}
+  .pill.gone{opacity:0;max-width:0;padding:0;margin:0;border:0;overflow:hidden;transition:all 0.3s}
+
+  /* One-shot pills (current/broken) */
+  .pill-rail-broken{flex-shrink:0;padding:6px 12px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;transition:all 0.4s}
+  .pill-rail-broken::-webkit-scrollbar{display:none}
+  .pill-rail-broken.hidden{height:0;padding:0;opacity:0;overflow:hidden}
+
+  /* Chat input */
+  .chat-input{flex-shrink:0;display:flex;align-items:center;padding:6px 12px 14px;gap:8px;border-top:1px solid rgba(255,255,255,0.06)}
+  .chat-input-field{flex:1;height:36px;border-radius:18px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);padding:0 14px;font-size:11px;color:var(--text-primary);outline:none}
+  .chat-input-field::placeholder{color:var(--text-dim)}
+  .chat-send{width:36px;height:36px;border-radius:50%;background:var(--accent);border:none;color:#111;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+  /* Stale badge */
+  .stale-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:8px;background:rgba(255,165,0,0.1);border:1px solid rgba(255,165,0,0.2);font-size:9px;color:#ffa500;margin-bottom:6px;align-self:center}
+
+  /* Fresh session banner */
+  .fresh-banner{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.15);font-size:10px;color:var(--text-secondary);margin-bottom:6px;align-self:stretch}
+  .fresh-banner-icon{font-size:14px}
+  .fresh-banner-text{flex:1;line-height:1.35}
+  .fresh-banner-text strong{color:var(--accent)}
+
+  /* Typing indicator */
+  .typing{display:flex;gap:4px;padding:8px 12px;align-self:flex-start}
+  .typing-dot{width:6px;height:6px;border-radius:50%;background:var(--text-dim);animation:typingBounce 1.2s ease-in-out infinite}
+  .typing-dot:nth-child(2){animation-delay:0.15s}
+  .typing-dot:nth-child(3){animation-delay:0.3s}
+  @keyframes typingBounce{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-6px)}}
+
+  /* Question highlight */
+  .msg-question{color:var(--accent);font-weight:500;display:block;margin-top:4px}
+
+  /* Bug markers */
+  .bug-marker{position:absolute;z-index:50;display:flex;align-items:center;gap:4px;padding:3px 8px;border-radius:6px;background:rgba(255,80,80,0.15);border:1px solid rgba(255,80,80,0.3);font-size:8px;color:#ff6b6b;font-weight:600;pointer-events:none;white-space:nowrap}
+  .bug-marker::before{content:'BUG';font-size:7px;font-weight:800;background:#ff6b6b;color:#111;padding:1px 3px;border-radius:3px;margin-right:2px}
+
+  .replay-bar{text-align:center;padding:0 16px 24px}
+  .replay-btn{background:rgba(78,205,196,0.15);border:1px solid rgba(78,205,196,0.3);color:var(--accent);padding:10px 24px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s}
+  .replay-btn:hover{background:rgba(78,205,196,0.25)}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Chat Experience: Current vs Redesign</h1>
+  <p>Left: Current bugs — no POI cards in follow-ups, pills vanish, "nearby" doesn't match map, stale conversation.<br>
+  Right: Redesign — persistent pill rail, POI card rail in every response, map-aware chat, fresh sessions.</p>
+</div>
+
+<div class="side-by-side">
+
+<!-- ========== PHONE A: CURRENT (BROKEN) ========== -->
+<div class="phone" id="phoneA">
+  <div class="phone-label">CURRENT — 5 BUGS VISIBLE</div>
+  <div class="phone-sublabel">Stale chat, no POI cards in follow-ups, pills vanish, nearby mismatch, no ending question</div>
+
+  <div class="chat-header">
+    <span class="chat-back">←</span>
+    <span class="chat-title">✨ AI Chat</span>
+    <span class="chat-area-tag">Shoreditch</span>
+  </div>
+
+  <div class="chat-body" id="chatA">
+    <!-- Stale conversation marker -->
+    <div class="stale-badge">⚠️ Conversation from 2 hours ago</div>
+
+    <!-- Old AI message with raw markdown -->
+    <div class="msg ai">
+      <div class="msg-bubble">
+        <div class="msg-raw">Shoreditch is a **vibrant** neighborhood known for its *street art* and creative energy! Here are some spots:
+
+**Rivington Murals** — Banksy started here, new murals weekly
+**Cafe Lumiere** — Victorian warehouse roaster
+**Jazz Cellar** — Underground speakeasy
+
+These are great starting points for exploring the area.</div>
+      </div>
+    </div>
+
+    <!-- User follow-up -->
+    <div class="msg user">
+      <div class="msg-bubble">What about food nearby?</div>
+    </div>
+
+    <!-- AI follow-up — NO POI cards, nearby mismatch, no question -->
+    <div class="msg ai">
+      <div class="msg-bubble">
+        <div class="msg-raw">For food in Shoreditch, I'd recommend:
+
+**Dishoom** — Bombay-style breakfast, their bacon naan roll is legendary
+**Smokestak** — Incredible smoked brisket
+**Padella** — Fresh pasta, always a queue but worth it
+
+They're all within walking distance!</div>
+      </div>
+    </div>
+
+    <!-- Bug markers overlaid -->
+  </div>
+
+  <!-- One-shot pills — GONE after first tap -->
+  <div class="pill-rail-broken hidden" id="pillsA">
+    <!-- Already vanished -->
+  </div>
+
+  <div class="chat-input">
+    <input class="chat-input-field" placeholder="Ask anything..." readonly>
+    <button class="chat-send">↑</button>
+  </div>
+
+  <!-- Bug annotations -->
+  <div class="bug-marker" style="top:100px;left:14px">Stale — 2hr old chat still active</div>
+  <div class="bug-marker" style="top:268px;right:14px">Raw **markdown** asterisks visible</div>
+  <div class="bug-marker" style="top:480px;left:14px">No POI cards — just plain text names</div>
+  <div class="bug-marker" style="top:560px;right:14px">Padella is in Borough, not Shoreditch</div>
+  <div class="bug-marker" style="top:610px;left:14px">No follow-up question — dead end</div>
+  <div class="bug-marker" style="bottom:80px;left:14px">Pills vanished after first tap</div>
+</div>
+
+<!-- ========== PHONE B: REDESIGN ========== -->
+<div class="phone" id="phoneB">
+  <div class="phone-label">REDESIGN — ALL 5 BUGS FIXED</div>
+  <div class="phone-sublabel">Map-aware POIs, persistent pills, card rail, fresh sessions, always a question</div>
+
+  <div class="chat-header">
+    <span class="chat-back">←</span>
+    <span class="chat-title">✨ AI Chat</span>
+    <span class="chat-area-tag">Shoreditch</span>
+    <button class="chat-new-btn" onclick="showFresh()">New ↻</button>
+  </div>
+
+  <div class="chat-body" id="chatB">
+    <!-- Fresh session banner -->
+    <div class="fresh-banner">
+      <span class="fresh-banner-icon">🔄</span>
+      <span class="fresh-banner-text"><strong>Fresh session</strong> — I can see 3 places on your map right now</span>
+    </div>
+
+    <!-- AI opening — with POI card rail -->
+    <div class="msg ai" id="msgB1">
+      <div class="msg-bubble">
+        Shoreditch is a vibrant neighborhood known for its street art and creative energy! I found these 3 spots for you:
+        <span class="msg-question">Tap any card to learn more — which one catches your eye?</span>
+      </div>
+      <div class="poi-rail">
+        <div class="poi-card">
+          <div class="poi-card-header"><span class="poi-card-emoji">🎨</span><span class="poi-card-name">Rivington Murals</span></div>
+          <div class="poi-card-vibe">Street Art</div>
+          <div class="poi-card-why">Banksy started here. New murals weekly from global artists.</div>
+          <div class="poi-card-meta"><span>⭐ 4.8</span><span>📍 120m</span><span>Always open</span></div>
+          <div class="poi-card-actions">
+            <button class="poi-card-action">🔖 Save</button>
+            <button class="poi-card-action map-action">📍 Map</button>
+          </div>
+        </div>
+        <div class="poi-card">
+          <div class="poi-card-header"><span class="poi-card-emoji">☕</span><span class="poi-card-name">Cafe Lumiere</span></div>
+          <div class="poi-card-vibe">Cafe Scene</div>
+          <div class="poi-card-why">Victorian warehouse roaster. Oat flat white is legendary.</div>
+          <div class="poi-card-meta"><span>⭐ 4.6</span><span>📍 200m</span><span>7am–6pm</span></div>
+          <div class="poi-card-actions">
+            <button class="poi-card-action">🔖 Save</button>
+            <button class="poi-card-action map-action">📍 Map</button>
+          </div>
+        </div>
+        <div class="poi-card">
+          <div class="poi-card-header"><span class="poi-card-emoji">🎵</span><span class="poi-card-name">Jazz Cellar</span></div>
+          <div class="poi-card-vibe">Live Music</div>
+          <div class="poi-card-why">Underground speakeasy. Thursday jams draw musicians.</div>
+          <div class="poi-card-meta"><span>⭐ 4.7</span><span>📍 350m</span><span>8pm–2am</span></div>
+          <div class="poi-card-actions">
+            <button class="poi-card-action">🔖 Save</button>
+            <button class="poi-card-action map-action">📍 Map</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Persistent intent pill rail -->
+  <div class="pill-rail" id="pillsB">
+    <div class="pill" onclick="simulateFollowUp()">🍜 Food nearby?</div>
+    <div class="pill" onclick="simulateFollowUp()">🎨 More street art</div>
+    <div class="pill" onclick="simulateFollowUp()">🔒 Is it safe at night?</div>
+    <div class="pill" onclick="simulateFollowUp()">💰 Budget tips</div>
+    <div class="pill" onclick="simulateFollowUp()">📸 Best photo spots</div>
+  </div>
+
+  <div class="chat-input">
+    <input class="chat-input-field" placeholder="Ask anything..." readonly>
+    <button class="chat-send">↑</button>
+  </div>
+</div>
+
+</div>
+
+<div class="replay-bar">
+  <button class="replay-btn" onclick="location.reload()">↻ Replay</button>
+</div>
+
+<script>
+let followUpShown = false;
+
+function simulateFollowUp() {
+  if (followUpShown) return;
+  followUpShown = true;
+
+  const chat = document.getElementById('chatB');
+  const pills = document.getElementById('pillsB');
+
+  // Add user message
+  const userMsg = document.createElement('div');
+  userMsg.className = 'msg user';
+  userMsg.innerHTML = '<div class="msg-bubble">What about food nearby?</div>';
+  chat.appendChild(userMsg);
+
+  // Typing indicator
+  const typing = document.createElement('div');
+  typing.className = 'typing';
+  typing.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
+  chat.appendChild(typing);
+  chat.scrollTop = chat.scrollHeight;
+
+  // After "thinking", show AI response WITH cards
+  setTimeout(() => {
+    typing.remove();
+
+    const aiMsg = document.createElement('div');
+    aiMsg.className = 'msg ai';
+    aiMsg.innerHTML = `
+      <div class="msg-bubble">
+        Great choice! Here are the best food spots on your map right now:
+        <span class="msg-question">Smokestak is the closest — want me to check if they're open right now?</span>
+      </div>
+      <div class="poi-rail">
+        <div class="poi-card">
+          <div class="poi-card-header"><span class="poi-card-emoji">🍖</span><span class="poi-card-name">Smokestak</span></div>
+          <div class="poi-card-vibe">Street Food</div>
+          <div class="poi-card-why">Brisket smoked 16 hours over oak. Queue at 11am.</div>
+          <div class="poi-card-meta"><span>⭐ 4.5</span><span>📍 280m</span><span>12–10pm</span></div>
+          <div class="poi-card-actions">
+            <button class="poi-card-action">🔖 Save</button>
+            <button class="poi-card-action map-action">📍 Map</button>
+          </div>
+        </div>
+        <div class="poi-card">
+          <div class="poi-card-header"><span class="poi-card-emoji">🍜</span><span class="poi-card-name">Gunpowder</span></div>
+          <div class="poi-card-vibe">Indian Small Plates</div>
+          <div class="poi-card-why">Spice Trail from Mumbai to Kerala. Tiny room, big flavors.</div>
+          <div class="poi-card-meta"><span>⭐ 4.6</span><span>📍 190m</span><span>12–3, 5:30–10pm</span></div>
+          <div class="poi-card-actions">
+            <button class="poi-card-action">🔖 Save</button>
+            <button class="poi-card-action map-action">📍 Map</button>
+          </div>
+        </div>
+        <div class="poi-card">
+          <div class="poi-card-header"><span class="poi-card-emoji">🥘</span><span class="poi-card-name">Dishoom</span></div>
+          <div class="poi-card-vibe">Bombay Cafe</div>
+          <div class="poi-card-why">Bacon naan roll changed breakfast forever. Go before 10am.</div>
+          <div class="poi-card-meta"><span>⭐ 4.7</span><span>📍 350m</span><span>8am–11pm</span></div>
+          <div class="poi-card-actions">
+            <button class="poi-card-action">🔖 Save</button>
+            <button class="poi-card-action map-action">📍 Map</button>
+          </div>
+        </div>
+      </div>
+    `;
+    chat.appendChild(aiMsg);
+    chat.scrollTop = chat.scrollHeight;
+
+    // Replenish pills with NEW contextual suggestions
+    pills.innerHTML = `
+      <div class="pill">🍖 More about Smokestak</div>
+      <div class="pill">🥘 Compare Dishoom vs Gunpowder</div>
+      <div class="pill">🍺 Drinks after dinner?</div>
+      <div class="pill">💰 Which is cheapest?</div>
+      <div class="pill">🕐 Open right now?</div>
+    `;
+  }, 1500);
+}
+
+function showFresh() {
+  const chat = document.getElementById('chatB');
+  const pills = document.getElementById('pillsB');
+
+  chat.innerHTML = `
+    <div class="fresh-banner">
+      <span class="fresh-banner-icon">✨</span>
+      <span class="fresh-banner-text"><strong>New conversation</strong> — what would you like to explore?</span>
+    </div>
+  `;
+
+  pills.innerHTML = `
+    <div class="pill">🎨 Tell me about Street Art here</div>
+    <div class="pill">🍜 Best food spots</div>
+    <div class="pill">🔒 Is it safe?</div>
+    <div class="pill">🎵 Nightlife</div>
+    <div class="pill">💎 Hidden gems</div>
+  `;
+
+  followUpShown = false;
+}
+</script>
+</body>
+</html>

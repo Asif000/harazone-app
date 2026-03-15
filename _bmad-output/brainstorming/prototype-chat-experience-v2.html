@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — Chat POI Cards v2</title>
+<style>
+  :root {
+    --bg:#0a0a0f;--bg-card:#1c1c2e;
+    --accent:#4ecdc4;
+    --gold:#FFD700;
+    --green:#66bb6a;--red:#ef5350;--orange:#ffa726;
+    --text:#fafafa;--text2:rgba(255,255,255,0.65);--text3:rgba(255,255,255,0.35);
+    --vibe-food:#66bb6a;--vibe-music:#42a5f5;--vibe-art:#e040fb;--vibe-cafe:#ff7043;--vibe-rooftop:#ff8a65;
+    --ease:cubic-bezier(0.34,1.56,0.64,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text);display:flex;flex-direction:column;align-items:center}
+
+  .page-header{text-align:center;padding:20px 16px 12px}
+  .page-header h1{font-size:18px;margin-bottom:4px}
+  .page-header p{font-size:11px;color:#666;max-width:500px;margin:0 auto;line-height:1.4}
+
+  .phone{width:375px;height:780px;border-radius:32px;border:2px solid #333;overflow:hidden;position:relative;background:var(--bg);display:flex;flex-direction:column}
+
+  /* Topbar */
+  .topbar{padding:48px 16px 10px;display:flex;align-items:center;gap:10px;background:var(--bg);flex-shrink:0}
+  .topbar-back{width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,0.08);border:none;color:var(--text);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .topbar-info{flex:1}
+  .topbar-title{font-size:14px;font-weight:600}
+  .topbar-sub{font-size:10px;color:var(--text3)}
+  .topbar-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--accent),#2a7c76);display:flex;align-items:center;justify-content:center;font-size:14px}
+
+  /* POI Header (sticky context) */
+  .poi-header{flex-shrink:0;margin:0 12px 0;border-radius:14px;background:var(--bg-card);border:1px solid rgba(255,255,255,0.08);overflow:hidden}
+  .ph-stripe{height:3px}
+  .ph-stripe.open{background:var(--green)}
+  .ph-body{padding:10px 14px;display:flex;align-items:center;gap:10px}
+  .ph-emoji{font-size:26px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:10px;background:rgba(255,255,255,0.05);flex-shrink:0}
+  .ph-info{flex:1;min-width:0}
+  .ph-name{font-size:14px;font-weight:700}
+  .ph-vibe{font-size:9px;font-weight:600}
+  .ph-meta{font-size:9px;color:var(--text3);margin-top:2px;display:flex;gap:6px}
+  .ph-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+  .ph-status{padding:2px 7px;border-radius:5px;font-size:8px;font-weight:600}
+  .ph-status.open{background:rgba(102,187,106,0.15);color:var(--green)}
+  .ph-save{width:28px;height:28px;border-radius:50%;background:rgba(255,215,0,0.1);border:1px solid rgba(255,215,0,0.2);color:var(--gold);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+
+  /* Chat */
+  .chat-scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:12px 12px 8px;display:flex;flex-direction:column;gap:12px}
+  .chat-scroll::-webkit-scrollbar{display:none}
+  .chat-scroll > *{flex-shrink:0}
+
+  .msg{max-width:90%}
+  .msg.ai{align-self:flex-start}
+  .msg.user{align-self:flex-end}
+  .msg-label{font-size:9px;color:var(--text3);margin-bottom:3px;padding:0 4px;display:flex;align-items:center;gap:4px}
+  .msg.user .msg-label{justify-content:flex-end}
+  .msg-bubble{padding:10px 14px;border-radius:16px;font-size:12.5px;line-height:1.55}
+  .msg.ai .msg-bubble{background:rgba(78,205,196,0.08);border:1px solid rgba(78,205,196,0.12);border-bottom-left-radius:4px;color:var(--text2)}
+  .msg.ai .msg-bubble strong{color:var(--text)}
+  .msg.user .msg-bubble{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.12);border-bottom-right-radius:4px;color:var(--text)}
+
+  /* ===== POI CARDS (matching app style + image + rich data) ===== */
+  .poi-card-row{display:flex;gap:8px;overflow-x:auto;padding:4px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch;min-height:0;width:100%}
+  .poi-card-row::-webkit-scrollbar{display:none}
+
+  .poi-card{flex:0 0 200px;width:200px;min-width:200px;border-radius:16px;background:var(--bg-card);border:1px solid rgba(255,255,255,0.08);overflow:hidden;cursor:pointer;transition:all 0.2s}
+  .poi-card:active{transform:scale(0.97)}
+
+  /* Image section */
+  .pc-img{height:100px;background-size:cover;background-position:center;position:relative;width:100%}
+  .pc-img::after{content:'';position:absolute;inset:0;background:linear-gradient(to top,var(--bg-card) 0%,rgba(0,0,0,0.15) 60%,rgba(0,0,0,0.05) 100%)}
+  .pc-status{position:absolute;top:6px;right:6px;padding:2px 7px;border-radius:5px;font-size:8px;font-weight:700;z-index:2;backdrop-filter:blur(6px)}
+  .pc-status.open{background:rgba(102,187,106,0.3);color:var(--green)}
+  .pc-status.closing{background:rgba(255,167,38,0.3);color:var(--orange)}
+  .pc-status.closed{background:rgba(239,83,80,0.3);color:var(--red)}
+
+  /* Card body */
+  .pc-body{padding:8px 12px 10px}
+  .pc-top{display:flex;align-items:center;gap:6px;margin-bottom:2px}
+  .pc-emoji{font-size:14px}
+  .pc-name{font-size:12.5px;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .pc-vibe{font-size:9px;font-weight:600;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,0.06)}
+  .pc-why{font-size:10.5px;color:var(--text2);line-height:1.35;margin:4px 0 6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* Action buttons — matching app screenshot */
+  .pc-actions{display:flex;gap:6px;margin-bottom:6px}
+  .pc-btn{height:28px;padding:0 10px;border-radius:8px;border:none;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;flex:1}
+  .pc-btn.save{background:rgba(255,255,255,0.08);color:var(--text2)}
+  .pc-btn.directions{background:rgba(255,255,255,0.08);color:var(--text2)}
+  .pc-map-btn{width:100%;height:26px;border-radius:8px;border:none;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;background:rgba(78,205,196,0.1);color:var(--accent)}
+
+  /* Pills */
+  .pills{display:flex;gap:6px;flex-wrap:wrap;padding:4px 0}
+  .pill{padding:6px 12px;border-radius:16px;border:1px solid rgba(78,205,196,0.2);background:rgba(78,205,196,0.06);font-size:10px;color:var(--accent);cursor:pointer;white-space:nowrap}
+
+  /* Divider */
+  .chat-divider{display:flex;align-items:center;gap:8px;padding:4px 0}
+  .chat-divider-line{flex:1;height:1px;background:rgba(255,255,255,0.06)}
+  .chat-divider-text{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap}
+
+  /* Input */
+  .chat-input-area{flex-shrink:0;padding:8px 12px 28px;background:var(--bg);border-top:1px solid rgba(255,255,255,0.06)}
+  .chat-input-row{display:flex;gap:8px;align-items:center}
+  .chat-input{flex:1;height:40px;border-radius:20px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);padding:0 16px;font-size:12px;color:var(--text);outline:none}
+  .chat-input::placeholder{color:var(--text3)}
+  .chat-send{width:40px;height:40px;border-radius:50%;background:var(--accent);border:none;color:#111;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Chat + POI Cards v2</h1>
+  <p>POI header stays on top. Cards match app style: image background, dark card body, Save/Directions + Show on Map buttons. Short conversation with multiple Gemini card rounds.</p>
+</div>
+
+<div class="phone">
+  <div class="topbar">
+    <button class="topbar-back">←</button>
+    <div class="topbar-info">
+      <div class="topbar-title">Tonkotsu East</div>
+      <div class="topbar-sub">📍 Shoreditch, London</div>
+    </div>
+    <div class="topbar-avatar">✨</div>
+  </div>
+
+  <div class="chat-scroll">
+
+    <!-- POI card at top of list — scrolls away naturally -->
+    <div class="poi-card" style="width:100%;flex:0 0 auto;min-width:0">
+      <div class="pc-img" style="background:linear-gradient(135deg,#1a3a1a,#0d1f0d);height:120px">
+        <span class="pc-status open">● Open now</span>
+      </div>
+      <div class="pc-body">
+        <div class="pc-top">
+          <span class="pc-emoji">🍜</span>
+          <span class="pc-name" style="font-size:15px">Tonkotsu East</span>
+        </div>
+        <div class="pc-vibe" style="color:var(--vibe-food)">Food</div>
+        <div class="pc-why" style="-webkit-line-clamp:3">12-hour pork bone broth ramen. The black garlic ramen is legendary — and right now there's no queue.</div>
+        <div style="display:flex;gap:8px;font-size:9px;color:var(--text3);margin-bottom:8px"><span>⭐ 4.5</span><span>📍 280m</span><span>💰 $$</span><span>🕐 11:30am–10pm</span></div>
+        <div class="pc-actions">
+          <button class="pc-btn save">🔖 Save</button>
+          <button class="pc-btn directions">↗ Directions</button>
+        </div>
+        <button class="pc-map-btn">📍 Show on Map</button>
+        <!-- User notes -->
+        <div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:9px;font-weight:600;color:var(--text3)">📝 My Notes</span>
+            <span style="font-size:8px;color:var(--text3)">Tap to edit</span>
+          </div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.4;font-style:italic">"Get the black garlic with extra egg. Sit at the counter for the best view of the kitchen."</div>
+          <div style="font-size:8px;color:var(--text3);margin-top:4px">Added Mar 10</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI intro about this place -->
+    <div class="msg ai">
+      <div class="msg-label">✨ AreaDiscovery AI</div>
+      <div class="msg-bubble">
+        <strong>Tonkotsu East does one thing perfectly</strong> — 12-hour pork bone broth ramen.<br><br>
+        The black garlic ramen is the move. Rich, creamy, deeply savoury. 🔥 <strong>No queue right now</strong> — rare for this hour.
+      </div>
+    </div>
+
+    <div class="pills">
+      <div class="pill">What should I order?</div>
+      <div class="pill">How busy is it?</div>
+      <div class="pill">Similar places nearby?</div>
+    </div>
+
+    <!-- User -->
+    <div class="msg user">
+      <div class="msg-label">You</div>
+      <div class="msg-bubble">Similar places nearby in case it's full?</div>
+    </div>
+
+    <!-- AI + Round 1: food alternatives -->
+    <div class="msg ai">
+      <div class="msg-label">✨ AreaDiscovery AI</div>
+      <div class="msg-bubble">Two solid backups within 3 minutes:</div>
+    </div>
+
+    <div class="poi-card-row">
+      <!-- Card 1: Pizza East -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#2a1a0a,#3d2815)">
+          <span class="pc-status open">● Open</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">🍕</span>
+            <span class="pc-name">Pizza East</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-food)">Food</div>
+          <div class="pc-why">Wood-fired pizza in a converted tea warehouse. The nduja with honey is addictive.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+
+      <!-- Card 2: Breddos -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#1a2a0a,#2d3815)">
+          <span class="pc-status open">● Open</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">🌮</span>
+            <span class="pc-name">Breddos Tacos</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-food)">Food</div>
+          <div class="pc-why">Killer tacos from a street cart team. Baja fish taco is legendary.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- User -->
+    <div class="msg user">
+      <div class="msg-label">You</div>
+      <div class="msg-bubble">Sticking with Tonkotsu. What should I do after? Got the whole evening.</div>
+    </div>
+
+    <div class="chat-divider">
+      <div class="chat-divider-line"></div>
+      <div class="chat-divider-text">✨ Evening plan</div>
+      <div class="chat-divider-line"></div>
+    </div>
+
+    <!-- AI + Round 2: evening plan -->
+    <div class="msg ai">
+      <div class="msg-label">✨ AreaDiscovery AI</div>
+      <div class="msg-bubble">Great evening ahead — all within walking distance:</div>
+    </div>
+
+    <div class="poi-card-row">
+      <!-- Rough Trade -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#0d1f3a,#1a2d4a)">
+          <span class="pc-status open">● Open</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">🎵</span>
+            <span class="pc-name">Rough Trade East</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-music)">Live Music</div>
+          <div class="pc-why">Iconic record shop. Free acoustic set at 6:30pm — standing room only by 6:15.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+
+      <!-- Jazz Cellar -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#0d1228,#071420)">
+          <span class="pc-status closed">Opens 8pm</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">🎵</span>
+            <span class="pc-name">Jazz Cellar</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-music)">Live Music</div>
+          <div class="pc-why">Underground speakeasy. Live trio at 9pm — no cover. Arrive by 8:30.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+
+      <!-- Callooh Callay -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#1a0d2a,#2a1540)">
+          <span class="pc-status open">● Open</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">🍸</span>
+            <span class="pc-name">Callooh Callay</span>
+          </div>
+          <div class="pc-vibe" style="color:#7e57c2">Cocktail Bar</div>
+          <div class="pc-why">Alice in Wonderland themed. Hidden back room through a wardrobe.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="msg ai">
+      <div class="msg-bubble">
+        <strong>My route:</strong><br>
+        🍜 Now → Tonkotsu<br>
+        🎵 ~7:30 → Rough Trade<br>
+        🎵 8:30 → Jazz Cellar<br>
+        🍸 ~10:30 → Callooh Callay
+      </div>
+    </div>
+
+    <div class="pills">
+      <div class="pill">🗺️ Show on map</div>
+      <div class="pill">Save this plan</div>
+      <div class="pill">Street art along the way?</div>
+    </div>
+
+    <!-- User -->
+    <div class="msg user">
+      <div class="msg-label">You</div>
+      <div class="msg-bubble">Street art along the way? And coffee for tomorrow?</div>
+    </div>
+
+    <div class="chat-divider">
+      <div class="chat-divider-line"></div>
+      <div class="chat-divider-text">🎨 Street art + ☕ Tomorrow</div>
+      <div class="chat-divider-line"></div>
+    </div>
+
+    <!-- AI + Round 3: street art -->
+    <div class="msg ai">
+      <div class="msg-label">✨ AreaDiscovery AI</div>
+      <div class="msg-bubble">You'll walk right past some of London's best street art:</div>
+    </div>
+
+    <div class="poi-card-row">
+      <!-- Rivington Murals -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#2d1b69,#1a0a3e)">
+          <span class="pc-status open">● Always open</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">🎨</span>
+            <span class="pc-name">Rivington Murals</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-art)">Street Art</div>
+          <div class="pc-why">Banksy started here. New piece appeared yesterday on the south wall.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+
+      <!-- Brick Lane -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#3a1b69,#220a3e)">
+          <span class="pc-status open">● Always open</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">🎨</span>
+            <span class="pc-name">Brick Lane Walls</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-art)">Street Art</div>
+          <div class="pc-why">Old Truman Brewery walls. Currently a massive Ben Eine piece.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI + Round 4: coffee -->
+    <div class="msg ai">
+      <div class="msg-bubble">And for <strong>tomorrow morning coffee:</strong></div>
+    </div>
+
+    <div class="poi-card-row">
+      <!-- Cafe Lumiere -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#3e1f0d,#261305)">
+          <span class="pc-status closing">● Closing soon</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">☕</span>
+            <span class="pc-name">Cafe Lumiere</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-cafe)">Cafe Scene</div>
+          <div class="pc-why">Victorian warehouse roaster. Oat flat white is legendary. Opens 7am.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+
+      <!-- Allpress -->
+      <div class="poi-card">
+        <div class="pc-img" style="background:linear-gradient(135deg,#2a1f0d,#1a1305)">
+          <span class="pc-status open">● Open</span>
+        </div>
+        <div class="pc-body">
+          <div class="pc-top">
+            <span class="pc-emoji">☕</span>
+            <span class="pc-name">Allpress Espresso</span>
+          </div>
+          <div class="pc-vibe" style="color:var(--vibe-cafe)">Cafe Scene</div>
+          <div class="pc-why">NZ roasters. Huge industrial space, great wifi. Pastries from local bakery.</div>
+          <div class="pc-actions">
+            <button class="pc-btn save">🔖 Save</button>
+            <button class="pc-btn directions">↗ Directions</button>
+          </div>
+          <button class="pc-map-btn">📍 Show on Map</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="msg ai">
+      <div class="msg-bubble">
+        <strong>Cafe Lumiere</strong> is the better cup, <strong>Allpress</strong> has more space + wifi. Both open 7am. Save everything?
+      </div>
+    </div>
+
+    <div class="pills">
+      <div class="pill">✅ Save everything</div>
+      <div class="pill">🗺️ Show all on map</div>
+    </div>
+
+    <div style="height:20px"></div>
+  </div>
+
+  <div class="chat-input-area">
+    <div class="chat-input-row">
+      <input class="chat-input" placeholder="Ask about this place...">
+      <button class="chat-send">↑</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

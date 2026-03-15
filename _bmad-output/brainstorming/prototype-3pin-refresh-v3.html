@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — 3-Pin Refresh v3</title>
+<style>
+  :root {
+    --bg-dark: #0d1b2a;
+    --ui-dark: rgba(20, 14, 28, 0.92);
+    --ui-dark-solid: #1a1224;
+    --accent: #4ecdc4;
+    --accent-glow: rgba(78,205,196,0.35);
+    --saved: #ff6b6b;
+    --gold: #FFD700;
+    --gold-light: #FFE26A;
+    --text-primary: #fafafa;
+    --text-secondary: rgba(255,255,255,0.6);
+    --text-dim: rgba(255,255,255,0.35);
+    --ease-spring: cubic-bezier(0.34,1.56,0.64,1);
+    --ease-out: cubic-bezier(0.16,1,0.3,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text-primary);max-width:390px;margin:0 auto;height:100vh;height:100dvh;overflow:hidden;position:relative}
+
+  /* === MAP === */
+  .map{position:absolute;inset:0;background:var(--bg-dark);z-index:0}
+  .map::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 35% 45%,#1b2838 0%,transparent 50%),radial-gradient(circle at 65% 55%,#162230 0%,transparent 40%)}
+  .map::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%),linear-gradient(90deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%);background-size:70px 70px;opacity:0.25}
+
+  /* === TOP: Search + Batch Nav === */
+  .top-bar{position:absolute;top:48px;left:12px;right:12px;z-index:100}
+  .search-row{height:46px;border-radius:14px;background:var(--ui-dark);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 4px 0 14px;gap:8px;transition:all 0.3s var(--ease-out)}
+  .search-row.active{border-color:var(--accent);border-radius:14px 14px 0 0;border-bottom-color:rgba(255,255,255,0.05)}
+  .search-icon{font-size:14px;opacity:0.45;flex-shrink:0}
+  .search-text{flex:1;font-size:13px;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .search-actions{display:flex;gap:4px;align-items:center;flex-shrink:0}
+  .search-btn{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,0.06);border:none;color:var(--text-secondary);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s}
+  .search-btn:active{background:rgba(255,255,255,0.12);transform:scale(0.9)}
+  .search-btn.accent{background:rgba(78,205,196,0.15);color:var(--accent)}
+  .batch-nav{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,0.04);border-radius:10px;padding:2px}
+  .batch-nav-btn{width:30px;height:30px;border-radius:8px;border:none;background:transparent;color:var(--text-dim);font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+  .batch-nav-btn:active{background:rgba(255,255,255,0.1)}
+  .batch-nav-btn.disabled{opacity:0.2;pointer-events:none}
+  .batch-nav-counter{font-size:10px;color:var(--text-secondary);padding:0 4px;font-weight:600;min-width:30px;text-align:center;cursor:pointer;border-radius:6px;transition:all 0.2s}
+  .batch-nav-counter:active{background:rgba(255,255,255,0.1)}
+  .batch-nav-counter.all-mode{background:var(--accent);color:#111;padding:2px 6px}
+  .search-dropdown{background:var(--ui-dark);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);border-top:none;border-radius:0 0 14px 14px;max-height:0;overflow:hidden;transition:max-height 0.3s var(--ease-out)}
+  .search-dropdown.open{max-height:220px}
+  .search-item{padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;transition:background 0.15s}
+  .search-item:active{background:rgba(255,255,255,0.05)}
+  .search-item-icon{font-size:13px;opacity:0.4}
+  .search-item-text{font-size:12px}
+  .search-item-sub{font-size:10px;color:var(--text-dim);margin-top:1px}
+
+  /* === VIBE RAIL (right, above FAB) === */
+  .vibe-rail{
+    position:absolute;bottom:92px;right:10px;z-index:50;
+    display:flex;flex-direction:column;gap:4px;align-items:center;
+  }
+
+  /* Saved orb — gold gradient */
+  .saved-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;margin-bottom:2px}
+  .saved-orb-wrap:active .saved-orb{transform:scale(0.92)}
+  .saved-orb{
+    width:40px;height:40px;border-radius:50%;
+    background:radial-gradient(circle at 40% 35%,var(--gold-light),var(--gold));
+    display:flex;align-items:center;justify-content:center;
+    font-size:18px;transition:all 0.2s;
+    box-shadow:0 2px 10px rgba(255,215,0,0.3);
+  }
+  .saved-orb.active{border:2px solid #fff;box-shadow:0 0 12px rgba(255,215,0,0.5)}
+  .saved-label{font-size:10px;color:var(--gold);margin-top:2px;font-weight:500}
+  .saved-badge{
+    position:absolute;top:-2px;right:-2px;
+    min-width:14px;height:14px;border-radius:7px;
+    background:var(--gold);color:#000;font-size:8px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    border:1.5px solid #0a0c10;padding:0 3px;
+  }
+
+  .vibe-divider{width:24px;height:1px;background:rgba(255,255,255,0.12);margin:2px 0}
+
+  /* Dynamic vibe orb — circular, radial gradient */
+  .vibe-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center}
+  .vibe-orb-wrap:active .vibe-orb{transform:scale(0.9)}
+  .vibe-orb-wrap.dimmed{opacity:0.45}
+  .vibe-orb{
+    border-radius:50%;
+    background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35);
+    display:flex;align-items:center;justify-content:center;
+    transition:all 0.2s;
+  }
+  .vibe-orb.active{border:2px solid #fff;animation:breathe 1.8s ease-in-out infinite alternate}
+  @keyframes breathe{from{opacity:0.85}to{opacity:1}}
+  .vibe-orb-label{font-size:10px;color:rgba(255,255,255,0.8);margin-top:2px;text-align:center;max-width:52px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vibe-orb.active+.vibe-orb-label{color:#fff;font-weight:700}
+  .vibe-count-badge{
+    position:absolute;top:-2px;right:-2px;
+    min-width:14px;height:14px;border-radius:7px;
+    background:#4a7cf7;color:#fff;font-size:8px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    border:1.5px solid #0a0c10;padding:0 3px;
+  }
+
+  /* Skeleton shimmer */
+  .skeleton-orb{
+    width:40px;height:40px;border-radius:50%;
+    background:rgba(255,255,255,0.12);
+    animation:shimmer 1.5s infinite;
+  }
+  @keyframes shimmer{0%,100%{opacity:0.12}50%{opacity:0.2}}
+
+  /* === MAP PINS === */
+  .pin{position:absolute;z-index:20;display:flex;flex-direction:column;align-items:center;transition:all 0.45s var(--ease-spring);cursor:pointer}
+  .pin.hidden{opacity:0;transform:translate(-50%,-50%) scale(0);pointer-events:none}
+  .pin.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .pin.saved .pin-marker{background:var(--saved);border-color:var(--saved);box-shadow:0 2px 12px rgba(255,107,107,0.4)}
+  .pin.dimmed{opacity:0.35;transition:opacity 0.3s}
+  .pin-marker{width:38px;height:38px;border-radius:50%;background:var(--accent);border:2.5px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 3px 14px var(--accent-glow);transition:all 0.3s}
+  .pin:active .pin-marker{transform:scale(1.15)}
+  .pin-label{margin-top:3px;font-size:9px;font-weight:600;color:#fff;background:rgba(0,0,0,0.75);padding:2px 7px;border-radius:5px;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+  /* Mini pin (show-all mode) */
+  .pin.mini .pin-marker{width:28px;height:28px;font-size:13px;box-shadow:0 2px 8px var(--accent-glow)}
+  .pin.mini .pin-label{font-size:8px;padding:1px 5px;max-width:70px}
+
+  /* === FLOATING CARD (next to pin) === */
+  .poi-float-card{
+    position:absolute;z-index:25;width:165px;border-radius:12px;
+    background:var(--ui-dark);backdrop-filter:blur(16px);
+    border:1px solid rgba(255,255,255,0.08);
+    padding:10px 11px;cursor:pointer;
+    transition:all 0.4s var(--ease-spring);pointer-events:all;
+  }
+  .poi-float-card.hidden{opacity:0;transform:scale(0.85) translateY(8px);pointer-events:none}
+  .poi-float-card.visible{opacity:1;transform:scale(1) translateY(0)}
+  .poi-float-card:active{transform:scale(0.97);border-color:var(--accent)}
+  .pfc-header{display:flex;align-items:center;gap:7px}
+  .pfc-emoji{font-size:18px}
+  .pfc-name{font-size:12px;font-weight:600;line-height:1.2}
+  .pfc-vibe{margin-top:4px;font-size:9px;color:var(--accent);font-weight:600}
+  .pfc-why{margin-top:3px;font-size:10px;color:var(--text-secondary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* === BOTTOM BAR === */
+  .bottom-bar{position:absolute;bottom:0;left:0;right:0;z-index:80;padding:0 12px 28px;display:flex;align-items:flex-end;justify-content:space-between}
+  .ai-bar{height:40px;border-radius:20px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:7px;padding:0 14px;cursor:pointer;transition:all 0.2s;max-width:160px}
+  .ai-bar:active{border-color:rgba(255,255,255,0.2);transform:scale(0.97)}
+  .ai-bar-icon{font-size:13px}
+  .ai-bar-text{font-size:11px;color:var(--text-secondary);white-space:nowrap;overflow:hidden}
+  @keyframes ghostCycle{0%,100%{opacity:0.5}50%{opacity:0.8}}
+  .ghost-text{animation:ghostCycle 3s ease-in-out infinite}
+  .bottom-right{display:flex;gap:6px;align-items:flex-end}
+  .toggle-btn{height:36px;border-radius:18px;background:var(--ui-dark);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;overflow:hidden}
+  .toggle-seg{padding:0 12px;height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-dim);transition:all 0.2s;border:none;background:transparent;cursor:pointer}
+  .toggle-seg.active{color:var(--accent)}
+  .fab{width:50px;height:50px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:26px;color:#111;font-weight:300;cursor:pointer;transition:all 0.2s;box-shadow:0 4px 20px var(--accent-glow)}
+  .fab:active{transform:scale(0.9)}
+
+  /* My location */
+  .my-loc{position:absolute;bottom:80px;left:12px;z-index:65;width:36px;height:36px;border-radius:50%;background:var(--ui-dark);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:15px;cursor:pointer}
+  .my-loc:active{transform:scale(0.9)}
+
+  /* === DETAIL OVERLAY === */
+  .detail-overlay{position:absolute;inset:0;z-index:200;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity 0.3s}
+  .detail-overlay.open{opacity:1;pointer-events:all}
+  .detail-sheet{position:absolute;bottom:0;left:0;right:0;background:var(--ui-dark-solid);border-radius:20px 20px 0 0;transform:translateY(100%);transition:transform 0.4s var(--ease-out);max-height:72vh;overflow-y:auto}
+  .detail-overlay.open .detail-sheet{transform:translateY(0)}
+  .detail-handle{width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,0.2);margin:10px auto 0}
+  .detail-swipe-dots{display:flex;justify-content:center;gap:6px;padding:8px 0 4px}
+  .detail-dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,0.2);transition:all 0.2s;cursor:pointer}
+  .detail-dot.active{background:var(--accent);width:20px;border-radius:4px}
+  .detail-close{position:absolute;top:14px;right:14px;width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .detail-close:active{background:rgba(255,255,255,0.2)}
+  .detail-hero{padding:16px 18px;display:flex;align-items:flex-start;gap:12px}
+  .detail-emoji{font-size:38px}
+  .detail-info{flex:1}
+  .detail-name{font-size:18px;font-weight:700}
+  .detail-vibe-tag{display:inline-block;margin-top:5px;padding:2px 9px;border-radius:9px;background:rgba(78,205,196,0.15);color:var(--accent);font-size:10px;font-weight:600}
+  .detail-why{padding:0 18px 14px;font-size:13px;color:var(--text-secondary);line-height:1.5}
+  .detail-meta{padding:0 18px 16px;display:flex;gap:14px;flex-wrap:wrap}
+  .detail-meta-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-dim)}
+  .detail-meta-item span:first-child{font-size:13px}
+  .detail-actions{padding:0 18px 28px;display:flex;gap:8px}
+  .detail-action-btn{flex:1;height:42px;border-radius:12px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all 0.2s}
+  .detail-action-btn:active{transform:scale(0.96)}
+  .detail-action-btn.primary{background:var(--accent);color:#111}
+  .detail-action-btn.secondary{background:rgba(255,255,255,0.08);color:var(--text-primary);border:1px solid rgba(255,255,255,0.1)}
+
+  /* Toast */
+  .toast{position:absolute;top:104px;left:50%;transform:translateX(-50%) translateY(-16px);z-index:300;background:var(--accent);color:#111;padding:7px 16px;border-radius:16px;font-size:11px;font-weight:600;opacity:0;pointer-events:none;transition:all 0.35s var(--ease-spring);white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="map" id="map"></div>
+<div class="toast" id="toast"></div>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="search-row" id="searchRow">
+    <span class="search-icon">🔍</span>
+    <span class="search-text" id="searchText" onclick="toggleSearch()">Shoreditch, London</span>
+    <div class="search-actions">
+      <div class="batch-nav">
+        <button class="batch-nav-btn disabled" id="batchPrev" onclick="navigateBatch(-1)">◀</button>
+        <span class="batch-nav-counter" id="batchCounter" onclick="toggleShowAll()" title="Tap to show all pins">1/3</span>
+        <button class="batch-nav-btn" id="batchNext" onclick="navigateBatch(1)">▶</button>
+      </div>
+      <button class="search-btn accent" onclick="refreshArea()" title="Refresh">↻</button>
+    </div>
+  </div>
+  <div class="search-dropdown" id="searchDropdown">
+    <div class="search-item" onclick="selectPlace('Shibuya, Tokyo')"><span class="search-item-icon">🕐</span><div><div class="search-item-text">Shibuya, Tokyo</div><div class="search-item-sub">2 days ago</div></div></div>
+    <div class="search-item" onclick="selectPlace('Kreuzberg, Berlin')"><span class="search-item-icon">🕐</span><div><div class="search-item-text">Kreuzberg, Berlin</div><div class="search-item-sub">4 days ago</div></div></div>
+    <div class="search-item" onclick="selectPlace('Le Marais, Paris')"><span class="search-item-icon">🕐</span><div><div class="search-item-text">Le Marais, Paris</div><div class="search-item-sub">Last week</div></div></div>
+    <div class="search-item" onclick="selectPlace('Gothic Quarter, Barcelona')"><span class="search-item-icon">📍</span><div><div class="search-item-text">Gothic Quarter, Barcelona</div><div class="search-item-sub">1,240 km</div></div></div>
+  </div>
+</div>
+
+<!-- VIBE RAIL (right side, above FAB, Saved on top) -->
+<div class="vibe-rail" id="vibeRail">
+  <!-- Saved orb -->
+  <div class="saved-orb-wrap" onclick="toggleSavedFilter()">
+    <div class="saved-orb" id="savedOrb">🔖</div>
+    <span class="saved-label">Saved</span>
+    <span class="saved-badge" id="savedBadge">2</span>
+  </div>
+  <div class="vibe-divider"></div>
+  <!-- Dynamic vibes populated by JS -->
+  <div id="vibeList"></div>
+</div>
+
+<!-- MY LOCATION -->
+<div class="my-loc" onclick="showToast('Returning to location...')">📍</div>
+
+<!-- BOTTOM BAR -->
+<div class="bottom-bar">
+  <div class="ai-bar" onclick="showToast('Chat opening...')">
+    <span class="ai-bar-icon">✨</span>
+    <span class="ai-bar-text ghost-text">Hidden gems nearby?</span>
+  </div>
+  <div class="bottom-right">
+    <div class="toggle-btn">
+      <button class="toggle-seg active">🗺️</button>
+      <button class="toggle-seg" onclick="showToast('List view')">📋</button>
+    </div>
+    <div class="fab" onclick="showToast('Actions menu')">+</div>
+  </div>
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div class="detail-overlay" id="detailOverlay" onclick="closeDetail()">
+  <div class="detail-sheet" onclick="event.stopPropagation()">
+    <div class="detail-handle"></div>
+    <div class="detail-swipe-dots" id="detailDots"></div>
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div class="detail-hero">
+      <div class="detail-emoji" id="detailEmoji"></div>
+      <div class="detail-info">
+        <div class="detail-name" id="detailName"></div>
+        <div class="detail-vibe-tag" id="detailVibe"></div>
+      </div>
+    </div>
+    <div class="detail-why" id="detailWhy"></div>
+    <div class="detail-meta">
+      <div class="detail-meta-item"><span>⭐</span><span id="detailRating"></span></div>
+      <div class="detail-meta-item"><span>🕐</span><span id="detailHours"></span></div>
+      <div class="detail-meta-item"><span>📍</span><span id="detailDist"></span></div>
+    </div>
+    <div class="detail-actions">
+      <button class="detail-action-btn primary" onclick="savePoi()">💾 Save</button>
+      <button class="detail-action-btn secondary" onclick="showToast('Directions...');closeDetail()">🧭 Navigate</button>
+      <button class="detail-action-btn secondary" onclick="showToast('Ask AI...');closeDetail()">✨ Ask AI</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const allBatches = [
+  [
+    {emoji:'🎨',name:'Rivington Murals',vibe:'Street Art',why:'Every surface is a canvas — Banksy started here. New murals weekly from global artists.',rating:'4.8',hours:'Always open',dist:'120m',x:28,y:38,cardSide:'right'},
+    {emoji:'☕',name:'Cafe Lumiere',vibe:'Cafe Scene',why:'Third-wave roaster in a converted Victorian warehouse. Oat flat white is legendary.',rating:'4.6',hours:'7am–6pm',dist:'200m',x:52,y:55,cardSide:'left'},
+    {emoji:'🎵',name:'Jazz Cellar',vibe:'Live Music',why:'Underground speakeasy, no sign on the door. Thursday jams draw musicians from across London.',rating:'4.7',hours:'8pm–2am',dist:'350m',x:36,y:73,cardSide:'right'},
+  ],
+  [
+    {emoji:'🍜',name:'Smokestak',vibe:'Street Food',why:'Brisket smoked 16 hours over oak. Queue forms at 11am. Worth every minute.',rating:'4.5',hours:'12–10pm',dist:'280m',x:60,y:36,cardSide:'left'},
+    {emoji:'📚',name:'Libreria',vibe:'Hidden History',why:'Bookshop organized by theme, not author. Mirrors on ceiling make shelves infinite.',rating:'4.4',hours:'10am–8pm',dist:'180m',x:22,y:58,cardSide:'right'},
+    {emoji:'🎨',name:'Village Underground',vibe:'Street Art',why:"Tube carriages on a warehouse roof — Shoreditch's most photographed landmark.",rating:'4.3',hours:'Varies',dist:'400m',x:45,y:76,cardSide:'right'},
+  ],
+  [
+    {emoji:'🏛️',name:'Dennis Severs House',vibe:'Hidden History',why:'18th-century Huguenot silk weaver\'s home. Candle-lit rooms. Time travel.',rating:'4.9',hours:'Mon & Wed eve',dist:'150m',x:34,y:32,cardSide:'right'},
+    {emoji:'☕',name:'Ozone Coffee',vibe:'Cafe Scene',why:'NZ-style brunch in vast industrial space. The kimchi pancakes changed the game.',rating:'4.5',hours:'7:30am–5pm',dist:'320m',x:58,y:60,cardSide:'left'},
+    {emoji:'🎵',name:'Rough Trade East',vibe:'Live Music',why:'Indie record store with intimate in-store gigs. Arctic Monkeys played here in 2006.',rating:'4.6',hours:'9am–9pm',dist:'250m',x:20,y:44,cardSide:'right'},
+  ],
+];
+
+const vibeData = [
+  {emoji:'🎨',label:'Street Art',count:3,size:46},
+  {emoji:'☕',label:'Cafe Scene',count:2,size:40},
+  {emoji:'🎵',label:'Live Music',count:2,size:40},
+  {emoji:'🍜',label:'Street Food',count:1,size:34},
+  {emoji:'🏛️',label:'History',count:1,size:34},
+];
+
+const savedPin = {emoji:'❤️',name:'Dishoom',x:78,y:46,saved:true};
+let currentBatch=0, searchOpen=false, saveCount=2, activeVibe=0, savedFilterActive=false, showAllMode=false;
+
+// Render vibes
+function renderVibes(){
+  const list=document.getElementById('vibeList');
+  list.innerHTML='';
+  vibeData.forEach((v,i)=>{
+    const isActive=i===activeVibe && !savedFilterActive;
+    const isDimmed=(activeVibe!==null||savedFilterActive)&&!isActive&&!savedFilterActive;
+    const wrap=document.createElement('div');
+    wrap.className='vibe-orb-wrap'+(isDimmed?' dimmed':'');
+    wrap.onclick=()=>{activeVibe=activeVibe===i?null:i;savedFilterActive=false;document.getElementById('savedOrb').classList.remove('active');renderVibes()};
+    wrap.innerHTML=`
+      <div class="vibe-orb${isActive?' active':''}" style="width:${v.size}px;height:${v.size}px;font-size:${v.size>38?18:15}px">${v.emoji}</div>
+      <div class="vibe-orb-label"${isActive?' style="color:#fff;font-weight:700"':''}>${v.label}</div>
+      ${v.count>0?`<div class="vibe-count-badge">${v.count}</div>`:''}
+    `;
+    list.appendChild(wrap);
+  });
+}
+
+function toggleSavedFilter(){
+  savedFilterActive=!savedFilterActive;
+  document.getElementById('savedOrb').classList.toggle('active',savedFilterActive);
+  if(savedFilterActive)activeVibe=null;
+  renderVibes();
+}
+
+renderVibes();
+renderBatch(0,true);
+updateBatchNav();
+
+function toggleShowAll(){
+  showAllMode=!showAllMode;
+  const counter=document.getElementById('batchCounter');
+  counter.classList.toggle('all-mode',showAllMode);
+  if(showAllMode){
+    counter.textContent='ALL';
+    document.getElementById('batchPrev').classList.add('disabled');
+    document.getElementById('batchNext').classList.add('disabled');
+    renderAllPins();
+  } else {
+    renderBatch(currentBatch,false);
+    updateBatchNav();
+  }
+}
+
+function renderAllPins(){
+  const map=document.getElementById('map');
+  map.querySelectorAll('.pin:not(.saved)').forEach(p=>{p.classList.remove('visible');p.classList.add('hidden');setTimeout(()=>p.remove(),450)});
+  map.querySelectorAll('.poi-float-card').forEach(c=>{c.classList.remove('visible');c.classList.add('hidden');setTimeout(()=>c.remove(),400)});
+  if(!map.querySelector('.pin.saved')){const sp=createPin(savedPin,true);map.appendChild(sp);requestAnimationFrame(()=>sp.classList.add('visible'))}
+  let delay=0;
+  allBatches.forEach((batch,bIdx)=>{
+    batch.forEach((poi,pIdx)=>{
+      setTimeout(()=>{
+        const pin=createPin(poi,false);
+        pin.classList.add('mini');
+        pin.onclick=()=>{showAllMode=false;currentBatch=bIdx;document.getElementById('batchCounter').classList.remove('all-mode');renderBatch(bIdx,false);updateBatchNav();setTimeout(()=>openDetail(bIdx,pIdx),500)};
+        map.appendChild(pin);
+        requestAnimationFrame(()=>requestAnimationFrame(()=>pin.classList.add('visible')));
+      },delay);
+      delay+=100;
+    });
+  });
+}
+
+function renderBatch(idx,initial){
+  showAllMode=false;
+  document.getElementById('batchCounter').classList.remove('all-mode');
+  const map=document.getElementById('map');
+  map.querySelectorAll('.pin:not(.saved)').forEach(p=>{p.classList.remove('visible');p.classList.add('hidden');setTimeout(()=>p.remove(),450)});
+  map.querySelectorAll('.poi-float-card').forEach(c=>{c.classList.remove('visible');c.classList.add('hidden');setTimeout(()=>c.remove(),400)});
+  map.querySelectorAll('.pin.saved').forEach(p=>{p.classList.add('dimmed');setTimeout(()=>p.classList.remove('dimmed'),600)});
+  if(!map.querySelector('.pin.saved')){const sp=createPin(savedPin,true);map.appendChild(sp);requestAnimationFrame(()=>sp.classList.add('visible'))}
+  allBatches[idx].forEach((poi,i)=>{
+    const delay=initial?i*280:150+i*220;
+    setTimeout(()=>{
+      const pin=createPin(poi,false);pin.onclick=()=>openDetail(idx,i);
+      map.appendChild(pin);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>pin.classList.add('visible')));
+      setTimeout(()=>{
+        const card=createFloatCard(poi,i,idx);map.appendChild(card);
+        requestAnimationFrame(()=>requestAnimationFrame(()=>card.classList.add('visible')));
+      },150);
+    },delay);
+  });
+}
+
+function createPin(poi,isSaved){
+  const el=document.createElement('div');
+  el.className='pin hidden'+(isSaved?' saved':'');
+  el.style.left=poi.x+'%';el.style.top=poi.y+'%';
+  el.innerHTML=`<div class="pin-marker">${poi.emoji}</div><div class="pin-label">${poi.name}</div>`;
+  return el;
+}
+
+function createFloatCard(poi,idx,batchIdx){
+  const card=document.createElement('div');
+  card.className='poi-float-card hidden';
+  if(poi.cardSide==='left'){card.style.right=(100-poi.x+3)+'%';card.style.top=(poi.y-4)+'%'}
+  else{card.style.left=(poi.x+3)+'%';card.style.top=(poi.y-4)+'%'}
+  card.onclick=()=>openDetail(batchIdx,idx);
+  card.innerHTML=`<div class="pfc-header"><span class="pfc-emoji">${poi.emoji}</span><span class="pfc-name">${poi.name}</span></div><div class="pfc-vibe">${poi.vibe}</div><div class="pfc-why">${poi.why}</div>`;
+  return card;
+}
+
+function navigateBatch(dir){
+  const n=currentBatch+dir;
+  if(n<0||n>=allBatches.length){if(n>=allBatches.length)showToast("You've explored all 9 places ✨");return}
+  currentBatch=n;renderBatch(n,false);updateBatchNav();
+}
+function updateBatchNav(){
+  document.getElementById('batchCounter').textContent=(currentBatch+1)+'/'+allBatches.length;
+  document.getElementById('batchPrev').className='batch-nav-btn'+(currentBatch===0?' disabled':'');
+  document.getElementById('batchNext').className='batch-nav-btn'+(currentBatch>=allBatches.length-1?' disabled':'');
+}
+function refreshArea(){
+  showToast('Refreshing area...');currentBatch=0;
+  setTimeout(()=>{renderBatch(0,true);updateBatchNav()},600);
+}
+function toggleSearch(){
+  searchOpen=!searchOpen;
+  document.getElementById('searchRow').classList.toggle('active',searchOpen);
+  document.getElementById('searchDropdown').classList.toggle('open',searchOpen);
+}
+function selectPlace(name){
+  document.getElementById('searchText').textContent=name;toggleSearch();
+  showToast('Loading '+name+'...');currentBatch=0;
+  setTimeout(()=>{renderBatch(0,true);updateBatchNav();showToast(name)},800);
+}
+function openDetail(batchIdx,poiIdx){
+  if(searchOpen)toggleSearch();
+  const poi=allBatches[batchIdx][poiIdx];
+  document.getElementById('detailEmoji').textContent=poi.emoji;
+  document.getElementById('detailName').textContent=poi.name;
+  document.getElementById('detailVibe').textContent=poi.vibe;
+  document.getElementById('detailWhy').textContent=poi.why;
+  document.getElementById('detailRating').textContent=poi.rating;
+  document.getElementById('detailHours').textContent=poi.hours;
+  document.getElementById('detailDist').textContent=poi.dist;
+  const dots=document.getElementById('detailDots');dots.innerHTML='';
+  allBatches[batchIdx].forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='detail-dot'+(i===poiIdx?' active':'');
+    d.onclick=(e)=>{e.stopPropagation();openDetail(batchIdx,i)};
+    dots.appendChild(d);
+  });
+  document.getElementById('detailOverlay').classList.add('open');
+}
+function closeDetail(){document.getElementById('detailOverlay').classList.remove('open')}
+function savePoi(){saveCount++;document.getElementById('savedBadge').textContent=saveCount;showToast('Saved! ❤️');closeDetail()}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+</script>
+</body>
+</html>

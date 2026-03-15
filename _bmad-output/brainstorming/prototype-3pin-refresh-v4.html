@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AreaDiscovery — 3-Pin Refresh v4 (Side by Side)</title>
+<style>
+  :root {
+    --bg-dark:#0d1b2a;--ui-dark:rgba(20,14,28,0.92);--ui-dark-solid:#1a1224;
+    --accent:#4ecdc4;--accent-glow:rgba(78,205,196,0.35);--saved:#ff6b6b;
+    --gold:#FFD700;--gold-light:#FFE26A;
+    --text-primary:#fafafa;--text-secondary:rgba(255,255,255,0.6);--text-dim:rgba(255,255,255,0.35);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);--ease-out:cubic-bezier(0.16,1,0.3,1);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;background:#000;color:var(--text-primary);overflow-x:hidden}
+
+  .page-header{text-align:center;padding:20px 16px 10px;font-size:12px;color:#888;letter-spacing:1px;text-transform:uppercase}
+  .page-header h1{font-size:18px;color:#fff;letter-spacing:0;text-transform:none;margin-bottom:2px}
+
+  .side-by-side{display:flex;gap:16px;padding:0 16px 24px;justify-content:center;flex-wrap:wrap}
+
+  /* Phone frame */
+  .phone{width:340px;border-radius:28px;border:2px solid #333;overflow:hidden;position:relative;height:680px;background:var(--bg-dark);flex-shrink:0}
+  .phone-label{text-align:center;padding:8px;font-size:11px;color:#888;font-weight:600;letter-spacing:0.5px;background:#111;border-bottom:1px solid #222}
+
+  /* Map */
+  .map{position:absolute;inset:28px 0 0 0;background:var(--bg-dark)}
+  .map::before{content:'';position:absolute;inset:0;background:radial-gradient(circle at 35% 45%,#1b2838 0%,transparent 50%),radial-gradient(circle at 65% 55%,#162230 0%,transparent 40%);pointer-events:none}
+  .map::after{content:'';position:absolute;inset:0;background:linear-gradient(0deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%),linear-gradient(90deg,transparent 49.5%,#1a2a3a 49.5%,#1a2a3a 50.5%,transparent 50.5%);background-size:60px 60px;opacity:0.2;pointer-events:none}
+
+  /* Search bar */
+  .search-row{position:absolute;top:38px;left:10px;right:10px;z-index:100;height:40px;border-radius:12px;background:var(--ui-dark);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;padding:0 4px 0 10px;gap:6px}
+  .search-icon{font-size:12px;opacity:0.45}
+  .search-text{flex:1;font-size:11px;color:var(--text-primary);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .search-actions{display:flex;gap:3px;align-items:center;flex-shrink:0}
+  .search-btn{width:28px;height:28px;border-radius:8px;background:rgba(78,205,196,0.15);border:none;color:var(--accent);font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all 0.2s}
+  .search-btn:active{transform:scale(0.9)}
+  .batch-nav{display:flex;align-items:center;gap:1px;background:rgba(255,255,255,0.04);border-radius:8px;padding:2px}
+  .bn-btn{width:24px;height:24px;border-radius:6px;border:none;background:transparent;color:var(--text-dim);font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+  .bn-btn:active{background:rgba(255,255,255,0.1)}
+  .bn-btn.disabled{opacity:0.2;pointer-events:none}
+  .bn-counter{font-size:9px;color:var(--text-secondary);padding:0 3px;font-weight:600;min-width:24px;text-align:center;cursor:pointer;border-radius:4px;transition:all 0.2s}
+  .bn-counter:active{background:rgba(255,255,255,0.1)}
+  .bn-counter.all-mode{background:var(--accent);color:#111;padding:1px 4px}
+
+  /* Vibe rail */
+  .vibe-rail{position:absolute;bottom:80px;right:6px;z-index:28;display:flex;flex-direction:column;gap:3px;align-items:center}
+  .saved-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;margin-bottom:1px}
+  .saved-orb{width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 40% 35%,var(--gold-light),var(--gold));display:flex;align-items:center;justify-content:center;font-size:15px;transition:all 0.2s;box-shadow:0 2px 8px rgba(255,215,0,0.3)}
+  .saved-orb.active{border:2px solid #fff}
+  .saved-label{font-size:8px;color:var(--gold);margin-top:1px;font-weight:500}
+  .saved-badge{position:absolute;top:-2px;right:-2px;min-width:12px;height:12px;border-radius:6px;background:var(--gold);color:#000;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #0a0c10;padding:0 2px}
+  .vibe-divider{width:20px;height:1px;background:rgba(255,255,255,0.12);margin:1px 0}
+  .vibe-orb-wrap{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center}
+  .vibe-orb-wrap.dimmed{opacity:0.45}
+  .vibe-orb{border-radius:50%;background:radial-gradient(circle at 40% 35%,rgba(255,255,255,0.3),#2a2e35);display:flex;align-items:center;justify-content:center;transition:all 0.2s}
+  .vibe-orb.active{border:2px solid #fff;animation:breathe 1.8s ease-in-out infinite alternate}
+  @keyframes breathe{from{opacity:0.85}to{opacity:1}}
+  .vibe-orb-label{font-size:8px;color:rgba(255,255,255,0.8);margin-top:1px;text-align:center;max-width:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .vibe-count-badge{position:absolute;top:-2px;right:-2px;min-width:12px;height:12px;border-radius:6px;background:#4a7cf7;color:#fff;font-size:7px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1.5px solid #0a0c10;padding:0 2px}
+
+  /* Pins */
+  .pin{position:absolute;z-index:20;display:flex;flex-direction:column;align-items:center;transition:all 0.45s var(--ease-spring);cursor:pointer}
+  .pin.hidden{opacity:0;transform:translate(-50%,-50%) scale(0);pointer-events:none}
+  .pin.visible{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .pin.saved .pin-marker{background:var(--gold);border-color:var(--gold);box-shadow:0 2px 10px rgba(255,215,0,0.4)}
+  .pin.saved .pin-label{background:rgba(255,215,0,0.2);color:var(--gold)}
+  .pin.dimmed{opacity:0.35;transition:opacity 0.3s}
+  .pin-marker{width:32px;height:32px;border-radius:50%;background:var(--accent);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 10px var(--accent-glow);transition:all 0.3s}
+  .pin:active .pin-marker{transform:scale(1.15)}
+  .pin-label{margin-top:2px;font-size:8px;font-weight:600;color:#fff;background:rgba(0,0,0,0.75);padding:1px 5px;border-radius:4px;white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis}
+  .pin.mini .pin-marker{width:24px;height:24px;font-size:11px;box-shadow:0 1px 6px var(--accent-glow)}
+  .pin.mini .pin-label{font-size:7px;padding:1px 4px;max-width:60px}
+
+  /* Float card */
+  .poi-float-card{position:absolute;z-index:25;width:150px;border-radius:12px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.1);padding:10px 11px;cursor:pointer;transition:all 0.4s var(--ease-spring);pointer-events:all}
+  .poi-float-card.hidden{opacity:0;transform:scale(0.85) translateY(8px);pointer-events:none}
+  .poi-float-card.visible{opacity:1;transform:scale(1) translateY(0)}
+  .poi-float-card:active{transform:scale(0.97);border-color:var(--accent)}
+  /* Expanded card — centered, 80% viewport, matches ExpandablePoiCard */
+  .poi-float-card.expanded{
+    position:absolute !important;
+    left:10px !important;right:10px !important;
+    top:10% !important;bottom:10% !important;
+    transform:none !important;
+    width:auto !important;height:auto !important;
+    z-index:30;border-color:var(--accent);
+    box-shadow:0 8px 40px rgba(0,0,0,0.7);
+    padding:0;border-radius:16px;
+    overflow-y:auto;overflow-x:hidden;
+    display:flex;flex-direction:column;
+  }
+  /* Image header */
+  .pfc-image{display:none;height:130px;position:relative;overflow:hidden;border-radius:16px 16px 0 0;flex-shrink:0}
+  .poi-float-card.expanded .pfc-image{display:block}
+  .pfc-image-bg{width:100%;height:100%;object-fit:cover;display:block}
+  .pfc-image-gradient{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(20,14,28,0.95) 100%)}
+  .pfc-image-close{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.5);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+  .pfc-image-close:active{background:rgba(0,0,0,0.7)}
+  /* Expanded body */
+  .pfc-body{display:none;padding:14px 14px 16px;flex:1}
+  .poi-float-card.expanded .pfc-body{display:block}
+  .pfc-compact{display:block;position:relative}
+  .pfc-compact-close{position:absolute;top:0;right:0;width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:var(--text-dim);font-size:9px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s}
+  .pfc-compact-close:active{background:rgba(255,255,255,0.2);transform:scale(0.9)}
+  .poi-float-card.expanded .pfc-compact{display:none}
+  .pfc-header{display:flex;align-items:center;gap:6px}
+  .pfc-emoji{font-size:16px}
+  .pfc-exp-emoji{font-size:28px}
+  .pfc-exp-name{font-size:16px;font-weight:700;line-height:1.3}
+  .pfc-exp-type{font-size:11px;color:var(--text-dim);margin-top:1px;text-transform:capitalize}
+  .pfc-name{font-size:11px;font-weight:600;line-height:1.25}
+  .pfc-vibe{margin-top:4px;font-size:9px;color:var(--accent);font-weight:600}
+  .pfc-why{margin-top:3px;font-size:10px;color:var(--text-secondary);line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pfc-meta{margin-top:5px;display:flex;gap:8px;font-size:9px;color:var(--text-dim);flex-wrap:wrap}
+  .pfc-meta span{display:flex;align-items:center;gap:2px}
+  /* Expanded meta row */
+  .pfc-exp-meta{display:flex;gap:12px;margin-top:10px;font-size:12px;color:var(--text-secondary);align-items:center}
+  .pfc-exp-meta-item{display:flex;align-items:center;gap:4px}
+  .pfc-status{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:600}
+  .pfc-status.open{background:rgba(76,175,80,0.15);color:#66bb6a}
+  .pfc-status.closed{background:rgba(158,158,158,0.15);color:#999}
+  /* Insight */
+  .pfc-exp-insight{margin-top:12px;font-size:13px;line-height:1.55;color:rgba(255,255,255,0.8)}
+  /* Description */
+  .pfc-exp-desc{margin-top:10px;font-size:12px;line-height:1.5;color:var(--text-secondary);padding-top:10px;border-top:1px solid rgba(255,255,255,0.06)}
+  /* Hours */
+  .pfc-exp-hours{margin-top:8px;font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:4px}
+  /* Expand actions */
+  /* Action chips row (matching ExpandablePoiCard FlowRow) */
+  .pfc-chips{display:none;margin-top:14px;gap:8px;flex-wrap:wrap}
+  .poi-float-card.expanded .pfc-chips{display:flex}
+  .pfc-chip{height:36px;border-radius:18px;border:1px solid rgba(255,255,255,0.12);background:rgba(255,255,255,0.06);padding:0 14px;font-size:11px;font-weight:500;cursor:pointer;display:flex;align-items:center;gap:5px;transition:all 0.2s;color:var(--text-primary)}
+  .pfc-chip:active{transform:scale(0.94);background:rgba(255,255,255,0.1)}
+  .pfc-chip.save{border-color:rgba(78,205,196,0.3);color:var(--accent)}
+  .pfc-chip.saved{border-color:var(--gold);color:var(--gold);background:rgba(255,215,0,0.08)}
+  /* Legacy actions (compact) */
+  .pfc-actions{display:none;margin-top:10px;gap:8px}
+  .pfc-action{flex:1;height:40px;border-radius:10px;border:none;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:all 0.2s}
+  .pfc-action:active{transform:scale(0.94)}
+  .pfc-action.primary{background:var(--accent);color:#111}
+  .pfc-action.secondary{background:rgba(255,255,255,0.08);color:var(--text-primary);border:1px solid rgba(255,255,255,0.1)}
+  /* Dimmed siblings */
+  .poi-float-card.dimmed-sibling{opacity:0.3;pointer-events:none}
+  .pin.dimmed-sibling{opacity:0.3;pointer-events:none}
+
+  /* Bottom bar */
+  .bottom-bar{position:absolute;bottom:0;left:0;right:0;z-index:80;padding:0 10px 18px;display:flex;align-items:flex-end;justify-content:space-between}
+  .ai-bar{height:34px;border-radius:17px;background:var(--ui-dark);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;gap:5px;padding:0 10px;cursor:pointer;max-width:130px}
+  .ai-bar-icon{font-size:11px}
+  .ai-bar-text{font-size:9px;color:var(--text-secondary);white-space:nowrap;overflow:hidden}
+  @keyframes ghostCycle{0%,100%{opacity:0.5}50%{opacity:0.8}}
+  .ghost-text{animation:ghostCycle 3s ease-in-out infinite}
+  .bottom-right{display:flex;gap:5px;align-items:flex-end}
+  .toggle-btn{height:30px;border-radius:15px;background:var(--ui-dark);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;overflow:hidden}
+  .toggle-seg{padding:0 10px;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-dim);border:none;background:transparent;cursor:pointer}
+  .toggle-seg.active{color:var(--accent)}
+  .fab{width:42px;height:42px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:22px;color:#111;font-weight:300;cursor:pointer;box-shadow:0 3px 16px var(--accent-glow)}
+  .fab:active{transform:scale(0.9)}
+  .my-loc{position:absolute;bottom:62px;left:10px;z-index:65;width:30px;height:30px;border-radius:50%;background:var(--ui-dark);border:1px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer}
+
+  /* Detail */
+  .detail-overlay{position:absolute;inset:28px 0 0 0;z-index:200;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);opacity:0;pointer-events:none;transition:opacity 0.3s}
+  .detail-overlay.open{opacity:1;pointer-events:all}
+  .detail-sheet{position:absolute;bottom:0;left:0;right:0;background:var(--ui-dark-solid);border-radius:16px 16px 0 0;transform:translateY(100%);transition:transform 0.4s var(--ease-out);max-height:65vh;overflow-y:auto}
+  .detail-overlay.open .detail-sheet{transform:translateY(0)}
+  .detail-handle{width:30px;height:3px;border-radius:2px;background:rgba(255,255,255,0.2);margin:8px auto 0}
+  .detail-swipe-dots{display:flex;justify-content:center;gap:5px;padding:6px 0 3px}
+  .detail-dot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,0.2);cursor:pointer}
+  .detail-dot.active{background:var(--accent);width:16px;border-radius:3px}
+  .detail-close{position:absolute;top:10px;right:10px;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .detail-hero{padding:12px 14px;display:flex;align-items:flex-start;gap:10px}
+  .detail-emoji{font-size:32px}
+  .detail-info{flex:1}
+  .detail-name{font-size:15px;font-weight:700}
+  .detail-vibe-tag{display:inline-block;margin-top:4px;padding:2px 7px;border-radius:7px;background:rgba(78,205,196,0.15);color:var(--accent);font-size:9px;font-weight:600}
+  .detail-why{padding:0 14px 10px;font-size:11px;color:var(--text-secondary);line-height:1.45}
+  .detail-meta{padding:0 14px 12px;display:flex;gap:10px;flex-wrap:wrap}
+  .detail-meta-item{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-dim)}
+  .detail-actions{padding:0 14px 20px;display:flex;gap:6px}
+  .detail-action-btn{flex:1;height:36px;border-radius:10px;border:none;font-size:10px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px}
+  .detail-action-btn:active{transform:scale(0.96)}
+  .detail-action-btn.primary{background:var(--accent);color:#111}
+  .detail-action-btn.secondary{background:rgba(255,255,255,0.08);color:var(--text-primary);border:1px solid rgba(255,255,255,0.1)}
+
+  .toast{position:absolute;top:80px;left:50%;transform:translateX(-50%) translateY(-12px);z-index:300;background:var(--accent);color:#111;padding:5px 12px;border-radius:12px;font-size:9px;font-weight:600;opacity:0;pointer-events:none;transition:all 0.35s var(--ease-spring);white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>3-Pin Refresh — Side by Side</h1>
+  Left: 1 saved place nearby. Right: no saved places. Both show 3 new POI pins. Last batch page = "ALL" view.
+</div>
+
+<div class="side-by-side">
+
+<!-- ========== PHONE A: With 1 saved pin ========== -->
+<div class="phone" id="phoneA">
+  <div class="phone-label">WITH 1 SAVED PLACE</div>
+  <div class="map" id="mapA" onclick="collapseCard('A')"></div>
+  <div class="toast" id="toastA"></div>
+  <div class="search-row">
+    <span class="search-icon">🔍</span>
+    <span class="search-text">Shoreditch, London</span>
+    <div class="search-actions">
+      <div class="batch-nav">
+        <button class="bn-btn disabled" id="prevA" onclick="nav('A',-1)">◀</button>
+        <span class="bn-counter" id="counterA" onclick="toggleAll('A')">1/4</span>
+        <button class="bn-btn" id="nextA" onclick="nav('A',1)">▶</button>
+      </div>
+      <button class="search-btn" onclick="refresh('A')">↻</button>
+    </div>
+  </div>
+  <div class="vibe-rail">
+    <div class="saved-orb-wrap"><div class="saved-orb">🔖</div><span class="saved-label">Saved</span><span class="saved-badge">1</span></div>
+    <div class="vibe-divider"></div>
+    <div class="vibe-orb-wrap"><div class="vibe-orb active" style="width:38px;height:38px;font-size:16px">🎨</div><div class="vibe-orb-label" style="color:#fff;font-weight:700">Street Art</div><div class="vibe-count-badge">3</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px">☕</div><div class="vibe-orb-label">Cafe</div><div class="vibe-count-badge">2</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px">🎵</div><div class="vibe-orb-label">Music</div><div class="vibe-count-badge">2</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🍜</div><div class="vibe-orb-label">Food</div><div class="vibe-count-badge">1</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🏛️</div><div class="vibe-orb-label">History</div><div class="vibe-count-badge">1</div></div>
+  </div>
+  <div class="my-loc">📍</div>
+  <div class="bottom-bar">
+    <div class="ai-bar"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text">Hidden gems?</span></div>
+    <div class="bottom-right">
+      <div class="toggle-btn"><button class="toggle-seg active">🗺️</button><button class="toggle-seg">📋</button></div>
+      <div class="fab">+</div>
+    </div>
+  </div>
+  <div class="detail-overlay" id="detailA" onclick="closeDetail('A')">
+    <div class="detail-sheet" onclick="event.stopPropagation()">
+      <div class="detail-handle"></div>
+      <div class="detail-swipe-dots" id="dotsA"></div>
+      <button class="detail-close" onclick="closeDetail('A')">✕</button>
+      <div class="detail-hero"><div class="detail-emoji" id="emojiA"></div><div class="detail-info"><div class="detail-name" id="nameA"></div><div class="detail-vibe-tag" id="vibeA"></div></div></div>
+      <div class="detail-why" id="whyA"></div>
+      <div class="detail-meta"><div class="detail-meta-item"><span>⭐</span><span id="ratingA"></span></div><div class="detail-meta-item"><span>🕐</span><span id="hoursA"></span></div><div class="detail-meta-item"><span>📍</span><span id="distA"></span></div></div>
+      <div class="detail-actions">
+        <button class="detail-action-btn primary" onclick="showToast('A','Saved! ❤️');closeDetail('A')">💾 Save</button>
+        <button class="detail-action-btn secondary" onclick="closeDetail('A')">🧭 Navigate</button>
+        <button class="detail-action-btn secondary" onclick="closeDetail('A')">✨ Ask AI</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== PHONE B: No saved pins ========== -->
+<div class="phone" id="phoneB">
+  <div class="phone-label">NO SAVED PLACES</div>
+  <div class="map" id="mapB" onclick="collapseCard('B')"></div>
+  <div class="toast" id="toastB"></div>
+  <div class="search-row">
+    <span class="search-icon">🔍</span>
+    <span class="search-text">Kreuzberg, Berlin</span>
+    <div class="search-actions">
+      <div class="batch-nav">
+        <button class="bn-btn disabled" id="prevB" onclick="nav('B',-1)">◀</button>
+        <span class="bn-counter" id="counterB" onclick="toggleAll('B')">1/4</span>
+        <button class="bn-btn" id="nextB" onclick="nav('B',1)">▶</button>
+      </div>
+      <button class="search-btn" onclick="refresh('B')">↻</button>
+    </div>
+  </div>
+  <div class="vibe-rail">
+    <div class="saved-orb-wrap"><div class="saved-orb" style="opacity:0.4">🔖</div><span class="saved-label" style="opacity:0.4">Saved</span></div>
+    <div class="vibe-divider"></div>
+    <div class="vibe-orb-wrap"><div class="vibe-orb active" style="width:38px;height:38px;font-size:16px">🍺</div><div class="vibe-orb-label" style="color:#fff;font-weight:700">Beer</div><div class="vibe-count-badge">3</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px">🎭</div><div class="vibe-orb-label">Alt Scene</div><div class="vibe-count-badge">2</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:34px;height:34px;font-size:14px">🥙</div><div class="vibe-orb-label">Kebab</div><div class="vibe-count-badge">2</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🎨</div><div class="vibe-orb-label">Graffiti</div><div class="vibe-count-badge">1</div></div>
+    <div class="vibe-orb-wrap dimmed"><div class="vibe-orb" style="width:30px;height:30px;font-size:12px">🌳</div><div class="vibe-orb-label">Parks</div><div class="vibe-count-badge">1</div></div>
+  </div>
+  <div class="my-loc">📍</div>
+  <div class="bottom-bar">
+    <div class="ai-bar"><span class="ai-bar-icon">✨</span><span class="ai-bar-text ghost-text">What's the vibe?</span></div>
+    <div class="bottom-right">
+      <div class="toggle-btn"><button class="toggle-seg active">🗺️</button><button class="toggle-seg">📋</button></div>
+      <div class="fab">+</div>
+    </div>
+  </div>
+  <div class="detail-overlay" id="detailB" onclick="closeDetail('B')">
+    <div class="detail-sheet" onclick="event.stopPropagation()">
+      <div class="detail-handle"></div>
+      <div class="detail-swipe-dots" id="dotsB"></div>
+      <button class="detail-close" onclick="closeDetail('B')">✕</button>
+      <div class="detail-hero"><div class="detail-emoji" id="emojiB"></div><div class="detail-info"><div class="detail-name" id="nameB"></div><div class="detail-vibe-tag" id="vibeB"></div></div></div>
+      <div class="detail-why" id="whyB"></div>
+      <div class="detail-meta"><div class="detail-meta-item"><span>⭐</span><span id="ratingB"></span></div><div class="detail-meta-item"><span>🕐</span><span id="hoursB"></span></div><div class="detail-meta-item"><span>📍</span><span id="distB"></span></div></div>
+      <div class="detail-actions">
+        <button class="detail-action-btn primary" onclick="showToast('B','Saved! ❤️');closeDetail('B')">💾 Save</button>
+        <button class="detail-action-btn secondary" onclick="closeDetail('B')">🧭 Navigate</button>
+        <button class="detail-action-btn secondary" onclick="closeDetail('B')">✨ Ask AI</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<script>
+// POI data per phone
+const data = {
+  A: {
+    batches: [
+      [{emoji:'🎨',name:'Rivington Murals',vibe:'Street Art',why:'Banksy started here. New murals weekly from global artists.',rating:'4.8',hours:'Always open',dist:'120m',x:26,y:36,cs:'right'},
+       {emoji:'☕',name:'Cafe Lumiere',vibe:'Cafe Scene',why:'Victorian warehouse roaster. Oat flat white is legendary.',rating:'4.6',hours:'7am–6pm',dist:'200m',x:50,y:54,cs:'left'},
+       {emoji:'🎵',name:'Jazz Cellar',vibe:'Live Music',why:'Underground speakeasy. Thursday jams draw musicians from across London.',rating:'4.7',hours:'8pm–2am',dist:'350m',x:34,y:72,cs:'right'}],
+      [{emoji:'🍜',name:'Smokestak',vibe:'Street Food',why:'Brisket smoked 16 hours over oak. Queue at 11am.',rating:'4.5',hours:'12–10pm',dist:'280m',x:58,y:34,cs:'left'},
+       {emoji:'📚',name:'Libreria',vibe:'Hidden History',why:'Books by theme not author. Mirrors make shelves infinite.',rating:'4.4',hours:'10am–8pm',dist:'180m',x:20,y:56,cs:'right'},
+       {emoji:'🎨',name:'Village Underground',vibe:'Street Art',why:'Tube carriages on a warehouse roof.',rating:'4.3',hours:'Varies',dist:'400m',x:42,y:75,cs:'right'}],
+      [{emoji:'🏛️',name:'Dennis Severs',vibe:'History',why:'Candle-lit 18th-century rooms. Time travel.',rating:'4.9',hours:'Mon & Wed',dist:'150m',x:32,y:30,cs:'right'},
+       {emoji:'☕',name:'Ozone Coffee',vibe:'Cafe Scene',why:'NZ brunch. Kimchi pancakes changed the game.',rating:'4.5',hours:'7:30am–5pm',dist:'320m',x:56,y:58,cs:'left'},
+       {emoji:'🎵',name:'Rough Trade',vibe:'Live Music',why:'Indie records + intimate gigs.',rating:'4.6',hours:'9am–9pm',dist:'250m',x:18,y:42,cs:'right'}],
+    ],
+    saved: {emoji:'❤️',name:'Dishoom',x:76,y:44,saved:true},
+    hasSaved: true,
+  },
+  B: {
+    batches: [
+      [{emoji:'🍺',name:'Birgit & Bier',vibe:'Beer Garden',why:'Open-air techno beer garden on the canal. Legendary sunsets.',rating:'4.7',hours:'4pm–late',dist:'180m',x:28,y:38,cs:'right'},
+       {emoji:'🥙',name:'Mustafas Gemüse',vibe:'Kebab',why:'The most famous döner in Berlin. 30-min queue worth it.',rating:'4.8',hours:'10am–2am',dist:'90m',x:52,y:56,cs:'left'},
+       {emoji:'🎭',name:'SO36',vibe:'Alt Scene',why:'Punk venue since 1978. Bowie played here.',rating:'4.5',hours:'Varies',dist:'300m',x:36,y:74,cs:'right'}],
+      [{emoji:'🌳',name:'Görlitzer Park',vibe:'Parks',why:'The heartbeat of Kreuzberg. Sunday BBQs, slack-liners, drum circles.',rating:'4.2',hours:'Always open',dist:'120m',x:60,y:36,cs:'left'},
+       {emoji:'🎨',name:'East Side Gallery',vibe:'Graffiti',why:'Longest open-air gallery in the world. 1.3km of Berlin Wall murals.',rating:'4.9',hours:'Always open',dist:'800m',x:22,y:58,cs:'right'},
+       {emoji:'🍺',name:'Hops & Barley',vibe:'Beer Garden',why:'Micro-brewery in a former butcher shop. Pilsner brewed on site.',rating:'4.6',hours:'5pm–late',dist:'250m',x:44,y:76,cs:'right'}],
+      [{emoji:'🥙',name:'Imren Grill',vibe:'Kebab',why:'Locals-only spot. Adana kebab with hand-ground spices.',rating:'4.4',hours:'11am–11pm',dist:'200m',x:34,y:32,cs:'right'},
+       {emoji:'🎭',name:'Monarch',vibe:'Alt Scene',why:'Tiny bar above a supermarket. Best DJs in the city.',rating:'4.3',hours:'8pm–late',dist:'350m',x:58,y:60,cs:'left'},
+       {emoji:'🌳',name:'Tempelhofer Feld',vibe:'Parks',why:'Former airport turned park. Runway cycling, kite-surfing, urban gardening.',rating:'4.8',hours:'Dawn–dusk',dist:'1.2km',x:20,y:44,cs:'right'}],
+    ],
+    saved: null,
+    hasSaved: false,
+  }
+};
+
+// State per phone
+const state = {A:{batch:0,allMode:false}, B:{batch:0,allMode:false}};
+
+// Total pages = batches + 1 (for ALL page)
+function totalPages(id){ return data[id].batches.length + 1; }
+
+function init(id){
+  renderBatch(id, 0, true);
+  updateNav(id);
+}
+
+function renderBatch(id, idx, initial){
+  state[id].allMode = false;
+  document.getElementById('counter'+id).classList.remove('all-mode');
+  const map = document.getElementById('map'+id);
+  clearMap(map);
+
+  // Saved pin (always visible if exists)
+  if(data[id].hasSaved && data[id].saved){
+    const sp = makePin(data[id].saved, true);
+    map.appendChild(sp);
+    requestAnimationFrame(()=>{sp.classList.remove('hidden');sp.classList.add('visible')});
+  }
+
+  // 3 new POI pins + float cards
+  data[id].batches[idx].forEach((poi,i)=>{
+    const delay = initial ? i*280 : 120+i*200;
+    setTimeout(()=>{
+      const pin = makePin(poi, false);
+      map.appendChild(pin);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{pin.classList.remove('hidden');pin.classList.add('visible')}));
+      setTimeout(()=>{
+        const card = makeCard(poi, i, idx, id);
+        // Pin tap toggles its card
+        pin.onclick = ()=>{
+          if(card.classList.contains('hidden')){
+            card.classList.remove('hidden');
+            card.classList.add('visible');
+          } else {
+            expandCard(id, card);
+          }
+        };
+        map.appendChild(card);
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{card.classList.remove('hidden');card.classList.add('visible')}));
+      },140);
+    }, delay);
+  });
+}
+
+function renderAll(id){
+  state[id].allMode = true;
+  const counter = document.getElementById('counter'+id);
+  counter.classList.add('all-mode');
+  counter.textContent = 'ALL';
+  document.getElementById('prev'+id).classList.add('disabled');
+  document.getElementById('next'+id).classList.add('disabled');
+
+  const map = document.getElementById('map'+id);
+  clearMap(map);
+
+  // Saved pin (also mini in ALL mode)
+  if(data[id].hasSaved && data[id].saved){
+    const sp = makePin(data[id].saved, true);
+    sp.classList.add('mini');
+    map.appendChild(sp);
+    requestAnimationFrame(()=>{sp.classList.remove('hidden');sp.classList.add('visible')});
+  }
+
+  // All POI pins as mini — NO float cards
+  let delay=0;
+  data[id].batches.forEach((batch,bIdx)=>{
+    batch.forEach((poi,pIdx)=>{
+      setTimeout(()=>{
+        const pin = makePin(poi, false);
+        pin.classList.add('mini');
+        pin.onclick = ()=>{
+          state[id].batch = bIdx;
+          state[id].allMode = false;
+          renderBatch(id, bIdx, false);
+          updateNav(id);
+          setTimeout(()=>openDetail(id, bIdx, pIdx), 500);
+        };
+        map.appendChild(pin);
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{pin.classList.remove('hidden');pin.classList.add('visible')}));
+      }, delay);
+      delay += 80;
+    });
+  });
+}
+
+function clearMap(map){
+  map.querySelectorAll('.pin').forEach(p=>{p.classList.remove('visible');p.classList.add('hidden');setTimeout(()=>p.remove(),400)});
+  map.querySelectorAll('.poi-float-card').forEach(c=>{c.classList.remove('visible');c.classList.add('hidden');setTimeout(()=>c.remove(),350)});
+}
+
+function makePin(poi, isSaved){
+  const el=document.createElement('div');
+  el.className='pin hidden'+(isSaved?' saved':'');
+  el.style.left=poi.x+'%';el.style.top=poi.y+'%';
+  el.innerHTML=`<div class="pin-marker">${poi.emoji}</div><div class="pin-label">${poi.name}</div>`;
+  return el;
+}
+
+function makeCard(poi, idx, batchIdx, phoneId){
+  const card=document.createElement('div');
+  card.className='poi-float-card hidden';
+  if(poi.cs==='left'){card.style.right=(100-poi.x+3)+'%';card.style.top=(poi.y-3)+'%'}
+  else{card.style.left=(poi.x+3)+'%';card.style.top=(poi.y-3)+'%'}
+  card.setAttribute('data-phone', phoneId);
+  card.addEventListener('click', function(e){e.stopPropagation();expandCard(phoneId, this)}, false);
+  // Image URLs (Unsplash placeholders keyed by vibe)
+  const vibeImages = {
+    'Street Art':'https://images.unsplash.com/photo-1569017388730-020b5f80a004?w=400&h=200&fit=crop',
+    'Cafe Scene':'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=400&h=200&fit=crop',
+    'Live Music':'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=400&h=200&fit=crop',
+    'Street Food':'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=200&fit=crop',
+    'Hidden History':'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop',
+    'History':'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=200&fit=crop',
+    'Beer Garden':'https://images.unsplash.com/photo-1575037614876-c38a4b44571e?w=400&h=200&fit=crop',
+    'Kebab':'https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=400&h=200&fit=crop',
+    'Alt Scene':'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=400&h=200&fit=crop',
+    'Parks':'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?w=400&h=200&fit=crop',
+    'Graffiti':'https://images.unsplash.com/photo-1569017388730-020b5f80a004?w=400&h=200&fit=crop',
+  };
+  const imgUrl = vibeImages[poi.vibe] || '';
+  const isOpen = poi.hours && !poi.hours.toLowerCase().includes('closed');
+  card.innerHTML=`
+    <div class="pfc-image">
+      <img class="pfc-image-bg" src="${imgUrl}" alt="" onerror="this.style.display='none'">
+      <div class="pfc-image-gradient"></div>
+      <button class="pfc-image-close" onclick="event.stopPropagation();collapseCard('${phoneId}')">✕</button>
+    </div>
+    <div class="pfc-body">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <span class="pfc-exp-emoji">${poi.emoji}</span>
+        <div>
+          <div class="pfc-exp-name">${poi.name}</div>
+          <div class="pfc-exp-type">${poi.vibe}</div>
+        </div>
+      </div>
+      <div class="pfc-exp-meta">
+        <div class="pfc-exp-meta-item">⭐ ${poi.rating}</div>
+        <div class="pfc-status ${isOpen?'open':'closed'}">${isOpen?'Open':'Closed'}</div>
+        <div class="pfc-exp-meta-item">📍 ${poi.dist}</div>
+      </div>
+      <div class="pfc-exp-insight">${poi.why}</div>
+      <div class="pfc-exp-hours">🕐 ${poi.hours}</div>
+      <div class="pfc-chips">
+        <button class="pfc-chip save" onclick="event.stopPropagation();this.classList.toggle('saved');this.classList.toggle('save');this.textContent=this.classList.contains('saved')?'🔖 Saved':'🔖 Save';showToast('${phoneId}',this.classList.contains('saved')?'Saved! ❤️':'Unsaved')">🔖 Save</button>
+        <button class="pfc-chip" onclick="event.stopPropagation();showToast('${phoneId}','Share...')">↗ Share</button>
+        <button class="pfc-chip" onclick="event.stopPropagation();showToast('${phoneId}','Directions...')">🧭 Directions</button>
+        <button class="pfc-chip" onclick="event.stopPropagation();showToast('${phoneId}','Ask AI...')">✨ Ask AI</button>
+      </div>
+    </div>
+    <div class="pfc-compact">
+      <button class="pfc-compact-close" onclick="event.stopPropagation();this.closest('.poi-float-card').classList.remove('visible');this.closest('.poi-float-card').classList.add('hidden')">✕</button>
+      <div class="pfc-header"><span class="pfc-emoji">${poi.emoji}</span><span class="pfc-name">${poi.name}</span></div>
+      <div class="pfc-vibe">${poi.vibe}</div>
+      <div class="pfc-why">${poi.why}</div>
+      <div class="pfc-meta"><span>⭐ ${poi.rating}</span><span>🕐 ${poi.hours}</span><span>📍 ${poi.dist}</span></div>
+    </div>
+  `;
+  return card;
+}
+
+// Navigation: batches 0..n-1 are normal, page n = ALL
+function nav(id, dir){
+  const total = totalPages(id);
+  const currentPage = state[id].allMode ? total-1 : state[id].batch;
+  const newPage = currentPage + dir;
+  if(newPage < 0 || newPage >= total) return;
+
+  if(newPage === data[id].batches.length){
+    // Last page = ALL
+    renderAll(id);
+  } else {
+    state[id].batch = newPage;
+    renderBatch(id, newPage, false);
+  }
+  updateNav(id);
+}
+
+function toggleAll(id){
+  if(state[id].allMode){
+    state[id].allMode = false;
+    renderBatch(id, state[id].batch, false);
+    updateNav(id);
+  } else {
+    renderAll(id);
+    updateNav(id);
+  }
+}
+
+function updateNav(id){
+  const total = totalPages(id);
+  const counter = document.getElementById('counter'+id);
+
+  if(state[id].allMode){
+    counter.textContent = 'ALL';
+    counter.classList.add('all-mode');
+    document.getElementById('prev'+id).className = 'bn-btn';
+    document.getElementById('next'+id).className = 'bn-btn disabled';
+  } else {
+    counter.textContent = (state[id].batch+1)+'/'+total;
+    counter.classList.remove('all-mode');
+    document.getElementById('prev'+id).className = 'bn-btn'+(state[id].batch===0?' disabled':'');
+    // Last batch page still has "next" to reach ALL
+    document.getElementById('next'+id).className = 'bn-btn';
+  }
+}
+
+function refresh(id){
+  showToast(id,'Refreshing...');
+  state[id].batch=0; state[id].allMode=false;
+  setTimeout(()=>{renderBatch(id,0,true);updateNav(id)},500);
+}
+
+function openDetail(id, bIdx, pIdx){
+  const poi = data[id].batches[bIdx][pIdx];
+  document.getElementById('emoji'+id).textContent=poi.emoji;
+  document.getElementById('name'+id).textContent=poi.name;
+  document.getElementById('vibe'+id).textContent=poi.vibe;
+  document.getElementById('why'+id).textContent=poi.why;
+  document.getElementById('rating'+id).textContent=poi.rating;
+  document.getElementById('hours'+id).textContent=poi.hours;
+  document.getElementById('dist'+id).textContent=poi.dist;
+  const dots=document.getElementById('dots'+id);dots.innerHTML='';
+  data[id].batches[bIdx].forEach((_,i)=>{
+    const d=document.createElement('div');
+    d.className='detail-dot'+(i===pIdx?' active':'');
+    d.onclick=(e)=>{e.stopPropagation();openDetail(id,bIdx,i)};
+    dots.appendChild(d);
+  });
+  document.getElementById('detail'+id).classList.add('open');
+}
+
+function closeDetail(id){document.getElementById('detail'+id).classList.remove('open')}
+
+function showToast(id,msg){
+  const t=document.getElementById('toast'+id);
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),1500);
+}
+
+// Expand card in-place
+function expandCard(id, card){
+  if(card.classList.contains('expanded')){collapseCard(id);return}
+  // Collapse any previously expanded first
+  collapseCard(id);
+  const map=document.getElementById('map'+id);
+  // Dim siblings
+  map.querySelectorAll('.poi-float-card').forEach(function(c){
+    if(c!==card)c.classList.add('dimmed-sibling');
+  });
+  map.querySelectorAll('.pin:not(.saved)').forEach(function(p){p.classList.add('dimmed-sibling')});
+  // Expand
+  card.classList.add('expanded');
+}
+
+function collapseCard(id){
+  var map=document.getElementById('map'+id);
+  var cards=map.querySelectorAll('.poi-float-card');
+  for(var i=0;i<cards.length;i++){
+    cards[i].classList.remove('expanded');
+    cards[i].classList.remove('dimmed-sibling');
+  }
+  var pins=map.querySelectorAll('.pin');
+  for(var j=0;j<pins.length;j++){
+    pins[j].classList.remove('dimmed-sibling');
+  }
+}
+
+init('A');
+init('B');
+</script>
+</body>
+</html>
