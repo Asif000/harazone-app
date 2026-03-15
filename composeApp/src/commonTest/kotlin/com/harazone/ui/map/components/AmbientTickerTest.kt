@@ -8,10 +8,10 @@ import kotlin.test.assertTrue
 
 class AmbientTickerTest {
 
-    private fun poi(liveStatus: String? = null) = POI(
+    private fun poi(liveStatus: String? = null, hours: String? = null) = POI(
         name = "Test", type = "cafe", description = "desc",
         confidence = Confidence.HIGH, latitude = 1.0, longitude = 2.0,
-        liveStatus = liveStatus,
+        liveStatus = liveStatus, hours = hours,
     )
 
     @Test
@@ -98,5 +98,104 @@ class AmbientTickerTest {
         assertTrue(slots.isNotEmpty())
         assertEquals("Night market open", slots.first())
         assertTrue(slots.none { it.contains("places closed") }, "Fallback should not appear when highlights exist")
+    }
+
+    // --- Sunrise countdown tests ---
+
+    @Test
+    fun buildTickerSlots_sunriseWithinRange_showsSunriseSlot() {
+        val slots = buildTickerSlots(
+            listOf(poi()), 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 200 },
+            sunriseMinutesProvider = { _, _ -> 30 },
+        )
+        assertTrue(slots.any { it == "Sunrise in 30 min" })
+    }
+
+    @Test
+    fun buildTickerSlots_sunriseOutOfRange_omitsSunriseSlot() {
+        val slots = buildTickerSlots(
+            listOf(poi()), 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 200 },
+            sunriseMinutesProvider = { _, _ -> 200 },
+        )
+        assertTrue(slots.none { it.contains("Sunrise") })
+    }
+
+    @Test
+    fun buildTickerSlots_sunriseNegative_omitsSunriseSlot() {
+        val slots = buildTickerSlots(
+            listOf(poi()), 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 200 },
+            sunriseMinutesProvider = { _, _ -> -1 },
+        )
+        assertTrue(slots.none { it.contains("Sunrise") })
+    }
+
+    @Test
+    fun buildTickerSlots_nullIsland_skipsSunrise() {
+        val slots = buildTickerSlots(
+            emptyList(), 0.0, 0.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 45 },
+            sunriseMinutesProvider = { _, _ -> 30 },
+        )
+        assertTrue(slots.none { it.contains("Sunrise") })
+    }
+
+    // --- Early morning "places open from" tests ---
+
+    @Test
+    fun buildTickerSlots_earlyMorning_showsPlacesOpenFromHint() {
+        val pois = listOf(
+            poi("closed", hours = "8am-10pm"),
+            poi("closed", hours = "6am-11pm"),
+        )
+        val slots = buildTickerSlots(
+            pois, 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 200 },
+            sunriseMinutesProvider = { _, _ -> 200 },
+            nowHourOverride = 3,
+        )
+        assertTrue(slots.any { it == "Places open from 6 AM" }, "Should show earliest opening: $slots")
+    }
+
+    @Test
+    fun buildTickerSlots_earlyMorning_noOpeningHours_noHint() {
+        val pois = listOf(poi("closed"))
+        val slots = buildTickerSlots(
+            pois, 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 200 },
+            sunriseMinutesProvider = { _, _ -> 200 },
+            nowHourOverride = 2,
+        )
+        assertTrue(slots.none { it.contains("Places open from") })
+    }
+
+    @Test
+    fun buildTickerSlots_notEarlyMorning_noOpenHint() {
+        val pois = listOf(poi("closed", hours = "8am-10pm"))
+        val slots = buildTickerSlots(
+            pois, 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 200 },
+            sunriseMinutesProvider = { _, _ -> 200 },
+            nowHourOverride = 10, // Not early morning
+        )
+        assertTrue(slots.none { it.contains("Places open from") })
+    }
+
+    @Test
+    fun buildTickerSlots_earlyMorning_24h_skipsAlreadyOpen() {
+        // 24h places have opening hour 0, which is not > nowHour=3, so should be skipped
+        val pois = listOf(
+            poi("open", hours = "24 hours"),
+            poi("closed", hours = "7am-9pm"),
+        )
+        val slots = buildTickerSlots(
+            pois, 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> 200 },
+            sunriseMinutesProvider = { _, _ -> 200 },
+            nowHourOverride = 3,
+        )
+        assertTrue(slots.any { it == "Places open from 7 AM" }, "Should show 7 AM, not 12 AM: $slots")
     }
 }

@@ -87,6 +87,18 @@ internal data class Stage1Response(
 )
 
 @Serializable
+internal data class EnrichmentResponseJson(
+    val pois: List<EnrichJson> = emptyList(),
+    val ah: List<String> = emptyList(),
+)
+
+@Serializable
+internal data class PortraitPoisJson(
+    val pois: List<PoiJson> = emptyList(),
+    val ah: List<String> = emptyList(),
+)
+
+@Serializable
 internal data class DynamicVibeJson(
     val label: String = "",
     val icon: String = "",
@@ -99,6 +111,17 @@ internal fun stripMarkdownFences(raw: String): String {
     val trimmed = raw.trim()
     return if (trimmed.startsWith("```")) trimmed.lines().drop(1).dropLast(1).joinToString("\n") else trimmed
 }
+
+internal data class Stage1ParseResult(
+    val vibes: List<DynamicVibe>,
+    val pois: List<POI>,
+    val areaHighlights: List<String> = emptyList(),
+)
+
+internal data class EnrichmentParseResult(
+    val enrichments: List<EnrichJson>,
+    val areaHighlights: List<String> = emptyList(),
+)
 
 internal class GeminiResponseParser {
 
@@ -139,6 +162,11 @@ internal class GeminiResponseParser {
     }
 
     fun parseStage1Response(text: String): Pair<List<DynamicVibe>, List<POI>> {
+        val result = parseStage1WithHighlights(text)
+        return Pair(result.vibes, result.pois)
+    }
+
+    fun parseStage1WithHighlights(text: String): Stage1ParseResult {
         return try {
             val cleaned = stripMarkdownFences(text)
             try {
@@ -163,7 +191,7 @@ internal class GeminiResponseParser {
                             liveStatus = poiJson.s,
                         )
                     }
-                Pair(vibes, pois)
+                Stage1ParseResult(vibes, pois, stage1.ah)
             } catch (_: Exception) {
                 // Fallback: old flat array format
                 val poisJson = json.decodeFromString<List<PoiJson>>(cleaned)
@@ -184,11 +212,11 @@ internal class GeminiResponseParser {
                             liveStatus = poiJson.s,
                         )
                     }
-                Pair(emptyList(), pois)
+                Stage1ParseResult(emptyList(), pois)
             }
         } catch (e: Exception) {
             AppLogger.e(e) { "GeminiResponseParser: failed to parse Stage 1 response" }
-            Pair(emptyList(), emptyList())
+            Stage1ParseResult(emptyList(), emptyList())
         }
     }
 
@@ -256,13 +284,28 @@ internal class GeminiResponseParser {
     }
 
     internal fun parseEnrichmentResponse(text: String): List<EnrichJson> {
+        return parseEnrichmentWithHighlights(text).enrichments
+    }
+
+    internal fun parseEnrichmentWithHighlights(text: String): EnrichmentParseResult {
         return try {
             val cleaned = stripMarkdownFences(text)
-            json.decodeFromString<List<EnrichJson>>(cleaned)
-                .filter { it.n.isNotBlank() }
+            try {
+                // New format: {"pois":[...],"ah":[...]}
+                val wrapper = json.decodeFromString<EnrichmentResponseJson>(cleaned)
+                EnrichmentParseResult(
+                    enrichments = wrapper.pois.filter { it.n.isNotBlank() },
+                    areaHighlights = wrapper.ah,
+                )
+            } catch (_: Exception) {
+                // Backward-compatible fallback: old flat array format
+                val enrichments = json.decodeFromString<List<EnrichJson>>(cleaned)
+                    .filter { it.n.isNotBlank() }
+                EnrichmentParseResult(enrichments = enrichments)
+            }
         } catch (e: Exception) {
             AppLogger.e(e) { "GeminiResponseParser: failed to parse enrichment response" }
-            emptyList()
+            EnrichmentParseResult(emptyList())
         }
     }
 
@@ -350,32 +393,46 @@ internal class GeminiResponseParser {
         }
     }
 
-    private fun parsePoisJson(jsonString: String): List<POI> {
+    private data class PoisWithHighlights(val pois: List<POI>, val areaHighlights: List<String> = emptyList())
+
+    private fun parsePoisJson(jsonString: String): List<POI> = parsePoisJsonWithHighlights(jsonString).pois
+
+    private fun parsePoisJsonWithHighlights(jsonString: String): PoisWithHighlights {
         return try {
-            val poisJson = json.decodeFromString<List<PoiJson>>(jsonString)
-            poisJson.filter { it.n.isNotBlank() }.map { poiJson ->
-                POI(
-                    name = poiJson.n,
-                    type = poiJson.t,
-                    description = "",
-                    confidence = Confidence.MEDIUM,
-                    latitude = poiJson.lat,
-                    longitude = poiJson.lng,
-                    vibe = poiJson.v,
-                    insight = poiJson.w,
-                    hours = poiJson.h,
-                    liveStatus = poiJson.s,
-                    rating = poiJson.r,
-                    vibeInsights = emptyMap(),
-                    wikiSlug = poiJson.wiki,
-                    priceRange = poiJson.p,
+            // Try new wrapper format: {"pois":[...],"ah":[...]}
+            try {
+                val wrapper = json.decodeFromString<PortraitPoisJson>(jsonString)
+                PoisWithHighlights(
+                    pois = wrapper.pois.filter { it.n.isNotBlank() }.map { it.toPoi() },
+                    areaHighlights = wrapper.ah,
                 )
+            } catch (_: Exception) {
+                // Backward-compatible fallback: old flat array format
+                val poisJson = json.decodeFromString<List<PoiJson>>(jsonString)
+                PoisWithHighlights(pois = poisJson.filter { it.n.isNotBlank() }.map { it.toPoi() })
             }
         } catch (e: Exception) {
             AppLogger.e(e) { "GeminiResponseParser: failed to parse POIs JSON" }
-            emptyList()
+            PoisWithHighlights(emptyList())
         }
     }
+
+    private fun PoiJson.toPoi(): POI = POI(
+        name = n,
+        type = t,
+        description = "",
+        confidence = Confidence.MEDIUM,
+        latitude = lat,
+        longitude = lng,
+        vibe = v,
+        insight = w,
+        hours = h,
+        liveStatus = s,
+        rating = r,
+        vibeInsights = emptyMap(),
+        wikiSlug = wiki,
+        priceRange = p,
+    )
 
     private fun parseBucketType(type: String): BucketType? {
         return when (type.uppercase()) {

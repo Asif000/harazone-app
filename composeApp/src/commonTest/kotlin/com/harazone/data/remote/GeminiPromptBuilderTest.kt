@@ -407,4 +407,28 @@ class GeminiPromptBuilderTest {
         )
         assertFalse(result.contains("LANGUAGE RULE"))
     }
+
+    // --- Area highlights enforcement tests ---
+
+    @Test
+    fun buildPinOnlyPrompt_enforcesAreaHighlightsRequired() {
+        val prompt = builder.buildPinOnlyPrompt("Shoreditch")
+        assertTrue(prompt.contains("ah"))
+        assertTrue(prompt.contains("REQUIRED"), "ah field must be marked REQUIRED")
+        assertTrue(prompt.contains("ALWAYS include at least 2"))
+    }
+
+    @Test
+    fun buildEnrichmentPrompt_includesAreaHighlightsField() {
+        val prompt = builder.buildEnrichmentPrompt("Alfama", listOf("Cafe X"), testContext)
+        assertTrue(prompt.contains("\"ah\""))
+        assertTrue(prompt.contains("REQUIRED"))
+    }
+
+    @Test
+    fun buildAreaPortraitPrompt_includesAreaHighlightsField() {
+        val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
+        assertTrue(prompt.contains("\"ah\""))
+        assertTrue(prompt.contains("ALWAYS include at least 2"))
+    }
 }

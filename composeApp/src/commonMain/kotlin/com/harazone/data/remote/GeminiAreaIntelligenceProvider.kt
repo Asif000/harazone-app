@@ -117,11 +117,10 @@ internal class GeminiAreaIntelligenceProvider(
                     stage1Deferred.completeExceptionally(result.exceptionOrNull()!!)
                     throw result.exceptionOrNull()!!
                 }
-                val (dynamicVibes, pois) = responseParser.parseStage1Response(fullText.toString())
-                val areaHighlights = try {
-                    val stripped = stripMarkdownFences(fullText.toString())
-                    json.decodeFromString<Stage1Response>(stripped).ah
-                } catch (_: Exception) { emptyList() }
+                val stage1Parsed = responseParser.parseStage1WithHighlights(fullText.toString())
+                val dynamicVibes = stage1Parsed.vibes
+                val pois = stage1Parsed.pois
+                val areaHighlights = stage1Parsed.areaHighlights
                 stage1Deferred.complete(Stage1Result(pois.map { it.name }, dynamicVibes, dynamicVibes.map { it.label }))
                 if (pois.isNotEmpty()) {
                     if (dynamicVibes.isNotEmpty()) {

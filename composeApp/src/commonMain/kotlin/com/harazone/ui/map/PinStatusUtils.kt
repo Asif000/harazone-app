@@ -99,11 +99,16 @@ private fun toRad(deg: Double): Double = deg * PI / 180.0
 private fun toDeg(rad: Double): Double = rad * 180.0 / PI
 
 /**
- * NOAA Solar Calculator — minutes until sunset for given lat/lng.
- * Returns Int.MAX_VALUE for polar summer (never sets), -1 for polar winter (never rises).
+ * NOAA Solar Calculator — shared solar geometry for sunrise/sunset.
  */
+private data class SolarGeometry(
+    val cosOmega: Double,
+    val jTransit: Double,
+    val currentMs: Double,
+)
+
 @OptIn(ExperimentalTime::class)
-internal fun calculateSunsetMinutes(lat: Double, lng: Double): Int {
+private fun solarGeometry(lat: Double, lng: Double): SolarGeometry {
     val currentMs = Clock.System.now().toEpochMilliseconds().toDouble()
     val daysSinceEpoch = floor(currentMs / 86400000.0).toLong()
     val jd = daysSinceEpoch + 2440587.5
@@ -116,18 +121,55 @@ internal fun calculateSunsetMinutes(lat: Double, lng: Double): Int {
     val declination = toDeg(asin(sin(eclRad) * sin(toRad(23.4393))))
     val decRad = toRad(declination)
     val latRad = toRad(lat)
-
     val cosOmega = (sin(toRad(-0.833)) - sin(latRad) * sin(decRad)) /
         (cos(latRad) * cos(decRad))
-
-    if (cosOmega > 1.0) return -1     // polar winter
-    if (cosOmega < -1.0) return Int.MAX_VALUE // polar summer
-
-    val omega = toDeg(acos(cosOmega))
     val jTransit = 2451545.0 + n + 0.0009 + ((-lng) / 360.0)
-    val jSet = jTransit + omega / 360.0
+    return SolarGeometry(cosOmega, jTransit, currentMs)
+}
 
+/**
+ * NOAA Solar Calculator — minutes until sunset for given lat/lng.
+ * Returns Int.MAX_VALUE for polar summer (never sets), -1 for polar winter (never rises).
+ */
+internal fun calculateSunsetMinutes(lat: Double, lng: Double): Int {
+    val sg = solarGeometry(lat, lng)
+    if (sg.cosOmega > 1.0) return -1     // polar winter
+    if (sg.cosOmega < -1.0) return Int.MAX_VALUE // polar summer
+    val omega = toDeg(acos(sg.cosOmega))
+    val jSet = sg.jTransit + omega / 360.0
     val sunsetMs = (jSet - 2440587.5) * 86400000.0
-    val diffMinutes = ((sunsetMs - currentMs) / 60000.0).toInt()
-    return diffMinutes
+    return ((sunsetMs - sg.currentMs) / 60000.0).toInt()
+}
+
+/**
+ * NOAA Solar Calculator — minutes until sunrise for given lat/lng.
+ * Returns Int.MAX_VALUE for polar winter (never rises), -1 for polar summer (never sets / already risen).
+ */
+internal fun calculateSunriseMinutes(lat: Double, lng: Double): Int {
+    val sg = solarGeometry(lat, lng)
+    if (sg.cosOmega > 1.0) return Int.MAX_VALUE // polar winter — never rises
+    if (sg.cosOmega < -1.0) return -1            // polar summer — already risen
+    val omega = toDeg(acos(sg.cosOmega))
+    val jRise = sg.jTransit - omega / 360.0
+    val sunriseMs = (jRise - 2440587.5) * 86400000.0
+    return ((sunriseMs - sg.currentMs) / 60000.0).toInt()
+}
+
+/**
+ * Parse earliest opening hour from a POI hours string.
+ * Returns the opening hour (0-23) or null if unparseable.
+ */
+internal fun parseOpeningHour(hours: String?): Int? {
+    if (hours == null) return null
+    val h = hours.trim().lowercase()
+    if (h.contains("24 hour") || h == "24h") return 0
+    val timePattern = Regex("""(\d{1,2})(?::(\d{2}))?\s*(am|pm)""", RegexOption.IGNORE_CASE)
+    val match = timePattern.find(h) ?: return null
+    val hr = match.groupValues[1].toInt()
+    val amPm = match.groupValues[3].lowercase()
+    return when {
+        amPm == "am" && hr == 12 -> 0
+        amPm == "pm" && hr != 12 -> hr + 12
+        else -> hr
+    }
 }

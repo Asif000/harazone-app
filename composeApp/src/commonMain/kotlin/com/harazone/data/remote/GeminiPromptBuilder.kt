@@ -15,11 +15,11 @@ internal class GeminiPromptBuilder {
         } else ""
         return """
 Area: "$areaName". Return JSON only, no other text.
-Schema: {"vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art","p":"$$","h":"9am-10pm","s":"open"}],"ah":["highlight"]}
+Schema: {"vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art","p":"$$","h":"9am-10pm","s":"open"}],"ah":["highlight1","highlight2"]}
 Rules:
 - vibes: 4-6 most distinctive dimensions of THIS area.
 - pois: 3 best POIs. Each "v" MUST exactly match a vibe label. "p" is price range ($ to $$$$, omit if N/A). "h" is current hours. "s" is status: open, busy, or closed.
-- ah: up to 3 short area highlights (recurring events, seasonal notes, trending now). Max 40 chars each. Omit if nothing notable.
+- ah: REQUIRED — 2-3 short area highlights (recurring events, seasonal notes, trending now, local tips). Max 80 chars each. ALWAYS include at least 2 highlights. Examples: "Live jazz every Friday at Praça do Comércio", "Flea market Sat 8am-2pm", "Best pastel de nata in the city".
 - t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 - GPS to 4 decimal places.$newUserHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
@@ -55,12 +55,13 @@ Context:
 - Day of week: ${context.dayOfWeek}
 - Preferred language: ${context.preferredLanguage}
 ${if (!context.preferredLanguage.startsWith("en")) "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '${context.preferredLanguage}'. Every word of your response must be in that language." else ""}
-Output ONLY a JSON array. No other text:
-[{"n":"Name","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"p":"$$"}]
+Output ONLY a JSON object. No other text:
+{"pois":[{"n":"Name","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"p":"$$"}],"ah":["highlight1","highlight2"]}
 
 Valid v values: character, history, whats_on, safety, nearby, cost
 Valid s values: open, busy, closed
 WHY SPECIAL REQUIRED: Every POI needs a compelling "w". Generic descriptions are not acceptable.
+ah: REQUIRED — 2-3 short area highlights (events, seasonal tips, trending now). Max 80 chars each. ALWAYS include at least 2.
         """.trimIndent()
     }
 
@@ -96,8 +97,8 @@ DIG DEEPER: For areas with less obvious attractions (suburbs, residential), look
 After the last bucket, output this delimiter:
 ---POIS---
 
-Then output a JSON array of points of interest:
-[{"n":"Name","t":"type","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"lat":38.7100,"lng":-9.1300,"wiki":"Wikipedia_Article_Title"}]
+Then output a JSON object with POIs and area highlights:
+{"pois":[{"n":"Name","t":"type","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"lat":38.7100,"lng":-9.1300,"wiki":"Wikipedia_Article_Title"}],"ah":["highlight1","highlight2"]}
 
 Valid vibe values: character, history, whats_on, safety, nearby, cost
 Valid s values: open, busy, closed
@@ -110,6 +111,7 @@ IMPORTANT:
 - NEVER include the strings "---BUCKET---" or "---POIS---" inside JSON field values
 - For each POI, provide decimal GPS coordinates to 4 decimal places. Coordinates are required for map marker placement. Only include a POI if you can provide coordinates with reasonable confidence
 - For each POI, include "wiki" with the exact Wikipedia article title (underscores, e.g. "Igreja_Matriz_Nossa_Senhora_da_Penha"). Only include if you are confident in the article name. Omit "wiki" rather than guessing.
+- ah: REQUIRED — 2-3 short area highlights (events, seasonal tips, trending now). Max 80 chars each. ALWAYS include at least 2.
         """.trimIndent()
     }
 

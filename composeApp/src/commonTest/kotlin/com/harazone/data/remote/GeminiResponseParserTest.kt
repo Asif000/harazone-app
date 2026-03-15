@@ -415,4 +415,58 @@ not valid json either"""
         assertEquals(1, pois.size)
         assertNull(pois[0].priceRange)
     }
+
+    // --- parseStage1WithHighlights ---
+
+    @Test
+    fun parseStage1WithHighlights_returnsAreaHighlights() {
+        val json = """{"vibes":[{"label":"food","icon":"🍔"}],"pois":[{"n":"Bistro","t":"restaurant","lat":1.0,"lng":2.0,"v":"food"}],"ah":["Jazz Fridays","Outdoor Market Sat"]}"""
+        val result = parser.parseStage1WithHighlights(json)
+        assertEquals(1, result.vibes.size)
+        assertEquals(1, result.pois.size)
+        assertEquals(listOf("Jazz Fridays", "Outdoor Market Sat"), result.areaHighlights)
+    }
+
+    @Test
+    fun parseStage1WithHighlights_missingAh_defaultsToEmpty() {
+        val json = """{"vibes":[{"label":"food","icon":"🍔"}],"pois":[{"n":"Cafe","t":"cafe","lat":1.0,"lng":2.0,"v":"food"}]}"""
+        val result = parser.parseStage1WithHighlights(json)
+        assertEquals(emptyList(), result.areaHighlights)
+    }
+
+    @Test
+    fun parseStage1WithHighlights_fallbackFlatArray_emptyHighlights() {
+        val json = """[{"n":"Place","t":"park","lat":1.0,"lng":2.0,"v":"nature"}]"""
+        val result = parser.parseStage1WithHighlights(json)
+        assertEquals(1, result.pois.size)
+        assertEquals(emptyList(), result.areaHighlights)
+        assertEquals(emptyList(), result.vibes)
+    }
+
+    // --- parseEnrichmentWithHighlights ---
+
+    @Test
+    fun parseEnrichmentWithHighlights_newFormat_parsesAh() {
+        val json = """{"pois":[{"n":"Cafe X","v":"food","w":"great coffee","h":"8am-6pm","s":"open","r":4.5,"p":"$$"}],"ah":["Best brunch spot","Live music Fri"]}"""
+        val result = parser.parseEnrichmentWithHighlights(json)
+        assertEquals(1, result.enrichments.size)
+        assertEquals("Cafe X", result.enrichments[0].n)
+        assertEquals(listOf("Best brunch spot", "Live music Fri"), result.areaHighlights)
+    }
+
+    @Test
+    fun parseEnrichmentWithHighlights_oldFlatArray_fallback() {
+        val json = """[{"n":"Cafe X","v":"food","w":"great coffee","h":"8am-6pm","s":"open","r":4.5,"p":"$$"}]"""
+        val result = parser.parseEnrichmentWithHighlights(json)
+        assertEquals(1, result.enrichments.size)
+        assertEquals(emptyList(), result.areaHighlights)
+    }
+
+    @Test
+    fun parseEnrichmentResponse_backwardCompatible() {
+        val json = """[{"n":"Cafe X","v":"food","w":"great coffee"}]"""
+        val result = parser.parseEnrichmentResponse(json)
+        assertEquals(1, result.size)
+        assertEquals("Cafe X", result[0].n)
+    }
 }

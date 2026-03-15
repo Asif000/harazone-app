@@ -183,4 +183,49 @@ class PinStatusUtilsTest {
     fun resolveStatus_bothNull_returnsNull() {
         assertNull(resolveStatus(null, null))
     }
+
+    // --- parseOpeningHour ---
+
+    @Test
+    fun parseOpeningHour_standard_returnsHour() {
+        assertEquals(9, parseOpeningHour("9am-10pm"))
+    }
+
+    @Test
+    fun parseOpeningHour_withMinutes_returnsHour() {
+        assertEquals(11, parseOpeningHour("11:30am-9:30pm"))
+    }
+
+    @Test
+    fun parseOpeningHour_pm_returnsCorrectHour() {
+        assertEquals(18, parseOpeningHour("6pm-2am"))
+    }
+
+    @Test
+    fun parseOpeningHour_12am_returnsZero() {
+        assertEquals(0, parseOpeningHour("12am-6pm"))
+    }
+
+    @Test
+    fun parseOpeningHour_12pm_returnsTwelve() {
+        assertEquals(12, parseOpeningHour("12pm-6pm"))
+    }
+
+    @Test
+    fun parseOpeningHour_24hours_returnsZero() {
+        assertEquals(0, parseOpeningHour("24 hours"))
+        assertEquals(0, parseOpeningHour("Open 24 hours"))
+        assertEquals(0, parseOpeningHour("24h"))
+    }
+
+    @Test
+    fun parseOpeningHour_null_returnsNull() {
+        assertNull(parseOpeningHour(null))
+    }
+
+    @Test
+    fun parseOpeningHour_unparseable_returnsNull() {
+        assertNull(parseOpeningHour("varies"))
+        assertNull(parseOpeningHour("call for hours"))
+    }
 }
