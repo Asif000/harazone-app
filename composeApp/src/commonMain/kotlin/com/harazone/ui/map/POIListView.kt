@@ -189,7 +189,7 @@ private fun PoiListCard(
                 ) {
                     if (poi.rating != null) {
                         Text(
-                            "\u2B50 ${"%.1f".format(poi.rating)}",
+                            "\u2B50 ${poi.rating}",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
                         )
