@@ -2439,12 +2439,31 @@ class MapViewModelTest {
     }
 
     @Test
-    fun areaReset_clearsSelectedPinIndex() = runTest(testDispatcher) {
-        val vm = createViewModelWithPois(areaHighlights = listOf("Highlight"))
+    fun areaReset_clearsSelectedPinIndexAndAreaHighlights() = runTest(testDispatcher) {
+        val suspendingRepo = SuspendingFakeAreaRepository()
+        val vm = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = suspendingRepo,
+        )
+        // Complete initial fetch with highlights
+        suspendingRepo.completeCall(0, listOf(
+            BucketUpdate.VibesReady(
+                vibes = emptyList(),
+                pois = listOf(
+                    POI("Place A", "cafe", "desc", Confidence.HIGH, 1.0, 2.0),
+                    POI("Place B", "bar", "desc", Confidence.HIGH, 1.1, 2.1),
+                    POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2),
+                ),
+                areaHighlights = listOf("Highlight"),
+            ),
+        ))
+        testScheduler.advanceUntilIdle()
         vm.onPinTapped(1)
 
-        // Trigger area reset via geocoding suggestion — selectedPinIndex and areaHighlights
-        // are cleared in the reset path before the new area fetch re-populates
+        // Trigger area reset — suspending repo won't auto-complete the 2nd fetch
         vm.onGeocodingSuggestionSelected(
             GeocodingSuggestion(
                 name = "Paris",
@@ -2454,10 +2473,10 @@ class MapViewModelTest {
                 distanceKm = null,
             )
         )
+        testScheduler.advanceUntilIdle()
         val state = assertIs<MapUiState.Ready>(vm.uiState.value)
         assertNull(state.selectedPinIndex)
-        // Note: areaHighlights may be re-populated by the immediate fake fetch;
-        // the reset itself clears them (verified in onGeocodingSuggestionSelected code)
+        assertEquals(emptyList(), state.areaHighlights)
     }
 
 }
