@@ -2,7 +2,7 @@
 title: 'AI Detail Page'
 slug: 'ai-detail-page'
 created: '2026-03-15'
-status: 'implementation-complete'
+status: 'done'
 stepsCompleted: [1, 2, 3, 4]
 tech_stack: ['Kotlin Multiplatform', 'Compose Multiplatform', 'Koin', 'Coroutines/Flow', 'Turbine', 'kotlin.test']
 files_to_modify:
