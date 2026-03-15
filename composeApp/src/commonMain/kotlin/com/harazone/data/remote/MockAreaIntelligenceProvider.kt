@@ -43,6 +43,18 @@ class MockAreaIntelligenceProvider : AreaIntelligenceProvider {
         emit(ChatToken(text = "", isComplete = true))
     }
 
+    override suspend fun generatePoiContext(
+        poiName: String,
+        poiType: String,
+        areaName: String,
+        timeHint: String,
+        languageTag: String,
+    ): Triple<String, String, String> = Triple(
+        "Mock context blurb for $poiName in $areaName.",
+        "Great time to visit.",
+        "",
+    )
+
     companion object {
         val mockPOIs = listOf(
             com.harazone.domain.model.POI(

@@ -32,6 +32,25 @@ class FakeAreaIntelligenceProvider : AreaIntelligenceProvider {
         }
     }
 
+    var poiContextResult: Triple<String, String, String>? = Triple(
+        "Mock context blurb.",
+        "Great time to visit.",
+        "",
+    )
+    var shouldReturnNullPoiContext: Boolean = false
+    var poiContextCallCount = 0
+
+    override suspend fun generatePoiContext(
+        poiName: String,
+        poiType: String,
+        areaName: String,
+        timeHint: String,
+        languageTag: String,
+    ): Triple<String, String, String>? {
+        poiContextCallCount++
+        return if (shouldReturnNullPoiContext) null else poiContextResult
+    }
+
     var chatTokens: List<ChatToken> = emptyList()
     var shouldThrowChat: Boolean = false
     var chatCallCount = 0

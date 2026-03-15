@@ -80,6 +80,7 @@ private val IndigoGradient = Brush.linearGradient(
     colors = listOf(Color(0xFF6366F1), Color(0xFF8B5CF6))
 )
 private val AiBubbleColor = Color.White.copy(alpha = 0.07f)
+private val AiBubbleLightBorder = BorderStroke(0.5.dp, Color.Gray.copy(alpha = 0.25f))
 private val HandleColor = Color.White.copy(alpha = 0.14f)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -535,6 +536,7 @@ internal fun poiTypeEmoji(type: String): String = com.harazone.util.poiTypeEmoji
 internal fun ChatBubbleItem(
     bubble: ChatBubble,
     onRetry: () -> Unit,
+    lightMode: Boolean = false,
 ) {
     val isUser = bubble.role == MessageRole.USER
 
@@ -586,16 +588,20 @@ internal fun ChatBubbleItem(
             }
         } else {
             // AI bubble
+            val aiBg = if (lightMode) Color.White else AiBubbleColor
+            val aiBorder = if (lightMode) AiBubbleLightBorder else null
+            val aiTextColor = if (lightMode) Color(0xFF2A2A2A) else MaterialTheme.colorScheme.onSurface
             Surface(
                 shape = RoundedCornerShape(16.dp, 16.dp, 16.dp, 4.dp),
-                color = AiBubbleColor,
+                color = aiBg,
+                border = aiBorder,
                 modifier = Modifier.fillMaxWidth(0.85f),
             ) {
                 Row(modifier = Modifier.padding(12.dp)) {
                     MarkdownText(
                         text = bubble.content,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
+                            color = aiTextColor,
                         ),
                         modifier = Modifier.weight(1f, fill = false),
                     )
@@ -634,6 +640,7 @@ internal fun ChatInputBar(
     isStreaming: Boolean,
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
+    placeholder: String? = null,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -645,7 +652,7 @@ internal fun ChatInputBar(
             value = inputText,
             onValueChange = onInputChange,
             enabled = !isStreaming,
-            placeholder = { Text(stringResource(Res.string.chat_input_placeholder)) },
+            placeholder = { Text(placeholder ?: stringResource(Res.string.chat_input_placeholder)) },
             singleLine = true,
             shape = RoundedCornerShape(24.dp),
             colors = TextFieldDefaults.colors(

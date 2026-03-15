@@ -123,6 +123,13 @@ internal data class EnrichmentParseResult(
     val areaHighlights: List<String> = emptyList(),
 )
 
+@Serializable
+internal data class PoiContextJson(
+    val contextBlurb: String = "",
+    val whyNow: String = "",
+    val localTip: String = "",
+)
+
 internal class GeminiResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -372,6 +379,17 @@ internal class GeminiResponseParser {
             chunk.candidates.firstOrNull()?.content?.parts?.firstOrNull()?.text
         } catch (e: Exception) {
             AppLogger.e(e) { "GeminiResponseParser: failed to parse SSE event" }
+            null
+        }
+    }
+
+    fun parsePoiContextResponse(text: String): Triple<String, String, String>? {
+        return try {
+            val cleaned = stripMarkdownFences(text)
+            val ctx = json.decodeFromString<PoiContextJson>(cleaned)
+            Triple(ctx.contextBlurb, ctx.whyNow, ctx.localTip)
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: failed to parse poi context response" }
             null
         }
     }

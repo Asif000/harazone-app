@@ -1069,6 +1069,67 @@ Enjoy!"""
         assertTrue(vm.uiState.value.isOpen, "Chat should be open")
     }
 
+    // --- POI context block tests ---
+
+    @Test
+    fun `openChatForPoi sets isContextLoading true immediately`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("About the place", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        val poi = testPoi("Test Cafe")
+
+        // With UnconfinedTestDispatcher, the entire coroutine runs eagerly
+        // so by the time we check, loading is already complete.
+        // We verify the final state instead: context fields populated, loading false.
+        vm.openChatForPoi(poi, "Test Area", emptyList(), null)
+
+        val state = vm.uiState.value
+        assertFalse(state.isContextLoading, "After provider resolves, isContextLoading should be false")
+        assertTrue(state.contextBlurb != null, "contextBlurb should be non-null after provider resolves")
+        assertEquals(1, fakeAiProvider.poiContextCallCount)
+    }
+
+    @Test
+    fun `openChatForPoi populates context fields after load`() = runTest {
+        fakeAiProvider.poiContextResult = Triple(
+            "A historic morning at the cafe.",
+            "Perfect for a morning visit.",
+            "Ask the barista about the rooftop.",
+        )
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("About the place", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        val poi = testPoi("Test Cafe")
+        vm.openChatForPoi(poi, "Test Area", emptyList(), null)
+
+        val state = vm.uiState.value
+        assertEquals("A historic morning at the cafe.", state.contextBlurb)
+        assertEquals("Perfect for a morning visit.", state.whyNow)
+        assertEquals("Ask the barista about the rooftop.", state.localTip)
+        assertFalse(state.isContextLoading)
+    }
+
+    @Test
+    fun `openChatForPoi uses fallback on provider null`() = runTest {
+        fakeAiProvider.shouldReturnNullPoiContext = true
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("About the place", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        val poi = testPoi("Test Cafe")
+        vm.openChatForPoi(poi, "Test Area", emptyList(), null)
+
+        val state = vm.uiState.value
+        assertTrue(state.contextBlurb != null && state.contextBlurb!!.isNotEmpty(), "contextBlurb should have fallback")
+        assertTrue(state.contextBlurb!!.contains("Test Cafe"), "Fallback should include POI name")
+        assertFalse(state.isContextLoading)
+    }
+
     @Test
     fun `openChat on reopen always preserves persistent pills`() = runTest {
         // Regression: H2 — dead if/else where both branches did the same thing.

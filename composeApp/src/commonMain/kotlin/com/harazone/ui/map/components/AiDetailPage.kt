@@ -35,9 +35,18 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
@@ -60,10 +69,15 @@ import com.harazone.ui.map.ChatViewModel
 import com.harazone.ui.map.SkeletonSection
 import com.harazone.ui.map.pillDisplayLabel
 import com.harazone.ui.theme.DarkColorScheme
+import com.harazone.ui.theme.DetailPageLight
 import com.harazone.ui.theme.MapSurfaceDark
 import com.harazone.ui.theme.toColor
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
+
+private const val DETAIL_PAGE_CHAT_HINT = "Ask about this place..."
+// TODO(BACKLOG-LOW): extract DETAIL_PAGE_CHAT_HINT to strings.xml
+private val DetailPageTextDark = Color(0xFF2A2A2A)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -102,12 +116,8 @@ internal fun AiDetailPage(
 
     PlatformBackHandler(enabled = true) { onDismiss() }
 
-    // Force dark color scheme — AiDetailPage always uses a dark background,
-    // so child composables (ChatBubbleItem, etc.) must resolve theme colors as dark.
-    MaterialTheme(colorScheme = DarkColorScheme) {
     Box(
-        modifier = modifier
-            .background(MapSurfaceDark.copy(alpha = 0.97f))
+        modifier = modifier.background(DetailPageLight)
     ) {
         Column(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -115,27 +125,49 @@ internal fun AiDetailPage(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                // Header card
+                // Header card — stays dark
                 item(key = "header") {
-                    PoiDetailHeader(
-                        poi = poi,
-                        isSaved = isSaved,
-                        onSave = onSave,
-                        onUnsave = onUnsave,
-                        onDirectionsClick = onDirectionsClick,
-                        onShowOnMap = onShowOnMap,
-                        onDismiss = onDismiss,
-                    )
+                    MaterialTheme(colorScheme = DarkColorScheme) {
+                        PoiDetailHeader(
+                            poi = poi,
+                            isSaved = isSaved,
+                            onSave = onSave,
+                            onUnsave = onUnsave,
+                            onDirectionsClick = onDirectionsClick,
+                            onShowOnMap = onShowOnMap,
+                            onDismiss = onDismiss,
+                        )
+                    }
+                }
+
+                // Context block — between header and chat (hidden when empty and not loading)
+                val hasContextContent = chatState.isContextLoading ||
+                    !chatState.contextBlurb.isNullOrBlank() ||
+                    !chatState.whyNow.isNullOrBlank() ||
+                    !chatState.localTip.isNullOrBlank()
+                if (hasContextContent) {
+                    item(key = "context") {
+                        PoiContextBlock(
+                            contextBlurb = chatState.contextBlurb,
+                            whyNow = chatState.whyNow,
+                            localTip = chatState.localTip,
+                            isLoading = chatState.isContextLoading,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
 
                 // Chat bubbles
                 items(chatState.bubbles, key = { it.id }) { bubble ->
-                    ChatBubbleItem(
-                        bubble = bubble,
-                        onRetry = { chatViewModel.retryLastMessage() },
-                    )
+                    Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                        ChatBubbleItem(
+                            bubble = bubble,
+                            onRetry = { chatViewModel.retryLastMessage() },
+                            lightMode = true,
+                        )
+                    }
                 }
 
                 // Skeleton shimmer
@@ -153,7 +185,7 @@ internal fun AiDetailPage(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 12.dp),
+                                .padding(horizontal = 12.dp, vertical = 4.dp),
                             horizontalArrangement = Arrangement.Start,
                         ) {
                             ChatPoiMiniCard(
@@ -216,10 +248,102 @@ internal fun AiDetailPage(
                 isStreaming = chatState.isStreaming,
                 onInputChange = { chatViewModel.updateInput(it) },
                 onSend = { chatViewModel.sendMessage() },
+                placeholder = DETAIL_PAGE_CHAT_HINT,
             )
         }
     }
-    } // MaterialTheme
+}
+
+@Composable
+private fun PoiContextBlock(
+    contextBlurb: String?,
+    whyNow: String?,
+    localTip: String?,
+    isLoading: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier
+            .background(DetailPageLight)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .then(if (isLoading) Modifier.semantics { stateDescription = "Loading context" } else Modifier),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (isLoading) {
+            val infiniteTransition = rememberInfiniteTransition(label = "contextShimmer")
+            val shimmerAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.3f,
+                targetValue = 0.7f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(800),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+                label = "contextShimmerAlpha",
+            )
+            val shimmerColor = Color(0xFFE0DDD9).copy(alpha = shimmerAlpha)
+            // Shimmer placeholders
+            repeat(3) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(if (it == 2) 0.65f else 0.9f)
+                        .height(14.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(shimmerColor),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            // whyNow shimmer
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.75f)
+                    .height(14.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(shimmerColor),
+            )
+        } else {
+            if (!contextBlurb.isNullOrBlank()) {
+                Text(
+                    text = contextBlurb,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = DetailPageTextDark,
+                )
+            }
+            if (!whyNow.isNullOrBlank()) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFF0EDE9))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("\u23F0", style = MaterialTheme.typography.bodySmall, modifier = Modifier.clearAndSetSemantics { })
+                    Text(
+                        text = whyNow,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF4A4A4A),
+                    )
+                }
+            }
+            if (!localTip.isNullOrBlank()) {
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFE8F5E9))
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("\uD83D\uDCA1", style = MaterialTheme.typography.bodySmall, modifier = Modifier.clearAndSetSemantics { })
+                    Text(
+                        text = localTip,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF2E7D32),
+                    )
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -287,7 +411,7 @@ private fun PoiDetailHeader(
             }
         }
 
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.background(MapSurfaceDark).padding(16.dp)) {
             // Name
             Text(
                 text = poi.name,

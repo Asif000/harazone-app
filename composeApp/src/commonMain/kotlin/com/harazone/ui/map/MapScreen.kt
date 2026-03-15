@@ -338,7 +338,7 @@ private fun ReadyContent(
         )
 
         // Ambient ticker — rotating area intel below search bar
-        if (state.pois.isNotEmpty() && !state.showListView) {
+        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null) {
             AmbientTicker(
                 pois = state.pois,
                 latitude = state.latitude,
@@ -372,7 +372,7 @@ private fun ReadyContent(
         }
 
         // Vibe rail (right side, bottom-aligned above FAB) — map mode only
-        if (!state.showListView) {
+        if (!state.showListView && state.selectedPoi == null) {
             VibeRail(
                 vibes = state.dynamicVibes,
                 activeDynamicVibe = state.activeDynamicVibe,
@@ -478,7 +478,7 @@ private fun ReadyContent(
         val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.savedPoiIds }
         val carouselVisible = state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null
         AnimatedVisibility(
-            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded && !carouselVisible,
+            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded && !carouselVisible && state.selectedPoi == null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -518,7 +518,7 @@ private fun ReadyContent(
 
         // MyLocation button (Position C — left side, above AI bar)
         AnimatedVisibility(
-            visible = state.showMyLocation && !state.isSearchingArea && !chatState.isOpen,
+            visible = state.showMyLocation && !state.isSearchingArea && !chatState.isOpen && state.selectedPoi == null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -543,25 +543,29 @@ private fun ReadyContent(
         }
 
         // Map/List toggle
-        MapListToggle(
-            showListView = state.showListView,
-            onToggle = { viewModel.toggleListView() },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = navBarPadding + 16.dp, end = 80.dp),
-        )
+        if (state.selectedPoi == null) {
+            MapListToggle(
+                showListView = state.showListView,
+                onToggle = { viewModel.toggleListView() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = navBarPadding + 16.dp, end = 80.dp),
+            )
+        }
 
         // AI search bar — tapping opens the ChatOverlay directly
-        AISearchBar(
-            onTap = { chatViewModel.openChat(state.areaName, state.allDiscoveredPois, state.activeDynamicVibe) },
-            chatIsOpen = chatState.isOpen,
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp)
-                .onGloballyPositioned { coords ->
-                    searchBarOffset = coords.boundsInRoot().center
-                },
-        )
+        if (state.selectedPoi == null) {
+            AISearchBar(
+                onTap = { chatViewModel.openChat(state.areaName, state.allDiscoveredPois, state.activeDynamicVibe) },
+                chatIsOpen = chatState.isOpen,
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp)
+                    .onGloballyPositioned { coords ->
+                        searchBarOffset = coords.boundsInRoot().center
+                    },
+            )
+        }
 
         // Chat overlay — suppressed when AiDetailPage is open (conflict guard)
         if (chatState.isOpen && state.selectedPoi == null) {

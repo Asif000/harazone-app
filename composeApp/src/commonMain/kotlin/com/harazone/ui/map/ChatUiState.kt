@@ -19,6 +19,12 @@ data class ChatPoiCard(
     val lng: Double,
     @SerialName("w") val whySpecial: String,
     @SerialName("img") val imageUrl: String? = null,
+    // TODO(BACKLOG-MEDIUM): render these fields in ChatPoiMiniCard UI
+    @SerialName("insight") val insight: String? = null,
+    @SerialName("rating") val rating: Float? = null,
+    @SerialName("priceRange") val priceRange: String? = null,
+    @SerialName("status") val status: String? = null,
+    @SerialName("hours") val hours: String? = null,
 ) {
     val id: String get() = "$name|$lat|$lng"
 }
@@ -46,4 +52,8 @@ data class ChatUiState(
     val depthLevel: Int = 0,
     val persistentPills: List<ContextualPill> = emptyList(),
     val showReturnDialog: Boolean = false,
+    val contextBlurb: String? = null,
+    val whyNow: String? = null,
+    val localTip: String? = null,
+    val isContextLoading: Boolean = false,
 )

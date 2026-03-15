@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Detail Page — States</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --primary: #E89A5E;
+    --primary-dark: #C47A3E;
+    --vibe-character: #2BBCB3;
+    --status-open: #4CAF50;
+    --status-closing: #FF9800;
+    --status-closed: #f44336;
+    --gold: #FFD700;
+    --indigo-start: #6366F1;
+    --indigo-end: #8B5CF6;
+    --chat-bg: #F5F2EF;
+    --chat-input-bg: #EBE7E3;
+    --chat-text: #1A1412;
+    --chat-text-sec: #7A6E64;
+    --chat-text-muted: #A89888;
+    --chat-divider: rgba(0,0,0,0.08);
+    --bubble-bg: #FFFFFF;
+    --bubble-border: rgba(0,0,0,0.06);
+    --pill-bg: #FFFFFF;
+    --pill-border: rgba(0,0,0,0.10);
+    --pill-text: #3D3530;
+    --ctx-bg: #FFFFFF;
+    --ctx-why-bg: #FAF7F4;
+  }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #111;
+    color: #EDE0D4;
+    display: flex;
+    justify-content: center;
+    gap: 32px;
+    padding: 24px 16px;
+    min-height: 100vh;
+    flex-wrap: wrap;
+  }
+  h1 { width:100%; text-align:center; font-size:20px; font-weight:600; margin-bottom:4px; }
+  .sub { width:100%; text-align:center; font-size:13px; color:#A89888; margin-bottom:20px; }
+  .phone-col { display:flex; flex-direction:column; align-items:center; }
+  .label { text-align:center; font-size:12px; font-weight:600; color:#A89888; margin-bottom:8px; text-transform:uppercase; letter-spacing:1px; }
+  .label b { color:var(--primary); }
+  .phone {
+    width: 360px;
+    height: 780px;
+    border-radius: 36px;
+    overflow: hidden;
+    border: 2px solid #333;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* Map */
+  .map {
+    height: 65px;
+    background: linear-gradient(180deg, #1a2a1a 0%, #0d1a0d 60%, #0A0A0A 100%);
+    position: relative;
+    flex-shrink: 0;
+  }
+  .map::before {
+    content:''; position:absolute; inset:0;
+    background: radial-gradient(circle at 30% 40%, rgba(42,80,42,0.3) 0%, transparent 50%), radial-gradient(circle at 70% 60%, rgba(30,60,80,0.2) 0%, transparent 40%);
+  }
+  .map-lbl { position:absolute; top:6px; left:10px; font-size:9px; color:rgba(255,255,255,0.25); }
+  /* Detail container */
+  .detail {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--chat-bg);
+  }
+  .scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .scroll::-webkit-scrollbar { display:none; }
+  /* Hero */
+  .hero { position:relative; height:130px; overflow:hidden; flex-shrink:0; }
+  .hero-img { width:100%; height:100%; background: linear-gradient(135deg, #3a2a20 0%, #1a1210 50%, #0a0806 100%); }
+  .hero-grad { position:absolute; inset:0; background: linear-gradient(90deg, rgba(43,188,179,0.5) 0%, rgba(43,188,179,0.15) 100%); }
+  .hero-x { position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; color:white; font-size:13px; }
+  /* POI info */
+  .poi-info { padding:8px 14px 6px; }
+  .poi-nm { font-size:15px; font-weight:600; color:var(--chat-text); }
+  .poi-tp { font-size:11px; color:var(--chat-text-sec); margin-top:1px; }
+  .meta { display:flex; align-items:center; gap:6px; margin-top:4px; flex-wrap:wrap; }
+  .vchip { background:rgba(43,188,179,0.12); padding:1px 7px; border-radius:7px; font-size:10px; font-weight:500; color:#1A8A82; }
+  .rat { font-size:11px; color:var(--chat-text); display:flex; align-items:center; gap:2px; }
+  .star { color:var(--gold); }
+  .sbadge { display:inline-flex; align-items:center; gap:3px; padding:1px 5px; border-radius:3px; font-size:10px; font-weight:500; }
+  .s-open { background:rgba(76,175,80,0.12); color:#3A8A3E; }
+  .s-closing { background:rgba(255,152,0,0.12); color:#B86E00; }
+  .s-closed { background:rgba(244,67,54,0.10); color:#C62828; }
+  .sdot { width:4px; height:4px; border-radius:50%; display:inline-block; }
+  .price { font-size:11px; color:var(--chat-text-sec); }
+  .acts { display:flex; gap:6px; margin-top:6px; }
+  .act { display:flex; align-items:center; gap:3px; padding:4px 9px; border:1px solid rgba(0,0,0,0.12); border-radius:12px; font-size:10px; color:var(--chat-text); background:transparent; cursor:pointer; white-space:nowrap; }
+  /* AI Context */
+  .ctx {
+    margin:6px 14px 4px;
+    padding:10px 12px;
+    background:var(--ctx-bg);
+    border-radius:10px;
+    border-left:3px solid var(--primary);
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
+  }
+  .ctx-lbl { font-size:10px; font-weight:600; color:var(--primary-dark); text-transform:uppercase; letter-spacing:0.7px; margin-bottom:5px; }
+  .ctx-blurb { font-size:12px; line-height:18px; color:#2D2520; margin-bottom:6px; }
+  .ctx-why { font-size:11px; line-height:17px; color:#5A4E44; padding:5px 7px; background:var(--ctx-why-bg); border-radius:5px; margin-bottom:5px; }
+  .ctx-why strong { color:var(--primary-dark); }
+  .ctx-tip { font-size:11px; line-height:17px; color:#7A6E64; font-style:italic; }
+  /* Divider */
+  .div { height:1px; background:var(--chat-divider); margin:4px 14px; }
+  .sec-mk { font-size:9px; font-weight:600; letter-spacing:0.7px; text-transform:uppercase; padding:2px 14px; color:var(--chat-text-muted); }
+  /* Chat */
+  .chat { padding:6px 14px; display:flex; flex-direction:column; gap:7px; }
+  .b { max-width:88%; padding:9px 11px; font-size:12px; line-height:18px; }
+  .b-u { align-self:flex-end; background:linear-gradient(135deg,var(--indigo-start),var(--indigo-end)); border-radius:13px 13px 3px 13px; color:white; }
+  .b-ai { align-self:flex-start; background:var(--bubble-bg); border:1px solid var(--bubble-border); border-radius:13px 13px 13px 3px; color:var(--chat-text); box-shadow:0 1px 3px rgba(0,0,0,0.04); }
+  /* Shimmer */
+  @keyframes shimmer { 0%{opacity:0.4} 50%{opacity:0.7} 100%{opacity:0.4} }
+  .shimmer-block {
+    height: 14px;
+    border-radius: 6px;
+    background: rgba(0,0,0,0.06);
+    animation: shimmer 1.2s ease-in-out infinite;
+  }
+  .shimmer-ctx {
+    margin:6px 14px;
+    padding:12px;
+    background:white;
+    border-radius:10px;
+    border-left:3px solid var(--primary);
+    box-shadow:0 1px 4px rgba(0,0,0,0.06);
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  /* POI card */
+  .pc {
+    align-self:flex-start;
+    width:100%;
+    max-width:94%;
+    background:#FFF;
+    border-radius:10px;
+    overflow:hidden;
+    border:1px solid rgba(0,0,0,0.08);
+    box-shadow:0 2px 6px rgba(0,0,0,0.06);
+  }
+  .pc-inner { display:flex; }
+  .pc-stripe { width:4px; flex-shrink:0; }
+  .pc-thumb { width:64px; height:72px; flex-shrink:0; }
+  .tb1 { background:linear-gradient(135deg,#4a3828,#2a1a10,#1a0e08); }
+  .tb2 { background:linear-gradient(135deg,#2a3828,#1a2a10,#0e1a08); }
+  .tb3 { background:linear-gradient(135deg,#28303a,#1a2030,#0e1420); }
+  .tb4 { background:linear-gradient(135deg,#3a2838,#2a1a28,#1a0e18); }
+  .pc-body { flex:1; padding:6px 8px; display:flex; flex-direction:column; justify-content:center; min-width:0; }
+  .pc-hdr { display:flex; align-items:center; gap:4px; }
+  .pc-emoji { font-size:12px; }
+  .pc-name { font-size:12px; font-weight:600; color:var(--chat-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .pc-type { font-size:10px; color:var(--chat-text-sec); }
+  .pc-ins { font-size:11px; line-height:15px; color:var(--chat-text-sec); margin-top:3px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .pc-meta { display:flex; align-items:center; gap:5px; margin-top:3px; font-size:10px; color:var(--chat-text-muted); }
+  .pc-acts { display:flex; gap:5px; padding:0 8px 6px; }
+  .pc-act { padding:3px 7px; border-radius:8px; font-size:10px; border:none; cursor:pointer; background:rgba(0,0,0,0.04); color:var(--chat-text-sec); }
+  .pc-act-ai { background:rgba(99,102,241,0.08); color:var(--indigo-start); }
+  /* Pills */
+  .pills { display:flex; gap:6px; padding:5px 14px 5px; overflow-x:auto; scrollbar-width:none; }
+  .pills::-webkit-scrollbar { display:none; }
+  .pill { padding:4px 10px; border-radius:12px; font-size:11px; white-space:nowrap; cursor:pointer; background:var(--pill-bg); color:var(--pill-text); border:1px solid var(--pill-border); box-shadow:0 1px 2px rgba(0,0,0,0.03); }
+  .pill-active { background:rgba(99,102,241,0.10); border-color:rgba(99,102,241,0.25); color:var(--indigo-start); }
+  /* Input */
+  .ibar { display:flex; align-items:center; padding:5px 10px 10px; gap:6px; background:var(--chat-bg); }
+  .ifield { flex:1; height:38px; border-radius:20px; border:1px solid rgba(0,0,0,0.08); padding:0 14px; font-family:'Inter',sans-serif; font-size:12px; color:var(--chat-text); background:var(--chat-input-bg); outline:none; }
+  .ifield::placeholder { color:var(--chat-text-muted); }
+  .sbtn { width:38px; height:38px; border-radius:50%; border:none; background:var(--primary); color:#1A1412; font-size:15px; cursor:pointer; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+  .sbtn-off { background:#DDD8D3; color:var(--chat-text-muted); }
+  /* State badge */
+  .state-badge {
+    position:absolute; top:8px; left:50%; transform:translateX(-50%);
+    background:rgba(0,0,0,0.7); color:white; padding:3px 10px;
+    border-radius:10px; font-size:10px; font-weight:600; z-index:10;
+    letter-spacing:0.5px; white-space:nowrap;
+  }
+  /* Notes */
+  .notes {
+    width:100%; max-width:1100px; margin-top:24px; padding:16px 20px;
+    background:rgba(255,255,255,0.03); border-radius:12px; border:1px solid rgba(255,255,255,0.08);
+  }
+  .notes h3 { font-size:13px; font-weight:600; color:var(--primary); margin-bottom:10px; }
+  .notes ul { list-style:none; padding:0; }
+  .notes li { font-size:12px; line-height:19px; color:#A89888; padding:3px 0 3px 14px; position:relative; }
+  .notes li::before { content:''; position:absolute; left:0; top:10px; width:5px; height:5px; border-radius:50%; background:var(--primary); opacity:0.6; }
+  .hl { color:#EDE0D4; font-weight:500; }
+  @media (max-width:1200px) { body { gap:16px; } .phone { width:340px; height:740px; } }
+  @media (max-width:800px) { body { flex-direction:column; align-items:center; } }
+</style>
+</head>
+<body>
+
+<h1>Detail Page States — Conversation Flow</h1>
+<div class="sub">State 1: Just opened (no interaction) &mdash; State 2: After pill tap with mixed POI + text responses</div>
+
+<!-- ======== STATE 1: JUST LAUNCHED ======== -->
+<div class="phone-col">
+  <div class="label"><b>State 1</b> — just opened, no interaction</div>
+  <div class="phone" style="position:relative;">
+    <div class="map"><div class="map-lbl">MAP</div></div>
+    <div class="detail">
+      <div class="scroll">
+        <!-- Hero -->
+        <div class="hero">
+          <div class="hero-img"></div>
+          <div class="hero-grad"></div>
+          <div class="hero-x">x</div>
+        </div>
+        <!-- POI info -->
+        <div class="poi-info">
+          <div class="poi-nm">Versailles Restaurant</div>
+          <div class="poi-tp">Cuban Restaurant</div>
+          <div class="meta">
+            <span class="vchip">Character</span>
+            <span class="rat"><span class="star">&#9733;</span> 4.5</span>
+            <span class="sbadge s-open"><span class="sdot" style="background:var(--status-open)"></span> Open</span>
+            <span class="price">$$</span>
+          </div>
+          <div class="acts">
+            <button class="act">&#9734; Save</button>
+            <button class="act">&#8599; Directions</button>
+            <button class="act">&#9673; On Map</button>
+          </div>
+        </div>
+
+        <!-- AI Context Block — loading shimmer -->
+        <div class="shimmer-ctx">
+          <div class="ctx-lbl">&#10024; AI Context</div>
+          <div class="shimmer-block" style="width:90%"></div>
+          <div class="shimmer-block" style="width:100%"></div>
+          <div class="shimmer-block" style="width:70%"></div>
+        </div>
+
+        <!-- Empty chat area — just pills visible -->
+        <div class="div"></div>
+        <div class="sec-mk">Chat</div>
+        <div style="padding: 40px 14px; text-align:center;">
+          <div style="font-size:11px; color:var(--chat-text-muted); line-height:18px;">Tap a suggestion below or ask anything<br>about this place</div>
+        </div>
+      </div>
+
+      <!-- Pills + input -->
+      <div style="background:var(--chat-bg);">
+        <div class="pills">
+          <span class="pill">&#127860; Best dishes</span>
+          <span class="pill">&#128205; History</span>
+          <span class="pill">&#9203; Best time to visit</span>
+          <span class="pill">&#128176; Budget tips</span>
+        </div>
+        <div class="ibar">
+          <input class="ifield" placeholder="Ask about this place..." disabled>
+          <button class="sbtn sbtn-off">&#8593;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== STATE 1b: CONTEXT LOADED ======== -->
+<div class="phone-col">
+  <div class="label"><b>State 1b</b> — context loaded, still no interaction</div>
+  <div class="phone" style="position:relative;">
+    <div class="map"><div class="map-lbl">MAP</div></div>
+    <div class="detail">
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-img"></div>
+          <div class="hero-grad"></div>
+          <div class="hero-x">x</div>
+        </div>
+        <div class="poi-info">
+          <div class="poi-nm">Versailles Restaurant</div>
+          <div class="poi-tp">Cuban Restaurant</div>
+          <div class="meta">
+            <span class="vchip">Character</span>
+            <span class="rat"><span class="star">&#9733;</span> 4.5</span>
+            <span class="sbadge s-open"><span class="sdot" style="background:var(--status-open)"></span> Open</span>
+            <span class="price">$$</span>
+          </div>
+          <div class="acts">
+            <button class="act">&#9734; Save</button>
+            <button class="act">&#8599; Directions</button>
+            <button class="act">&#9673; On Map</button>
+          </div>
+        </div>
+
+        <!-- AI Context Block — LOADED -->
+        <div class="ctx">
+          <div class="ctx-lbl">&#10024; AI Context</div>
+          <div class="ctx-blurb">Versailles has been the heartbeat of Miami's Cuban exile community since 1971 — a cultural landmark on Calle Ocho where politicians campaign over cafecitos and three generations share Sunday ropa vieja.</div>
+          <div class="ctx-why"><strong>Why now:</strong> It's 12:30 PM — lunch rush peaking. Ventanita line moves faster than dine-in.</div>
+          <div class="ctx-tip">&#128161; Locals skip the dining room at lunch — grab pan con lechon from the ventanita.</div>
+        </div>
+
+        <!-- Empty chat — waiting for interaction -->
+        <div class="div"></div>
+        <div class="sec-mk">Chat</div>
+        <div style="padding: 40px 14px; text-align:center;">
+          <div style="font-size:11px; color:var(--chat-text-muted); line-height:18px;">Tap a suggestion below or ask anything<br>about this place</div>
+        </div>
+      </div>
+
+      <div style="background:var(--chat-bg);">
+        <div class="pills">
+          <span class="pill">&#127860; Best dishes</span>
+          <span class="pill">&#128205; History</span>
+          <span class="pill">&#9203; Best time to visit</span>
+          <span class="pill">&#128176; Budget tips</span>
+        </div>
+        <div class="ibar">
+          <input class="ifield" placeholder="Ask about this place..." disabled>
+          <button class="sbtn sbtn-off">&#8593;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== STATE 2: CONVERSATION WITH MIXED POI + TEXT ======== -->
+<div class="phone-col">
+  <div class="label"><b>State 2</b> — conversation: POI, text, POI (no clustering)</div>
+  <div class="phone" style="position:relative;">
+    <div class="map"><div class="map-lbl">MAP</div></div>
+    <div class="detail">
+      <div class="scroll">
+        <div class="hero">
+          <div class="hero-img"></div>
+          <div class="hero-grad"></div>
+          <div class="hero-x">x</div>
+        </div>
+        <div class="poi-info">
+          <div class="poi-nm">Versailles Restaurant</div>
+          <div class="poi-tp">Cuban Restaurant</div>
+          <div class="meta">
+            <span class="vchip">Character</span>
+            <span class="rat"><span class="star">&#9733;</span> 4.5</span>
+            <span class="sbadge s-open"><span class="sdot" style="background:var(--status-open)"></span> Open</span>
+            <span class="price">$$</span>
+          </div>
+          <div class="acts">
+            <button class="act">&#9734; Save</button>
+            <button class="act">&#8599; Directions</button>
+            <button class="act">&#9673; On Map</button>
+          </div>
+        </div>
+
+        <!-- AI Context (collapsed/compact since user has scrolled past) -->
+        <div class="ctx">
+          <div class="ctx-lbl">&#10024; AI Context</div>
+          <div class="ctx-blurb">Versailles has been the heartbeat of Miami's Cuban exile community since 1971 — a cultural landmark on Calle Ocho where politicians campaign over cafecitos.</div>
+          <div class="ctx-why"><strong>Why now:</strong> 12:30 PM — lunch rush. Ventanita is faster.</div>
+          <div class="ctx-tip">&#128161; Grab pan con lechon from the ventanita.</div>
+        </div>
+
+        <div class="div"></div>
+        <div class="sec-mk">Chat</div>
+
+        <div class="chat">
+
+          <!-- Turn 1: User taps "Best dishes" pill -->
+          <div class="b b-u">&#127860; Best dishes</div>
+
+          <!-- AI response: text intro -->
+          <div class="b b-ai">Versailles is legendary for a few signature dishes. Here's the one you absolutely can't miss right now:</div>
+
+          <!-- POI CARD 1 — featured dish context (inline, single) -->
+          <div class="pc">
+            <div class="pc-inner">
+              <div class="pc-stripe" style="background:var(--status-open)"></div>
+              <div class="pc-thumb tb1"></div>
+              <div class="pc-body">
+                <div class="pc-hdr">
+                  <span class="pc-emoji">&#127860;</span>
+                  <span class="pc-name">La Carreta</span>
+                </div>
+                <div class="pc-type">Cuban Restaurant &middot; 24h</div>
+                <div class="pc-ins">Same family recipes as Versailles — the midnight croquetas here are even better. Open all night.</div>
+                <div class="pc-meta">
+                  <span class="star">&#9733;</span> 4.3 · $$ · 0.3 mi ·
+                  <span class="sbadge s-open" style="padding:1px 4px;font-size:9px;"><span class="sdot" style="background:var(--status-open)"></span> Open</span>
+                </div>
+              </div>
+            </div>
+            <div class="pc-acts">
+              <button class="pc-act">&#9734; Save</button>
+              <button class="pc-act">&#8599; Navigate</button>
+              <button class="pc-act pc-act-ai">&#128172; Ask AI</button>
+            </div>
+          </div>
+
+          <!-- AI text — NOT another card. Breathing room. -->
+          <div class="b b-ai">Back at Versailles though — the ropa vieja is the signature. Slow-braised shredded beef in tomato sofrito, served with white rice and sweet plantains. It's been the same recipe since 1971. For the full experience: start with a colada at the ventanita, then sit down for the ropa vieja, and finish with tres leches. That's the Versailles triple.</div>
+
+          <!-- Turn 2: User asks follow-up -->
+          <div class="b b-u">What about dessert nearby? Something walkable</div>
+
+          <!-- AI text response first — context before card -->
+          <div class="b b-ai">There's one dessert spot on this block that locals obsess over — Cuban ice cream with flavors you won't find anywhere else:</div>
+
+          <!-- POI CARD 2 — separated by text, not clustered -->
+          <div class="pc">
+            <div class="pc-inner">
+              <div class="pc-stripe" style="background:var(--status-closing)"></div>
+              <div class="pc-thumb tb4"></div>
+              <div class="pc-body">
+                <div class="pc-hdr">
+                  <span class="pc-emoji">&#127854;</span>
+                  <span class="pc-name">Azucar Ice Cream</span>
+                </div>
+                <div class="pc-type">Ice Cream &middot; Cuban Flavors</div>
+                <div class="pc-ins">Abuela Maria's guava cream cheese flavor is Miami in a cone. Walk here after lunch for dessert.</div>
+                <div class="pc-meta">
+                  <span class="star">&#9733;</span> 4.7 · $ · 0.2 mi ·
+                  <span class="sbadge s-closing" style="padding:1px 4px;font-size:9px;"><span class="sdot" style="background:var(--status-closing)"></span> Opens 1 PM</span>
+                </div>
+              </div>
+            </div>
+            <div class="pc-acts">
+              <button class="pc-act">&#9734; Save</button>
+              <button class="pc-act">&#8599; Navigate</button>
+              <button class="pc-act pc-act-ai">&#128172; Ask AI</button>
+            </div>
+          </div>
+
+          <!-- AI follow-up text after card — time-aware -->
+          <div class="b b-ai">Azucar opens at 1 PM — about 25 minutes from now. Perfect timing if you eat at Versailles first. The guava cream cheese and the cafe con leche flavor are the must-tries.</div>
+
+        </div>
+      </div>
+
+      <!-- Updated pills (contextual to conversation) -->
+      <div style="background:var(--chat-bg);">
+        <div class="pills">
+          <span class="pill pill-active">&#127860; Best dishes</span>
+          <span class="pill">&#128205; History</span>
+          <span class="pill">&#9203; Best time to visit</span>
+          <span class="pill">&#128663; Getting there</span>
+        </div>
+        <div class="ibar">
+          <input class="ifield" placeholder="Ask about this place..." disabled>
+          <button class="sbtn">&#8593;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== NOTES ======== -->
+<div class="notes">
+  <h3>State Flow & Anti-Clustering Rules</h3>
+  <ul>
+    <li><span class="hl">State 1 (just opened):</span> Hero + POI info + shimmer context block + empty chat with hint text + pills. Send button disabled. User sees the place, waits ~1-2s for AI context.</li>
+    <li><span class="hl">State 1b (context loaded):</span> Shimmer replaced by AI Context Block. Chat still empty with hint. Pills are the primary CTA — inviting first tap.</li>
+    <li><span class="hl">State 2 (conversation):</span> After pill tap, natural conversation flow. POI cards appear INLINE but never back-to-back. Always separated by AI text.</li>
+    <li><span class="hl">Anti-clustering rule:</span> AI text MUST appear between every POI card. Pattern: text → card → text → (user) → text → card → text. No card stacks. This is a prompt contract rule.</li>
+    <li><span class="hl">Single-POI responses:</span> When AI mentions just one place, one card appears with surrounding text. No card rail needed.</li>
+    <li><span class="hl">Multi-POI responses:</span> When AI recommends 3+ places, cards can appear in sequence BUT with a brief text line between each (e.g., "And for a different vibe:"). This was shown in the previous prototype for the "list" use case — acceptable clustering only when user explicitly asks for a list.</li>
+    <li><span class="hl">Pill state:</span> Tapped pill gets active highlight. Pills update contextually — "Getting there" replaces "Budget tips" after dessert mention.</li>
+    <li><span class="hl">Empty state hint:</span> "Tap a suggestion below or ask anything about this place" — centered, muted, disappears on first message.</li>
+  </ul>
+</div>
+
+<div class="notes">
+  <h3>Prompt Contract — Card Spacing Rules</h3>
+  <ul>
+    <li><span class="hl">Rule 1:</span> Every POI mentioned by name in prose MUST have a corresponding card in the pois array.</li>
+    <li><span class="hl">Rule 2:</span> When returning multiple POIs, include a brief text segment between each card (context, comparison, or transition).</li>
+    <li><span class="hl">Rule 3:</span> Exception — if user explicitly asks "list all nearby X," cards may appear consecutively (max 3) with a text intro and text summary after.</li>
+    <li><span class="hl">Rule 4:</span> The tapped/focused POI always has a guaranteed card (belt-and-suspenders: prompt + client-side injection).</li>
+    <li><span class="hl">Client-side enforcement:</span> If Gemini returns consecutive cards with no text between them, client inserts a minimal separator (e.g., thin divider line) to prevent visual clustering.</li>
+  </ul>
+</div>
+
+</body>
+</html>

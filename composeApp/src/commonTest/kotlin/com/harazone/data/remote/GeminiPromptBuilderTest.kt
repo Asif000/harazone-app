@@ -480,6 +480,55 @@ class GeminiPromptBuilderTest {
         assertTrue(prompt.contains("REQUIRED"))
     }
 
+    // --- outputFormatBlock extended schema tests ---
+
+    @Test
+    fun outputFormatBlock_containsHistoryInstruction() {
+        val result = chatContext()
+        assertTrue(result.contains("HISTORY"))
+    }
+
+    @Test
+    fun outputFormatBlock_containsPoiGuarantee() {
+        val result = chatContext()
+        assertTrue(result.contains("POI GUARANTEE"))
+    }
+
+    @Test
+    fun outputFormatBlock_containsAntiClusteringRule() {
+        val result = chatContext()
+        assertTrue(result.contains("ANTI-CLUSTERING"))
+    }
+
+    @Test
+    fun outputFormatBlock_schemaContainsInsightAndRating() {
+        val result = chatContext()
+        assertTrue(result.contains("\"insight\""))
+        assertTrue(result.contains("\"rating\""))
+    }
+
+    // --- buildPoiContextPrompt tests ---
+
+    @Test
+    fun buildPoiContextPrompt_containsTimeHint() {
+        val prompt = builder.buildPoiContextPrompt("Cafe X", "food", "Alfama", "morning")
+        assertTrue(prompt.contains("morning"))
+    }
+
+    @Test
+    fun buildPoiContextPrompt_containsHistoryInstruction() {
+        val prompt = builder.buildPoiContextPrompt("Cafe X", "food", "Alfama", "morning")
+        assertTrue(prompt.contains("history") || prompt.contains("cultural significance"))
+    }
+
+    @Test
+    fun buildPoiContextPrompt_containsJsonSchema() {
+        val prompt = builder.buildPoiContextPrompt("Cafe X", "food", "Alfama", "morning")
+        assertTrue(prompt.contains("contextBlurb"))
+        assertTrue(prompt.contains("whyNow"))
+        assertTrue(prompt.contains("localTip"))
+    }
+
     @Test
     fun buildAreaPortraitPrompt_includesAreaHighlightsField() {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)

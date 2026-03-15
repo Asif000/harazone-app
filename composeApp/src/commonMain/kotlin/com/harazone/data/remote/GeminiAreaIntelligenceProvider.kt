@@ -20,7 +20,9 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod
 import io.ktor.http.contentType
 import io.ktor.client.request.parameter
+import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.client.plugins.ClientRequestException
 import io.ktor.client.plugins.ServerResponseException
 import kotlinx.coroutines.CancellationException
@@ -334,6 +336,33 @@ internal class GeminiAreaIntelligenceProvider(
                 is Exception -> mapToDomainErrorException(error)
                 else -> mapToDomainErrorException(RuntimeException("Unexpected error", error))
             }
+        }
+    }
+
+    override suspend fun generatePoiContext(
+        poiName: String,
+        poiType: String,
+        areaName: String,
+        timeHint: String,
+        languageTag: String,
+    ): Triple<String, String, String>? {
+        return try {
+            val apiKey = apiKeyProvider.geminiApiKey
+            if (apiKey.isBlank()) return null
+            val prompt = promptBuilder.buildPoiContextPrompt(poiName, poiType, areaName, timeHint, languageTag)
+            val requestBody = buildRequestBody(prompt)
+            val responseJson = httpClient.post("$BASE_URL/$GEMINI_MODEL:generateContent") {
+                parameter("key", apiKey)
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }.bodyAsText()
+            val text = responseParser.extractTextFromGenerateContent(responseJson)
+            responseParser.parsePoiContextResponse(text)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiAreaIntelligenceProvider: generatePoiContext failed" }
+            null
         }
     }
 

@@ -480,6 +480,34 @@ not valid json either"""
         assertEquals(emptyList(), result.areaHighlights)
     }
 
+    // --- parsePoiContextResponse tests ---
+
+    @Test
+    fun parsePoiContextResponse_happyPath() {
+        val json = """{"contextBlurb":"A lovely morning at the cafe.","whyNow":"Perfect time for breakfast.","localTip":"Ask for the secret menu."}"""
+        val result = parser.parsePoiContextResponse(json)
+        assertNotNull(result)
+        assertEquals("A lovely morning at the cafe.", result.first)
+        assertEquals("Perfect time for breakfast.", result.second)
+        assertEquals("Ask for the secret menu.", result.third)
+    }
+
+    @Test
+    fun parsePoiContextResponse_missingLocalTip_defaultsToEmpty() {
+        val json = """{"contextBlurb":"Nice place.","whyNow":"Good time."}"""
+        val result = parser.parsePoiContextResponse(json)
+        assertNotNull(result)
+        assertEquals("Nice place.", result.first)
+        assertEquals("Good time.", result.second)
+        assertEquals("", result.third)
+    }
+
+    @Test
+    fun parsePoiContextResponse_malformedJson_returnsNull() {
+        val result = parser.parsePoiContextResponse("not valid json at all")
+        assertNull(result)
+    }
+
     @Test
     fun parseEnrichmentResponse_backwardCompatible() {
         val json = """[{"n":"Cafe X","v":"food","w":"great coffee"}]"""

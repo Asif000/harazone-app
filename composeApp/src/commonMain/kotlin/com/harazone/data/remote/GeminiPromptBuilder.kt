@@ -177,6 +177,23 @@ Rules:
         ).filter { it.isNotBlank() }.joinToString("\n\n")
     }
 
+    fun buildPoiContextPrompt(poiName: String, poiType: String, areaName: String, timeHint: String, languageTag: String = "en"): String {
+        val langRule = languageBlock(languageTag)
+        return """You are a passionate local in "$areaName". Return ONLY a JSON object — no markdown, no other text.
+
+POI: $poiName ($poiType) in $areaName
+Time of day: $timeHint
+
+Schema: {"contextBlurb":"2-3 sentences: time-aware intro, with one sentence about this place's history, origin story, or the neighborhood's cultural significance","whyNow":"1 sentence: why this is a good moment to visit (time of day, mood, opportunity)","localTip":"insider tip a tourist would never find (empty string if you have nothing genuine)"}
+
+Rules:
+- contextBlurb MUST mention the time of day ($timeHint) naturally, not as a label.
+- contextBlurb MUST include at least one sentence about history, origin, or cultural significance.
+- whyNow should be specific to $timeHint — not generic advice.
+- localTip: only include if you have a genuinely specific insider tip. If not, return "".
+- All fields must be present. Respond with valid JSON only.${if (langRule.isNotBlank()) "\n$langRule" else ""}"""
+    }
+
     private fun languageBlock(languageTag: String): String =
         if (languageTag.startsWith("en")) ""
         else "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '$languageTag'. Every word of your response must be in that language."
@@ -281,16 +298,21 @@ VOICE: Mischievous. "Okay, you're not going to believe this, but...""""
 
     private fun outputFormatBlock(): String =
         """RESPONSE FORMAT: Always respond with a single JSON object — no other text, no markdown outside the JSON.
-Schema: {"prose":"your conversational reply here","pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"w":"why special"}]}
+Schema: {"prose":"your conversational reply here","pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"w":"why special","insight":"1-2 line AI hook","rating":4.5,"priceRange":"$$","status":"open|closing|closed|unknown","hours":"Mon-Fri 9am-10pm"}]}
 Rules:
 - prose: 2-3 sentences max. Conversational, not a travel blog. End with a follow-up question.
 - pois: every place mentioned in prose MUST appear in the pois array. If no places mentioned, return empty array.
+- POI GUARANTEE: If you were given a focused POI (the place the user tapped), it MUST appear in the pois array in every response — even if not mentioned in prose.
+- HISTORY: Include one sentence about the place's history, origin story, or the neighborhood's cultural significance somewhere in your prose or the focused POI's insight field.
+- ANTI-CLUSTERING: When mentioning multiple places, include at least 1 sentence of prose/transition between consecutive POI cards. No back-to-back pois entries without connecting prose context. Exception: if user explicitly asks for a list → max 3 consecutive entries with a brief text intro and summary.
+- insight: 1-2 sentence AI hook specific to this place (different from w/why-special — insight is the memorable hook, w is the factual reason).
+- rating, priceRange, status, hours: include when you know them; omit fields you are uncertain about.
 - prose may use **bold**, *italic*, and `code` for emphasis — these will be rendered.
 - t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 - DEPTH CONTROL: First response = 1-2 places. If user asks for more = 2-3 more. Never exceed 5 places total per message.
 - DEDUPLICATION: If the user context mentions previously recommended places, do NOT include them in pois or mention them in prose.
 - LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.
-Example: {"prose":"Check out **Brick Lane** for incredible street art — it changes weekly.\nWhat mood are you in — edgy underground spots or the well-known walls?","pois":[{"n":"Brick Lane","t":"arts","lat":51.5215,"lng":-0.0714,"w":"London's densest open-air gallery, curated by the street itself"}]}"""
+Example: {"prose":"Check out **Brick Lane** for incredible street art — it changes weekly.\nWhat mood are you in — edgy underground spots or the well-known walls?","pois":[{"n":"Brick Lane","t":"arts","lat":51.5215,"lng":-0.0714,"w":"London's densest open-air gallery, curated by the street itself","insight":"Every Sunday morning the whole street transforms — murals painted overnight, artists you'll never find on Google","rating":4.7,"priceRange":"$","status":"open","hours":"Open 24/7"}]}"""
 
     private fun framingBlock(framingHint: String?): String = framingHint ?: ""
 }

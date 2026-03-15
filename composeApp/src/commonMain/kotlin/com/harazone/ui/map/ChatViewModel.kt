@@ -39,6 +39,7 @@ internal class ChatViewModel(
 
     private var conversationHistory: MutableList<ChatMessage> = mutableListOf()
     private var chatJob: Job? = null
+    private var poiContextJob: Job? = null
     private var nextId = 0L
     private fun nextId() = (nextId++).toString()
 
@@ -147,6 +148,40 @@ internal class ChatViewModel(
             intent = ChatIntent.DISCOVER,
             emoji = "\uD83D\uDCCD",
         ))
+        poiContextJob?.cancel()
+        poiContextJob = viewModelScope.launch {
+            fetchPoiContext(poi, areaName)
+        }
+    }
+
+    private suspend fun fetchPoiContext(poi: POI, areaName: String) {
+        _uiState.value = _uiState.value.copy(
+            contextBlurb = null, whyNow = null, localTip = null, isContextLoading = true,
+        )
+        val hour = com.harazone.ui.components.currentHour()
+        val timeHint = when {
+            hour in 5..10 -> "morning"
+            hour in 11..16 -> "afternoon"
+            hour in 17..20 -> "evening"
+            else -> "night"
+        }
+        val result = aiProvider.generatePoiContext(poi.name, poi.type, areaName, timeHint, localeProvider.languageTag)
+        val (blurb, whyNow, tip) = result ?: Triple(
+            "${poi.name} is a ${poi.type} in $areaName.",
+            when (timeHint) {
+                "morning" -> "A great way to start your morning."
+                "afternoon" -> "Perfect for an afternoon visit."
+                "evening" -> "A lovely spot for the evening."
+                else -> "Worth a visit at any time."
+            },
+            "",
+        )
+        _uiState.value = _uiState.value.copy(
+            contextBlurb = blurb.ifBlank { "${poi.name} is a ${poi.type} in $areaName." },
+            whyNow = whyNow.ifBlank { null },
+            localTip = tip.ifBlank { null },
+            isContextLoading = false,
+        )
     }
 
     fun tapIntentPill(pill: ContextualPill) {

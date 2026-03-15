@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Detail Page — Inline POI Cards</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --primary: #E89A5E;
+    --primary-dark: #C47A3E;
+    --vibe-character: #2BBCB3;
+    --vibe-history: #C4935A;
+    --vibe-cost: #5CAD6F;
+    --status-open: #4CAF50;
+    --status-closing: #FF9800;
+    --status-closed: #f44336;
+    --gold: #FFD700;
+    --indigo-start: #6366F1;
+    --indigo-end: #8B5CF6;
+
+    /* Light chat theme */
+    --chat-bg: #F5F2EF;
+    --chat-surface: #FFFFFF;
+    --chat-input-bg: #EBE7E3;
+    --chat-text: #1A1412;
+    --chat-text-secondary: #7A6E64;
+    --chat-text-muted: #A89888;
+    --chat-divider: rgba(0,0,0,0.08);
+    --chat-ai-bubble: #FFFFFF;
+    --chat-ai-bubble-border: rgba(0,0,0,0.06);
+    --chat-pill-bg: #FFFFFF;
+    --chat-pill-border: rgba(0,0,0,0.10);
+    --chat-pill-text: #3D3530;
+
+    /* Context block */
+    --context-bg: #FFFFFF;
+    --context-border: var(--primary);
+    --context-text: #2D2520;
+    --context-text-secondary: #5A4E44;
+    --context-why-bg: #FAF7F4;
+    --context-tip-text: #7A6E64;
+    --context-label: var(--primary-dark);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #111;
+    color: #EDE0D4;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 24px;
+    min-height: 100vh;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    width: 100%;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    width: 100%;
+    text-align: center;
+    font-size: 13px;
+    color: #A89888;
+    margin-bottom: 24px;
+  }
+
+  .phone-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .label {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: #A89888;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .label-accent { color: var(--primary); }
+
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    border-radius: 40px;
+    overflow: hidden;
+    border: 2px solid #333;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  /* Map strip */
+  .map-strip {
+    height: 70px;
+    background: linear-gradient(180deg, #1a2a1a 0%, #0d1a0d 60%, #0A0A0A 100%);
+    position: relative;
+  }
+  .map-strip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(42,80,42,0.3) 0%, transparent 50%),
+      radial-gradient(circle at 70% 60%, rgba(30,60,80,0.2) 0%, transparent 40%);
+  }
+  .map-label {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.25);
+  }
+
+  /* Detail page */
+  .detail-page {
+    height: calc(812px - 70px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--chat-bg);
+  }
+  .detail-scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .detail-scroll::-webkit-scrollbar { display: none; }
+
+  /* Hero */
+  .hero {
+    position: relative;
+    height: 140px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .hero-img {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #3a2a20 0%, #1a1210 50%, #0a0806 100%);
+  }
+  .hero-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(43,188,179,0.5) 0%, rgba(43,188,179,0.15) 100%);
+  }
+  .hero-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+  }
+
+  /* POI info (light) */
+  .poi-info {
+    padding: 10px 16px 6px;
+  }
+  .poi-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--chat-text);
+  }
+  .poi-type {
+    font-size: 12px;
+    color: var(--chat-text-secondary);
+    margin-top: 1px;
+  }
+  .poi-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+  }
+  .vibe-chip {
+    background: rgba(43,188,179,0.12);
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 500;
+    color: #1A8A82;
+  }
+  .rating {
+    font-size: 12px;
+    color: var(--chat-text);
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .star { color: var(--gold); }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .status-open { background: rgba(76,175,80,0.12); color: #3A8A3E; }
+  .status-closing { background: rgba(255,152,0,0.12); color: #B86E00; }
+  .status-closed { background: rgba(244,67,54,0.10); color: #C62828; }
+  .status-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  .price { font-size: 12px; color: var(--chat-text-secondary); }
+
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .action-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 14px;
+    font-size: 11px;
+    color: var(--chat-text);
+    background: transparent;
+    cursor: pointer;
+  }
+
+  /* AI Context Block */
+  .ai-context {
+    margin: 8px 16px 4px;
+    padding: 12px 14px;
+    background: var(--context-bg);
+    border-radius: 12px;
+    border-left: 3px solid var(--primary);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .ai-context-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--context-label);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+  }
+  .ai-context-blurb {
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--context-text);
+    margin-bottom: 8px;
+  }
+  .ai-context-why {
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--context-text-secondary);
+    padding: 6px 8px;
+    background: var(--context-why-bg);
+    border-radius: 6px;
+    margin-bottom: 6px;
+  }
+  .ai-context-why strong { color: var(--primary-dark); font-weight: 600; }
+  .ai-context-tip {
+    font-size: 12px;
+    line-height: 18px;
+    color: var(--context-tip-text);
+    font-style: italic;
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: var(--chat-divider);
+    margin: 6px 16px;
+  }
+  .section-marker {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 2px 16px 4px;
+    color: var(--chat-text-muted);
+  }
+
+  /* Chat messages */
+  .chat-flow {
+    padding: 8px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .bubble {
+    max-width: 88%;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 20px;
+  }
+  .bubble-user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, var(--indigo-start), var(--indigo-end));
+    border-radius: 14px 14px 4px 14px;
+    color: white;
+  }
+  .bubble-ai {
+    align-self: flex-start;
+    background: var(--chat-ai-bubble);
+    border: 1px solid var(--chat-ai-bubble-border);
+    border-radius: 14px 14px 14px 4px;
+    color: var(--chat-text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  /* ============ INLINE POI CARD ============ */
+  .poi-card-inline {
+    align-self: flex-start;
+    width: 100%;
+    max-width: 92%;
+    background: #FFFFFF;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(0,0,0,0.08);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+  .poi-card-inline:hover {
+    box-shadow: 0 3px 10px rgba(0,0,0,0.10);
+  }
+
+  .poi-card-inner {
+    display: flex;
+    gap: 0;
+  }
+
+  /* Left: status stripe */
+  .poi-card-stripe {
+    width: 4px;
+    flex-shrink: 0;
+  }
+  .stripe-open { background: var(--status-open); }
+  .stripe-closing { background: var(--status-closing); }
+  .stripe-closed { background: var(--status-closed); }
+
+  /* Left: thumbnail */
+  .poi-card-thumb {
+    width: 72px;
+    height: 80px;
+    flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .poi-card-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  /* Placeholder satellite tile backgrounds */
+  .thumb-bg-1 {
+    background: linear-gradient(135deg, #4a3828 0%, #2a1a10 60%, #1a0e08 100%);
+  }
+  .thumb-bg-2 {
+    background: linear-gradient(135deg, #2a3828 0%, #1a2a10 60%, #0e1a08 100%);
+  }
+  .thumb-bg-3 {
+    background: linear-gradient(135deg, #28303a 0%, #1a2030 60%, #0e1420 100%);
+  }
+  .thumb-bg-4 {
+    background: linear-gradient(135deg, #3a2838 0%, #2a1a28 60%, #1a0e18 100%);
+  }
+
+  /* Right: content */
+  .poi-card-content {
+    flex: 1;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+  }
+  .poi-card-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .poi-card-emoji {
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .poi-card-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--chat-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .poi-card-type {
+    font-size: 11px;
+    color: var(--chat-text-secondary);
+    margin-top: 1px;
+  }
+  .poi-card-insight {
+    font-size: 12px;
+    line-height: 17px;
+    color: var(--chat-text-secondary);
+    margin-top: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .poi-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--chat-text-muted);
+  }
+  .poi-card-meta .star { font-size: 11px; }
+
+  /* Card action row */
+  .poi-card-actions {
+    display: flex;
+    gap: 6px;
+    padding: 0 10px 8px;
+  }
+  .poi-card-action {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    cursor: pointer;
+    border: none;
+    background: rgba(0,0,0,0.04);
+    color: var(--chat-text-secondary);
+  }
+  .poi-card-action:hover { background: rgba(0,0,0,0.08); }
+  .poi-card-action-primary {
+    background: rgba(99,102,241,0.08);
+    color: var(--indigo-start);
+  }
+
+  /* Pills */
+  .pills-row {
+    display: flex;
+    gap: 8px;
+    padding: 6px 16px 6px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .pills-row::-webkit-scrollbar { display: none; }
+  .pill {
+    padding: 5px 11px;
+    border-radius: 14px;
+    font-size: 12px;
+    white-space: nowrap;
+    cursor: pointer;
+    background: var(--chat-pill-bg);
+    color: var(--chat-pill-text);
+    border: 1px solid var(--chat-pill-border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }
+
+  /* Input bar */
+  .input-bar {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px 12px;
+    gap: 8px;
+    background: var(--chat-bg);
+  }
+  .input-field {
+    flex: 1;
+    height: 42px;
+    border-radius: 22px;
+    border: 1px solid rgba(0,0,0,0.08);
+    padding: 0 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: var(--chat-text);
+    background: var(--chat-input-bg);
+    outline: none;
+  }
+  .input-field::placeholder { color: var(--chat-text-muted); }
+  .send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: none;
+    background: var(--primary);
+    color: #1A1412;
+    font-size: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Annotation callouts */
+  .callout {
+    margin: 4px 16px;
+    padding: 4px 8px;
+    background: rgba(232,154,94,0.08);
+    border-left: 2px solid var(--primary);
+    border-radius: 0 6px 6px 0;
+    font-size: 10px;
+    color: var(--primary-dark);
+    font-weight: 500;
+    letter-spacing: 0.3px;
+  }
+
+  /* Notes */
+  .notes-panel {
+    width: 100%;
+    max-width: 860px;
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .notes-panel h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 12px;
+  }
+  .notes-panel ul { list-style: none; padding: 0; }
+  .notes-panel li {
+    font-size: 13px;
+    line-height: 20px;
+    color: #A89888;
+    padding: 4px 0 4px 16px;
+    position: relative;
+  }
+  .notes-panel li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 11px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+    opacity: 0.6;
+  }
+  .hl { color: #EDE0D4; font-weight: 500; }
+
+  @media (max-width: 900px) {
+    body { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Detail Page — Inline POI Cards in Chat</h1>
+<div class="subtitle">Vertical inline cards between AI messages, not horizontal carousel &mdash; Brainstorm 2026-03-15</div>
+
+<!-- ============ FULL CONVERSATION FLOW ============ -->
+<div class="phone-col">
+  <div class="label"><span class="label-accent">Full Flow</span> — scrolled conversation</div>
+  <div class="phone-frame">
+    <div class="map-strip">
+      <div class="map-label">MAP</div>
+    </div>
+    <div class="detail-page">
+      <div class="detail-scroll">
+
+        <!-- Hero -->
+        <div class="hero">
+          <div class="hero-img"></div>
+          <div class="hero-gradient"></div>
+          <div class="hero-close">x</div>
+        </div>
+
+        <!-- POI Info -->
+        <div class="poi-info">
+          <div class="poi-name">Versailles Restaurant</div>
+          <div class="poi-type">Cuban Restaurant</div>
+          <div class="poi-meta-row">
+            <span class="vibe-chip">Character</span>
+            <span class="rating"><span class="star">&#9733;</span> 4.5</span>
+            <span class="status-badge status-open"><span class="status-dot" style="background:var(--status-open)"></span> Open</span>
+            <span class="price">$$</span>
+          </div>
+          <div class="action-row">
+            <button class="action-chip">&#9734; Save</button>
+            <button class="action-chip">&#8599; Directions</button>
+            <button class="action-chip">&#9673; On Map</button>
+          </div>
+        </div>
+
+        <!-- AI Context Block -->
+        <div class="ai-context">
+          <div class="ai-context-label">&#10024; AI Context</div>
+          <div class="ai-context-blurb">Versailles has been the heartbeat of Miami's Cuban exile community since 1971 — a cultural landmark on Calle Ocho where politicians campaign over cafecitos and three generations share Sunday ropa vieja.</div>
+          <div class="ai-context-why"><strong>Why now:</strong> It's 12:30 PM — lunch rush peaks soon. The ventanita line moves faster than dine-in.</div>
+          <div class="ai-context-tip">&#128161; Locals skip the dining room at lunch — grab pan con lechon from the ventanita.</div>
+        </div>
+
+        <!-- Chat flow -->
+        <div class="divider"></div>
+        <div class="section-marker">Chat</div>
+
+        <div class="chat-flow">
+
+          <!-- User asks -->
+          <div class="bubble bubble-user">What are the best places to eat nearby? I like authentic Cuban food.</div>
+
+          <!-- AI responds with text + inline POI cards -->
+          <div class="bubble bubble-ai">Calle Ocho is ground zero for Cuban food in Miami. Here are three spots within walking distance that locals love — each with a different vibe:</div>
+
+          <!-- INLINE POI CARD 1 -->
+          <div class="poi-card-inline">
+            <div class="poi-card-inner">
+              <div class="poi-card-stripe stripe-open"></div>
+              <div class="poi-card-thumb thumb-bg-1"></div>
+              <div class="poi-card-content">
+                <div class="poi-card-header">
+                  <span class="poi-card-emoji">&#127860;</span>
+                  <span class="poi-card-name">La Carreta</span>
+                </div>
+                <div class="poi-card-type">Cuban Restaurant</div>
+                <div class="poi-card-insight">The 24-hour spot where Miami cops, nurses, and night owls all end up. Their croquetas are legendary.</div>
+                <div class="poi-card-meta">
+                  <span class="star">&#9733;</span> 4.3
+                  <span>·</span> $$
+                  <span>·</span> 0.3 mi
+                  <span>·</span>
+                  <span class="status-badge status-open" style="padding:1px 4px; font-size:10px;"><span class="status-dot" style="background:var(--status-open);width:4px;height:4px"></span> Open 24h</span>
+                </div>
+              </div>
+            </div>
+            <div class="poi-card-actions">
+              <button class="poi-card-action">&#9734; Save</button>
+              <button class="poi-card-action">&#8599; Navigate</button>
+              <button class="poi-card-action poi-card-action-primary">&#128172; Ask AI</button>
+            </div>
+          </div>
+
+          <!-- INLINE POI CARD 2 -->
+          <div class="poi-card-inline">
+            <div class="poi-card-inner">
+              <div class="poi-card-stripe stripe-open"></div>
+              <div class="poi-card-thumb thumb-bg-2"></div>
+              <div class="poi-card-content">
+                <div class="poi-card-header">
+                  <span class="poi-card-emoji">&#127862;</span>
+                  <span class="poi-card-name">Exquisito Restaurant</span>
+                </div>
+                <div class="poi-card-type">Cuban Restaurant</div>
+                <div class="poi-card-insight">Hole-in-the-wall with the best ropa vieja on the block. Cash-only, no frills, all flavor.</div>
+                <div class="poi-card-meta">
+                  <span class="star">&#9733;</span> 4.6
+                  <span>·</span> $
+                  <span>·</span> 0.1 mi
+                  <span>·</span>
+                  <span class="status-badge status-closing" style="padding:1px 4px; font-size:10px;"><span class="status-dot" style="background:var(--status-closing);width:4px;height:4px"></span> Closes 2 PM</span>
+                </div>
+              </div>
+            </div>
+            <div class="poi-card-actions">
+              <button class="poi-card-action">&#9734; Save</button>
+              <button class="poi-card-action">&#8599; Navigate</button>
+              <button class="poi-card-action poi-card-action-primary">&#128172; Ask AI</button>
+            </div>
+          </div>
+
+          <!-- INLINE POI CARD 3 -->
+          <div class="poi-card-inline">
+            <div class="poi-card-inner">
+              <div class="poi-card-stripe stripe-closed"></div>
+              <div class="poi-card-thumb thumb-bg-4"></div>
+              <div class="poi-card-content">
+                <div class="poi-card-header">
+                  <span class="poi-card-emoji">&#127854;</span>
+                  <span class="poi-card-name">Azucar Ice Cream</span>
+                </div>
+                <div class="poi-card-type">Ice Cream &middot; Cuban Flavors</div>
+                <div class="poi-card-insight">Abuela Maria's guava cream cheese flavor is Miami in a cone. Walk here for dessert after lunch.</div>
+                <div class="poi-card-meta">
+                  <span class="star">&#9733;</span> 4.7
+                  <span>·</span> $
+                  <span>·</span> 0.2 mi
+                  <span>·</span>
+                  <span class="status-badge status-closed" style="padding:1px 4px; font-size:10px;"><span class="status-dot" style="background:var(--status-closed);width:4px;height:4px"></span> Opens 1 PM</span>
+                </div>
+              </div>
+            </div>
+            <div class="poi-card-actions">
+              <button class="poi-card-action">&#9734; Save</button>
+              <button class="poi-card-action">&#8599; Navigate</button>
+              <button class="poi-card-action poi-card-action-primary">&#128172; Ask AI</button>
+            </div>
+          </div>
+
+          <!-- AI follow-up text -->
+          <div class="bubble bubble-ai">Exquisito is closing at 2 PM today, so if you want to try their ropa vieja, I'd head there first. La Carreta is 24 hours — save it for late night. And Azucar opens at 1 for the perfect post-lunch dessert walk.</div>
+
+          <!-- User follow-up -->
+          <div class="bubble bubble-user">Tell me more about Exquisito</div>
+
+          <!-- AI response about specific POI -->
+          <div class="bubble bubble-ai">Exquisito has been family-run since 1985 — three generations of the same recipe book. It's cash-only and seating is tight (8 tables), but that's part of the charm. The ropa vieja uses the grandmother's original recipe with a tomato sofrito that simmers 6+ hours. At $8 for a full plate with rice, beans, and plantains, it's the best value on Calle Ocho. They close at 2 PM sharp — no exceptions.</div>
+
+        </div>
+      </div>
+
+      <!-- Input bar -->
+      <div style="background: var(--chat-bg);">
+        <div class="pills-row">
+          <span class="pill">&#127860; Best dishes</span>
+          <span class="pill">&#128205; History</span>
+          <span class="pill">&#9203; Hours</span>
+          <span class="pill">&#128176; Budget</span>
+        </div>
+        <div class="input-bar">
+          <input class="input-field" placeholder="Ask about this place..." disabled>
+          <button class="send-btn">&#8593;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ ZOOMED: CARD ANATOMY ============ -->
+<div class="phone-col">
+  <div class="label"><span class="label-accent">Card Anatomy</span> — zoomed</div>
+  <div class="phone-frame" style="height: 812px;">
+    <div style="background: var(--chat-bg); height: 100%; padding: 24px 16px; overflow-y: auto;">
+
+      <!-- Callout: AI message before cards -->
+      <div class="callout">AI TEXT BUBBLE — sets context before cards</div>
+      <div style="height: 8px;"></div>
+      <div class="bubble bubble-ai" style="max-width: 100%;">Here are three spots within walking distance:</div>
+      <div style="height: 12px;"></div>
+
+      <!-- Callout: inline card -->
+      <div class="callout">INLINE POI CARD — vertical, full width, tappable</div>
+      <div style="height: 8px;"></div>
+
+      <!-- Card with annotations -->
+      <div style="position: relative;">
+        <div class="poi-card-inline" style="max-width: 100%;">
+          <div class="poi-card-inner">
+            <div class="poi-card-stripe stripe-open"></div>
+            <div class="poi-card-thumb thumb-bg-1"></div>
+            <div class="poi-card-content">
+              <div class="poi-card-header">
+                <span class="poi-card-emoji">&#127860;</span>
+                <span class="poi-card-name">La Carreta</span>
+              </div>
+              <div class="poi-card-type">Cuban Restaurant</div>
+              <div class="poi-card-insight">The 24-hour spot where Miami cops, nurses, and night owls all end up. Legendary croquetas.</div>
+              <div class="poi-card-meta">
+                <span class="star">&#9733;</span> 4.3 <span>·</span> $$ <span>·</span> 0.3 mi <span>·</span>
+                <span class="status-badge status-open" style="padding:1px 4px; font-size:10px;"><span class="status-dot" style="background:var(--status-open);width:4px;height:4px"></span> Open 24h</span>
+              </div>
+            </div>
+          </div>
+          <div class="poi-card-actions">
+            <button class="poi-card-action">&#9734; Save</button>
+            <button class="poi-card-action">&#8599; Navigate</button>
+            <button class="poi-card-action poi-card-action-primary">&#128172; Ask AI</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="height: 16px;"></div>
+      <div class="callout">CARDS STACK VERTICALLY — natural scroll</div>
+      <div style="height: 8px;"></div>
+
+      <div class="poi-card-inline" style="max-width: 100%;">
+        <div class="poi-card-inner">
+          <div class="poi-card-stripe stripe-closing"></div>
+          <div class="poi-card-thumb thumb-bg-2"></div>
+          <div class="poi-card-content">
+            <div class="poi-card-header">
+              <span class="poi-card-emoji">&#127862;</span>
+              <span class="poi-card-name">Exquisito Restaurant</span>
+            </div>
+            <div class="poi-card-type">Cuban Restaurant</div>
+            <div class="poi-card-insight">Hole-in-the-wall. Best ropa vieja on the block. Cash-only, no frills.</div>
+            <div class="poi-card-meta">
+              <span class="star">&#9733;</span> 4.6 <span>·</span> $ <span>·</span> 0.1 mi <span>·</span>
+              <span class="status-badge status-closing" style="padding:1px 4px; font-size:10px;"><span class="status-dot" style="background:var(--status-closing);width:4px;height:4px"></span> Closes 2 PM</span>
+            </div>
+          </div>
+        </div>
+        <div class="poi-card-actions">
+          <button class="poi-card-action">&#9734; Save</button>
+          <button class="poi-card-action">&#8599; Navigate</button>
+          <button class="poi-card-action poi-card-action-primary">&#128172; Ask AI</button>
+        </div>
+      </div>
+
+      <div style="height: 16px;"></div>
+      <div class="callout">AI TEXT AFTER CARDS — adds time-aware advice</div>
+      <div style="height: 8px;"></div>
+      <div class="bubble bubble-ai" style="max-width: 100%;">Exquisito closes at 2 PM — head there first. La Carreta is 24h, save it for late night.</div>
+
+      <div style="height: 20px;"></div>
+
+      <!-- Card element legend -->
+      <div style="padding: 12px; background: white; border-radius: 10px; border: 1px solid rgba(0,0,0,0.08);">
+        <div style="font-size: 11px; font-weight: 600; color: var(--primary-dark); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Card Elements</div>
+        <div style="font-size: 12px; line-height: 22px; color: var(--chat-text-secondary);">
+          <span style="color: var(--status-open);">&#9608;</span> <strong style="color:var(--chat-text);">Status stripe</strong> — green/orange/red/grey<br>
+          <span>&#127860;</span> <strong style="color:var(--chat-text);">Thumbnail</strong> — satellite tile (from map data)<br>
+          <strong style="color:var(--chat-text);">Emoji + Name</strong> — POI identity<br>
+          <strong style="color:var(--chat-text);">Insight</strong> — AI-generated 1-2 line hook<br>
+          <strong style="color:var(--chat-text);">Meta row</strong> — rating, price, distance, hours<br>
+          <strong style="color:var(--chat-text);">Actions</strong> — Save, Navigate, Ask AI<br>
+          <span style="font-size:11px; color: var(--chat-text-muted);">Tap card body = open that POI's detail page</span>
+        </div>
+      </div>
+
+      <div style="height: 20px;"></div>
+
+      <!-- Flow legend -->
+      <div style="padding: 12px; background: white; border-radius: 10px; border: 1px solid rgba(0,0,0,0.08);">
+        <div style="font-size: 11px; font-weight: 600; color: var(--primary-dark); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Inline Flow Pattern</div>
+        <div style="font-size: 12px; line-height: 22px; color: var(--chat-text-secondary);">
+          1. AI text bubble (context)<br>
+          2. POI card<br>
+          3. POI card<br>
+          4. POI card<br>
+          5. AI text bubble (time-aware advice)<br>
+          6. User follow-up<br>
+          7. AI text response (no card needed)<br>
+          <span style="font-size:11px; color: var(--chat-text-muted);">Cards are interleaved with text, not grouped separately.</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Notes -->
+<div class="notes-panel">
+  <h3>Inline POI Card Design Decisions</h3>
+  <ul>
+    <li><span class="hl">Vertical inline</span> — cards stack in the chat flow like messages. No horizontal carousel. Natural scroll.</li>
+    <li><span class="hl">Full width</span> (92% of chat area) — cards are prominent but clearly distinct from text bubbles via card styling (border, shadow, thumbnail).</li>
+    <li><span class="hl">Status stripe</span> on left edge — immediate open/closed signal without reading text. Green/orange/red/grey.</li>
+    <li><span class="hl">Satellite thumbnail</span> — reuses map tile data. Gives spatial context. Dark image on light card creates visual anchor.</li>
+    <li><span class="hl">AI insight line</span> — not generic description. Gemini generates a 1-2 line hook specific to context ("24-hour spot where cops end up" vs "Cuban restaurant").</li>
+    <li><span class="hl">Action row</span> — Save, Navigate, Ask AI. "Ask AI" opens that POI's detail page with auto-seeded context.</li>
+    <li><span class="hl">Tapping card body</span> navigates to that POI's detail page (pushes onto nav stack).</li>
+    <li><span class="hl">Cards interleaved with text</span> — AI can put text before cards (context), between cards (comparison), and after cards (advice). Not a separate "card section."</li>
+  </ul>
+</div>
+
+</body>
+</html>

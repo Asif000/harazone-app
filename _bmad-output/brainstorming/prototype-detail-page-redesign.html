@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Detail Page — Light Chat Theme Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    /* Existing dark theme (map, hero) */
+    --map-surface-dark: #161016;
+    --map-bg: #0A0A0A;
+    --surface: #2D2520;
+    --text-primary: #EDE0D4;
+    --text-secondary: #A89888;
+    --primary: #E89A5E;
+    --primary-dark: #C47A3E;
+    --vibe-character: #2BBCB3;
+    --status-open: #4CAF50;
+    --status-closing: #FF9800;
+    --gold: #FFD700;
+    --indigo-start: #6366F1;
+    --indigo-end: #8B5CF6;
+
+    /* LIGHT chat theme (default — respects system preference) */
+    --chat-bg: #F5F2EF;
+    --chat-surface: #FFFFFF;
+    --chat-input-bg: #EBE7E3;
+    --chat-text: #1A1412;
+    --chat-text-secondary: #7A6E64;
+    --chat-text-muted: #A89888;
+    --chat-divider: rgba(0,0,0,0.08);
+    --chat-ai-bubble: #FFFFFF;
+    --chat-ai-bubble-border: rgba(0,0,0,0.06);
+    --chat-pill-bg: #FFFFFF;
+    --chat-pill-border: rgba(0,0,0,0.10);
+    --chat-pill-text: #3D3530;
+    --chat-section-marker: #A89888;
+    --chat-send-active: var(--primary);
+    --chat-send-inactive: #DDD8D3;
+
+    /* AI Context Block — light variant */
+    --context-bg: #FFFFFF;
+    --context-border: var(--primary);
+    --context-text: #2D2520;
+    --context-text-secondary: #5A4E44;
+    --context-why-bg: #FAF7F4;
+    --context-tip-text: #7A6E64;
+    --context-label: var(--primary-dark);
+
+    /* POI info — transition zone (dark to light) */
+    --poi-info-bg: #2A2320;
+    --poi-info-gradient-end: var(--chat-bg);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #111;
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 24px;
+    min-height: 100vh;
+    flex-wrap: wrap;
+  }
+
+  h1 {
+    width: 100%;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    width: 100%;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+  }
+
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    border-radius: 40px;
+    overflow: hidden;
+    border: 2px solid #333;
+    position: relative;
+    flex-shrink: 0;
+  }
+
+  .label {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .label-accent { color: var(--primary); }
+  .phone-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ============ MAP BACKDROP ============ */
+  .map-strip {
+    height: 90px;
+    background: linear-gradient(180deg, #1a2a1a 0%, #0d1a0d 60%, #0A0A0A 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  .map-strip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 30% 40%, rgba(42,80,42,0.3) 0%, transparent 50%),
+      radial-gradient(circle at 70% 60%, rgba(30,60,80,0.2) 0%, transparent 40%);
+  }
+  .map-strip .pin {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    width: 28px;
+    height: 28px;
+    background: var(--vibe-character);
+    border-radius: 50% 50% 50% 0;
+    transform: translateX(-50%) rotate(-45deg);
+    border: 2px solid white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .map-label {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.3);
+    letter-spacing: 0.5px;
+  }
+
+  /* ============ DETAIL PAGE CONTAINER ============ */
+  .detail-page {
+    height: calc(812px - 90px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .detail-scroll {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .detail-scroll::-webkit-scrollbar { display: none; }
+
+  /* ============ HERO ============ */
+  .hero {
+    position: relative;
+    height: 160px;
+    overflow: hidden;
+  }
+  .hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    background: linear-gradient(135deg, #3a2a20 0%, #1a1210 50%, #0a0806 100%);
+  }
+  .hero-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, rgba(43,188,179,0.5) 0%, rgba(43,188,179,0.15) 100%);
+  }
+  .hero-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  /* ============ POI INFO (DARK — part of hero zone) ============ */
+  .poi-info-dark {
+    padding: 12px 16px 8px;
+    background: rgba(22,16,22,0.97);
+  }
+  .poi-name-dark {
+    font-size: 16px;
+    font-weight: 600;
+    color: white;
+    line-height: 20.8px;
+  }
+  .poi-type-dark {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.6);
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+  .poi-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    flex-wrap: wrap;
+  }
+  .vibe-chip {
+    background: rgba(43,188,179,0.3);
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    letter-spacing: 0.5px;
+  }
+  .rating {
+    font-size: 12px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .star { color: var(--gold); font-size: 13px; }
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .status-open {
+    background: rgba(76,175,80,0.15);
+    color: var(--status-open);
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .buzz-meter {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+  }
+  .buzz-seg {
+    width: 12px;
+    height: 6px;
+    border-radius: 2px;
+  }
+  .buzz-filled { background: var(--vibe-character); }
+  .buzz-empty { background: rgba(43,188,179,0.2); }
+  .price-range-dark {
+    font-size: 12px;
+    color: rgba(255,255,255,0.6);
+    font-weight: 500;
+  }
+
+  /* Dark action chips */
+  .action-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+    padding-bottom: 4px;
+  }
+  .action-chip-dark {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 16px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.9);
+    cursor: pointer;
+    background: transparent;
+    white-space: nowrap;
+  }
+
+  /* ============ POI INFO (LIGHT — proposed version) ============ */
+  .poi-info-light {
+    padding: 12px 16px 8px;
+    background: var(--chat-bg);
+  }
+  .poi-name-light {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--chat-text);
+    line-height: 20.8px;
+  }
+  .poi-type-light {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--chat-text-secondary);
+    margin-top: 2px;
+    letter-spacing: 0.5px;
+  }
+  .vibe-chip-light {
+    background: rgba(43,188,179,0.15);
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #1A8A82;
+    letter-spacing: 0.5px;
+  }
+  .rating-light {
+    font-size: 12px;
+    color: var(--chat-text);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .status-open-light {
+    background: rgba(76,175,80,0.12);
+    color: #3A8A3E;
+  }
+  .buzz-filled-light { background: #1A8A82; }
+  .buzz-empty-light { background: rgba(43,188,179,0.15); }
+  .price-range-light {
+    font-size: 12px;
+    color: var(--chat-text-secondary);
+    font-weight: 500;
+  }
+  .action-chip-light {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    border: 1px solid rgba(0,0,0,0.15);
+    border-radius: 16px;
+    font-size: 12px;
+    color: var(--chat-text);
+    cursor: pointer;
+    background: transparent;
+    white-space: nowrap;
+  }
+  .action-chip-light:hover { background: rgba(0,0,0,0.04); }
+
+  /* Dark-to-light transition gradient */
+  .dark-to-light-transition {
+    height: 20px;
+    background: linear-gradient(180deg, rgba(22,16,22,0.97) 0%, var(--chat-bg) 100%);
+  }
+
+  /* ============ AI CONTEXT BLOCK (DARK — current) ============ */
+  .ai-context-block-dark {
+    margin: 8px 16px 4px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 12px;
+    border-left: 3px solid var(--primary);
+  }
+  .ai-context-label-dark {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--primary);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .ai-context-blurb-dark {
+    font-size: 14px;
+    line-height: 21px;
+    color: rgba(255,255,255,0.88);
+    margin-bottom: 10px;
+  }
+  .ai-context-why-dark {
+    font-size: 13px;
+    line-height: 19px;
+    color: rgba(255,255,255,0.7);
+    padding: 8px 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .ai-context-why-dark strong {
+    color: var(--primary);
+    font-weight: 600;
+  }
+  .ai-context-tip-dark {
+    font-size: 13px;
+    line-height: 19px;
+    color: rgba(255,255,255,0.65);
+    font-style: italic;
+  }
+
+  /* ============ AI CONTEXT BLOCK (LIGHT) ============ */
+  .ai-context-block-light {
+    margin: 8px 16px 4px;
+    padding: 14px 16px;
+    background: var(--context-bg);
+    border-radius: 12px;
+    border-left: 3px solid var(--context-border);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .ai-context-label-light {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--context-label);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .ai-context-label-light .sparkle { font-size: 12px; }
+  .ai-context-blurb-light {
+    font-size: 14px;
+    line-height: 22px;
+    color: var(--context-text);
+    margin-bottom: 10px;
+  }
+  .ai-context-why-light {
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--context-text-secondary);
+    padding: 8px 10px;
+    background: var(--context-why-bg);
+    border-radius: 8px;
+    margin-bottom: 8px;
+  }
+  .ai-context-why-light strong {
+    color: var(--primary-dark);
+    font-weight: 600;
+  }
+  .ai-context-tip-light {
+    font-size: 13px;
+    line-height: 19px;
+    color: var(--context-tip-text);
+    font-style: italic;
+  }
+  .tip-icon { font-style: normal; margin-right: 4px; }
+
+  /* ============ CHAT — CURRENT DARK ============ */
+  .chat-dark-bg {
+    background: rgba(22,16,22,0.97);
+  }
+  .chat-dark-bg .chat-divider-line {
+    height: 1px;
+    background: rgba(255,255,255,0.06);
+    margin: 0 16px;
+  }
+
+  /* ============ CHAT — NEW LIGHT ============ */
+  .chat-light-bg {
+    background: var(--chat-bg);
+  }
+  .chat-light-bg .chat-divider-line {
+    height: 1px;
+    background: var(--chat-divider);
+    margin: 0 16px;
+  }
+
+  .chat-messages {
+    flex: 1;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .chat-messages::-webkit-scrollbar { display: none; }
+
+  .chat-bubble {
+    max-width: 85%;
+    padding: 12px;
+    font-size: 14px;
+    line-height: 21px;
+  }
+
+  /* User bubble — same in both themes (indigo gradient pops on any bg) */
+  .chat-user {
+    align-self: flex-end;
+    background: linear-gradient(135deg, var(--indigo-start), var(--indigo-end));
+    border-radius: 16px 16px 4px 16px;
+    color: white;
+  }
+
+  /* AI bubble — dark theme */
+  .chat-ai-dark {
+    align-self: flex-start;
+    background: rgba(255,255,255,0.07);
+    border-radius: 16px 16px 16px 4px;
+    color: var(--text-primary);
+  }
+
+  /* AI bubble — light theme */
+  .chat-ai-light {
+    align-self: flex-start;
+    background: var(--chat-ai-bubble);
+    border: 1px solid var(--chat-ai-bubble-border);
+    border-radius: 16px 16px 16px 4px;
+    color: var(--chat-text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+
+  /* Chat input — dark */
+  .chat-input-bar {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px 12px;
+    gap: 8px;
+  }
+  .chat-input {
+    flex: 1;
+    height: 44px;
+    border-radius: 24px;
+    border: none;
+    padding: 0 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    outline: none;
+  }
+  .chat-input-dark {
+    background: var(--surface);
+    color: var(--text-primary);
+  }
+  .chat-input-dark::placeholder { color: var(--text-secondary); }
+
+  .chat-input-light {
+    background: var(--chat-input-bg);
+    color: var(--chat-text);
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .chat-input-light::placeholder { color: var(--chat-text-muted); }
+
+  .send-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .send-btn.active {
+    background: var(--primary);
+    color: #1A1412;
+  }
+  .send-btn.inactive-dark {
+    background: var(--surface);
+    color: rgba(255,255,255,0.4);
+  }
+  .send-btn.inactive-light {
+    background: var(--chat-send-inactive);
+    color: var(--chat-text-muted);
+  }
+
+  /* Pills — dark */
+  .pills-row {
+    display: flex;
+    gap: 8px;
+    padding: 6px 16px 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .pills-row::-webkit-scrollbar { display: none; }
+  .pill {
+    padding: 6px 12px;
+    border-radius: 16px;
+    font-size: 13px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .pill-dark {
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.8);
+  }
+  .pill-light {
+    background: var(--chat-pill-bg);
+    color: var(--chat-pill-text);
+    border: 1px solid var(--chat-pill-border);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .pill:hover { opacity: 0.8; }
+
+  /* Section label inside phone */
+  .section-marker-dark {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 4px 16px 2px;
+    color: rgba(255,255,255,0.3);
+  }
+  .section-marker-light {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 4px 16px 2px;
+    color: var(--chat-text-muted);
+  }
+
+  /* ============ NOTES PANEL ============ */
+  .notes-panel {
+    width: 100%;
+    max-width: 860px;
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .notes-panel h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 12px;
+  }
+  .notes-panel ul {
+    list-style: none;
+    padding: 0;
+  }
+  .notes-panel li {
+    font-size: 13px;
+    line-height: 20px;
+    color: var(--text-secondary);
+    padding: 4px 0;
+    padding-left: 16px;
+    position: relative;
+  }
+  .notes-panel li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 11px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--primary);
+    opacity: 0.6;
+  }
+  .notes-panel .hl { color: var(--text-primary); font-weight: 500; }
+
+  /* Color swatch */
+  .swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 4px;
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+
+  @media (max-width: 900px) {
+    body { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<h1>AI Detail Page — Light Chat Theme</h1>
+<div class="subtitle">Dark hero + light content/chat &mdash; respects system theme, light by default &mdash; Brainstorm 2026-03-15</div>
+
+<!-- ============ CURRENT (ALL DARK) ============ -->
+<div class="phone-col">
+  <div class="label">Current <span style="color:rgba(255,255,255,0.3)">(all dark)</span></div>
+  <div class="phone-frame">
+    <div class="map-strip">
+      <div class="map-label">MAP (ambient)</div>
+      <div class="pin"></div>
+    </div>
+    <div class="detail-page">
+      <div class="detail-scroll chat-dark-bg">
+        <!-- Hero -->
+        <div class="hero">
+          <div class="hero-img"></div>
+          <div class="hero-gradient"></div>
+          <div class="hero-close">x</div>
+        </div>
+        <!-- POI Info (dark) -->
+        <div class="poi-info-dark">
+          <div class="poi-name-dark">Versailles Restaurant</div>
+          <div class="poi-type-dark">Cuban Restaurant</div>
+          <div class="poi-meta-row">
+            <span class="vibe-chip">Character</span>
+            <span class="rating"><span class="star">&#9733;</span> 4.5</span>
+            <span class="status-badge status-open"><span class="status-dot" style="background:var(--status-open)"></span> Open</span>
+            <span class="price-range-dark">$$</span>
+          </div>
+          <div class="action-row">
+            <button class="action-chip-dark">&#9734; Save</button>
+            <button class="action-chip-dark">&#8599; Directions</button>
+            <button class="action-chip-dark">&#9673; On Map</button>
+          </div>
+        </div>
+        <!-- No AI Context Block — straight to chat -->
+        <div class="chat-divider-line"></div>
+        <div class="chat-messages" style="min-height: 280px;">
+          <div class="chat-ai-dark chat-bubble">Versailles has been the heartbeat of Miami's Cuban exile community since 1971. Known as "the world's most famous Cuban restaurant," it's a cultural landmark on Calle Ocho where politicians campaign and families gather for cafecitos at the ventanita. You're arriving at lunch — the line moves fast but the ropa vieja is worth any wait.</div>
+          <div class="chat-user chat-bubble">What should I order?</div>
+          <div class="chat-ai-dark chat-bubble">The ropa vieja is the signature, but locals swear by the pan con lechon at the ventanita. Since you're here during lunch rush, the ventanita line moves faster.</div>
+        </div>
+      </div>
+      <div class="chat-dark-bg">
+        <div class="pills-row">
+          <span class="pill pill-dark">&#127860; Best dishes</span>
+          <span class="pill pill-dark">&#128205; History</span>
+          <span class="pill pill-dark">&#9203; Best time</span>
+        </div>
+        <div class="chat-input-bar">
+          <input class="chat-input chat-input-dark" placeholder="Ask anything..." disabled>
+          <button class="send-btn inactive-dark">&#8593;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ PROPOSED (DARK HERO + LIGHT CONTENT/CHAT) ============ -->
+<div class="phone-col">
+  <div class="label"><span class="label-accent">Proposed</span> — light chat</div>
+  <div class="phone-frame">
+    <div class="map-strip">
+      <div class="map-label">MAP (ambient, non-interactive)</div>
+      <div class="pin"></div>
+    </div>
+    <div class="detail-page">
+      <div class="detail-scroll chat-light-bg">
+        <!-- LAYER 1: Hero (stays dark — it's an image) -->
+        <div class="hero">
+          <div class="hero-img"></div>
+          <div class="hero-gradient"></div>
+          <div class="hero-close">x</div>
+        </div>
+
+        <!-- POI Info — light theme -->
+        <div class="poi-info-light">
+          <div class="poi-name-light">Versailles Restaurant</div>
+          <div class="poi-type-light">Cuban Restaurant</div>
+          <div class="poi-meta-row">
+            <span class="vibe-chip-light">Character</span>
+            <span class="rating-light"><span class="star">&#9733;</span> 4.5</span>
+            <span class="status-badge status-open-light"><span class="status-dot" style="background:var(--status-open)"></span> Open</span>
+            <div class="buzz-meter">
+              <div class="buzz-seg buzz-filled-light"></div>
+              <div class="buzz-seg buzz-filled-light"></div>
+              <div class="buzz-seg buzz-empty-light"></div>
+            </div>
+            <span class="price-range-light">$$</span>
+          </div>
+          <div class="action-row">
+            <button class="action-chip-light">&#9734; Save</button>
+            <button class="action-chip-light">&#8599; Directions</button>
+            <button class="action-chip-light">&#9673; On Map</button>
+          </div>
+        </div>
+
+        <!-- LAYER 2: AI Context Block (light) -->
+        <div class="ai-context-block-light">
+          <div class="ai-context-label-light"><span class="sparkle">&#10024;</span> AI Context</div>
+          <div class="ai-context-blurb-light">Versailles has been the heartbeat of Miami's Cuban exile community since 1971 — a cultural landmark on Calle Ocho where politicians campaign over cafecitos and three generations share Sunday ropa vieja.</div>
+          <div class="ai-context-why-light"><strong>Why now:</strong> It's 12:30 PM — lunch rush is peaking. The ventanita (walk-up window) line moves faster than dine-in right now.</div>
+          <div class="ai-context-tip-light"><span class="tip-icon">&#128161;</span> Locals skip the dining room at lunch and grab pan con lechon from the ventanita.</div>
+        </div>
+
+        <!-- LAYER 3: Chat (light) -->
+        <div class="chat-divider-line"></div>
+        <div class="section-marker-light">Chat</div>
+
+        <div class="chat-messages" style="min-height: 160px;">
+          <div class="chat-user chat-bubble">What should I order?</div>
+          <div class="chat-ai-light chat-bubble">The ropa vieja is the signature — slow-braised shredded beef that's been on the menu since day one. But since you're at the ventanita, try the pan con lechon with a cortadito. It's the real Versailles experience.</div>
+        </div>
+      </div>
+      <div class="chat-light-bg">
+        <div class="pills-row">
+          <span class="pill pill-light">&#127860; Best dishes</span>
+          <span class="pill pill-light">&#128205; History</span>
+          <span class="pill pill-light">&#9203; Best time</span>
+          <span class="pill pill-light">&#128176; Prices</span>
+        </div>
+        <div class="chat-input-bar">
+          <input class="chat-input chat-input-light" placeholder="Ask about this place..." disabled>
+          <button class="send-btn active">&#8593;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ DESIGN NOTES ============ -->
+<div class="notes-panel">
+  <h3>Design Decisions</h3>
+  <ul>
+    <li><span class="hl">Light theme by default</span> for the entire detail page below the hero image. Chat bg <span class="swatch" style="background:#F5F2EF"></span>#F5F2EF (warm off-white), AI bubbles <span class="swatch" style="background:#FFFFFF"></span>#FFF with subtle border, input <span class="swatch" style="background:#EBE7E3"></span>#EBE7E3.</li>
+    <li><span class="hl">Hero stays dark</span> — it's a photo with gradient overlay. The dark-to-light transition happens at the POI info section. No jarring cut.</li>
+    <li><span class="hl">System theme support:</span> These light values become the default. When device is in dark mode, swap to the current dark palette. Two color schemes, one layout.</li>
+    <li><span class="hl">AI Context Block</span> is white card with primary-color left border + subtle shadow. Reads like editorial content, not a UI widget. Contains contextBlurb + whyNow + localTip.</li>
+    <li><span class="hl">Chat visual hierarchy:</span> Light bg makes chat feel like a reading experience, not a dark terminal. User bubbles (indigo gradient) pop on light bg. AI bubbles are white cards with hairline border.</li>
+    <li><span class="hl">Pills</span> are white with light border — feel tappable but not heavy. Input bar uses warm gray (#EBE7E3).</li>
+    <li><span class="hl">Bottom nav hidden</span> when detail page is open. FAB persists.</li>
+    <li><span class="hl">Placeholder text:</span> "Ask about this place..." (contextual, not generic).</li>
+  </ul>
+</div>
+
+<div class="notes-panel">
+  <h3>Color Palette — Light Theme (Default)</h3>
+  <ul>
+    <li><span class="swatch" style="background:#F5F2EF"></span><span class="hl">Chat background:</span> #F5F2EF — warm off-white (not cold/blue white)</li>
+    <li><span class="swatch" style="background:#FFFFFF"></span><span class="hl">AI bubbles / Context block / Pills:</span> #FFFFFF with rgba(0,0,0,0.06) border</li>
+    <li><span class="swatch" style="background:#EBE7E3"></span><span class="hl">Chat input:</span> #EBE7E3 — slightly darker warm gray</li>
+    <li><span class="swatch" style="background:#FAF7F4"></span><span class="hl">"Why now" inset:</span> #FAF7F4 — barely-there warm tint</li>
+    <li><span class="swatch" style="background:#1A1412"></span><span class="hl">Primary text:</span> #1A1412 — warm near-black (matches app's OnPrimary)</li>
+    <li><span class="swatch" style="background:#7A6E64"></span><span class="hl">Secondary text:</span> #7A6E64 — warm mid-gray</li>
+    <li><span class="swatch" style="background:#A89888"></span><span class="hl">Muted text:</span> #A89888 — placeholder, timestamps</li>
+    <li><span class="swatch" style="background:#C47A3E"></span><span class="hl">Primary accent (on light):</span> #C47A3E — slightly deeper than #E89A5E for contrast on white</li>
+  </ul>
+</div>
+
+<div class="notes-panel">
+  <h3>System Theme Strategy</h3>
+  <ul>
+    <li><span class="hl">Default: Light</span> — detail page uses light palette regardless of map (map always dark).</li>
+    <li><span class="hl">Dark mode override:</span> When system dark mode is active, detail page swaps to current dark palette. Single <code>isSystemInDarkTheme()</code> check.</li>
+    <li><span class="hl">Implementation:</span> Create <code>DetailPageColorScheme</code> with light/dark variants. Compose's <code>MaterialTheme</code> wrapper scoped to detail page only. Map + carousel keep dark theme always.</li>
+    <li><span class="hl">Tester release:</span> Ship light-only first. Add dark mode toggle as fast follow. Simpler to test one theme well than two themes poorly.</li>
+  </ul>
+</div>
+
+</body>
+</html>
