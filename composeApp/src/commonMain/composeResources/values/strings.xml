@@ -78,6 +78,7 @@
     <!-- Settings / Feedback -->
     <string name="settings_version">Version</string>
     <string name="settings_send_feedback">Send Feedback</string>
+    <string name="settings_privacy_policy">Privacy Policy</string>
     <string name="feedback_screenshot_captured">Screenshot captured ✓</string>
     <string name="feedback_description_placeholder">Describe the issue…</string>
     <string name="feedback_cancel">Cancel</string>

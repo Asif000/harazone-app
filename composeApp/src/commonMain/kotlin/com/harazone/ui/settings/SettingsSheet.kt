@@ -6,6 +6,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -25,6 +30,12 @@ fun SettingsSheet(
     onDismiss: () -> Unit,
     onSendFeedback: () -> Unit,
 ) {
+    var showPrivacyPolicy by remember { mutableStateOf(false) }
+
+    if (showPrivacyPolicy) {
+        PrivacyPolicySheet(onDismiss = { showPrivacyPolicy = false })
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss) {
         PlatformBackHandler(enabled = true) { onDismiss() }
         ListItem(
@@ -36,6 +47,12 @@ fun SettingsSheet(
             headlineContent = { Text(stringResource(Res.string.settings_send_feedback)) },
             leadingContent = { Icon(Icons.Default.BugReport, contentDescription = null) },
             modifier = Modifier.clickable { onSendFeedback() },
+        )
+        HorizontalDivider()
+        ListItem(
+            headlineContent = { Text(stringResource(Res.string.settings_privacy_policy)) },
+            leadingContent = { Icon(Icons.Default.Shield, contentDescription = null) },
+            modifier = Modifier.clickable { showPrivacyPolicy = true },
         )
         Spacer(Modifier.height(16.dp))
     }
