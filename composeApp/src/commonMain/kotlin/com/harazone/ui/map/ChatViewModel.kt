@@ -331,6 +331,9 @@ internal class ChatViewModel(
                         val existingIds = s.poiCards.map { it.id }.toSet()
                         val deduped = newCards.filter { it.id !in existingIds }
                         // Newest cards first so user sees them without scrolling
+                        val updatedBubbleCards = if (deduped.isNotEmpty()) {
+                            s.bubblePoiCards + (aiBubbleId to deduped)
+                        } else s.bubblePoiCards
                         _uiState.value = s.copy(
                             bubbles = s.bubbles.map {
                                 if (it.id == aiBubbleId) ChatBubble(
@@ -341,6 +344,7 @@ internal class ChatViewModel(
                                                         persistentPills = computePersistentPills(selectedIntent, query, _uiState.value.depthLevel),
                             showSkeletons = false,
                             poiCards = deduped + s.poiCards,
+                            bubblePoiCards = updatedBubbleCards,
                         )
                         conversationHistory.add(
                             ChatMessage(
@@ -596,6 +600,7 @@ internal class ChatViewModel(
         _uiState.value = _uiState.value.copy(
             bubbles = emptyList(),
                         poiCards = emptyList(),
+            bubblePoiCards = emptyMap(),
             showSkeletons = false,
             isStreaming = false,
             persistentPills = pillsFor(currentEntryPoint, areaName),

@@ -159,14 +159,42 @@ internal fun AiDetailPage(
                     }
                 }
 
-                // Chat bubbles
-                items(chatState.bubbles, key = { it.id }) { bubble ->
-                    Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
-                        ChatBubbleItem(
-                            bubble = bubble,
-                            onRetry = { chatViewModel.retryLastMessage() },
-                            lightMode = true,
-                        )
+                // Chat bubbles with inline POI cards after each AI response
+                chatState.bubbles.forEach { bubble ->
+                    item(key = bubble.id) {
+                        Box(Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                            ChatBubbleItem(
+                                bubble = bubble,
+                                onRetry = { chatViewModel.retryLastMessage() },
+                                lightMode = true,
+                            )
+                        }
+                    }
+                    // Render POI cards inline after their associated AI bubble
+                    val cards = chatState.bubblePoiCards[bubble.id]
+                    if (!cards.isNullOrEmpty()) {
+                        items(cards, key = { "poi_${it.id}" }) { card ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.Start,
+                            ) {
+                                ChatPoiMiniCard(
+                                    card = card,
+                                    isSaved = card.id in chatState.savedPoiIds,
+                                    onSave = { chatViewModel.savePoi(card, chatState.areaName) },
+                                    onUnsave = { chatViewModel.unsavePoi(card.id) },
+                                    onDirections = {
+                                        val handled = onNavigateToMaps(card.lat, card.lng, card.name)
+                                        if (!handled) onDirectionsFailed()
+                                    },
+                                    onShowOnMap = {
+                                        onShowOnMap(card.lat, card.lng)
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -175,32 +203,6 @@ internal fun AiDetailPage(
                     item(key = "skeletons") {
                         Box(Modifier.padding(horizontal = 16.dp)) {
                             SkeletonSection(3)
-                        }
-                    }
-                }
-
-                // POI cards — inline vertical items (scroll up with conversation)
-                if (chatState.poiCards.isNotEmpty()) {
-                    items(chatState.poiCards, key = { "poi_${it.id}" }) { card ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 4.dp),
-                            horizontalArrangement = Arrangement.Start,
-                        ) {
-                            ChatPoiMiniCard(
-                                card = card,
-                                isSaved = card.id in chatState.savedPoiIds,
-                                onSave = { chatViewModel.savePoi(card, chatState.areaName) },
-                                onUnsave = { chatViewModel.unsavePoi(card.id) },
-                                onDirections = {
-                                    val handled = onNavigateToMaps(card.lat, card.lng, card.name)
-                                    if (!handled) onDirectionsFailed()
-                                },
-                                onShowOnMap = {
-                                    onShowOnMap(card.lat, card.lng)
-                                },
-                            )
                         }
                     }
                 }

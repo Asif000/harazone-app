@@ -890,6 +890,25 @@ Enjoy!"""
     }
 
     @Test
+    fun `bubblePoiCards_associatesCardsWithAiBubble`() = runTest {
+        val cardJson = """{"prose":"Try this","pois":[{"n":"Cafe A","t":"food","lat":1.0,"lng":2.0,"w":"great"}]}"""
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken(cardJson, false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Test Area", emptyList(), null)
+        vm.sendMessage("First")
+
+        val state = vm.uiState.value
+        val aiBubble = state.bubbles.find { it.role == MessageRole.AI }
+        assertTrue(aiBubble != null, "Should have an AI bubble")
+        val inlineCards = state.bubblePoiCards[aiBubble!!.id]
+        assertTrue(inlineCards != null && inlineCards.isNotEmpty(), "Cards should be associated with AI bubble")
+        assertEquals("Cafe A", inlineCards!![0].name)
+    }
+
+    @Test
     fun `poiCards_clearOnReset`() = runTest {
         val cardJson = """{"prose":"Try this","pois":[{"n":"Cafe A","t":"food","lat":1.0,"lng":2.0,"w":"great"}]}"""
         fakeAiProvider.chatTokens = listOf(

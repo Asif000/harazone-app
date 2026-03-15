@@ -46,6 +46,7 @@ data class ChatUiState(
     val inputText: String = "",
     val lastUserQuery: String = "",
     val poiCards: List<ChatPoiCard> = emptyList(),
+    val bubblePoiCards: Map<String, List<ChatPoiCard>> = emptyMap(),
     val showSkeletons: Boolean = false,
     val savedPoiIds: Set<String> = emptySet(),
     val contextBanner: String? = null,
