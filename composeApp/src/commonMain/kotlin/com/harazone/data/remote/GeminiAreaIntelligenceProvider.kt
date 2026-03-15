@@ -197,13 +197,17 @@ internal class GeminiAreaIntelligenceProvider(
                     }
                     send(BucketUpdate.PortraitComplete(enrichedPois))
                 } else if (stage1Names.isNotEmpty()) {
-                    val enriched = responseParser.parseEnrichmentResponse(fullText.toString())
-                    AppLogger.d { "Stage 2 complete: ${enriched.size} enriched for '$areaName'" }
-                    send(BucketUpdate.PortraitComplete(enriched.map { e ->
-                        POI(name = e.n, type = "", description = "", confidence = Confidence.MEDIUM,
-                            latitude = null, longitude = null, vibe = e.v, insight = e.w,
-                            hours = e.h, liveStatus = e.s, rating = e.r, priceRange = e.p)
-                    }))
+                    val enrichResult = responseParser.parseEnrichmentWithHighlights(fullText.toString())
+                    val enriched = enrichResult.enrichments
+                    AppLogger.d { "Stage 2 complete: ${enriched.size} enriched, ${enrichResult.areaHighlights.size} highlights for '$areaName'" }
+                    send(BucketUpdate.PortraitComplete(
+                        pois = enriched.map { e ->
+                            POI(name = e.n, type = "", description = "", confidence = Confidence.MEDIUM,
+                                latitude = null, longitude = null, vibe = e.v, insight = e.w,
+                                hours = e.h, liveStatus = e.s, rating = e.r, priceRange = e.p)
+                        },
+                        areaHighlights = enrichResult.areaHighlights,
+                    ))
                 }
                 AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete for '$areaName'" }
             } catch (e: CancellationException) {

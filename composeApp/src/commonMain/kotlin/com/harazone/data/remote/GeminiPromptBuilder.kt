@@ -21,8 +21,8 @@ Rules:
 - pois: 3 best POIs. Each "v" MUST exactly match a vibe label. "p" is price range ($ to $$$$, omit if N/A). "h" is current hours. "s" is status: open, busy, or closed.
 - ah: REQUIRED — 2-3 short area highlights (recurring events, seasonal notes, trending now, local tips). Max 80 chars each. ALWAYS include at least 2 highlights. Examples: "Live jazz every Friday at Praça do Comércio", "Flea market Sat 8am-2pm", "Best pastel de nata in the city".
 - t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-- GPS to 4 decimal places. Skip any POI you cannot place accurately.
-- LAND COORDINATES ONLY: Every lat/lng MUST be on land, never in water, ocean, sea, river, or lake. For coastal cities, bias coordinates inland toward the street or building. If unsure, use the city center coordinates as fallback.$newUserHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
+- GPS to 4 decimal places. Prefer accurate placement; if unsure of exact location, use the city center coordinates as fallback. Never omit a POI for lack of coordinates.
+- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.$newUserHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 
@@ -37,8 +37,8 @@ Rules:
 - Do NOT include any of these places: $excludeList
 - Each POI "v" field MUST exactly match one of these vibe labels — character-for-character, same case: $vibeList
 - t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-- GPS to 4 decimal places. Skip any POI you cannot place accurately.
-- LAND COORDINATES ONLY: Every lat/lng MUST be on land, never in water, ocean, sea, river, or lake. For coastal cities, bias coordinates inland toward the street or building. If unsure, use the city center coordinates as fallback.${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
+- GPS to 4 decimal places. Prefer accurate placement; if unsure of exact location, use the city center coordinates as fallback. Never omit a POI for lack of coordinates.
+- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 
@@ -111,8 +111,8 @@ IMPORTANT:
 - Each bucket must be valid JSON on its own
 - Adapt content to the current time of day and day of week
 - NEVER include the strings "---BUCKET---" or "---POIS---" inside JSON field values
-- For each POI, provide decimal GPS coordinates to 4 decimal places. Coordinates are required for map marker placement. Only include a POI if you can provide coordinates with reasonable confidence
-- LAND COORDINATES ONLY: Every lat/lng MUST be on land, never in water, ocean, sea, river, or lake. For coastal cities, bias coordinates inland toward the street or building. Each coordinate must correspond to a road, building, or walkable area. If you cannot confidently place a POI on land, use the city center coordinates as fallback. Double-check coastal POIs — if a coordinate could be in water, move it inland.
+- For each POI, provide decimal GPS coordinates to 4 decimal places. Coordinates are required for map marker placement. Prefer accurate placement; if unsure, use the city center coordinates as fallback. Never omit a POI for lack of coordinates
+- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.
 - For each POI, include "wiki" with the exact Wikipedia article title (underscores, e.g. "Igreja_Matriz_Nossa_Senhora_da_Penha"). Only include if you are confident in the article name. Omit "wiki" rather than guessing.
 - ah: REQUIRED — 2-3 short area highlights (events, seasonal tips, trending now). Max 80 chars each. ALWAYS include at least 2.
         """.trimIndent()
@@ -140,7 +140,8 @@ Rules:
 - "w" field is required for every POI — one sentence on why it is special.
 - "h" is current hours (e.g. "9am-10pm"). "s" is current status: open, busy, or closed. Adapt to current time of day.
 - Valid s values: open, busy, closed
-- GPS to 4 decimal places. t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels, highlights, content, and 'w' fields MUST be in the language identified by locale '$languageTag'." else ""}
+- GPS to 4 decimal places. t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
+- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels, highlights, content, and 'w' fields MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 
@@ -288,7 +289,7 @@ Rules:
 - t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 - DEPTH CONTROL: First response = 1-2 places. If user asks for more = 2-3 more. Never exceed 5 places total per message.
 - DEDUPLICATION: If the user context mentions previously recommended places, do NOT include them in pois or mention them in prose.
-- LAND COORDINATES ONLY: Every lat/lng MUST be on land, never in water, ocean, sea, river, or lake. For coastal cities, bias coordinates inland toward the street or building. If unsure, use the city center coordinates as fallback.
+- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.
 Example: {"prose":"Check out **Brick Lane** for incredible street art — it changes weekly.\nWhat mood are you in — edgy underground spots or the well-known walls?","pois":[{"n":"Brick Lane","t":"arts","lat":51.5215,"lng":-0.0714,"w":"London's densest open-air gallery, curated by the street itself"}]}"""
 
     private fun framingBlock(framingHint: String?): String = framingHint ?: ""

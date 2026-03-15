@@ -2429,6 +2429,27 @@ class MapViewModelTest {
     }
 
     @Test
+    fun portraitComplete_areaHighlightsFlowToUiState() = runTest(testDispatcher) {
+        // Regression: H1 — enrichment path used parseEnrichmentResponse which dropped areaHighlights.
+        // Now uses parseEnrichmentWithHighlights, and PortraitComplete carries areaHighlights.
+        val highlights = listOf("Live music Fri", "Best brunch spot")
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(
+                    pois = listOf(POI("Cafe X", "food", "desc", Confidence.HIGH, 40.71, -74.00)),
+                    areaHighlights = highlights,
+                ))
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(highlights, state.areaHighlights)
+    }
+
+    @Test
     fun selectPoiNull_preservesSelectedPinIndex() = runTest(testDispatcher) {
         val vm = createViewModelWithPois()
         vm.onPinTapped(1)

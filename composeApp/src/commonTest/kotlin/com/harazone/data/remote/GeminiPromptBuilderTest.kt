@@ -191,10 +191,8 @@ class GeminiPromptBuilderTest {
     fun buildPinOnlyPrompt_includesLandCoordinateInstruction() {
         val prompt = builder.buildPinOnlyPrompt("Cayucos, CA")
         assertTrue(prompt.contains("LAND COORDINATES ONLY"))
-        assertTrue(prompt.contains("never in water"))
-        assertTrue(prompt.contains("ocean"))
-        assertTrue(prompt.contains("coastal"))
-        assertTrue(prompt.contains("inland"))
+        assertTrue(prompt.contains("not open water"))
+        assertTrue(prompt.contains("Waterfront venues"))
         assertTrue(prompt.contains("city center coordinates as fallback"))
     }
 
@@ -202,10 +200,8 @@ class GeminiPromptBuilderTest {
     fun buildAreaPortraitPrompt_includesLandCoordinateInstruction() {
         val prompt = builder.buildAreaPortraitPrompt("Cayucos, CA", testContext)
         assertTrue(prompt.contains("LAND COORDINATES ONLY"))
-        assertTrue(prompt.contains("never in water"))
-        assertTrue(prompt.contains("ocean"))
-        assertTrue(prompt.contains("coastal"))
-        assertTrue(prompt.contains("inland"))
+        assertTrue(prompt.contains("not open water"))
+        assertTrue(prompt.contains("Waterfront venues"))
         assertTrue(prompt.contains("city center coordinates as fallback"))
     }
 
@@ -213,8 +209,35 @@ class GeminiPromptBuilderTest {
     fun buildChatSystemContext_includesLandCoordinateInstruction() {
         val result = chatContext()
         assertTrue(result.contains("LAND COORDINATES ONLY"))
-        assertTrue(result.contains("never in water"))
-        assertTrue(result.contains("ocean"))
+        assertTrue(result.contains("not open water"))
+        assertTrue(result.contains("Waterfront venues"))
+    }
+
+    // --- M4 regression: buildDynamicVibeEnrichmentPrompt includes LAND COORDINATES ---
+
+    @Test
+    fun buildDynamicVibeEnrichmentPrompt_includesLandCoordinateInstruction() {
+        val prompt = builder.buildDynamicVibeEnrichmentPrompt("Cayucos, CA", listOf("Beach"), listOf("Pier"))
+        assertTrue(prompt.contains("LAND COORDINATES ONLY"))
+        assertTrue(prompt.contains("not open water"))
+        assertTrue(prompt.contains("Waterfront venues"))
+    }
+
+    // --- M2 regression: no contradictory skip instruction ---
+
+    @Test
+    fun buildPinOnlyPrompt_noSkipInstruction_usesFallback() {
+        val prompt = builder.buildPinOnlyPrompt("Cayucos, CA")
+        assertFalse(prompt.contains("Skip any POI"), "Must not tell Gemini to skip POIs")
+        assertTrue(prompt.contains("Never omit a POI"))
+        assertTrue(prompt.contains("city center coordinates as fallback"))
+    }
+
+    @Test
+    fun buildBackgroundBatchPrompt_noSkipInstruction_usesFallback() {
+        val prompt = builder.buildBackgroundBatchPrompt("Cayucos, CA", listOf("Pier"), listOf("Beach"))
+        assertFalse(prompt.contains("Skip any POI"), "Must not tell Gemini to skip POIs")
+        assertTrue(prompt.contains("Never omit a POI"))
     }
 
     // --- Updated old buildChatSystemContext tests (new signature) ---

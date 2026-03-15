@@ -443,6 +443,24 @@ not valid json either"""
         assertEquals(emptyList(), result.vibes)
     }
 
+    // --- parsePoisJson wires areaHighlights through to PortraitComplete (M1 regression) ---
+
+    @Test
+    fun parseFullResponse_poisSectionWithHighlights_portraitCompleteCarriesAh() {
+        val input = """
+---BUCKET---
+{"type":"character","heading":"About","body":"Nice area"}
+---POIS---
+{"pois":[{"n":"Cafe Z","t":"food","v":"food","w":"great","h":"8-6","s":"open","r":4.0,"lat":40.71,"lng":-74.00}],"ah":["Jazz night","Market Sat"]}
+        """.trimIndent()
+        val result = parser.parseFullResponse(input)
+        assertTrue(result.isSuccess)
+        val updates = result.getOrNull()!!
+        val portrait = updates.filterIsInstance<BucketUpdate.PortraitComplete>().single()
+        assertEquals(1, portrait.pois.size)
+        assertEquals(listOf("Jazz night", "Market Sat"), portrait.areaHighlights)
+    }
+
     // --- parseEnrichmentWithHighlights ---
 
     @Test

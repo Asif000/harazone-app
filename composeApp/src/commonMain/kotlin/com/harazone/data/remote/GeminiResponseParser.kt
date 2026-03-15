@@ -334,13 +334,13 @@ internal class GeminiResponseParser {
                 }
             }
 
-            val pois = if (!poisSection.isNullOrBlank()) {
-                parsePoisJson(poisSection)
+            val poisResult = if (!poisSection.isNullOrBlank()) {
+                parsePoisJsonWithHighlights(poisSection)
             } else {
-                emptyList()
+                PoisWithHighlights(emptyList())
             }
 
-            updates.add(BucketUpdate.PortraitComplete(pois))
+            updates.add(BucketUpdate.PortraitComplete(poisResult.pois, areaHighlights = poisResult.areaHighlights))
 
             Result.success(updates)
         } catch (e: Exception) {
@@ -511,8 +511,8 @@ internal class GeminiResponseParser {
 
             // Parse POIs
             val poisStr = poisText.toString().trim()
-            val pois = if (poisStr.isNotEmpty()) parsePoisJson(poisStr) else emptyList()
-            results.add(BucketUpdate.PortraitComplete(pois))
+            val poisResult = if (poisStr.isNotEmpty()) parsePoisJsonWithHighlights(poisStr) else PoisWithHighlights(emptyList())
+            results.add(BucketUpdate.PortraitComplete(poisResult.pois, areaHighlights = poisResult.areaHighlights))
 
             return results
         }
