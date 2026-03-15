@@ -68,9 +68,7 @@ import com.harazone.ui.map.ChatUiState
 import com.harazone.ui.map.ChatViewModel
 import com.harazone.ui.map.SkeletonSection
 import com.harazone.ui.map.pillDisplayLabel
-import com.harazone.ui.theme.DarkColorScheme
 import com.harazone.ui.theme.DetailPageLight
-import com.harazone.ui.theme.MapSurfaceDark
 import com.harazone.ui.theme.toColor
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
@@ -127,19 +125,17 @@ internal fun AiDetailPage(
                     .fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(0.dp),
             ) {
-                // Header card — stays dark
+                // Header card — hero image dark, info section light
                 item(key = "header") {
-                    MaterialTheme(colorScheme = DarkColorScheme) {
-                        PoiDetailHeader(
-                            poi = poi,
-                            isSaved = isSaved,
-                            onSave = onSave,
-                            onUnsave = onUnsave,
-                            onDirectionsClick = onDirectionsClick,
-                            onShowOnMap = onShowOnMap,
-                            onDismiss = onDismiss,
-                        )
-                    }
+                    PoiDetailHeader(
+                        poi = poi,
+                        isSaved = isSaved,
+                        onSave = onSave,
+                        onUnsave = onUnsave,
+                        onDirectionsClick = onDirectionsClick,
+                        onShowOnMap = onShowOnMap,
+                        onDismiss = onDismiss,
+                    )
                 }
 
                 // Context block — between header and chat (hidden when empty and not loading)
@@ -413,18 +409,18 @@ private fun PoiDetailHeader(
             }
         }
 
-        Column(modifier = Modifier.background(MapSurfaceDark).padding(16.dp)) {
+        Column(modifier = Modifier.background(DetailPageLight).padding(16.dp)) {
             // Name
             Text(
                 text = poi.name,
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White,
+                color = DetailPageTextDark,
             )
             // Type
             Text(
                 text = poi.type.replaceFirstChar { it.uppercaseChar() },
                 style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.6f),
+                color = Color(0xFF6B6B6B),
             )
 
             // Vibe chip
@@ -433,9 +429,9 @@ private fun PoiDetailHeader(
                 Text(
                     text = poi.vibe,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White,
+                    color = DetailPageTextDark,
                     modifier = Modifier
-                        .background(vibeColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .background(vibeColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 8.dp, vertical = 2.dp),
                 )
             }
@@ -454,7 +450,7 @@ private fun PoiDetailHeader(
                     Text(
                         text = " ${poi.rating}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color.White,
+                        color = DetailPageTextDark,
                     )
                     Spacer(Modifier.width(12.dp))
                 }
@@ -471,7 +467,7 @@ private fun PoiDetailHeader(
                 Text(
                     text = poi.priceRange,
                     style = MaterialTheme.typography.labelSmall,
-                    color = Color.White.copy(alpha = 0.6f),
+                    color = Color(0xFF6B6B6B),
                 )
             }
 
@@ -481,7 +477,7 @@ private fun PoiDetailHeader(
                 Text(
                     text = poi.insight,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color.White.copy(alpha = 0.8f),
+                    color = Color(0xFF4A4A4A),
                 )
             } else {
                 Spacer(Modifier.height(8.dp))
@@ -490,7 +486,7 @@ private fun PoiDetailHeader(
                         .fillMaxWidth(0.9f)
                         .height(14.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color.White.copy(alpha = 0.12f)),
+                        .background(Color(0xFFE0DDD9)),
                 )
                 Spacer(Modifier.height(4.dp))
                 Box(
@@ -498,7 +494,7 @@ private fun PoiDetailHeader(
                         .fillMaxWidth(0.65f)
                         .height(14.dp)
                         .clip(RoundedCornerShape(4.dp))
-                        .background(Color.White.copy(alpha = 0.08f)),
+                        .background(Color(0xFFE0DDD9).copy(alpha = 0.6f)),
                 )
             }
 
@@ -508,10 +504,10 @@ private fun PoiDetailHeader(
                 Text(
                     text = "\u270F\uFE0F ${poi.userNote}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.6f),
+                    color = Color(0xFF6B6B6B),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                        .background(Color(0xFFE8E5E1), RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
@@ -520,10 +516,10 @@ private fun PoiDetailHeader(
 
             // Action chips: Save, Directions, Show on Map
             val chipColors = AssistChipDefaults.assistChipColors(
-                labelColor = Color.White.copy(alpha = 0.9f),
-                leadingIconContentColor = Color.White.copy(alpha = 0.9f),
+                labelColor = DetailPageTextDark,
+                leadingIconContentColor = DetailPageTextDark,
             )
-            val chipBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+            val chipBorder = BorderStroke(1.dp, Color(0xFFCCC8C3))
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
