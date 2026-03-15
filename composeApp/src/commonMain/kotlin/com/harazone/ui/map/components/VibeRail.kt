@@ -49,10 +49,6 @@ import com.harazone.ui.components.rememberReduceMotion
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
 
-fun computeVibeSizeDp(count: Int, minCount: Int, maxCount: Int): Float =
-    if (maxCount == minCount) 40f
-    else (32f + 16f * (count - minCount) / (maxCount - minCount).toFloat()).coerceIn(32f, 48f)
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun VibeRail(
@@ -117,7 +113,7 @@ fun VibeRail(
 
                 for ((index, vibe) in vibes.withIndex()) {
                     val count = dynamicVibePoiCounts[vibe.label] ?: 0
-                    val sizeDp = computeVibeSizeDp(count, minCount, maxCount).dp
+                    val sizeDp = 40.dp
                     val isPinned = vibe.label in pinnedVibeLabels
                     Box {
                         DynamicVibeOrb(
@@ -184,7 +180,6 @@ private fun DynamicVibeOrb(
         alpha
     } else 1.0f
 
-    val vibeColor = Color(0xFF5B9BD5)
     val isDimmed = isFilterActive && !isActive
 
     val labelColor = when {
@@ -195,28 +190,29 @@ private fun DynamicVibeOrb(
 
     val columnModifier = if (isDimmed) Modifier.alpha(0.45f) else Modifier
 
-    Box {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = columnModifier
-                .minimumInteractiveComponentSize()
-                .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-                .semantics { contentDescription = "${vibe.label}, $poiCount places" },
-        ) {
-            val circleModifier = Modifier
-                .size(sizeDp)
-                .background(
-                    brush = Brush.radialGradient(
-                        listOf(Color.White.copy(alpha = 0.45f), Color(0xFF3a3f4a)),
-                    ),
-                    shape = CircleShape,
-                )
-                .let {
-                    if (isActive) it.border(2.dp, Color.White, CircleShape)
-                        .graphicsLayer { alpha = breathingAlpha }
-                    else it
-                }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = columnModifier
+            .width(48.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .semantics { contentDescription = "${vibe.label}, $poiCount places" },
+    ) {
+        val circleModifier = Modifier
+            .size(sizeDp)
+            .background(
+                brush = Brush.radialGradient(
+                    listOf(Color.White.copy(alpha = 0.45f), Color(0xFF3a3f4a)),
+                ),
+                shape = CircleShape,
+            )
+            .let {
+                if (isActive) it.border(2.dp, Color.White, CircleShape)
+                    .graphicsLayer { alpha = breathingAlpha }
+                else it
+            }
 
+        // Orb + count badge anchored to circle edge
+        Box {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = circleModifier,
@@ -226,36 +222,34 @@ private fun DynamicVibeOrb(
                     fontSize = 18.sp,
                 )
             }
-
-            Text(
-                text = if (isPinned) "\uD83D\uDCCC ${vibe.label}" else vibe.label,
-                fontSize = 10.sp,
-                color = labelColor,
-                fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
-        }
-
-        // Count badge — white badge with dark text, matching Saved orb design language
-        if (poiCount > 0) {
-            Box(
-                contentAlignment = Alignment.Center,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .defaultMinSize(minWidth = 14.dp, minHeight = 14.dp)
-                    .background(Color.White, CircleShape)
-                    .border(1.5.dp, Color(0xFF0a0c10), CircleShape),
-            ) {
-                Text(
-                    text = poiCount.toString(),
-                    fontSize = 8.sp,
-                    color = Color.Black,
-                    fontWeight = FontWeight.Bold,
-                )
+            if (poiCount > 0) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .defaultMinSize(minWidth = 14.dp, minHeight = 14.dp)
+                        .background(Color.White, CircleShape)
+                        .border(1.5.dp, Color(0xFF0a0c10), CircleShape),
+                ) {
+                    Text(
+                        text = poiCount.toString(),
+                        fontSize = 8.sp,
+                        color = Color.Black,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
+
+        Text(
+            text = if (isPinned) "\uD83D\uDCCC ${vibe.label}" else vibe.label,
+            fontSize = 10.sp,
+            color = labelColor,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+        )
     }
 }
 

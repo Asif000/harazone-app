@@ -128,7 +128,10 @@ class MapViewModel(
 
     fun selectPoi(poi: POI?) {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(selectedPoi = poi)
+        _uiState.value = current.copy(
+            selectedPoi = poi,
+            selectedPinIndex = current.selectedPinIndex,
+        )
         if (poi != null) {
             analyticsTracker.trackEvent(
                 "poi_tapped",
@@ -196,9 +199,6 @@ class MapViewModel(
             activeDynamicVibe = newVibe,
             savedVibeFilter = false,
             pois = visiblePois,
-            selectedPinId = null,
-            cardsVisible = false,
-            pinScreenPositions = emptyMap(),
         )
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.label ?: "all")))
     }
@@ -268,9 +268,6 @@ class MapViewModel(
         _uiState.value = current.copy(
             savedVibeFilter = newFilter,
             activeDynamicVibe = if (newFilter) null else vibeBeforeSavedFilter,
-            selectedPinId = null,
-            cardsVisible = false,
-            pinScreenPositions = emptyMap(),
         )
         if (!newFilter) vibeBeforeSavedFilter = null
     }
@@ -339,9 +336,8 @@ class MapViewModel(
             dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
             activeDynamicVibe = null,
-            selectedPinId = null,
-            cardsVisible = false,
-            pinScreenPositions = emptyMap(),
+            selectedPinIndex = null,
+            areaHighlights = emptyList(),
         )
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
         areaFetchJob = viewModelScope.launch {
@@ -425,9 +421,8 @@ class MapViewModel(
             dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
             activeDynamicVibe = null,
-            selectedPinId = null,
-            cardsVisible = false,
-            pinScreenPositions = emptyMap(),
+            selectedPinIndex = null,
+            areaHighlights = emptyList(),
         )
         fetchWeatherForLocation(recent.latitude, recent.longitude)
         areaFetchJob = viewModelScope.launch {
@@ -512,6 +507,8 @@ class MapViewModel(
             dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
             activeDynamicVibe = null,
+            selectedPinIndex = null,
+            areaHighlights = emptyList(),
         )
         fetchWeatherForLocation(lat, lng)
         areaFetchJob = viewModelScope.launch {
@@ -612,20 +609,21 @@ class MapViewModel(
         _uiState.value = current.copy(mapRenderFailed = true, showListView = true)
     }
 
-    fun onPinsProjected(positions: Map<String, ScreenOffset>) {
+    fun onPinTapped(index: Int) {
         val state = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = state.copy(pinScreenPositions = positions, cardsVisible = true)
+        if (state.pois.isEmpty()) return
+        _uiState.value = state.copy(selectedPinIndex = index.coerceIn(0, state.pois.size - 1))
     }
 
-    fun onMapGestureStart() {
+    fun onCarouselSwiped(index: Int) {
         val state = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = state.copy(cardsVisible = false)
+        if (state.pois.isEmpty()) return
+        _uiState.value = state.copy(selectedPinIndex = index.coerceIn(0, state.pois.size - 1))
     }
 
-    fun onPinChipTapped(poiId: String) {
+    fun onCarouselSelectionCleared() {
         val state = _uiState.value as? MapUiState.Ready ?: return
-        val newSelected = if (state.selectedPinId == poiId) null else poiId
-        _uiState.value = state.copy(selectedPinId = newSelected)
+        _uiState.value = state.copy(selectedPinIndex = null)
     }
 
     fun onCameraIdle(lat: Double, lng: Double) {
@@ -762,6 +760,8 @@ class MapViewModel(
                             activeBatchIndex = 0,
                             showAllMode = false,
                             isBackgroundFetching = false,
+                            selectedPinIndex = null,
+                            areaHighlights = emptyList(),
                         )
                     } else {
                         _uiState.value = state.copy(
@@ -778,6 +778,8 @@ class MapViewModel(
                             activeDynamicVibe = null,
                             geocodingSelectedPlace = null,
                             isGeocodingInitiatedSearch = false,
+                            selectedPinIndex = null,
+                            areaHighlights = emptyList(),
                         )
                         collectPortraitWithRetry(
                             areaName = gpsAreaName,
@@ -993,7 +995,11 @@ class MapViewModel(
     fun onNextBatch() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         if (current.showAllMode) return
-        val nextIndex = current.activeBatchIndex + 1
+        // Skip empty batches
+        var nextIndex = current.activeBatchIndex + 1
+        while (nextIndex < poiBatchesCache.size && poiBatchesCache[nextIndex].isEmpty()) {
+            nextIndex++
+        }
         if (nextIndex < poiBatchesCache.size) {
             val visible = computeVisiblePois(poiBatchesCache[nextIndex], current.activeDynamicVibe)
             _uiState.value = current.copy(
@@ -1019,16 +1025,21 @@ class MapViewModel(
     fun onPrevBatch() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         if (current.showAllMode) {
-            val lastIdx = poiBatchesCache.size - 1
-            val visible = computeVisiblePois(poiBatchesCache.getOrElse(lastIdx) { emptyList() }, current.activeDynamicVibe)
+            // Find last non-empty batch
+            var lastIdx = poiBatchesCache.size - 1
+            while (lastIdx >= 0 && poiBatchesCache[lastIdx].isEmpty()) lastIdx--
+            if (lastIdx < 0) return
+            val visible = computeVisiblePois(poiBatchesCache[lastIdx], current.activeDynamicVibe)
             _uiState.value = current.copy(
                 showAllMode = false,
-                activeBatchIndex = lastIdx.coerceAtLeast(0),
+                activeBatchIndex = lastIdx,
                 pois = visible,
                 selectedPoi = null,
             )
         } else if (current.activeBatchIndex > 0) {
-            val newIndex = current.activeBatchIndex - 1
+            // Skip empty batches backwards
+            var newIndex = current.activeBatchIndex - 1
+            while (newIndex > 0 && poiBatchesCache[newIndex].isEmpty()) newIndex--
             val visible = computeVisiblePois(poiBatchesCache[newIndex], current.activeDynamicVibe)
             _uiState.value = current.copy(
                 activeBatchIndex = newIndex,
@@ -1050,6 +1061,8 @@ class MapViewModel(
             poiBatches = emptyList(),
             allDiscoveredPois = emptyList(),
             pois = emptyList(),
+            selectedPinIndex = null,
+            areaHighlights = emptyList(),
         )
         retryAreaFetch()
     }
@@ -1121,6 +1134,7 @@ class MapViewModel(
                                 activeBatchIndex = 0,
                                 isBackgroundFetching = true,
                                 showAllMode = false,
+                                areaHighlights = update.areaHighlights,
                             )
                         }
                         is BucketUpdate.PinsReady -> {
@@ -1138,6 +1152,7 @@ class MapViewModel(
                                 activeBatchIndex = 0,
                                 isBackgroundFetching = true,
                                 showAllMode = false,
+                                areaHighlights = update.areaHighlights,
                             )
                         }
                         is BucketUpdate.DynamicVibeComplete -> {
@@ -1150,6 +1165,10 @@ class MapViewModel(
                                 mergePois(stage1Pois, update.pois)
                             } else {
                                 update.pois
+                            }
+                            // Keep batch 0 in sync with enriched data
+                            if (poiBatchesCache.isNotEmpty()) {
+                                poiBatchesCache[0] = pois
                             }
                             val s = _uiState.value as? MapUiState.Ready
                             if (s != null) {
@@ -1265,6 +1284,7 @@ class MapViewModel(
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
                                 isLoadingVibes = false,
+                                areaHighlights = update.areaHighlights,
                             )
                         }
                         is BucketUpdate.PinsReady -> {
@@ -1275,6 +1295,7 @@ class MapViewModel(
                                 dynamicVibePoiCounts = computeDynamicVibePoiCounts(update.pois),
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
+                                areaHighlights = update.areaHighlights,
                             )
                         }
                         is BucketUpdate.PortraitComplete -> {

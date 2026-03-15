@@ -62,6 +62,7 @@ internal data class PoiJson(
     val lng: Double? = null,
     val wiki: String? = null,
     val vs: List<String>? = null,
+    val p: String? = null,
 )
 
 @Serializable
@@ -72,6 +73,7 @@ internal data class EnrichJson(
     val h: String? = null,
     val s: String? = null,
     val r: Float? = null,
+    val p: String? = null,
 )
 
 @Serializable
@@ -81,6 +83,7 @@ internal data class VibeJson(val label: String = "", val icon: String = "")
 internal data class Stage1Response(
     val vibes: List<VibeJson> = emptyList(),
     val pois: List<PoiJson> = emptyList(),
+    val ah: List<String> = emptyList(),
 )
 
 @Serializable
@@ -91,6 +94,11 @@ internal data class DynamicVibeJson(
     val content: String = "",
     val poi_ids: List<String> = emptyList(),
 )
+
+internal fun stripMarkdownFences(raw: String): String {
+    val trimmed = raw.trim()
+    return if (trimmed.startsWith("```")) trimmed.lines().drop(1).dropLast(1).joinToString("\n") else trimmed
+}
 
 internal class GeminiResponseParser {
 
@@ -104,9 +112,7 @@ internal class GeminiResponseParser {
 
     fun parsePinOnlyResponse(text: String): List<POI> {
         return try {
-            val cleaned = text.trim().let {
-                if (it.startsWith("```")) it.lines().drop(1).dropLast(1).joinToString("\n") else it
-            }
+            val cleaned = stripMarkdownFences(text)
             val poisJson = json.decodeFromString<List<PoiJson>>(cleaned)
             poisJson.filter { it.n.isNotBlank() && it.lat != null && it.lng != null }.map { poiJson ->
                 POI(
@@ -118,11 +124,12 @@ internal class GeminiResponseParser {
                     longitude = poiJson.lng,
                     vibe = poiJson.v,
                     insight = "",
-                    hours = null,
-                    liveStatus = null,
+                    hours = poiJson.h,
+                    liveStatus = poiJson.s,
                     rating = null,
                     vibeInsights = emptyMap(),
                     wikiSlug = null,
+                    priceRange = poiJson.p,
                 )
             }
         } catch (e: Exception) {
@@ -133,9 +140,7 @@ internal class GeminiResponseParser {
 
     fun parseStage1Response(text: String): Pair<List<DynamicVibe>, List<POI>> {
         return try {
-            val cleaned = text.trim().let {
-                if (it.startsWith("```")) it.lines().drop(1).dropLast(1).joinToString("\n") else it
-            }
+            val cleaned = stripMarkdownFences(text)
             try {
                 val stage1 = json.decodeFromString<Stage1Response>(cleaned)
                 val vibes = stage1.vibes
@@ -153,6 +158,9 @@ internal class GeminiResponseParser {
                             longitude = poiJson.lng,
                             vibe = poiJson.v,
                             insight = "",
+                            priceRange = poiJson.p,
+                            hours = poiJson.h,
+                            liveStatus = poiJson.s,
                         )
                     }
                 Pair(vibes, pois)
@@ -171,6 +179,9 @@ internal class GeminiResponseParser {
                             longitude = poiJson.lng,
                             vibe = poiJson.v,
                             insight = "",
+                            priceRange = poiJson.p,
+                            hours = poiJson.h,
+                            liveStatus = poiJson.s,
                         )
                     }
                 Pair(emptyList(), pois)
@@ -226,6 +237,7 @@ internal class GeminiResponseParser {
                             vibeInsights = emptyMap(),
                             wikiSlug = poiJson.wiki,
                             vibes = poiJson.vs ?: emptyList(),
+                            priceRange = poiJson.p,
                         )
                     }
                 } catch (e: Exception) {
@@ -245,9 +257,7 @@ internal class GeminiResponseParser {
 
     internal fun parseEnrichmentResponse(text: String): List<EnrichJson> {
         return try {
-            val cleaned = text.trim().let {
-                if (it.startsWith("```")) it.lines().drop(1).dropLast(1).joinToString("\n") else it
-            }
+            val cleaned = stripMarkdownFences(text)
             json.decodeFromString<List<EnrichJson>>(cleaned)
                 .filter { it.n.isNotBlank() }
         } catch (e: Exception) {
@@ -358,6 +368,7 @@ internal class GeminiResponseParser {
                     rating = poiJson.r,
                     vibeInsights = emptyMap(),
                     wikiSlug = poiJson.wiki,
+                    priceRange = poiJson.p,
                 )
             }
         } catch (e: Exception) {

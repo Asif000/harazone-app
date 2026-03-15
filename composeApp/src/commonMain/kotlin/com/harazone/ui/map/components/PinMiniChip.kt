@@ -65,7 +65,7 @@ fun PinMiniChip(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier
-            .widthIn(max = 120.dp)  // caps chip width; chipHalfWidthPx in PinCardLayer assumes 60dp half
+            .widthIn(max = 120.dp)
             .alpha(if (isClosed) 0.5f else 1f)
             .clickable { onClick() }
             .border(1.dp, borderColor, RoundedCornerShape(8.dp))

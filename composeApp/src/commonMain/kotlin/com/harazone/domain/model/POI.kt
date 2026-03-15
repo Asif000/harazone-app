@@ -20,6 +20,7 @@ data class POI(
     val wikiSlug: String? = null,
     val imageUrl: String? = null,
     val userNote: String? = null,
+    val priceRange: String? = null,
 ) {
     val savedId: String get() = "$name|${latitude ?: 0.0}|${longitude ?: 0.0}"
 }

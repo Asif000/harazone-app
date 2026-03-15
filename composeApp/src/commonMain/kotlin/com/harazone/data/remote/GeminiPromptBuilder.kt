@@ -15,10 +15,11 @@ internal class GeminiPromptBuilder {
         } else ""
         return """
 Area: "$areaName". Return JSON only, no other text.
-Schema: {"vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art"}]}
+Schema: {"vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art","p":"$$","h":"9am-10pm","s":"open"}],"ah":["highlight"]}
 Rules:
 - vibes: 4-6 most distinctive dimensions of THIS area.
-- pois: 3 best POIs. Each "v" MUST exactly match a vibe label.
+- pois: 3 best POIs. Each "v" MUST exactly match a vibe label. "p" is price range ($ to $$$$, omit if N/A). "h" is current hours. "s" is status: open, busy, or closed.
+- ah: up to 3 short area highlights (recurring events, seasonal notes, trending now). Max 40 chars each. Omit if nothing notable.
 - t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 - GPS to 4 decimal places.$newUserHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
@@ -29,9 +30,9 @@ Rules:
         val excludeList = excludeNames.joinToString(", ")
         return """
 Area: "$areaName". Return JSON only, no other text.
-Schema: {"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Vibe Label"},...]}
+Schema: {"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Vibe Label","p":"$$","h":"9am-10pm","s":"open"},...]}
 Rules:
-- pois: 3 best POIs that are DIFFERENT from the ones already found.
+- pois: 3 best POIs that are DIFFERENT from the ones already found. "p" is price range ($ to $$$$, omit if N/A). "h" is current hours. "s" is status: open, busy, or closed.
 - Do NOT include any of these places: $excludeList
 - Each POI "v" field MUST exactly match one of these vibe labels — character-for-character, same case: $vibeList
 - t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
@@ -55,7 +56,7 @@ Context:
 - Preferred language: ${context.preferredLanguage}
 ${if (!context.preferredLanguage.startsWith("en")) "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '${context.preferredLanguage}'. Every word of your response must be in that language." else ""}
 Output ONLY a JSON array. No other text:
-[{"n":"Name","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5}]
+[{"n":"Name","v":"vibe","w":"Why this place is genuinely special — what you'd tell a friend","h":"hours","s":"open|busy|closed","r":4.5,"p":"$$"}]
 
 Valid v values: character, history, whats_on, safety, nearby, cost
 Valid s values: open, busy, closed
@@ -126,12 +127,14 @@ For each vibe, output a section:
 
 Then output:
 ---POIS---
-[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"dominant vibe","vs":["vibe1","vibe2"],"w":"why special","r":4.2}]
+[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"dominant vibe","vs":["vibe1","vibe2"],"w":"why special","h":"9am-10pm","s":"open|busy|closed","r":4.2,"p":"$$"}]
 
 Rules:
 - Each vibe label MUST exactly match the labels above — character-for-character, same case.
 - Each POI "v" field is the single dominant vibe. "vs" is the full list of vibes this POI belongs to.
 - "w" field is required for every POI — one sentence on why it is special.
+- "h" is current hours (e.g. "9am-10pm"). "s" is current status: open, busy, or closed. Adapt to current time of day.
+- Valid s values: open, busy, closed
 - GPS to 4 decimal places. t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels, highlights, content, and 'w' fields MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }

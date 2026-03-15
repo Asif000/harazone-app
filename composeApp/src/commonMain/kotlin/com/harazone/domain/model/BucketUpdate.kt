@@ -11,7 +11,8 @@ sealed class BucketUpdate {
     ) : BucketUpdate()
 
     data class PinsReady(
-        val pois: List<POI>
+        val pois: List<POI>,
+        val areaHighlights: List<String> = emptyList(),
     ) : BucketUpdate()
 
     data class PortraitComplete(
@@ -26,6 +27,7 @@ sealed class BucketUpdate {
         val vibes: List<DynamicVibe>,
         val pois: List<POI>,
         val fromCache: Boolean = false,
+        val areaHighlights: List<String> = emptyList(),
     ) : BucketUpdate()
 
     data class DynamicVibeComplete(

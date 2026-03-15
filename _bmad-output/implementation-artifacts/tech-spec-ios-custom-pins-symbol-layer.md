@@ -1,6 +1,6 @@
 # Tech Spec: iOS Custom POI Pins via Symbol Style Layer
 
-**Status**: Ready for dev
+**Status**: SUPERSEDED — implemented via `MLNAnnotationImage` + `UIGraphicsBeginImageContextWithOptions` + `AnnotationTapHandler` in ambient-layer-bottom-carousel spec (2026-03-15). Symbol layer approach abandoned due to K/N interop issues with `UIGraphicsImageRenderer`, `NSString.drawAtPoint`, and `MLNShapeSource.setFeatures`.
 **Platform**: iOS only (`iosMain`)
 **File**: `composeApp/src/iosMain/kotlin/com/areadiscovery/ui/map/MapComposable.ios.kt`
 **Effort**: ~half day

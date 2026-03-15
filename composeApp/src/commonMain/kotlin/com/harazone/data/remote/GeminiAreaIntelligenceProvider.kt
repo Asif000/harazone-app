@@ -118,12 +118,16 @@ internal class GeminiAreaIntelligenceProvider(
                     throw result.exceptionOrNull()!!
                 }
                 val (dynamicVibes, pois) = responseParser.parseStage1Response(fullText.toString())
+                val areaHighlights = try {
+                    val stripped = stripMarkdownFences(fullText.toString())
+                    json.decodeFromString<Stage1Response>(stripped).ah
+                } catch (_: Exception) { emptyList() }
                 stage1Deferred.complete(Stage1Result(pois.map { it.name }, dynamicVibes, dynamicVibes.map { it.label }))
                 if (pois.isNotEmpty()) {
                     if (dynamicVibes.isNotEmpty()) {
-                        send(BucketUpdate.VibesReady(vibes = dynamicVibes, pois = pois))
+                        send(BucketUpdate.VibesReady(vibes = dynamicVibes, pois = pois, areaHighlights = areaHighlights))
                     } else {
-                        send(BucketUpdate.PinsReady(pois))
+                        send(BucketUpdate.PinsReady(pois, areaHighlights = areaHighlights))
                     }
                     AppLogger.d { "Stage 1 complete: ${pois.size} pins, ${dynamicVibes.size} vibes for '$areaName'" }
                 } else {
@@ -199,7 +203,7 @@ internal class GeminiAreaIntelligenceProvider(
                     send(BucketUpdate.PortraitComplete(enriched.map { e ->
                         POI(name = e.n, type = "", description = "", confidence = Confidence.MEDIUM,
                             latitude = null, longitude = null, vibe = e.v, insight = e.w,
-                            hours = e.h, liveStatus = e.s, rating = e.r)
+                            hours = e.h, liveStatus = e.s, rating = e.r, priceRange = e.p)
                     }))
                 }
                 AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete for '$areaName'" }

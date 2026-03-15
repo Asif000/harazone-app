@@ -8,7 +8,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.interop.UIKitView
+import cocoapods.MapLibre.MLNAnnotationImage
 import cocoapods.MapLibre.MLNAnnotationProtocol
+import kotlinx.cinterop.ObjCAction
 import cocoapods.MapLibre.MLNCircleStyleLayer
 import cocoapods.MapLibre.MLNMapView
 import cocoapods.MapLibre.MLNMapViewDelegateProtocol
@@ -21,15 +23,29 @@ import com.harazone.BuildKonfig
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Vibe
+import com.harazone.ui.theme.toColor
+import com.harazone.util.poiTypeEmoji
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.useContents
+import platform.CoreGraphics.CGPointMake
 import platform.CoreGraphics.CGRectMake
+import platform.CoreGraphics.CGSizeMake
 import platform.CoreLocation.CLLocationCoordinate2DMake
 import platform.Foundation.NSError
 import platform.Foundation.NSExpression
 import platform.Foundation.NSNumber
 import platform.Foundation.NSURL
+import platform.UIKit.UIBezierPath
 import platform.UIKit.UIColor
+import platform.UIKit.UIFont
+import platform.UIKit.UIGraphicsBeginImageContextWithOptions
+import platform.UIKit.UIGraphicsEndImageContext
+import platform.UIKit.UIGraphicsGetCurrentContext
+import platform.UIKit.UIGraphicsGetImageFromCurrentImageContext
+import platform.UIKit.UIImage
+import platform.UIKit.UILabel
+import platform.UIKit.UITapGestureRecognizer
+import platform.UIKit.UITextAlignmentCenter
 import platform.darwin.NSObject
 
 private val MAP_STYLE_URL get() =
@@ -38,7 +54,6 @@ private val MAP_STYLE_URL get() =
 private const val POI_TEXT_SOURCE_ID = "poi_text_source"
 private const val POI_TEXT_LAYER_ID = "poi_text_layer"
 
-// TODO(BACKLOG-LOW): iOS gold saved pins — implement MLNAnnotationView subclass with gold border when MLNAnnotationView ObjC bridging is resolved
 @OptIn(ExperimentalForeignApi::class)
 @Composable
 actual fun MapComposable(
@@ -52,19 +67,17 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
-    onPinsProjected: (Map<String, ScreenOffset>) -> Unit,
-    onMapGestureStart: () -> Unit,
     savedPoiIds: Set<String>,
     savedPois: List<SavedPoi>,
     savedVibeFilter: Boolean,
+    onPinTapped: (Int) -> Unit,
+    selectedPinIndex: Int?,
 ) {
-    // TODO(BACKLOG-HIGH): iOS dual-pin layer deferred — see tech-spec-save-as-snapshot-poi-architecture.md
-    // Required: load savedPois from DB, render as gold pins, apply 50m suppression for Gemini results
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
-    val currentOnPinsProjected = rememberUpdatedState(onPinsProjected)
-    val currentOnMapGestureStart = rememberUpdatedState(onMapGestureStart)
     val currentOnMapRenderFailed = rememberUpdatedState(onMapRenderFailed)
+    val currentOnPinTapped = rememberUpdatedState(onPinTapped)
+    val currentPois = rememberUpdatedState(pois)
 
     val suppressCameraIdle = remember { booleanArrayOf(false) }
     val annotationPoiMap = remember { mutableMapOf<MLNPointAnnotation, POI>() }
@@ -78,12 +91,21 @@ actual fun MapComposable(
         MapDelegate(
             annotationPoiMap = annotationPoiMap,
             suppressCameraIdle = suppressCameraIdle,
-            onPoiSelected = { currentOnPoiSelected.value(it) },
             onCameraIdle = { lat, lng -> currentOnCameraIdle.value(lat, lng) },
-            onPinsProjected = { positions -> currentOnPinsProjected.value(positions) },
-            onMapGestureStart = { currentOnMapGestureStart.value() },
             onStyleLoaded = { styleLoaded.value = true },
             onRenderFailed = { currentOnMapRenderFailed.value() },
+        )
+    }
+
+    // Tap handler for annotation selection (since imageForAnnotation conflicts with didSelectAnnotation)
+    val tapHandler = remember {
+        AnnotationTapHandler(
+            annotationPoiMap = annotationPoiMap,
+            onPoiSelected = { poi ->
+                val index = currentPois.value.indexOfFirst { it.savedId == poi.savedId }
+                if (index >= 0) currentOnPinTapped.value(index)
+                else currentOnPoiSelected.value(poi)
+            },
         )
     }
 
@@ -97,11 +119,13 @@ actual fun MapComposable(
                 animated = false,
             )
             this.delegate = delegate
-            // TODO(BACKLOG-LOW): Tap empty map space to deselect POI card on iOS.
-            //   UITapGestureRecognizer target-action requires @ObjCAction for Kotlin/Native
-            //   to expose the method to the ObjC runtime — without it crashes with
-            //   doesNotRecognizeSelector. Use MLNAnnotationView subclass or a bridging
-            //   NSObject helper class with @ObjCAction once confirmed.
+            // Add tap gesture for annotation selection
+            val tapGesture = UITapGestureRecognizer(
+                target = tapHandler,
+                action = platform.objc.sel_registerName("handleTap:"),
+            )
+            addGestureRecognizer(tapGesture)
+            tapHandler.mapView = this
         }
     }
 
@@ -116,7 +140,22 @@ actual fun MapComposable(
         )
     }
 
-    // POI markers + glow zones — react to pois / activeVibe / savedPois / savedVibeFilter / style ready
+    // Selection ring update — only re-render the 2 affected pins
+    LaunchedEffect(selectedPinIndex) {
+        delegate.selectedPinIndex = selectedPinIndex
+        delegate.currentPois = currentPois.value
+        // Clear image cache so imageForAnnotation returns fresh images
+        delegate.clearImageCache()
+        // Re-add only to trigger imageForAnnotation for changed pins
+        if (currentAnnotations.isNotEmpty() && styleLoaded.value) {
+            @Suppress("UNCHECKED_CAST")
+            mapView.removeAnnotations(currentAnnotations.toList() as List<*>)
+            @Suppress("UNCHECKED_CAST")
+            mapView.addAnnotations(currentAnnotations.toList() as List<*>)
+        }
+    }
+
+    // POI markers + text labels + glow zones
     LaunchedEffect(pois, activeVibe, savedPoiIds, savedPois, savedVibeFilter, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val style = mapView.style ?: return@LaunchedEffect
@@ -140,6 +179,9 @@ actual fun MapComposable(
         }.filter { it.latitude != null && it.longitude != null }
 
         delegate.activeVibe = activeVibe
+        delegate.savedPoiIds = savedPoiIds
+        delegate.selectedPinIndex = selectedPinIndex
+        delegate.currentPois = pois
 
         // Build annotations (pins + tap handling)
         val annotations = filteredPois.map { poi ->
@@ -156,7 +198,7 @@ actual fun MapComposable(
             mapView.addAnnotations(annotations as List<*>)
         }
 
-        // Text labels via MLNSymbolStyleLayer — renders POI name below each pin
+        // Text labels via MLNSymbolStyleLayer
         if (filteredPois.isNotEmpty()) {
             val features = filteredPois.map { poi ->
                 MLNPointFeature().apply {
@@ -178,7 +220,7 @@ actual fun MapComposable(
             textLayer.text = NSExpression.expressionForKeyPath("name")
             textLayer.textFontSize = NSExpression.expressionForConstantValue(NSNumber(double = 10.0))
             textLayer.textColor = NSExpression.expressionForConstantValue(
-                UIColor(red = 0.98, green = 0.98, blue = 0.98, alpha = 1.0), // #FAFAFA
+                UIColor(red = 0.98, green = 0.98, blue = 0.98, alpha = 1.0),
             )
             textLayer.textHaloColor = NSExpression.expressionForConstantValue(
                 UIColor(red = 0.0, green = 0.0, blue = 0.0, alpha = 0.7),
@@ -243,16 +285,19 @@ actual fun MapComposable(
                 layer.circleColor = NSExpression.expressionForConstantValue(vibeColor)
                 layer.circleOpacity = NSExpression.expressionForConstantValue(NSNumber(double = 0.25))
                 layer.circleBlur = NSExpression.expressionForConstantValue(NSNumber(double = 1.2))
-                // Insert below all other layers so markers appear on top
                 style.insertLayer(layer, atIndex = 0u)
             }
         }
     }
 
-    // Cleanup on disposal — break retain cycle: MLNMapView → MapDelegate → lambdas → remember state
+    // Cleanup on disposal
     DisposableEffect(Unit) {
         onDispose {
             mapView.delegate = null
+            tapHandler.mapView = null
+            mapView.gestureRecognizers?.filterIsInstance<UITapGestureRecognizer>()?.forEach {
+                mapView.removeGestureRecognizer(it)
+            }
             if (currentAnnotations.isNotEmpty()) {
                 @Suppress("UNCHECKED_CAST")
                 mapView.removeAnnotations(currentAnnotations as List<*>)
@@ -269,57 +314,137 @@ actual fun MapComposable(
 }
 
 // ---------------------------------------------------------------------------
-// Delegate
+// Pin image drawing — uses legacy UIGraphicsBeginImageContext (reliable in K/N)
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalForeignApi::class)
+private fun drawPinImage(
+    emoji: String,
+    vibeColor: UIColor,
+    statusColor: PinStatusColor,
+    isClosed: Boolean,
+    isSelected: Boolean,
+    isSaved: Boolean,
+): UIImage? {
+    val size = 44.0
+    UIGraphicsBeginImageContextWithOptions(CGSizeMake(size, size), false, 2.0)
+
+    // Background circle
+    val bgColor = if (isClosed) UIColor(white = 0.5, alpha = 0.35) else vibeColor
+    bgColor.setFill()
+    UIBezierPath.bezierPathWithOvalInRect(CGRectMake(0.0, 0.0, size, size)).fill()
+
+    // Emoji centered — render via UILabel snapshot into current context
+    val emojiLabel = UILabel(frame = CGRectMake(0.0, 0.0, size, size))
+    emojiLabel.text = emoji
+    emojiLabel.font = UIFont.systemFontOfSize(size * 0.45)
+    @Suppress("DEPRECATION")
+    emojiLabel.textAlignment = UITextAlignmentCenter
+    emojiLabel.backgroundColor = UIColor.clearColor
+    emojiLabel.layer.renderInContext(UIGraphicsGetCurrentContext()!!)
+
+    // Status dot at bottom-right
+    if (statusColor != PinStatusColor.GREY) {
+        // Dark outline
+        UIColor.blackColor.setFill()
+        UIBezierPath.bezierPathWithOvalInRect(CGRectMake(size - 15.0, size - 15.0, 14.0, 14.0)).fill()
+        // Colored dot
+        statusColor.toUIColor().setFill()
+        UIBezierPath.bezierPathWithOvalInRect(CGRectMake(size - 13.0, size - 13.0, 10.0, 10.0)).fill()
+    }
+
+    // Saved: gold ring
+    if (isSaved) {
+        val gold = UIColor(red = 1.0, green = 0.843, blue = 0.0, alpha = 1.0)
+        gold.setStroke()
+        val ringPath = UIBezierPath.bezierPathWithOvalInRect(CGRectMake(2.0, 2.0, size - 4.0, size - 4.0))
+        ringPath.lineWidth = 3.0
+        ringPath.stroke()
+    }
+
+    // Selected: white ring
+    if (isSelected) {
+        UIColor.whiteColor.setStroke()
+        val ringPath = UIBezierPath.bezierPathWithOvalInRect(CGRectMake(2.0, 2.0, size - 4.0, size - 4.0))
+        ringPath.lineWidth = 4.0
+        ringPath.stroke()
+    }
+
+    val image = UIGraphicsGetImageFromCurrentImageContext()
+    UIGraphicsEndImageContext()
+    return image
+}
+
+private fun PinStatusColor.toUIColor(): UIColor = when (this) {
+    PinStatusColor.GREEN -> UIColor(red = 0.298, green = 0.686, blue = 0.314, alpha = 1.0)
+    PinStatusColor.ORANGE -> UIColor(red = 1.0, green = 0.596, blue = 0.0, alpha = 1.0)
+    PinStatusColor.RED -> UIColor(red = 0.957, green = 0.263, blue = 0.212, alpha = 1.0)
+    PinStatusColor.GREY -> UIColor(red = 0.620, green = 0.620, blue = 0.620, alpha = 1.0)
+}
+
+// ---------------------------------------------------------------------------
+// Tap handler — @ObjCAction bridge for annotation selection
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalForeignApi::class)
+private class AnnotationTapHandler(
+    private val annotationPoiMap: MutableMap<MLNPointAnnotation, POI>,
+    private val onPoiSelected: (POI) -> Unit,
+) : NSObject() {
+    var mapView: MLNMapView? = null
+
+    @Suppress("unused")
+    @ObjCAction
+    fun handleTap(gesture: UITapGestureRecognizer) {
+        val mv = mapView ?: return
+        val point = gesture.locationInView(mv)
+        // Find closest annotation within 44pt hit area
+        val px = point.useContents { x }
+        val py = point.useContents { y }
+        var closest: MLNPointAnnotation? = null
+        var closestDist = 44.0 * 44.0 // max tap distance squared
+        for (annotation in annotationPoiMap.keys) {
+            val screenPt = mv.convertCoordinate(annotation.coordinate, toPointToView = mv)
+            val dx = screenPt.useContents { x } - px
+            val dy = screenPt.useContents { y } - py
+            val dist = dx * dx + dy * dy
+            if (dist < closestDist) {
+                closestDist = dist
+                closest = annotation
+            }
+        }
+        closest?.let { annotationPoiMap[it]?.let(onPoiSelected) }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Delegate — provides custom pin images via imageForAnnotation
 // ---------------------------------------------------------------------------
 
 @OptIn(ExperimentalForeignApi::class)
 private class MapDelegate(
     val annotationPoiMap: MutableMap<MLNPointAnnotation, POI>,
     private val suppressCameraIdle: BooleanArray,
-    private val onPoiSelected: (POI?) -> Unit,
     private val onCameraIdle: (Double, Double) -> Unit,
-    private val onPinsProjected: (Map<String, ScreenOffset>) -> Unit,
-    private val onMapGestureStart: () -> Unit,
     private val onStyleLoaded: () -> Unit,
     private val onRenderFailed: () -> Unit,
 ) : NSObject(), MLNMapViewDelegateProtocol {
 
     var activeVibe: Vibe? = null
+    var savedPoiIds: Set<String> = emptySet()
+    var selectedPinIndex: Int? = null
+    var currentPois: List<POI> = emptyList()
 
-    /** Called when the map finishes loading a style. */
+    // Pin image cache to avoid redrawing identical pins
+    private val imageCache = mutableMapOf<String, MLNAnnotationImage>()
+
+    fun clearImageCache() { imageCache.clear() }
+
     override fun mapView(mapView: MLNMapView, didFinishLoadingStyle: MLNStyle) {
         onStyleLoaded()
     }
 
-    /** Called after camera animation completes or user stops panning/zooming.
-     *  Also handles gesture detection (animated=false → user gesture) since
-     *  regionWillChangeAnimated has the same Kotlin/Native signature and causes
-     *  CONFLICTING_OVERLOADS. Detecting gestures on region-did-change (end of gesture)
-     *  is slightly later than region-will-change but functionally equivalent for
-     *  hiding pin cards. */
     override fun mapView(mapView: MLNMapView, regionDidChangeAnimated: Boolean) {
-        // Gesture detection: animated=false means user panned/zoomed (not programmatic)
-        if (!regionDidChangeAnimated && !suppressCameraIdle[0]) {
-            onMapGestureStart()
-        }
-
-        // Always project pins — even after programmatic camera moves (matches Android ordering)
-        val projected = annotationPoiMap.entries.mapNotNull { (annotation, poi) ->
-            val point = annotation.coordinate.useContents {
-                mapView.convertCoordinate(
-                    CLLocationCoordinate2DMake(latitude, longitude),
-                    toPointToView = mapView,
-                )
-            }
-            val x = point.useContents { x.toFloat() }
-            val y = point.useContents { y.toFloat() }
-            if (x == 0f && y == 0f) return@mapNotNull null  // off-screen or unmeasured
-            poi.savedId to ScreenOffset(x, y)
-        }.toMap()
-        if (projected.isNotEmpty()) {
-            onPinsProjected(projected)
-        }
-
         if (suppressCameraIdle[0]) {
             suppressCameraIdle[0] = false
             return
@@ -328,16 +453,50 @@ private class MapDelegate(
         onCameraIdle(lat, lng)
     }
 
-    /** POI pin tapped → select. */
-    override fun mapView(mapView: MLNMapView, didSelectAnnotation: MLNAnnotationProtocol) {
-        val annotation = didSelectAnnotation as? MLNPointAnnotation ?: return
-        annotationPoiMap[annotation]?.let { onPoiSelected(it) }
-    }
+    // NOTE: didSelectAnnotation conflicts with imageForAnnotation in Kotlin/Native
+    // (same JVM signature). Selection is handled via didSelectAnnotation; custom images
+    // are provided via imageForAnnotation. We keep imageForAnnotation and use
+    // didSelectAnnotation for tap handling since Kotlin sees them as the same overload.
+    // Workaround: use only imageForAnnotation and handle selection via a tap gesture recognizer.
 
-    // TODO(BACKLOG-LOW): Add vibe-coloured circle marker images via mapView:imageForAnnotation:
-    //   once the Kotlin/Native conflicting-overloads issue with didSelectAnnotation is resolved.
-    //   Both delegate methods have (MLNMapView, MLNAnnotationProtocol) params so Kotlin sees them
-    //   as the same signature. For now, MLNMapView uses default red pins.
+    override fun mapView(mapView: MLNMapView, imageForAnnotation: MLNAnnotationProtocol): MLNAnnotationImage? {
+        val annotation = imageForAnnotation as? MLNPointAnnotation ?: return null
+        val poi = annotationPoiMap[annotation] ?: return null
+
+        val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) } ?: Vibe.DEFAULT
+        val vibe = activeVibe ?: poiVibe
+        val resolved = resolveStatus(poi.liveStatus, poi.hours)
+        val status = liveStatusToColor(resolved)
+        val closed = isClosed(resolved)
+        val isSaved = poi.savedId in savedPoiIds
+        val poiIndex = currentPois.indexOfFirst { it.savedId == poi.savedId }
+        val isSelected = poiIndex >= 0 && poiIndex == selectedPinIndex
+
+        val cacheKey = "${vibe.name}_${poi.type}_${status.name}_${closed}_${isSaved}_$isSelected"
+
+        imageCache[cacheKey]?.let { return it }
+
+        val vibeComposeColor = vibe.toColor()
+        val vibeUiColor = UIColor(
+            red = vibeComposeColor.red.toDouble(),
+            green = vibeComposeColor.green.toDouble(),
+            blue = vibeComposeColor.blue.toDouble(),
+            alpha = 1.0,
+        )
+
+        val image = drawPinImage(
+            emoji = poiTypeEmoji(poi.type),
+            vibeColor = vibeUiColor,
+            statusColor = status,
+            isClosed = closed,
+            isSelected = isSelected,
+            isSaved = isSaved,
+        ) ?: return null
+
+        val annotationImage = MLNAnnotationImage.annotationImageWithImage(image, reuseIdentifier = cacheKey)
+        imageCache[cacheKey] = annotationImage
+        return annotationImage
+    }
 
     override fun mapViewDidFailLoadingMap(mapView: MLNMapView, withError: NSError) {
         onRenderFailed()
@@ -350,20 +509,19 @@ private class MapDelegate(
 
 private fun hexToUIColor(hex: String): UIColor {
     val h = hex.trimStart('#')
+    if (h.length < 6) return UIColor.grayColor
     val r = h.substring(0, 2).toInt(16) / 255.0
     val g = h.substring(2, 4).toInt(16) / 255.0
     val b = h.substring(4, 6).toInt(16) / 255.0
     return UIColor(red = r, green = g, blue = b, alpha = 1.0)
 }
 
-/** Remove POI text label symbol layer + source from a previous render. */
 @OptIn(ExperimentalForeignApi::class)
 private fun removePoiTextLayer(style: MLNStyle) {
     style.layerWithIdentifier(POI_TEXT_LAYER_ID)?.let { style.removeLayer(it) }
     style.sourceWithIdentifier(POI_TEXT_SOURCE_ID)?.let { style.removeSource(it) }
 }
 
-/** Remove any glow circle layers/sources added by a previous POI render. */
 @OptIn(ExperimentalForeignApi::class)
 private fun removeGlowLayers(style: MLNStyle) {
     @Suppress("UNCHECKED_CAST")
@@ -379,7 +537,6 @@ private fun removeGlowLayers(style: MLNStyle) {
         .forEach { style.removeSource(it) }
 }
 
-// TODO(BACKLOG-MEDIUM): clusterPois uses Manhattan distance in degrees — same limitation as Android. Replace with Haversine.
 private fun clusterPois(pois: List<POI>): List<Pair<Pair<Double, Double>, List<POI>>> {
     val used = BooleanArray(pois.size)
     val clusters = mutableListOf<Pair<Pair<Double, Double>, List<POI>>>()

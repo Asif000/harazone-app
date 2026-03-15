@@ -49,9 +49,8 @@ sealed class MapUiState {
         val activeBatchIndex: Int = 0,
         val isBackgroundFetching: Boolean = false,
         val showAllMode: Boolean = false,
-        val pinScreenPositions: Map<String, ScreenOffset> = emptyMap(),
-        val cardsVisible: Boolean = false,
-        val selectedPinId: String? = null,
+        val selectedPinIndex: Int? = null,
+        val areaHighlights: List<String> = emptyList(),
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

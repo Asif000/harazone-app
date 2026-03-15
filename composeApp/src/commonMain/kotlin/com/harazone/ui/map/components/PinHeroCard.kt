@@ -43,7 +43,7 @@ fun PinHeroCard(
     Row(
         modifier = modifier
             .width(180.dp)
-            .height(110.dp)  // explicit height so fillMaxHeight() on the stripe resolves correctly; matches HERO_CARD_HEIGHT_DP in PinCardLayer
+            .height(110.dp)
             .clickable { onTap() }
             .border(1.dp, borderColor, RoundedCornerShape(12.dp))
             .clip(RoundedCornerShape(12.dp))

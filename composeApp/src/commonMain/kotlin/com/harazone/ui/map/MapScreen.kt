@@ -69,14 +69,14 @@ import com.harazone.ui.settings.SettingsSheet
 import com.harazone.ui.map.components.AISearchBar
 import com.harazone.ui.map.components.OnboardingBubble
 import com.harazone.ui.map.components.ExpandablePoiCard
-import com.harazone.ui.map.components.FloatingPoiCard
 import com.harazone.ui.map.components.GeocodingSearchBar
-import com.harazone.ui.map.components.PinCardLayer
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.ui.map.components.FabMenu
 import com.harazone.ui.map.components.MapListToggle
 import com.harazone.ui.map.components.FabScrim
 import com.harazone.ui.map.components.TopContextBar
+import com.harazone.ui.map.components.AmbientTicker
+import com.harazone.ui.map.components.PoiCarousel
 import com.harazone.ui.map.components.VibeRail
 import com.harazone.ui.theme.MapFloatingUiDark
 import com.harazone.ui.theme.spacing
@@ -251,11 +251,11 @@ private fun ReadyContent(
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
                 onCameraIdle = { lat, lng -> viewModel.onCameraIdle(lat, lng) },
-                onPinsProjected = { positions -> viewModel.onPinsProjected(positions) },
-                onMapGestureStart = { viewModel.onMapGestureStart() },
                 savedPoiIds = state.savedPoiIds,
                 savedPois = state.savedPois,
                 savedVibeFilter = state.savedVibeFilter,
+                onPinTapped = { index -> viewModel.onPinTapped(index) },
+                selectedPinIndex = state.selectedPinIndex,
             )
         }
 
@@ -283,40 +283,6 @@ private fun ReadyContent(
             )
         }
 
-        // Pin-anchored card layer — shown on both platforms once pinScreenPositions is populated
-        if (state.pinScreenPositions.isNotEmpty() && !state.showListView && state.selectedPoi == null) {
-            PinCardLayer(
-                pois = state.pois,
-                pinScreenPositions = state.pinScreenPositions,
-                savedPoiIds = state.savedPoiIds,
-                selectedPinId = state.selectedPinId,
-                cardsVisible = state.cardsVisible,
-                screenHeightPx = screenHeightPx,
-                onChipTapped = { poi -> viewModel.onPinChipTapped(poi.savedId) },
-                onHeroTapped = { poi -> viewModel.selectPoi(poi) },
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-
-        // Floating POI card strip — fallback before first pin projection (both platforms, brief)
-        if (state.pinScreenPositions.isEmpty() && !state.showListView && !state.showAllMode && state.pois.isNotEmpty() && state.selectedPoi == null) {
-            Row(
-                verticalAlignment = Alignment.Top,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = navBarPadding + 140.dp, start = 8.dp, end = 72.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                state.pois.take(3).forEach { poi ->
-                    FloatingPoiCard(
-                        poi = poi,
-                        isSaved = poi.savedId in state.savedPoiIds,
-                        onTap = { viewModel.selectPoi(poi) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-            }
-        }
 
         // Top context bar
         TopContextBar(
@@ -356,6 +322,40 @@ private fun ReadyContent(
                 .padding(top = statusBarPadding + 56.dp)
                 .fillMaxWidth(),
         )
+
+        // Ambient ticker — rotating area intel below search bar
+        if (state.pois.isNotEmpty() && !state.showListView) {
+            AmbientTicker(
+                pois = state.pois,
+                latitude = state.latitude,
+                longitude = state.longitude,
+                areaHighlights = state.areaHighlights,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = statusBarPadding + 56.dp + 48.dp + 4.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+            )
+        }
+
+        // Bottom carousel — snap-scroll POI cards
+        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null) {
+            PoiCarousel(
+                pois = state.pois,
+                selectedIndex = state.selectedPinIndex,
+                savedPoiIds = state.savedPoiIds,
+                onCardSwiped = { index -> viewModel.onCarouselSwiped(index) },
+                onSelectionCleared = { viewModel.onCarouselSelectionCleared() },
+                onSaveTapped = { poi ->
+                    if (poi.savedId in state.savedPoiIds) viewModel.unsavePoi(poi)
+                    else viewModel.savePoi(poi, state.areaName)
+                },
+                onDetailTapped = { poi -> viewModel.selectPoiWithImageResolve(poi) },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = navBarPadding + 72.dp),
+            )
+        }
 
         // Vibe rail (right side, bottom-aligned above FAB) — map mode only
         if (!state.showListView) {
@@ -457,13 +457,13 @@ private fun ReadyContent(
                     } else {
                         chatViewModel.openChat(
                             state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
-                            entryPoint = ChatEntryPoint.PoiCard(state.selectedPoi!!),
+                            entryPoint = ChatEntryPoint.PoiCard(state.selectedPoi),
                         )
                     }
                 },
-                isSaved = state.selectedPoi?.savedId in state.savedPoiIds,
-                onSave = { state.selectedPoi?.let { viewModel.savePoi(it, state.areaName) } },
-                onUnsave = { state.selectedPoi?.let { viewModel.unsavePoi(it) } },
+                isSaved = state.selectedPoi.savedId in state.savedPoiIds,
+                onSave = { viewModel.savePoi(state.selectedPoi, state.areaName) },
+                onUnsave = { viewModel.unsavePoi(state.selectedPoi) },
                 onShareClick = {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(sharingComingSoonMessage)
@@ -477,7 +477,7 @@ private fun ReadyContent(
                     ),
                 fullscreen = true,
                 siblingPois = if (state.showAllMode) emptyList() else state.pois.take(3),
-                siblingIndex = state.pois.take(3).indexOfFirst { it.name == state.selectedPoi?.name }.coerceAtLeast(0),
+                siblingIndex = state.pois.take(3).indexOfFirst { it.name == state.selectedPoi.name }.coerceAtLeast(0),
                 onSiblingSelected = { idx -> state.pois.getOrNull(idx)?.let { viewModel.selectPoi(it) } },
                 siblingIsSaved = { p -> p.savedId in state.savedPoiIds },
             )
@@ -488,8 +488,9 @@ private fun ReadyContent(
         // NOTE: state.savedPois contains ALL saves across all areas; the .count filter IS the area-scoping
         // — do not simplify to savedPoiIds.size (that would count saves from every area ever visited).
         val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.savedPoiIds }
+        val carouselVisible = state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null
         AnimatedVisibility(
-            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded,
+            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded && !carouselVisible,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier

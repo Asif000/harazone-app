@@ -2352,204 +2352,114 @@ class MapViewModelTest {
         )
     }
 
-    // -----------------------------------------------------------------------
-    // Pin-Anchored Hybrid Cards — ViewModel tests
-    // -----------------------------------------------------------------------
+    // --- Carousel / pin selection tests (T13) ---
 
-    @Test
-    fun onPinsProjected_setsPositionsAndCardsVisible() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
+    private fun createViewModelWithPois(
+        pois: List<POI> = listOf(
+            POI("Place A", "cafe", "desc", Confidence.HIGH, 1.0, 2.0),
+            POI("Place B", "bar", "desc", Confidence.HIGH, 1.1, 2.1),
+            POI("Place C", "museum", "desc", Confidence.HIGH, 1.2, 2.2),
+        ),
+        areaHighlights: List<String> = emptyList(),
+    ): MapViewModel {
+        return createViewModel(
             locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(
+                        vibes = emptyList(),
+                        pois = pois,
+                        areaHighlights = areaHighlights,
+                    ),
+                )
             ),
         )
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(state.cardsVisible)
-        assertTrue(state.pinScreenPositions.isEmpty())
-
-        val positions = mapOf("k" to ScreenOffset(10f, 20f))
-        viewModel.onPinsProjected(positions)
-        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals(ScreenOffset(10f, 20f), updated.pinScreenPositions["k"])
-        assertTrue(updated.cardsVisible)
     }
 
     @Test
-    fun onMapGestureStart_hidesCards() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
+    fun onPinTapped_setsSelectedPinIndex() = runTest(testDispatcher) {
+        val vm = createViewModelWithPois()
+        vm.onPinTapped(1)
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals(1, state.selectedPinIndex)
+    }
+
+    @Test
+    fun onCarouselSwiped_updatesSelectedPinIndex() = runTest(testDispatcher) {
+        val vm = createViewModelWithPois()
+        vm.onCarouselSwiped(2)
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals(2, state.selectedPinIndex)
+    }
+
+    @Test
+    fun onCarouselSwiped_withOutOfBoundsIndex_clamps() = runTest(testDispatcher) {
+        val vm = createViewModelWithPois() // 3 POIs
+        vm.onCarouselSwiped(99)
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals(2, state.selectedPinIndex) // clamped to last index
+    }
+
+    @Test
+    fun onCarouselSelectionCleared_setsSelectedPinIndexToNull() = runTest(testDispatcher) {
+        val vm = createViewModelWithPois()
+        vm.onPinTapped(1)
+        vm.onCarouselSelectionCleared()
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertNull(state.selectedPinIndex)
+    }
+
+    @Test
+    fun onPinTapped_whenPoisEmpty_doesNotCrash() = runTest(testDispatcher) {
+        val vm = createViewModelWithPois(pois = emptyList())
+        vm.onPinTapped(0) // should not crash
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertNull(state.selectedPinIndex)
+    }
+
+    @Test
+    fun areaFetch_storesAreaHighlightsFromVibesReady() = runTest(testDispatcher) {
+        val highlights = listOf("Jazz at 9pm", "Market till 8")
+        val vm = createViewModelWithPois(areaHighlights = highlights)
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals(highlights, state.areaHighlights)
+    }
+
+    @Test
+    fun selectPoiNull_preservesSelectedPinIndex() = runTest(testDispatcher) {
+        val vm = createViewModelWithPois()
+        vm.onPinTapped(1)
+        assertEquals(1, assertIs<MapUiState.Ready>(vm.uiState.value).selectedPinIndex)
+        vm.selectPoi(null) // closing detail view preserves carousel position
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertEquals(1, state.selectedPinIndex)
+    }
+
+    @Test
+    fun areaReset_clearsSelectedPinIndex() = runTest(testDispatcher) {
+        val vm = createViewModelWithPois(areaHighlights = listOf("Highlight"))
+        vm.onPinTapped(1)
+
+        // Trigger area reset via geocoding suggestion — selectedPinIndex and areaHighlights
+        // are cleared in the reset path before the new area fetch re-populates
+        vm.onGeocodingSuggestionSelected(
+            GeocodingSuggestion(
+                name = "Paris",
+                fullAddress = "Paris, France",
+                latitude = 48.8566,
+                longitude = 2.3522,
+                distanceKm = null,
+            )
         )
-        // First make cards visible
-        viewModel.onPinsProjected(mapOf("k" to ScreenOffset(10f, 20f)))
-        assertTrue(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
-
-        viewModel.onMapGestureStart()
-        assertFalse(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
+        val state = assertIs<MapUiState.Ready>(vm.uiState.value)
+        assertNull(state.selectedPinIndex)
+        // Note: areaHighlights may be re-populated by the immediate fake fetch;
+        // the reset itself clears them (verified in onGeocodingSuggestionSelected code)
     }
 
-    @Test
-    fun onPinChipTapped_togglesSelection() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
-        )
-        assertNull(assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-
-        viewModel.onPinChipTapped("id1")
-        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-
-        // Tap same again → deselect
-        viewModel.onPinChipTapped("id1")
-        assertNull(assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-    }
-
-    @Test
-    fun onPinChipTapped_backButtonClearsSelection() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
-        )
-        // Select a pin
-        viewModel.onPinChipTapped("id1")
-        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-
-        // Simulate back → toggle deselect via same function (PlatformBackHandler calls onChipTapped)
-        viewModel.onPinChipTapped("id1")
-        assertNull(assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-    }
-
-    @Test
-    fun onPinsProjected_notReadyState_noOp() = runTest(testDispatcher) {
-        val suspendingLocation = ResettableFakeLocationProvider()
-        val viewModel = createViewModel(locationProvider = suspendingLocation)
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
-
-        // Should not crash on non-Ready state
-        viewModel.onPinsProjected(mapOf("k" to ScreenOffset(10f, 20f)))
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
-    }
-
-    @Test
-    fun onMapGestureStart_notReadyState_noOp() = runTest(testDispatcher) {
-        val suspendingLocation = ResettableFakeLocationProvider()
-        val viewModel = createViewModel(locationProvider = suspendingLocation)
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
-
-        viewModel.onMapGestureStart()
-        assertIs<MapUiState.Loading>(viewModel.uiState.value)
-    }
-
-    @Test
-    fun onPinChipTapped_switchesSelection() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
-        )
-        viewModel.onPinChipTapped("id1")
-        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-
-        // Tap different chip → switches to new selection
-        viewModel.onPinChipTapped("id2")
-        assertEquals("id2", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-    }
-
-    // -----------------------------------------------------------------------
-    // Regression tests — H2/M3/M4 review findings
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun switchDynamicVibe_resetsSelectedPinIdAndCards() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
-        )
-        // Simulate pin card state
-        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
-        viewModel.onPinChipTapped("id1")
-        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertEquals("id1", before.selectedPinId)
-        assertTrue(before.cardsVisible)
-
-        // Switch vibe → pin card state must reset
-        viewModel.switchDynamicVibe(DynamicVibe(label = "HISTORY", icon = ""))
-        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertNull(after.selectedPinId)
-        assertFalse(after.cardsVisible)
-        assertTrue(after.pinScreenPositions.isEmpty())
-    }
-
-    @Test
-    fun onGeocodingSuggestionSelected_resetsSelectedPinId() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
-        )
-        // Simulate pin card state
-        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
-        viewModel.onPinChipTapped("id1")
-        assertEquals("id1", assertIs<MapUiState.Ready>(viewModel.uiState.value).selectedPinId)
-
-        // Select geocoding suggestion → pin card state must reset
-        viewModel.onGeocodingSuggestionSelected(
-            GeocodingSuggestion(name = "Paris", fullAddress = "Paris, France", latitude = 48.8, longitude = 2.3, distanceKm = null)
-        )
-        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertNull(after.selectedPinId)
-        assertFalse(after.cardsVisible)
-        assertTrue(after.pinScreenPositions.isEmpty())
-    }
-
-    @Test
-    fun onSavedVibeSelected_clearsPinScreenPositions() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
-        )
-        // Simulate pin card state
-        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
-        assertTrue(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
-
-        // Toggle saved vibe filter on → pin cards must clear
-        viewModel.onSavedVibeSelected()
-        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(after.savedVibeFilter)
-        assertNull(after.selectedPinId)
-        assertFalse(after.cardsVisible)
-        assertTrue(after.pinScreenPositions.isEmpty())
-    }
-
-    @Test
-    fun switchDynamicVibe_cardsNotVisibleAfterSwitch() = runTest(testDispatcher) {
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.0, -74.0)),
-                geocodeResult = Result.success("TestArea"),
-            ),
-        )
-        // Make cards visible
-        viewModel.onPinsProjected(mapOf("id1" to ScreenOffset(10f, 20f)))
-        assertTrue(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
-
-        // Switch vibe → cardsVisible must be false (stale card visibility)
-        viewModel.switchDynamicVibe(DynamicVibe(label = "CULTURE", icon = ""))
-        assertFalse(assertIs<MapUiState.Ready>(viewModel.uiState.value).cardsVisible)
-    }
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {

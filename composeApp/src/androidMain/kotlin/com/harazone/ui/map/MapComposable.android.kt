@@ -66,18 +66,17 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
-    onPinsProjected: (Map<String, ScreenOffset>) -> Unit,
-    onMapGestureStart: () -> Unit,
     savedPoiIds: Set<String>,
     savedPois: List<SavedPoi>,
     savedVibeFilter: Boolean,
+    onPinTapped: (Int) -> Unit,
+    selectedPinIndex: Int?,
 ) {
     val context = LocalContext.current
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnMapRenderFailed = rememberUpdatedState(onMapRenderFailed)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
-    val currentOnPinsProjected = rememberUpdatedState(onPinsProjected)
-    val currentOnMapGestureStart = rememberUpdatedState(onMapGestureStart)
+    val currentOnPinTapped = rememberUpdatedState(onPinTapped)
     val currentPois = rememberUpdatedState(pois)
 
     val isDestroyed = remember { booleanArrayOf(false) }
@@ -96,7 +95,6 @@ actual fun MapComposable(
     val mapRef = remember { arrayOfNulls<MapLibreMap>(1) }
     val styleRef = remember { arrayOfNulls<Style>(1) }
     val cameraIdleListenerRef = remember { arrayOfNulls<MapLibreMap.OnCameraIdleListener>(1) }
-    val gestureMoveListenerRef = remember { arrayOfNulls<MapLibreMap.OnCameraMoveStartedListener>(1) }
     val lastFittedPois = remember { mutableStateOf<List<POI>>(emptyList()) }
     val savedFilterFitted = remember { booleanArrayOf(false) }
     val wasSavedVibeFilter = remember { booleanArrayOf(false) }
@@ -162,7 +160,10 @@ actual fun MapComposable(
                                 currentOnPoiSelected.value(poi)
                             } else {
                                 symbolPoiMap[symbol.id]?.let { poi ->
-                                    currentOnPoiSelected.value(poi)
+                                    val index = currentPois.value.indexOfFirst { it.savedId == poi.savedId }
+                                    if (index >= 0) {
+                                        currentOnPinTapped.value(index)
+                                    }
                                 }
                             }
                             true
@@ -189,19 +190,6 @@ actual fun MapComposable(
                         }
 
                         val cameraIdleListener = MapLibreMap.OnCameraIdleListener {
-                            // Always project pins — even after programmatic camera moves
-                            if (styleLoaded.value && !isDestroyed[0]) {
-                                val projected = currentPois.value.mapNotNull { poi ->
-                                    val lat = poi.latitude ?: return@mapNotNull null
-                                    val lng = poi.longitude ?: return@mapNotNull null
-                                    val point = map.projection.toScreenLocation(LatLng(lat, lng))
-                                    poi.savedId to ScreenOffset(point.x, point.y)
-                                }.toMap()
-                                if (projected.isNotEmpty()) {
-                                    currentOnPinsProjected.value(projected)
-                                }
-                            }
-
                             if (suppressCameraIdle[0]) {
                                 suppressCameraIdle[0] = false
                                 return@OnCameraIdleListener
@@ -211,14 +199,6 @@ actual fun MapComposable(
                         }
                         map.addOnCameraIdleListener(cameraIdleListener)
                         cameraIdleListenerRef[0] = cameraIdleListener
-
-                        val gestureMoveListener = MapLibreMap.OnCameraMoveStartedListener { reason ->
-                            if (reason == MapLibreMap.OnCameraMoveStartedListener.REASON_API_GESTURE) {
-                                currentOnMapGestureStart.value()
-                            }
-                        }
-                        map.addOnCameraMoveStartedListener(gestureMoveListener)
-                        gestureMoveListenerRef[0] = gestureMoveListener
                     }
                 }
             }
@@ -270,7 +250,14 @@ actual fun MapComposable(
             val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
                 ?: Vibe.DEFAULT
             val vibe = activeVibe ?: poiVibe
-            val iconKey = ensureIcon(style, vibe, poi.type, isSaved = false)
+            val poiIndex = pois.indexOf(poi)
+            val resolved = resolveStatus(poi.liveStatus, poi.hours)
+            val iconKey = ensureIcon(
+                style, vibe, poi.type, isSaved = false,
+                liveStatus = resolved,
+                isSelected = poiIndex == selectedPinIndex,
+                badgeType = deriveBadge(resolved),
+            )
 
             // TODO(BACKLOG-LOW): Custom POI icons per type (landmark, food, culture, nature) using annotation plugin SymbolManager
             // TODO(BACKLOG-LOW): TalkBack per-marker contentDescription for map-mode accessibility
@@ -430,6 +417,36 @@ actual fun MapComposable(
         }
     }
 
+    // Selection ring update — only re-render the 2 affected pins (deselect old, select new)
+    val prevSelectedPinIndex = remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(selectedPinIndex) {
+        if (!styleLoaded.value) return@LaunchedEffect
+        val style = styleRef[0] ?: return@LaunchedEffect
+        val sm = symbolManagerRef[0] ?: return@LaunchedEffect
+
+        val affectedIndices = setOfNotNull(prevSelectedPinIndex.value, selectedPinIndex)
+        prevSelectedPinIndex.value = selectedPinIndex
+
+        for ((symbolId, poi) in symbolPoiMap) {
+            val poiIndex = pois.indexOfFirst { it.savedId == poi.savedId }
+            if (poiIndex !in affectedIndices) continue
+            val isSelected = poiIndex >= 0 && poiIndex == selectedPinIndex
+            val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
+                ?: Vibe.DEFAULT
+            val vibe = activeVibe ?: poiVibe
+            val resolved = resolveStatus(poi.liveStatus, poi.hours)
+            val iconKey = ensureIcon(
+                style, vibe, poi.type, isSaved = false,
+                liveStatus = resolved,
+                isSelected = isSelected,
+                badgeType = deriveBadge(resolved),
+            )
+            val symbol = symbolsRef.firstOrNull { it.id == symbolId } ?: continue
+            symbol.iconImage = iconKey
+            sm.update(symbol)
+        }
+    }
+
     // DB gold pins — independent layer from saved POIs in the database
     LaunchedEffect(savedPois, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
@@ -500,7 +517,6 @@ actual fun MapComposable(
             context.unregisterComponentCallbacks(lowMemoryCallback)
             lifecycleOwner.lifecycle.removeObserver(observer)
             cameraIdleListenerRef[0]?.let { mapRef[0]?.removeOnCameraIdleListener(it) }
-            gestureMoveListenerRef[0]?.let { mapRef[0]?.removeOnCameraMoveStartedListener(it) }
             symbolManagerRef[0]?.onDestroy()
             mapView.onPause()
             mapView.onStop()
@@ -510,19 +526,35 @@ actual fun MapComposable(
 }
 
 /** Ensure icon bitmap exists for a given vibe + POI type + saved state combo. */
-private fun ensureIcon(style: Style, vibe: Vibe, poiType: String, isSaved: Boolean): String {
+private fun ensureIcon(
+    style: Style,
+    vibe: Vibe,
+    poiType: String,
+    isSaved: Boolean,
+    liveStatus: String? = null,
+    isSelected: Boolean = false,
+    badgeType: PinBadge? = null,
+): String {
     val typeKey = poiType.lowercase().trim()
-    val iconKey = "poi_${vibe.name}_${typeKey}${if (isSaved) "_saved" else ""}"
+    val statusKey = liveStatusToColor(liveStatus).name
+    val iconKey = "poi_${vibe.name}_${typeKey}_${statusKey}_${badgeType?.name ?: "none"}_${isSelected}_$isSaved"
     if (style.getImage(iconKey) == null) {
         val vibeColorArgb = vibe.toColor().toArgb()
         val emoji = poiTypeEmoji(typeKey)
         val size = 64
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+        val closed = isClosed(liveStatus)
         // Vibe-colored circle background
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = vibeColorArgb
             this.style = Paint.Style.FILL
+            if (closed) {
+                alpha = 90
+                colorFilter = android.graphics.ColorMatrixColorFilter(
+                    android.graphics.ColorMatrix().apply { setSaturation(0f) }
+                )
+            }
         }
         canvas.drawCircle(size / 2f, size / 2f, size / 2f, bgPaint)
         // Emoji icon centered
@@ -530,9 +562,38 @@ private fun ensureIcon(style: Style, vibe: Vibe, poiType: String, isSaved: Boole
             textSize = size * 0.5f
             textAlign = Paint.Align.CENTER
             typeface = Typeface.DEFAULT
+            if (closed) alpha = 90
         }
         val textY = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
         canvas.drawText(emoji, size / 2f, textY, textPaint)
+        // Status dot at bottom-right
+        val statusColor = liveStatusToColor(liveStatus)
+        if (statusColor != PinStatusColor.GREY) {
+            // Dark outline for contrast
+            val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.BLACK
+                this.style = Paint.Style.FILL
+            }
+            canvas.drawCircle(size - 8f, size - 8f, 11f, outlinePaint)
+            val dotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = statusColor.toComposeColor().toArgb()
+                this.style = Paint.Style.FILL
+            }
+            canvas.drawCircle(size - 8f, size - 8f, 9f, dotPaint)
+        }
+        // Micro-badge emoji at top-left
+        if (badgeType != null) {
+            val badgeEmoji = when (badgeType) {
+                PinBadge.CLOSING_SOON -> "\u23F0"
+                PinBadge.TRENDING -> "\uD83D\uDD25"
+                PinBadge.EVENT -> "\uD83C\uDFA4"
+            }
+            val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = 14f
+                textAlign = Paint.Align.LEFT
+            }
+            canvas.drawText(badgeEmoji, 4f, 16f, badgePaint)
+        }
         // Gold ring + checkmark badge for saved POIs
         if (isSaved) {
             val strokeWidth = 5f
@@ -542,11 +603,11 @@ private fun ensureIcon(style: Style, vibe: Vibe, poiType: String, isSaved: Boole
                 this.strokeWidth = strokeWidth
             }
             canvas.drawCircle(size / 2f, size / 2f, size / 2f - strokeWidth / 2f - 1f, ringPaint)
-            val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            val savedBadgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = android.graphics.Color.parseColor("#FFD700")
                 this.style = Paint.Style.FILL
             }
-            canvas.drawCircle(size - 10f, size - 10f, 10f, badgePaint)
+            canvas.drawCircle(size - 10f, size - 10f, 10f, savedBadgePaint)
             val checkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                 color = android.graphics.Color.parseColor("#1A1A1A")
                 textSize = 12f
@@ -554,6 +615,15 @@ private fun ensureIcon(style: Style, vibe: Vibe, poiType: String, isSaved: Boole
                 typeface = Typeface.DEFAULT_BOLD
             }
             canvas.drawText("\u2713", size - 10f, size - 6f, checkPaint)
+        }
+        // Selected white ring (drawn last, on top)
+        if (isSelected) {
+            val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                this.style = Paint.Style.STROKE
+                strokeWidth = 6f
+            }
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f - 3f, ringPaint)
         }
         style.addImage(iconKey, bitmap)
     }
