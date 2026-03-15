@@ -264,28 +264,7 @@ internal fun ChatOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(chatState.persistentPills) { pill ->
-                        val pillDisplayLabel = when {
-                            pill.label == "New topic"                     -> stringResource(Res.string.pill_new_topic)
-                            pill.label == "Areas to avoid"                -> stringResource(Res.string.pill_areas_to_avoid)
-                            pill.label == "Best time to go"               -> stringResource(Res.string.pill_best_time)
-                            pill.label == "Tell me more"                  -> stringResource(Res.string.pill_tell_me_more)
-                            pill.label == "Surprise me"                   -> stringResource(Res.string.pill_surprise_me)
-                            pill.label == "Best food right now"           -> stringResource(Res.string.pill_best_food)
-                            pill.label == "Show me hidden gems"           -> stringResource(Res.string.pill_hidden_gems)
-                            pill.label == "Get me outside"                -> stringResource(Res.string.pill_get_outside)
-                            pill.label == "Plan a day trip from my saves" -> stringResource(Res.string.pill_day_trip)
-                            pill.label == "Find patterns in my saves"     -> stringResource(Res.string.pill_find_patterns)
-                            pill.label == "Safe at night?"                -> stringResource(Res.string.pill_safe_at_night)
-                            pill.label == "Veggie options?"               -> stringResource(Res.string.pill_veggie_options)
-                            pill.label == "Famous events?"                -> stringResource(Res.string.pill_famous_events)
-                            pill.label == "What's nearby?"                -> stringResource(Res.string.pill_whats_nearby)
-                            pill.label == "Is this worth visiting?"       -> stringResource(Res.string.pill_is_worth_visiting)
-                            pill.label == "What am I missing?"            -> stringResource(Res.string.pill_what_am_i_missing)
-                            pill.label.startsWith("What's on tonight")    -> stringResource(Res.string.pill_whats_on_tonight, pill.label.substringAfter("in ").trimEnd('?'))
-                            pill.label.startsWith("Surprise me in")       -> stringResource(Res.string.pill_surprise_me_in, pill.label.substringAfter("in "))
-                            pill.label.startsWith("Tell me more about")   -> stringResource(Res.string.pill_tell_me_more_about, pill.label.substringAfter("about "))
-                            else                                          -> pill.label
-                        }
+                        val pillDisplayLabel = pillDisplayLabel(pill)
                         if (pill.label == "New topic") {
                             SuggestionChip(
                                 onClick = { viewModel.resetToIntentPills() },
@@ -387,7 +366,7 @@ private fun ContextBanner(
 }
 
 @Composable
-private fun SkeletonSection(count: Int) {
+internal fun SkeletonSection(count: Int) {
     val infiniteTransition = rememberInfiniteTransition(label = "shimmer")
     val shimmerAlpha by infiniteTransition.animateFloat(
         initialValue = 0.3f,
@@ -415,7 +394,7 @@ private fun SkeletonSection(count: Int) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ChatPoiMiniCard(
+internal fun ChatPoiMiniCard(
     card: ChatPoiCard,
     isSaved: Boolean,
     onSave: () -> Unit,
@@ -540,7 +519,7 @@ private fun ChatPoiMiniCard(
     }
 }
 
-private fun poiThumbnailUrl(lat: Double, lng: Double): String {
+internal fun poiThumbnailUrl(lat: Double, lng: Double): String {
     // Convert lat/lng to satellite tile coords (zoom 15) — same approach as AreaRepositoryImpl
     val z = 15
     val n = 1 shl z
@@ -550,10 +529,10 @@ private fun poiThumbnailUrl(lat: Double, lng: Double): String {
     return "https://api.maptiler.com/tiles/satellite-v2/$z/$x/$y.jpg?key=${BuildKonfig.MAPTILER_API_KEY}"
 }
 
-private fun poiTypeEmoji(type: String): String = com.harazone.util.poiTypeEmoji(type.lowercase())
+internal fun poiTypeEmoji(type: String): String = com.harazone.util.poiTypeEmoji(type.lowercase())
 
 @Composable
-private fun ChatBubbleItem(
+internal fun ChatBubbleItem(
     bubble: ChatBubble,
     onRetry: () -> Unit,
 ) {
@@ -631,7 +610,7 @@ private fun ChatBubbleItem(
 }
 
 @Composable
-private fun BlinkingCursor() {
+internal fun BlinkingCursor() {
     val infiniteTransition = rememberInfiniteTransition(label = "cursor")
     val alpha by infiniteTransition.animateFloat(
         initialValue = 1f,
@@ -650,7 +629,7 @@ private fun BlinkingCursor() {
 }
 
 @Composable
-private fun ChatInputBar(
+internal fun ChatInputBar(
     inputText: String,
     isStreaming: Boolean,
     onInputChange: (String) -> Unit,
@@ -702,4 +681,28 @@ private fun ChatInputBar(
             }
         }
     }
+}
+
+@Composable
+internal fun pillDisplayLabel(pill: ContextualPill): String = when {
+    pill.label == "New topic"                     -> stringResource(Res.string.pill_new_topic)
+    pill.label == "Areas to avoid"                -> stringResource(Res.string.pill_areas_to_avoid)
+    pill.label == "Best time to go"               -> stringResource(Res.string.pill_best_time)
+    pill.label == "Tell me more"                  -> stringResource(Res.string.pill_tell_me_more)
+    pill.label == "Surprise me"                   -> stringResource(Res.string.pill_surprise_me)
+    pill.label == "Best food right now"           -> stringResource(Res.string.pill_best_food)
+    pill.label == "Show me hidden gems"           -> stringResource(Res.string.pill_hidden_gems)
+    pill.label == "Get me outside"                -> stringResource(Res.string.pill_get_outside)
+    pill.label == "Plan a day trip from my saves" -> stringResource(Res.string.pill_day_trip)
+    pill.label == "Find patterns in my saves"     -> stringResource(Res.string.pill_find_patterns)
+    pill.label == "Safe at night?"                -> stringResource(Res.string.pill_safe_at_night)
+    pill.label == "Veggie options?"               -> stringResource(Res.string.pill_veggie_options)
+    pill.label == "Famous events?"                -> stringResource(Res.string.pill_famous_events)
+    pill.label == "What's nearby?"                -> stringResource(Res.string.pill_whats_nearby)
+    pill.label == "Is this worth visiting?"       -> stringResource(Res.string.pill_is_worth_visiting)
+    pill.label == "What am I missing?"            -> stringResource(Res.string.pill_what_am_i_missing)
+    pill.label.startsWith("What's on tonight")    -> stringResource(Res.string.pill_whats_on_tonight, pill.label.substringAfter("in ").trimEnd('?'))
+    pill.label.startsWith("Surprise me in")       -> stringResource(Res.string.pill_surprise_me_in, pill.label.substringAfter("in "))
+    pill.label.startsWith("Tell me more about")   -> stringResource(Res.string.pill_tell_me_more_about, pill.label.substringAfter("about "))
+    else                                          -> pill.label
 }

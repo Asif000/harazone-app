@@ -1007,6 +1007,68 @@ Enjoy!"""
 
     // --- Regression: H2 — openChat re-open always preserves persistent pills ---
 
+    // --- AI Detail Page tests: forceReset + openChatForPoi ---
+
+    @Test
+    fun `openChatForPoi resets conversation even when same area has existing bubbles`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("First response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Tokyo", emptyList(), null)
+        vm.sendMessage("Hello Tokyo")
+        assertEquals(2, vm.uiState.value.bubbles.size)
+        val oldContent = vm.uiState.value.bubbles[0].content
+
+        // Now open for a specific POI in the same area — should force reset
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("About the cafe", false),
+            ChatToken("", true),
+        )
+        val poi = testPoi("Test Cafe")
+        vm.openChatForPoi(poi, "Tokyo", emptyList(), null)
+
+        val state = vm.uiState.value
+        assertTrue(state.bubbles.isNotEmpty(), "Should have AI intro bubbles")
+        assertFalse(state.bubbles.any { it.content == oldContent }, "Previous conversation should be cleared")
+    }
+
+    @Test
+    fun `openChatForPoi immediately starts streaming AI intro`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("This is a great place", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        val poi = testPoi("Test Cafe")
+        vm.openChatForPoi(poi, "Test Area", emptyList(), null)
+
+        val state = vm.uiState.value
+        // With UnconfinedTestDispatcher, streaming completes eagerly
+        assertTrue(state.bubbles.isNotEmpty(), "Should have bubbles from AI intro")
+        val aiBubble = state.bubbles.find { it.role == MessageRole.AI }
+        assertTrue(aiBubble != null, "Should have an AI bubble")
+        assertTrue(aiBubble!!.content.isNotEmpty(), "AI bubble should have content")
+    }
+
+    @Test
+    fun `openChat with forceReset true ignores same-area preservation`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        vm.openChat("Paris", emptyList(), null)
+        vm.sendMessage("Hello Paris")
+        assertEquals(2, vm.uiState.value.bubbles.size)
+
+        // Force reset same area
+        vm.openChat("Paris", emptyList(), null, forceReset = true)
+        assertTrue(vm.uiState.value.bubbles.isEmpty(), "Bubbles should be cleared with forceReset=true")
+        assertTrue(vm.uiState.value.isOpen, "Chat should be open")
+    }
+
     @Test
     fun `openChat on reopen always preserves persistent pills`() = runTest {
         // Regression: H2 — dead if/else where both branches did the same thing.

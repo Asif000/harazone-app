@@ -63,14 +63,40 @@ class AmbientTickerTest {
     }
 
     @Test
-    fun buildTickerSlots_emptyInputs_returnsEmptyList() {
+    fun buildTickerSlots_emptyInputs_returnsFallback() {
         val slots = buildTickerSlots(emptyList(), 40.0, -74.0, emptyList(), sunsetMinutesProvider = { _, _ -> 200 })
-        assertTrue(slots.isEmpty())
+        assertEquals(1, slots.size)
+        assertEquals("Exploring area\u2026", slots.first())
     }
 
     @Test
     fun buildTickerSlots_nullIsland_skipsSunset() {
         val slots = buildTickerSlots(emptyList(), 0.0, 0.0, emptyList(), sunsetMinutesProvider = { _, _ -> 45 })
         assertTrue(slots.none { it.contains("Sunset") })
+    }
+
+    @Test
+    fun buildTickerSlots_allClosedLateNight_showsClosedFallback() {
+        // Regression: when all POIs are closed, sunset out of range, no highlights,
+        // the ticker must NOT return empty (which causes it to disappear).
+        val pois = listOf(poi("closed"), poi("closed"), poi("closed"))
+        val slots = buildTickerSlots(
+            pois, 40.0, -74.0, emptyList(),
+            sunsetMinutesProvider = { _, _ -> -60 }, // well past sunset
+        )
+        assertTrue(slots.isNotEmpty(), "Ticker must not be empty when all POIs are closed")
+        assertEquals("All 3 places closed nearby", slots.first())
+    }
+
+    @Test
+    fun buildTickerSlots_allClosedWithHighlights_usesHighlightNotFallback() {
+        val pois = listOf(poi("closed"), poi("closed"))
+        val slots = buildTickerSlots(
+            pois, 40.0, -74.0, listOf("Night market open"),
+            sunsetMinutesProvider = { _, _ -> -60 },
+        )
+        assertTrue(slots.isNotEmpty())
+        assertEquals("Night market open", slots.first())
+        assertTrue(slots.none { it.contains("places closed") }, "Fallback should not appear when highlights exist")
     }
 }

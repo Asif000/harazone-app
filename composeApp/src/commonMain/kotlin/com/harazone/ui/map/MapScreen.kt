@@ -68,7 +68,7 @@ import com.harazone.ui.settings.FeedbackPreviewSheet
 import com.harazone.ui.settings.SettingsSheet
 import com.harazone.ui.map.components.AISearchBar
 import com.harazone.ui.map.components.OnboardingBubble
-import com.harazone.ui.map.components.ExpandablePoiCard
+import com.harazone.ui.map.components.AiDetailPage
 import com.harazone.ui.map.components.GeocodingSearchBar
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.ui.map.components.FabMenu
@@ -147,7 +147,6 @@ private fun ReadyContent(
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
     val noMapsAppMessage = stringResource(Res.string.map_no_maps_app)
-    val sharingComingSoonMessage = stringResource(Res.string.map_sharing_coming_soon)
     val returnToSaves = remember { booleanArrayOf(false) }
     val returnToChat = remember { booleanArrayOf(false) }
 
@@ -403,16 +402,6 @@ private fun ReadyContent(
         PlatformBackHandler(enabled = state.showAllMode && state.selectedPoi == null) {
             viewModel.onPrevBatch()
         }
-        PlatformBackHandler(enabled = state.selectedPoi != null) {
-            viewModel.clearPoiSelection()
-            if (returnToChat[0]) {
-                returnToChat[0] = false
-                chatViewModel.reopenChat()
-            } else if (returnToSaves[0]) {
-                returnToSaves[0] = false
-                viewModel.openSavesSheet()
-            }
-        }
         PlatformBackHandler(enabled = state.selectedPoi == null && state.savedVibeFilter) {
             viewModel.onSavedVibeSelected()
         }
@@ -420,41 +409,37 @@ private fun ReadyContent(
             viewModel.toggleFab()
         }
 
-        // POI card scrim (tap outside to dismiss)
+        // AI Detail Page — replaces ExpandablePoiCard + scrim
         if (state.selectedPoi != null) {
+            val dismissDetail: () -> Unit = {
+                viewModel.clearPoiSelection()
+                if (returnToSaves[0]) {
+                    returnToSaves[0] = false
+                    viewModel.openSavesSheet()
+                } else if (!returnToChat[0]) {
+                    chatViewModel.closeChat()
+                }
+                returnToChat[0] = false
+            }
+
+            // Scrim
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable {
-                        viewModel.clearPoiSelection()
-                        if (returnToChat[0]) {
-                            returnToChat[0] = false
-                            chatViewModel.reopenChat()
-                        } else if (returnToSaves[0]) {
-                            returnToSaves[0] = false
-                            viewModel.openSavesSheet()
-                        }
-                    },
+                    .clickable { dismissDetail() },
             )
-        }
 
-        // TODO(BACKLOG-LOW): Three-stop bottom sheet deferred — V1 uses two stops. Requires anchoredDraggable with custom snap points.
-        // Expandable POI card
-        if (state.selectedPoi != null) {
-            ExpandablePoiCard(
+            AiDetailPage(
                 poi = state.selectedPoi,
-                activeVibe = null, // Dynamic vibes — old Vibe enum coloring disabled
-                onDismiss = {
-                    viewModel.clearPoiSelection()
-                    if (returnToChat[0]) {
-                        returnToChat[0] = false
-                        chatViewModel.reopenChat()
-                    } else if (returnToSaves[0]) {
-                        returnToSaves[0] = false
-                        viewModel.openSavesSheet()
-                    }
-                },
+                chatViewModel = chatViewModel,
+                chatState = chatState,
+                areaName = state.areaName,
+                allPois = state.allDiscoveredPois,
+                activeDynamicVibe = state.activeDynamicVibe,
+                isSaved = state.selectedPoi.savedId in state.savedPoiIds,
+                onSave = { viewModel.savePoi(state.selectedPoi, state.areaName) },
+                onUnsave = { viewModel.unsavePoi(state.selectedPoi) },
                 onDirectionsClick = { lat, lon, name ->
                     val handled = onNavigateToMaps(lat, lon, name)
                     if (!handled) {
@@ -463,26 +448,20 @@ private fun ReadyContent(
                         }
                     }
                 },
-                onAskAiClick = {
+                onShowOnMap = {
+                    chatViewModel.closeChat()
                     viewModel.clearPoiSelection()
+                    returnToChat[0] = false
                     returnToSaves[0] = false
-                    if (chatState.isStreaming) {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar("AI is still responding...")
-                        }
-                    } else {
-                        chatViewModel.openChat(
-                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
-                            entryPoint = ChatEntryPoint.PoiCard(state.selectedPoi),
-                        )
+                    state.selectedPoi.latitude?.let { lat ->
+                        state.selectedPoi.longitude?.let { lng -> viewModel.flyToCoords(lat, lng) }
                     }
                 },
-                isSaved = state.selectedPoi.savedId in state.savedPoiIds,
-                onSave = { viewModel.savePoi(state.selectedPoi, state.areaName) },
-                onUnsave = { viewModel.unsavePoi(state.selectedPoi) },
-                onShareClick = {
+                onDismiss = dismissDetail,
+                onNavigateToMaps = onNavigateToMaps,
+                onDirectionsFailed = {
                     coroutineScope.launch {
-                        snackbarHostState.showSnackbar(sharingComingSoonMessage)
+                        snackbarHostState.showSnackbar(noMapsAppMessage)
                     }
                 },
                 modifier = Modifier
@@ -491,11 +470,6 @@ private fun ReadyContent(
                         top = statusBarPadding + 56.dp,
                         bottom = navBarPadding + 56.dp,
                     ),
-                fullscreen = true,
-                siblingPois = if (state.showAllMode) emptyList() else state.pois.take(3),
-                siblingIndex = state.pois.take(3).indexOfFirst { it.name == state.selectedPoi.name }.coerceAtLeast(0),
-                onSiblingSelected = { idx -> state.pois.getOrNull(idx)?.let { viewModel.selectPoi(it) } },
-                siblingIsSaved = { p -> p.savedId in state.savedPoiIds },
             )
         }
 
@@ -591,8 +565,8 @@ private fun ReadyContent(
                 },
         )
 
-        // Chat overlay
-        if (chatState.isOpen) {
+        // Chat overlay — suppressed when AiDetailPage is open (conflict guard)
+        if (chatState.isOpen && state.selectedPoi == null) {
             ChatOverlay(
                 viewModel = chatViewModel,
                 chatState = chatState,
@@ -729,7 +703,8 @@ private fun ReadyContent(
         }
 
         // Must be LAST PlatformBackHandler in ReadyContent — last-composed = highest priority
-        PlatformBackHandler(enabled = chatState.isOpen) {
+        // Suppressed when AiDetailPage is open (AiDetailPage has its own back handler)
+        PlatformBackHandler(enabled = chatState.isOpen && state.selectedPoi == null) {
             chatViewModel.closeChat()
         }
 

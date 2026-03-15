@@ -1,69 +1,65 @@
 package com.harazone.ui.map.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.painter.ColorPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.harazone.ui.components.PlatformBackHandler
+import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.Vibe
-import kotlinx.coroutines.flow.drop
+import com.harazone.ui.map.ChatBubbleItem
+import com.harazone.ui.map.ChatInputBar
+import com.harazone.ui.map.ChatPoiCard
+import com.harazone.ui.map.ChatPoiMiniCard
+import com.harazone.ui.map.ChatUiState
+import com.harazone.ui.map.ChatViewModel
+import com.harazone.ui.map.SkeletonSection
+import com.harazone.ui.map.pillDisplayLabel
+import com.harazone.ui.theme.DarkColorScheme
 import com.harazone.ui.theme.MapSurfaceDark
 import com.harazone.ui.theme.toColor
 import org.jetbrains.compose.resources.stringResource
@@ -71,137 +67,183 @@ import areadiscovery.composeapp.generated.resources.*
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ExpandablePoiCard(
+internal fun AiDetailPage(
     poi: POI,
-    activeVibe: Vibe?,
-    onDismiss: () -> Unit,
-    onDirectionsClick: (Double, Double, String) -> Unit,
-    onAskAiClick: () -> Unit,
+    chatViewModel: ChatViewModel,
+    chatState: ChatUiState,
+    areaName: String,
+    allPois: List<POI>,
+    activeDynamicVibe: DynamicVibe?,
     isSaved: Boolean,
     onSave: () -> Unit,
     onUnsave: () -> Unit,
-    onShareClick: () -> Unit,
+    onDirectionsClick: (Double, Double, String) -> Unit,
+    onShowOnMap: () -> Unit,
+    onDismiss: () -> Unit,
+    onNavigateToMaps: (Double, Double, String) -> Boolean,
+    onDirectionsFailed: () -> Unit,
     modifier: Modifier = Modifier,
-    fullscreen: Boolean = false,
-    siblingPois: List<POI> = emptyList(),
-    siblingIndex: Int = 0,
-    onSiblingSelected: (Int) -> Unit = {},
-    siblingIsSaved: (POI) -> Boolean = { false },
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
-    val vibeColor = (activeVibe ?: poiVibe ?: Vibe.DEFAULT).toColor()
-    val hasSiblings = siblingPois.size > 1
+    val listState = rememberLazyListState()
 
-    val shape = if (fullscreen) RoundedCornerShape(0.dp) else RoundedCornerShape(16.dp)
-    val rootModifier = modifier
-        .then(if (fullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth(0.9f))
-        .clip(shape)
-        .background(MapSurfaceDark.copy(alpha = 0.97f))
-        .then(if (fullscreen) Modifier else Modifier.border(1.dp, vibeColor.copy(alpha = 0.12f), shape))
-
-    if (hasSiblings) {
-        val pagerState = rememberPagerState(
-            initialPage = siblingIndex.coerceIn(0, siblingPois.size - 1),
-            pageCount = { siblingPois.size },
-        )
-        LaunchedEffect(pagerState) {
-            snapshotFlow { pagerState.currentPage }
-                .drop(1)
-                .collect { page -> onSiblingSelected(page) }
+    // Auto-scroll to latest content
+    val scrollKey = Pair(chatState.bubbles.size, chatState.isStreaming)
+    LaunchedEffect(scrollKey) {
+        val lastIndex = listState.layoutInfo.totalItemsCount - 1
+        if (lastIndex > 0) {
+            listState.animateScrollToItem(lastIndex)
         }
+    }
 
-        Column(modifier = rootModifier) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier.weight(1f),
-            ) { page ->
-                val pagePoi = siblingPois[page]
-                var pageExpanded by remember { mutableStateOf(false) }
-                PoiCardContent(
-                    poi = pagePoi,
-                    activeVibe = activeVibe,
-                    vibeColor = vibeColor,
-                    onDismiss = onDismiss,
-                    onDirectionsClick = onDirectionsClick,
-                    onAskAiClick = onAskAiClick,
-                    isSaved = siblingIsSaved(pagePoi),
-                    onSave = onSave,
-                    onUnsave = onUnsave,
-                    onShareClick = onShareClick,
-                    expanded = pageExpanded,
-                    onExpandToggle = { pageExpanded = !pageExpanded },
-                )
-            }
-            // Dot indicators
-            Row(
-                horizontalArrangement = Arrangement.Center,
+    // Pre-seed AI intro for this POI
+    LaunchedEffect(poi.savedId) {
+        chatViewModel.openChatForPoi(poi, areaName, allPois, activeDynamicVibe)
+    }
+
+    PlatformBackHandler(enabled = true) { onDismiss() }
+
+    // Force dark color scheme — AiDetailPage always uses a dark background,
+    // so child composables (ChatBubbleItem, etc.) must resolve theme colors as dark.
+    MaterialTheme(colorScheme = DarkColorScheme) {
+    Box(
+        modifier = modifier
+            .background(MapSurfaceDark.copy(alpha = 0.97f))
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 8.dp),
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                repeat(siblingPois.size) { idx ->
-                    Box(
-                        modifier = Modifier
-                            .padding(horizontal = 3.dp)
-                            .size(5.dp)
-                            .background(
-                                if (idx == pagerState.currentPage) Color.White
-                                else Color.White.copy(alpha = 0.3f),
-                                CircleShape,
-                            ),
+                // Header card
+                item(key = "header") {
+                    PoiDetailHeader(
+                        poi = poi,
+                        isSaved = isSaved,
+                        onSave = onSave,
+                        onUnsave = onUnsave,
+                        onDirectionsClick = onDirectionsClick,
+                        onShowOnMap = onShowOnMap,
+                        onDismiss = onDismiss,
                     )
                 }
+
+                // Chat bubbles
+                items(chatState.bubbles, key = { it.id }) { bubble ->
+                    ChatBubbleItem(
+                        bubble = bubble,
+                        onRetry = { chatViewModel.retryLastMessage() },
+                    )
+                }
+
+                // Skeleton shimmer
+                if (chatState.showSkeletons) {
+                    item(key = "skeletons") {
+                        Box(Modifier.padding(horizontal = 16.dp)) {
+                            SkeletonSection(3)
+                        }
+                    }
+                }
+
+                // POI cards — inline vertical items (scroll up with conversation)
+                if (chatState.poiCards.isNotEmpty()) {
+                    items(chatState.poiCards, key = { "poi_${it.id}" }) { card ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp),
+                            horizontalArrangement = Arrangement.Start,
+                        ) {
+                            ChatPoiMiniCard(
+                                card = card,
+                                isSaved = card.id in chatState.savedPoiIds,
+                                onSave = { chatViewModel.savePoi(card, chatState.areaName) },
+                                onUnsave = { chatViewModel.unsavePoi(card.id) },
+                                onDirections = {
+                                    val handled = onNavigateToMaps(card.lat, card.lng, card.name)
+                                    if (!handled) onDirectionsFailed()
+                                },
+                                onShowOnMap = {
+                                    onShowOnMap()
+                                },
+                            )
+                        }
+                    }
+                }
+
+                // Persistent pills
+                if (chatState.persistentPills.isNotEmpty() && !chatState.isStreaming) {
+                    item(key = "pills") {
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            items(chatState.persistentPills) { pill ->
+                                val label = pillDisplayLabel(pill)
+                                if (pill.label == "New topic") {
+                                    SuggestionChip(
+                                        onClick = { chatViewModel.resetToIntentPills() },
+                                        label = { Text("${pill.emoji} $label", fontSize = 13.sp) },
+                                        colors = SuggestionChipDefaults.suggestionChipColors(
+                                            containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.5f),
+                                        ),
+                                    )
+                                } else {
+                                    SuggestionChip(
+                                        onClick = {
+                                            if (chatState.bubbles.isEmpty()) chatViewModel.tapIntentPill(pill)
+                                            else chatViewModel.tapPersistentPill(pill)
+                                        },
+                                        label = { Text("${pill.emoji} $label", fontSize = 13.sp) },
+                                        colors = SuggestionChipDefaults.suggestionChipColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
-        }
-    } else {
-        // No outer verticalScroll — PoiCardContent has its own verticalScroll.
-        // Nesting two scrollables causes crash (infinite height constraints).
-        Column(modifier = rootModifier, verticalArrangement = Arrangement.Top) {
-            PoiCardContent(
-                poi = poi,
-                activeVibe = activeVibe,
-                vibeColor = vibeColor,
-                onDismiss = onDismiss,
-                onDirectionsClick = onDirectionsClick,
-                onAskAiClick = onAskAiClick,
-                isSaved = isSaved,
-                onSave = onSave,
-                onUnsave = onUnsave,
-                onShareClick = onShareClick,
-                expanded = expanded,
-                onExpandToggle = { expanded = !expanded },
+
+            // Sticky input bar
+            ChatInputBar(
+                inputText = chatState.inputText,
+                isStreaming = chatState.isStreaming,
+                onInputChange = { chatViewModel.updateInput(it) },
+                onSend = { chatViewModel.sendMessage() },
             )
         }
     }
+    } // MaterialTheme
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun PoiCardContent(
+private fun PoiDetailHeader(
     poi: POI,
-    activeVibe: Vibe?,
-    vibeColor: Color,
-    onDismiss: () -> Unit,
-    onDirectionsClick: (Double, Double, String) -> Unit,
-    onAskAiClick: () -> Unit,
     isSaved: Boolean,
     onSave: () -> Unit,
     onUnsave: () -> Unit,
-    onShareClick: () -> Unit,
-    expanded: Boolean,
-    onExpandToggle: () -> Unit,
+    onDirectionsClick: (Double, Double, String) -> Unit,
+    onShowOnMap: () -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.verticalScroll(rememberScrollState()),
-    ) {
+    val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
+    val vibeColor = (poiVibe ?: Vibe.DEFAULT).toColor()
+
+    Column {
+        // Hero image
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(160.dp)
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)),
+                .height(160.dp),
         ) {
-            // Gradient always visible as base layer (fallback when no image)
+            // Gradient fallback
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -211,7 +253,6 @@ private fun PoiCardContent(
                         )
                     ),
             )
-            // Image overlaid on top if URL is available
             if (poi.imageUrl != null) {
                 AsyncImage(
                     model = poi.imageUrl,
@@ -221,7 +262,6 @@ private fun PoiCardContent(
                     modifier = Modifier.matchParentSize(),
                 )
             } else {
-                // TODO(BACKLOG-HIGH): Replace with Foursquare photo API before public release
                 Text(
                     text = stringResource(Res.string.poi_card_loading),
                     color = Color.White.copy(alpha = 0.25f),
@@ -248,17 +288,31 @@ private fun PoiCardContent(
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
-            // Name + type
+            // Name
             Text(
                 text = poi.name,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
             )
+            // Type
             Text(
                 text = poi.type.replaceFirstChar { it.uppercaseChar() },
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.6f),
             )
+
+            // Vibe chip
+            if (poi.vibe.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = poi.vibe,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                    modifier = Modifier
+                        .background(vibeColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
 
             Spacer(Modifier.height(8.dp))
 
@@ -278,12 +332,21 @@ private fun PoiCardContent(
                     )
                     Spacer(Modifier.width(12.dp))
                 }
-
                 if (poi.liveStatus != null) {
                     LiveStatusBadge(poi.liveStatus)
                     Spacer(Modifier.width(12.dp))
                     BuzzMeter(liveStatus = poi.liveStatus, vibeColor = vibeColor)
                 }
+            }
+
+            // Price range
+            if (poi.priceRange != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = poi.priceRange,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.6f),
+                )
             }
 
             // Insight
@@ -295,7 +358,6 @@ private fun PoiCardContent(
                     color = Color.White.copy(alpha = 0.8f),
                 )
             } else {
-                // Stage 1 pin — enrich loading shimmer
                 Spacer(Modifier.height(8.dp))
                 Box(
                     modifier = Modifier
@@ -314,7 +376,7 @@ private fun PoiCardContent(
                 )
             }
 
-            // User note (from saved places)
+            // User note
             if (poi.userNote != null) {
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -330,7 +392,7 @@ private fun PoiCardContent(
 
             Spacer(Modifier.height(12.dp))
 
-            // Action chips
+            // Action chips: Save, Directions, Show on Map
             val chipColors = AssistChipDefaults.assistChipColors(
                 labelColor = Color.White.copy(alpha = 0.9f),
                 leadingIconContentColor = Color.White.copy(alpha = 0.9f),
@@ -353,15 +415,6 @@ private fun PoiCardContent(
                     colors = chipColors,
                     border = chipBorder,
                 )
-                AssistChip(
-                    onClick = onShareClick,
-                    label = { Text(stringResource(Res.string.poi_card_share)) },
-                    leadingIcon = {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
-                    colors = chipColors,
-                    border = chipBorder,
-                )
                 if (poi.latitude != null && poi.longitude != null) {
                     AssistChip(
                         onClick = { onDirectionsClick(poi.latitude!!, poi.longitude!!, poi.name) },
@@ -374,73 +427,10 @@ private fun PoiCardContent(
                     )
                 }
                 AssistChip(
-                    onClick = { onAskAiClick() },
-                    label = { Text(stringResource(Res.string.poi_card_ask_ai)) },
-                    leadingIcon = {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                    },
+                    onClick = onShowOnMap,
+                    label = { Text("\uD83D\uDCCD ${stringResource(Res.string.chat_poi_show_on_map)}") },
                     colors = chipColors,
                     border = chipBorder,
-                )
-            }
-
-            // Expandable section
-            AnimatedVisibility(
-                visible = expanded,
-                enter = expandVertically(),
-                exit = shrinkVertically(),
-            ) {
-                Column {
-                    Spacer(Modifier.height(12.dp))
-                    Text(
-                        text = poi.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color.White.copy(alpha = 0.8f),
-                    )
-                    if (poi.hours != null) {
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(Res.string.poi_card_hours, poi.hours!!),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.6f),
-                        )
-                    }
-                    if (poi.vibeInsights.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
-                        Text(
-                            text = stringResource(Res.string.poi_card_vibe_insights),
-                            style = MaterialTheme.typography.titleSmall,
-                            color = Color.White,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        for ((vibeName, insight) in poi.vibeInsights) {
-                            val vibe = Vibe.entries.find { it.name.equals(vibeName, ignoreCase = true) }
-                            Row(
-                                verticalAlignment = Alignment.Top,
-                                modifier = Modifier.padding(vertical = 2.dp),
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .padding(top = 6.dp)
-                                        .size(8.dp)
-                                        .background(vibe?.toColor() ?: Color.Gray, CircleShape),
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = insight,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color.White.copy(alpha = 0.7f),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            TextButton(onClick = onExpandToggle) {
-                Text(
-                    if (expanded) stringResource(Res.string.poi_card_less_details) else stringResource(Res.string.poi_card_more_details),
-                    color = vibeColor,
                 )
             }
         }
@@ -476,20 +466,7 @@ private fun BuzzMeter(liveStatus: String, vibeColor: Color) {
         "closed" -> 1
         else -> 0
     }
-    val statusOpen = stringResource(Res.string.poi_status_open)
-    val statusBusy = stringResource(Res.string.poi_status_busy)
-    val statusClosed = stringResource(Res.string.poi_status_closed)
-    val statusUnknown = stringResource(Res.string.poi_status_unknown)
-    val activityLabel = when (liveStatus.lowercase()) {
-        "busy" -> statusBusy
-        "open" -> statusOpen
-        "closed" -> statusClosed
-        else -> statusUnknown
-    }
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-        modifier = Modifier.semantics { contentDescription = "Activity: $activityLabel" },
-    ) {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         repeat(3) { index ->
             Box(
                 modifier = Modifier

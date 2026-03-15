@@ -49,6 +49,15 @@ internal fun buildTickerSlots(
     for (h in areaHighlights) {
         if (h.isNotBlank()) slots.add(h)
     }
+    // Fallback: never return empty — ticker should always show something
+    if (slots.isEmpty()) {
+        val closedCount = pois.size - openCount
+        if (closedCount > 0) {
+            slots.add("All $closedCount places closed nearby")
+        } else {
+            slots.add("Exploring area\u2026")
+        }
+    }
     return slots
 }
 

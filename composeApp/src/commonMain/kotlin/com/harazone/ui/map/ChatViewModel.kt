@@ -82,11 +82,12 @@ internal class ChatViewModel(
         pois: List<POI>,
         activeDynamicVibe: DynamicVibe?,
         entryPoint: ChatEntryPoint = ChatEntryPoint.Default,
+        forceReset: Boolean = false,
     ) {
         val current = _uiState.value
         // F7/M2: Same area — preserve conversation (whether open or closed)
         // TODO(BACKLOG-MEDIUM): chatOpenedAt measures from first open, not last interaction — re-open at T+31min triggers expiry even if user was active 2min ago. Consider resetting on each re-open.
-        if (current.areaName == areaName && (current.isOpen || current.bubbles.isNotEmpty())) {
+        if (!forceReset && current.areaName == areaName && (current.isOpen || current.bubbles.isNotEmpty())) {
             val isExpired = current.bubbles.isNotEmpty() && (clock.nowMs() - chatOpenedAt) > EXPIRY_MS
             if (isExpired) {
                 _uiState.value = current.copy(isOpen = true, showReturnDialog = true)
@@ -135,6 +136,16 @@ internal class ChatViewModel(
             contextBanner = bannerFor(entryPoint),
             depthLevel = 0,
         )
+    }
+
+    fun openChatForPoi(poi: POI, areaName: String, pois: List<POI>, activeDynamicVibe: DynamicVibe?) {
+        openChat(areaName, pois, activeDynamicVibe, ChatEntryPoint.PoiCard(poi), forceReset = true)
+        tapIntentPill(ContextualPill(
+            label = poi.name,
+            message = "Tell me about ${poi.name}.",
+            intent = ChatIntent.DISCOVER,
+            emoji = "\uD83D\uDCCD",
+        ))
     }
 
     fun tapIntentPill(pill: ContextualPill) {
