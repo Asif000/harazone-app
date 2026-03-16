@@ -51,6 +51,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.harazone.getPlatform
@@ -334,7 +335,8 @@ private fun ReadyContent(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 56.dp)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                .zIndex(1f), // Above AmbientTicker so suggestions aren't blocked
         )
 
         // Ambient ticker — rotating area intel below search bar

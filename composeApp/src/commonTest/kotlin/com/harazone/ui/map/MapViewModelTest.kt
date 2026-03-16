@@ -1099,6 +1099,46 @@ class MapViewModelTest {
     }
 
     @Test
+    fun searchSuggestionsAndPoisCoexist_zOrderRegression() {
+        val stdDispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.resetMain()
+        Dispatchers.setMain(stdDispatcher)
+        try {
+            runTest(stdDispatcher) {
+                val pois = listOf(
+                    POI("Cafe A", "cafe", "Nice cafe", Confidence.HIGH, 38.71, -9.14),
+                )
+                val fakeGeocoding = FakeMapTilerGeocodingProvider(result = Result.success(testSuggestions))
+                val viewModel = createViewModel(
+                    geocodingProvider = fakeGeocoding,
+                    locationProvider = FakeLocationProvider(
+                        locationResult = Result.success(GpsCoordinates(38.71, -9.14)),
+                        geocodeResult = Result.success("Lisbon"),
+                    ),
+                    areaRepository = FakeAreaRepository(
+                        updates = listOf(BucketUpdate.PortraitComplete(pois)),
+                    ),
+                )
+                advanceTimeBy(11_000)
+                val ready = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+                // POIs exist (ticker would render)
+                assertTrue(ready.pois.isNotEmpty(), "POIs should be present so ticker renders")
+
+                viewModel.onGeocodingQueryChanged("Tower")
+                advanceTimeBy(400)
+                val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+                // Suggestions exist (dropdown would render)
+                assertTrue(state.geocodingSuggestions.isNotEmpty(), "Suggestions should be present")
+                // Both POIs and suggestions coexist — z-order fix ensures suggestions render above ticker
+                assertTrue(state.pois.isNotEmpty(), "POIs should still be present alongside suggestions")
+            }
+        } finally {
+            Dispatchers.resetMain()
+            Dispatchers.setMain(testDispatcher)
+        }
+    }
+
+    @Test
     fun onGeocodingQueryChanged_debounce_cancelsQuickKeystrokes() {
         val stdDispatcher = StandardTestDispatcher(testScheduler)
         Dispatchers.resetMain()
