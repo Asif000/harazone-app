@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AreaDiscovery — Public Launch WOW Journey</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; background: #0a0a0a; color: #e8e8e8; overflow-x: hidden; }
+
+  .header { text-align: center; padding: 40px 20px 20px; }
+  .header h1 { font-size: 24px; font-weight: 700; color: #fff; }
+  .header p { font-size: 14px; color: #888; margin-top: 8px; }
+
+  .instructions { text-align: center; padding: 10px 20px 30px; font-size: 13px; color: #666; }
+  .instructions span { color: #4ecdc4; }
+
+  /* Timeline */
+  .timeline { position: relative; max-width: 420px; margin: 0 auto; padding: 0 20px 60px; }
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 50px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #4ecdc4, #ff6b6b, #ffe66d, #a78bfa, #4ecdc4);
+  }
+
+  .step {
+    position: relative;
+    margin-bottom: 0;
+    padding: 20px 20px 20px 80px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border-radius: 16px;
+  }
+  .step:hover { background: rgba(255,255,255,0.03); }
+  .step.active { background: rgba(255,255,255,0.06); }
+
+  .step-dot {
+    position: absolute;
+    left: 41px;
+    top: 24px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #333;
+    background: #0a0a0a;
+    transition: all 0.3s ease;
+    z-index: 2;
+  }
+  .step.active .step-dot,
+  .step:hover .step-dot {
+    border-color: var(--step-color);
+    background: var(--step-color);
+    box-shadow: 0 0 12px var(--step-color);
+  }
+
+  .step-badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-bottom: 6px;
+  }
+
+  .step-title { font-size: 16px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .step-desc { font-size: 13px; color: #999; line-height: 1.5; }
+
+  .step-detail {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s ease, padding 0.4s ease;
+    padding: 0;
+  }
+  .step.active .step-detail {
+    max-height: 500px;
+    padding: 12px 0 0;
+  }
+
+  .detail-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px;
+  }
+  .detail-card h4 { font-size: 12px; color: var(--step-color); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .detail-card p { font-size: 12px; color: #aaa; line-height: 1.6; margin-bottom: 6px; }
+  .detail-card .tag {
+    display: inline-block;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    margin: 2px 4px 2px 0;
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #ccc;
+  }
+  .tag.client { border-color: #4ecdc4; color: #4ecdc4; }
+  .tag.backend { border-color: #ff6b6b; color: #ff6b6b; }
+  .tag.exists { border-color: #ffe66d; color: #ffe66d; }
+  .tag.new { border-color: #a78bfa; color: #a78bfa; }
+
+  /* WOW meter */
+  .wow-section {
+    max-width: 420px;
+    margin: 0 auto 40px;
+    padding: 0 20px;
+  }
+  .wow-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .wow-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .wow-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+  }
+  .wow-card:hover { border-color: rgba(255,255,255,0.2); }
+  .wow-card.selected { border-color: #4ecdc4; background: rgba(78,205,196,0.08); }
+  .wow-card .wow-emoji { font-size: 24px; margin-bottom: 8px; }
+  .wow-card .wow-label { font-size: 12px; font-weight: 600; color: #fff; margin-bottom: 4px; }
+  .wow-card .wow-sub { font-size: 11px; color: #888; line-height: 1.4; }
+  .wow-card .wow-check {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 2px solid #333;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    transition: all 0.3s;
+  }
+  .wow-card.selected .wow-check { border-color: #4ecdc4; background: #4ecdc4; color: #000; }
+
+  .wow-counter {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 13px;
+    color: #666;
+    transition: color 0.3s;
+  }
+  .wow-counter.ready { color: #4ecdc4; }
+
+  /* Phone mockup */
+  .phone-section {
+    max-width: 420px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  .phone {
+    width: 280px;
+    margin: 0 auto;
+    background: #1a1a1a;
+    border-radius: 36px;
+    border: 3px solid #333;
+    padding: 12px;
+    position: relative;
+  }
+  .phone-notch {
+    width: 100px;
+    height: 24px;
+    background: #000;
+    border-radius: 0 0 16px 16px;
+    margin: 0 auto 8px;
+  }
+  .phone-screen {
+    background: #111;
+    border-radius: 24px;
+    overflow: hidden;
+    min-height: 480px;
+    position: relative;
+  }
+
+  /* Screen states */
+  .screen-state {
+    display: none;
+    padding: 20px 16px;
+    min-height: 480px;
+    position: relative;
+  }
+  .screen-state.active { display: block; }
+
+  /* Map screen */
+  .map-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #1a2332, #0d1b2a, #1b2838);
+    opacity: 0.6;
+  }
+  .map-streets {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(90deg, transparent 48%, rgba(78,205,196,0.06) 48%, rgba(78,205,196,0.06) 52%, transparent 52%),
+      linear-gradient(0deg, transparent 30%, rgba(78,205,196,0.04) 30%, rgba(78,205,196,0.04) 32%, transparent 32%),
+      linear-gradient(0deg, transparent 65%, rgba(78,205,196,0.04) 65%, rgba(78,205,196,0.04) 67%, transparent 67%);
+  }
+
+  .map-pin {
+    position: absolute;
+    width: 28px;
+    height: 28px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    animation: dropIn 0.5s ease-out;
+  }
+  .map-pin span { transform: rotate(45deg); }
+  @keyframes dropIn {
+    from { transform: rotate(-45deg) translateY(-30px); opacity: 0; }
+    to { transform: rotate(-45deg) translateY(0); opacity: 1; }
+  }
+
+  .ticker-bar {
+    position: absolute;
+    bottom: 70px;
+    left: 8px;
+    right: 8px;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .ticker-dot { width: 6px; height: 6px; border-radius: 50%; background: #4ecdc4; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .ticker-text { font-size: 11px; color: #ccc; }
+
+  .carousel-card {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    right: 8px;
+    background: rgba(20,20,20,0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 14px;
+    padding: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .carousel-img {
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+  .carousel-info { flex: 1; }
+  .carousel-name { font-size: 13px; font-weight: 600; color: #fff; }
+  .carousel-meta { font-size: 11px; color: #888; margin-top: 2px; }
+  .carousel-status { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-dot.open { background: #4ecdc4; }
+  .status-text { font-size: 10px; color: #4ecdc4; }
+
+  /* Visit button */
+  .visit-btn {
+    background: linear-gradient(135deg, #4ecdc4, #44b3ab);
+    color: #000;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+  }
+  .visit-btn:hover { transform: scale(1.05); box-shadow: 0 0 16px rgba(78,205,196,0.4); }
+
+  /* Detail screen */
+  .detail-hero {
+    height: 140px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    display: flex;
+    align-items: flex-end;
+    padding: 14px;
+    position: relative;
+    margin: -20px -16px 0;
+  }
+  .detail-hero-overlay { position: absolute; inset: 0; background: linear-gradient(transparent 40%, rgba(0,0,0,0.8)); }
+  .detail-hero-text { position: relative; z-index: 1; }
+  .detail-hero-name { font-size: 18px; font-weight: 700; color: #fff; }
+  .detail-hero-vibe { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; }
+
+  .detail-context {
+    background: #1a1a1a;
+    border-radius: 12px;
+    padding: 12px;
+    margin: 12px 0;
+    border-left: 3px solid #ffe66d;
+  }
+  .detail-context-title { font-size: 10px; color: #ffe66d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .detail-context-text { font-size: 12px; color: #ccc; line-height: 1.5; }
+
+  /* Go Now screen */
+  .gonow-header {
+    text-align: center;
+    padding: 16px 0;
+  }
+  .gonow-icon { font-size: 40px; margin-bottom: 8px; }
+  .gonow-verdict { font-size: 20px; font-weight: 700; color: #4ecdc4; }
+  .gonow-sub { font-size: 12px; color: #888; margin-top: 4px; }
+
+  .gonow-factors {
+    margin: 16px 0;
+  }
+  .factor {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .factor-icon { font-size: 18px; width: 28px; text-align: center; }
+  .factor-info { flex: 1; }
+  .factor-label { font-size: 12px; color: #fff; font-weight: 500; }
+  .factor-value { font-size: 11px; color: #888; margin-top: 1px; }
+  .factor-status {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 8px;
+  }
+  .factor-status.good { background: rgba(78,205,196,0.15); color: #4ecdc4; }
+  .factor-status.warn { background: rgba(255,230,109,0.15); color: #ffe66d; }
+  .factor-status.bad { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+
+  .gonow-action {
+    margin-top: 16px;
+    text-align: center;
+  }
+  .navigate-btn {
+    background: linear-gradient(135deg, #4ecdc4, #44b3ab);
+    color: #000;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 32px;
+    border-radius: 24px;
+    border: none;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.3s;
+  }
+  .navigate-btn:hover { box-shadow: 0 0 20px rgba(78,205,196,0.4); }
+
+  /* Visited screen */
+  .visited-celebration {
+    text-align: center;
+    padding: 20px 0;
+  }
+  .visited-icon { font-size: 48px; animation: celebrate 1s ease; }
+  @keyframes celebrate { 0% { transform: scale(0); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
+  .visited-text { font-size: 16px; font-weight: 600; color: #fff; margin-top: 8px; }
+  .visited-sub { font-size: 12px; color: #888; margin-top: 4px; }
+
+  .visited-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin: 16px 0;
+  }
+  .vstat {
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .vstat-val { font-size: 18px; font-weight: 700; color: #4ecdc4; }
+  .vstat-label { font-size: 10px; color: #888; margin-top: 4px; }
+
+  .return-insight {
+    background: rgba(167,139,250,0.1);
+    border: 1px solid rgba(167,139,250,0.2);
+    border-radius: 12px;
+    padding: 12px;
+    margin: 12px 0;
+  }
+  .return-insight-title { font-size: 10px; color: #a78bfa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .return-insight-text { font-size: 12px; color: #ccc; line-height: 1.5; }
+
+  /* Profile screen */
+  .profile-header { text-align: center; padding: 16px 0; }
+  .profile-avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #a78bfa, #4ecdc4);
+    margin: 0 auto 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+  }
+  .profile-name { font-size: 16px; font-weight: 600; color: #fff; }
+  .profile-ai-label { font-size: 11px; color: #a78bfa; margin-top: 4px; }
+
+  .profile-trait {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  .trait-icon { font-size: 20px; }
+  .trait-info { flex: 1; }
+  .trait-label { font-size: 12px; font-weight: 500; color: #fff; }
+  .trait-desc { font-size: 11px; color: #888; margin-top: 1px; }
+
+  /* Screen nav */
+  .screen-nav {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 16px;
+  }
+  .screen-nav-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #333;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+  .screen-nav-dot.active { background: #4ecdc4; width: 24px; border-radius: 4px; }
+
+  .screen-label {
+    text-align: center;
+    font-size: 11px;
+    color: #666;
+    margin-top: 10px;
+  }
+
+  /* Comparison section */
+  .compare-section {
+    max-width: 420px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  .compare-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .compare-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .compare-label {
+    width: 80px;
+    font-size: 11px;
+    color: #888;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  .compare-before, .compare-after {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+  .compare-before { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.15); color: #ff9999; }
+  .compare-after { background: rgba(78,205,196,0.08); border: 1px solid rgba(78,205,196,0.15); color: #88ddd8; }
+
+  .section-divider {
+    max-width: 420px;
+    margin: 40px auto;
+    border-top: 1px solid rgba(255,255,255,0.06);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>AreaDiscovery — Public Launch Journey</h1>
+  <p>The full WOW sequence: Discover → Engage → Visit → Return → Know Me</p>
+</div>
+
+<div class="instructions">
+  Tap each step to see details. <span>Pick your TOP 3 wow moments below.</span>
+</div>
+
+<!-- JOURNEY TIMELINE -->
+<div class="timeline">
+
+  <div class="step" style="--step-color: #4ecdc4" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(78,205,196,0.15); color: #4ecdc4;">EXISTS</div>
+    <div class="step-title">AI Reads the Area</div>
+    <div class="step-desc">Vibes appear, pins drop, ambient ticker shows live context</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Current State</h4>
+        <p>Map opens → Gemini analyzes area → dynamic vibes + 3 pins + carousel + ticker with open count, sunset, area highlights. This is your discover step — already shipped.</p>
+        <span class="tag exists">SHIPPED</span>
+        <span class="tag client">CLIENT-SIDE</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #ffe66d" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(255,230,109,0.15); color: #ffe66d;">SHIPPING</div>
+    <div class="step-title">Rich Detail Page + AI Context</div>
+    <div class="step-desc">POI hero → AI context block → inline chat — #47-50</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>In Progress (#47-50)</h4>
+        <p>Detail page with nav/UI overlap fix, AI context section (whyNow, localTip, contextBlurb), light theme, prompt engineering for richer responses. The engage step gets depth.</p>
+        <span class="tag new">IN PROGRESS</span>
+        <span class="tag client">CLIENT-SIDE</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #a78bfa" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(167,139,250,0.15); color: #a78bfa;">NEW</div>
+    <div class="step-title">"Visit" — The Missing Action</div>
+    <div class="step-desc">One tap. AI routes: Go Now / Plan Soon / Plan Trip</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Core Loop Completion</h4>
+        <p>Replaces "Save." Single action that means "I want to go here." AI determines the right flow based on distance, time, POI type. Nearby + open = Go Now with feasibility check. Nearby + closed = plan for soon. Far = plan trip.</p>
+        <p style="margin-top: 8px;">Go Now assesses: safety, crowd level, transport options, weather, open/closed — then recommends go/wait/skip.</p>
+        <span class="tag new">NEW FEATURE</span>
+        <span class="tag client">CLIENT-SIDE (Go Now)</span>
+        <span class="tag backend">BACKEND (Plan Trip notifications)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #ff6b6b" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(255,107,107,0.15); color: #ff6b6b;">NEW</div>
+    <div class="step-title">Auto-Detect Arrival — "Visited"</div>
+    <div class="step-desc">Location proximity detects you arrived. State evolves automatically.</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Zero-Effort State Tracking</h4>
+        <p>No manual check-in. App detects 50m proximity + 15min dwell time = auto-mark as Visited. AI behavior shifts: stops recommending as new, starts offering return context. Visit count becomes implicit rating — no stars needed.</p>
+        <span class="tag new">NEW FEATURE</span>
+        <span class="tag client">CLIENT-SIDE</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #ff9f43" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(255,159,67,0.15); color: #ff9f43;">EPIC 8</div>
+    <div class="step-title">Return Visits + Home Detection</div>
+    <div class="step-desc">"Welcome back" — app recognizes repeat areas and adapts</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Retention Loop</h4>
+        <p>Detects when user returns to a previously explored area. AI adapts: "Since your last visit, 2 new places opened" or "You usually explore here on weekends — here's what's different tonight." Home area gets special treatment — less tourist, more local.</p>
+        <span class="tag new">EPIC 8</span>
+        <span class="tag client">CLIENT-SIDE (local heuristics)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #a78bfa" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(167,139,250,0.15); color: #a78bfa;">NEW</div>
+    <div class="step-title">AI Mirror — "The App Knows Me"</div>
+    <div class="step-desc">Profile built from visit patterns. "You're a late-night foodie explorer."</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Identity Through Behavior (#19)</h4>
+        <p>No forms, no preferences page. Your visits, vibes, times, and patterns build an AI-generated profile. "You gravitate toward hidden gems over popular spots." "Your peak discovery time is 8-11pm." This feeds back into better recommendations.</p>
+        <span class="tag new">#19</span>
+        <span class="tag client">CLIENT-SIDE MVP</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #4ecdc4" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(78,205,196,0.15); color: #4ecdc4;">INFRA</div>
+    <div class="step-title">Backend + Push Notifications</div>
+    <div class="step-desc">Enables Plan Trip nurture loop, alerts, sync across devices</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Infrastructure Unlock (#43 + #33)</h4>
+        <p>Backend enables: push notifications for saved places ("that Tokyo spot has a festival next week"), cross-device sync, Plan Trip nurture loop, real-time events for ticker, session tracking for return visits. The "Plan Trip" branch of Visit is blocked until this ships.</p>
+        <span class="tag backend">BACKEND REQUIRED</span>
+        <span class="tag new">#43 + #33</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #ffe66d" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(255,230,109,0.15); color: #ffe66d;">EPIC 7</div>
+    <div class="step-title">Offline Queue + Cache</div>
+    <div class="step-desc">Works in subway, rural areas, airplane mode</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Reliability Layer</h4>
+        <p>Cache previously discovered areas. Queue visit actions offline. Sync when back online. Critical for travel use case — airports, subways, rural areas. Builds trust that the app won't lose your data.</p>
+        <span class="tag new">EPIC 7</span>
+        <span class="tag client">CLIENT-SIDE</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #ff6b6b" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(255,107,107,0.15); color: #ff6b6b;">EPIC 9</div>
+    <div class="step-title">Emergency Info + Share Cards</div>
+    <div class="step-desc">Safety net for travelers — emergency numbers, share location, data export</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Trust & Safety</h4>
+        <p>Quick access to local emergency numbers, embassy info. Share your location/itinerary with trusted contacts. Export your data (JSON/KML). The "I trust this app with my travels" layer.</p>
+        <span class="tag new">EPIC 9</span>
+        <span class="tag client">PARTIAL CLIENT</span>
+        <span class="tag backend">SHARE NEEDS BACKEND</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="step" style="--step-color: #4ecdc4" onclick="toggleStep(this)">
+    <div class="step-dot"></div>
+    <div class="step-badge" style="background: rgba(78,205,196,0.15); color: #4ecdc4;">DELIGHT</div>
+    <div class="step-title">Ambient Facts + Buckets→Vibe</div>
+    <div class="step-desc">"Surprise Me" facts + saved places organize into vibes — #16 + #23</div>
+    <div class="step-detail">
+      <div class="detail-card">
+        <h4>Engagement Polish</h4>
+        <p>"Surprise Me" surfaces random area facts while exploring. Buckets→Vibe lets saved places auto-organize into vibe categories. Both are delight features that make the app stickier but don't affect the core loop.</p>
+        <span class="tag new">#16 + #23</span>
+        <span class="tag client">CLIENT-SIDE</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="section-divider"></div>
+
+<!-- WOW PICKER -->
+<div class="wow-section">
+  <div class="wow-title">Pick Your TOP 3 "I've Never Seen This" Moments</div>
+  <div class="wow-grid">
+    <div class="wow-card" onclick="toggleWow(this)" data-name="visit">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">👣</div>
+      <div class="wow-label">"Visit" Action</div>
+      <div class="wow-sub">AI decides Go Now vs Plan — one tap</div>
+    </div>
+    <div class="wow-card" onclick="toggleWow(this)" data-name="autodetect">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">📍</div>
+      <div class="wow-label">Auto-Detect Arrival</div>
+      <div class="wow-sub">App knows you went — zero effort</div>
+    </div>
+    <div class="wow-card" onclick="toggleWow(this)" data-name="gonow">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">⚡</div>
+      <div class="wow-label">"Go Now" Check</div>
+      <div class="wow-sub">Safety, crowd, uber, weather — should I go?</div>
+    </div>
+    <div class="wow-card" onclick="toggleWow(this)" data-name="mirror">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">🪞</div>
+      <div class="wow-label">AI Mirror Profile</div>
+      <div class="wow-sub">App builds your identity from visits</div>
+    </div>
+    <div class="wow-card" onclick="toggleWow(this)" data-name="return">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">🔄</div>
+      <div class="wow-label">Return Intelligence</div>
+      <div class="wow-sub">"Since your last visit..." context</div>
+    </div>
+    <div class="wow-card" onclick="toggleWow(this)" data-name="offline">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">📶</div>
+      <div class="wow-label">Offline Resilience</div>
+      <div class="wow-sub">Works in subway, airplane, rural</div>
+    </div>
+    <div class="wow-card" onclick="toggleWow(this)" data-name="safety">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">🛡️</div>
+      <div class="wow-label">Emergency + Share</div>
+      <div class="wow-sub">Safety net for travelers</div>
+    </div>
+    <div class="wow-card" onclick="toggleWow(this)" data-name="surprise">
+      <div class="wow-check"></div>
+      <div class="wow-emoji">✨</div>
+      <div class="wow-label">Ambient Facts + Vibes</div>
+      <div class="wow-sub">Random discoveries + auto-organize</div>
+    </div>
+  </div>
+  <div class="wow-counter" id="wowCounter">Select 3 wow moments</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- PHONE MOCKUP -->
+<div class="phone-section">
+  <div class="phone">
+    <div class="phone-notch"></div>
+    <div class="phone-screen">
+
+      <!-- Screen 1: Map with Visit button -->
+      <div class="screen-state active" id="screen1">
+        <div class="map-bg"></div>
+        <div class="map-streets"></div>
+        <div class="map-pin" style="top: 80px; left: 60%; background: #ff6b6b; animation-delay: 0.1s"><span>🍜</span></div>
+        <div class="map-pin" style="top: 160px; left: 30%; background: #4ecdc4; animation-delay: 0.3s"><span>🎵</span></div>
+        <div class="map-pin" style="top: 220px; left: 70%; background: #ffe66d; animation-delay: 0.5s"><span>☕</span></div>
+        <div class="ticker-bar">
+          <div class="ticker-dot"></div>
+          <div class="ticker-text">3 open nearby · Sunset in 1h 42m</div>
+        </div>
+        <div class="carousel-card">
+          <div class="carousel-img">🍜</div>
+          <div class="carousel-info">
+            <div class="carousel-name">Ramen Yokocho</div>
+            <div class="carousel-meta">Late Night Eats · 350m</div>
+            <div class="carousel-status">
+              <div class="status-dot open"></div>
+              <div class="status-text">Open until 2am</div>
+            </div>
+          </div>
+          <button class="visit-btn" onclick="showScreen(2)">Visit</button>
+        </div>
+      </div>
+
+      <!-- Screen 2: Go Now Assessment -->
+      <div class="screen-state" id="screen2">
+        <div class="gonow-header">
+          <div class="gonow-icon">👣</div>
+          <div class="gonow-verdict">Great Time to Go</div>
+          <div class="gonow-sub">Ramen Yokocho · 350m away</div>
+        </div>
+        <div class="gonow-factors">
+          <div class="factor">
+            <div class="factor-icon">🕐</div>
+            <div class="factor-info">
+              <div class="factor-label">Open Status</div>
+              <div class="factor-value">Open until 2am — plenty of time</div>
+            </div>
+            <div class="factor-status good">GOOD</div>
+          </div>
+          <div class="factor">
+            <div class="factor-icon">👥</div>
+            <div class="factor-info">
+              <div class="factor-label">Crowd Level</div>
+              <div class="factor-value">Usually quieter after 10pm</div>
+            </div>
+            <div class="factor-status good">LOW</div>
+          </div>
+          <div class="factor">
+            <div class="factor-icon">🚗</div>
+            <div class="factor-info">
+              <div class="factor-label">Getting There</div>
+              <div class="factor-value">5 min walk · Uber ~R$8</div>
+            </div>
+            <div class="factor-status good">EASY</div>
+          </div>
+          <div class="factor">
+            <div class="factor-icon">🛡️</div>
+            <div class="factor-info">
+              <div class="factor-label">Area Safety</div>
+              <div class="factor-value">Well-lit commercial district</div>
+            </div>
+            <div class="factor-status good">SAFE</div>
+          </div>
+          <div class="factor">
+            <div class="factor-icon">🌧️</div>
+            <div class="factor-info">
+              <div class="factor-label">Weather</div>
+              <div class="factor-value">Light drizzle — bring umbrella</div>
+            </div>
+            <div class="factor-status warn">OK</div>
+          </div>
+        </div>
+        <div class="gonow-action">
+          <button class="navigate-btn" onclick="showScreen(3)">Navigate There →</button>
+        </div>
+      </div>
+
+      <!-- Screen 3: Visited State -->
+      <div class="screen-state" id="screen3">
+        <div class="visited-celebration">
+          <div class="visited-icon">🎉</div>
+          <div class="visited-text">You visited Ramen Yokocho!</div>
+          <div class="visited-sub">Auto-detected · 47 min visit</div>
+        </div>
+        <div class="visited-stats">
+          <div class="vstat">
+            <div class="vstat-val">1st</div>
+            <div class="vstat-label">Visit</div>
+          </div>
+          <div class="vstat">
+            <div class="vstat-val">47m</div>
+            <div class="vstat-label">Time Spent</div>
+          </div>
+          <div class="vstat">
+            <div class="vstat-val">10pm</div>
+            <div class="vstat-label">Arrived</div>
+          </div>
+          <div class="vstat">
+            <div class="vstat-val">Tue</div>
+            <div class="vstat-label">Day</div>
+          </div>
+        </div>
+        <div class="return-insight">
+          <div class="return-insight-title">AI Insight</div>
+          <div class="return-insight-text">Great choice for a Tuesday night! This spot is usually busier on weekends. Next time, try their seasonal tsukemen — it changes monthly.</div>
+        </div>
+        <div style="margin-top: 12px;">
+          <button class="visit-btn" style="width: 100%; padding: 12px;" onclick="showScreen(4)">See My Profile →</button>
+        </div>
+      </div>
+
+      <!-- Screen 4: AI Mirror -->
+      <div class="screen-state" id="screen4">
+        <div class="profile-header">
+          <div class="profile-avatar">🌙</div>
+          <div class="profile-name">Your Explorer Profile</div>
+          <div class="profile-ai-label">Built by AI from your visits</div>
+        </div>
+        <div class="profile-trait">
+          <div class="trait-icon">🦉</div>
+          <div class="trait-info">
+            <div class="trait-label">Night Explorer</div>
+            <div class="trait-desc">78% of your visits are after 8pm</div>
+          </div>
+        </div>
+        <div class="profile-trait">
+          <div class="trait-icon">🍜</div>
+          <div class="trait-info">
+            <div class="trait-label">Foodie First</div>
+            <div class="trait-desc">6 of 9 visits are food spots</div>
+          </div>
+        </div>
+        <div class="profile-trait">
+          <div class="trait-icon">💎</div>
+          <div class="trait-info">
+            <div class="trait-label">Hidden Gem Hunter</div>
+            <div class="trait-desc">You skip popular spots for local favorites</div>
+          </div>
+        </div>
+        <div class="profile-trait">
+          <div class="trait-icon">🚶</div>
+          <div class="trait-info">
+            <div class="trait-label">Walkable Radius</div>
+            <div class="trait-desc">Avg distance: 400m — you prefer walking</div>
+          </div>
+        </div>
+        <div class="profile-trait">
+          <div class="trait-icon">📍</div>
+          <div class="trait-info">
+            <div class="trait-label">3 Neighborhoods Explored</div>
+            <div class="trait-desc">Vila Madalena is your home base</div>
+          </div>
+        </div>
+        <div style="margin-top: 16px; text-align: center;">
+          <button class="visit-btn" onclick="showScreen(1)" style="background: rgba(255,255,255,0.1); color: #fff;">← Back to Map</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Screen navigation -->
+  <div class="screen-nav">
+    <div class="screen-nav-dot active" onclick="showScreen(1)"></div>
+    <div class="screen-nav-dot" onclick="showScreen(2)"></div>
+    <div class="screen-nav-dot" onclick="showScreen(3)"></div>
+    <div class="screen-nav-dot" onclick="showScreen(4)"></div>
+  </div>
+  <div class="screen-label" id="screenLabel">Map → Visit Button</div>
+</div>
+
+<div class="section-divider"></div>
+
+<!-- BEFORE/AFTER -->
+<div class="compare-section">
+  <div class="compare-title">Save vs Visit — What Changes</div>
+
+  <div class="compare-row">
+    <div class="compare-label">Action</div>
+    <div class="compare-before">Save — passive bookmark</div>
+    <div class="compare-after">Visit — active intent</div>
+  </div>
+  <div class="compare-row">
+    <div class="compare-label">AI Role</div>
+    <div class="compare-before">None — just stores it</div>
+    <div class="compare-after">Routes: Go Now / Plan Soon / Plan Trip</div>
+  </div>
+  <div class="compare-row">
+    <div class="compare-label">State</div>
+    <div class="compare-before">Saved or not (binary)</div>
+    <div class="compare-after">Visit → Visited → Return (evolving)</div>
+  </div>
+  <div class="compare-row">
+    <div class="compare-label">Rating</div>
+    <div class="compare-before">None / manual stars</div>
+    <div class="compare-after">Implicit from visit count</div>
+  </div>
+  <div class="compare-row">
+    <div class="compare-label">Detection</div>
+    <div class="compare-before">Manual check-in</div>
+    <div class="compare-after">Auto via location proximity</div>
+  </div>
+  <div class="compare-row">
+    <div class="compare-label">Profile</div>
+    <div class="compare-before">Empty / form-based</div>
+    <div class="compare-after">AI-built from visit patterns</div>
+  </div>
+</div>
+
+<script>
+function toggleStep(el) {
+  const wasActive = el.classList.contains('active');
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  if (!wasActive) el.classList.add('active');
+}
+
+let wowCount = 0;
+function toggleWow(el) {
+  if (el.classList.contains('selected')) {
+    el.classList.remove('selected');
+    wowCount--;
+  } else if (wowCount < 3) {
+    el.classList.add('selected');
+    wowCount++;
+  }
+  const counter = document.getElementById('wowCounter');
+  if (wowCount === 3) {
+    counter.textContent = '3 selected — these are your WOW priorities';
+    counter.classList.add('ready');
+  } else {
+    counter.textContent = `${wowCount}/3 selected`;
+    counter.classList.remove('ready');
+  }
+}
+
+const screenLabels = ['Map → Visit Button', 'Go Now Assessment', 'Auto-Detected Visit', 'AI Mirror Profile'];
+function showScreen(n) {
+  document.querySelectorAll('.screen-state').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.screen-nav-dot').forEach(d => d.classList.remove('active'));
+  document.getElementById('screen' + n).classList.add('active');
+  document.querySelectorAll('.screen-nav-dot')[n-1].classList.add('active');
+  document.getElementById('screenLabel').textContent = screenLabels[n-1];
+}
+</script>
+
+</body>
+</html>
