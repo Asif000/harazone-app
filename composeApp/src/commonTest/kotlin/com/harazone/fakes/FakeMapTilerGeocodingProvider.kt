@@ -9,7 +9,7 @@ import io.ktor.http.HttpStatusCode
 
 class FakeMapTilerGeocodingProvider(
     var result: Result<List<GeocodingSuggestion>> = Result.success(emptyList()),
-) : MapTilerGeocodingProvider(HttpClient(MockEngine { respond("", HttpStatusCode.OK) })) {
+) : MapTilerGeocodingProvider(HttpClient(MockEngine { respond("", HttpStatusCode.OK) }), FakeLocaleProvider()) {
 
     var callCount: Int = 0
         private set

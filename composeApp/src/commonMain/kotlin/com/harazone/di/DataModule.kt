@@ -60,7 +60,7 @@ val dataModule = module {
     }
     single { GetAreaPortraitUseCase(get()) }
     single<WeatherProvider> { OpenMeteoWeatherProvider(get()) }
-    single { MapTilerGeocodingProvider(get()) }
+    single { MapTilerGeocodingProvider(get(), get()) }
     single<RecentPlacesRepository> { RecentPlacesRepositoryImpl(get(), get()) }
     single<SavedPoiRepository> { SavedPoiRepositoryImpl(get(), get()) }
     single { UserPreferencesRepository(get()) }

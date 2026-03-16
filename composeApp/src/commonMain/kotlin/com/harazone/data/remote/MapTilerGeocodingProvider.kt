@@ -9,6 +9,7 @@ import io.ktor.http.encodeURLPathPart
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import com.harazone.domain.provider.LocaleProvider
 import kotlin.coroutines.cancellation.CancellationException
 
 @Serializable
@@ -21,7 +22,10 @@ private data class GeocodingFeature(
     val center: List<Double>,
 )
 
-open class MapTilerGeocodingProvider(private val httpClient: HttpClient) {
+open class MapTilerGeocodingProvider(
+    private val httpClient: HttpClient,
+    private val localeProvider: LocaleProvider,
+) {
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -29,8 +33,9 @@ open class MapTilerGeocodingProvider(private val httpClient: HttpClient) {
         return try {
             val sanitized = query.replace(Regex("[/#?&]"), " ").trim()
             val encoded = sanitized.encodeURLPathPart()
+            val lang = localeProvider.languageTag.substringBefore("-")
             val url = "https://api.maptiler.com/geocoding/$encoded.json" +
-                "?key=${BuildKonfig.MAPTILER_API_KEY}&limit=$limit"
+                "?key=${BuildKonfig.MAPTILER_API_KEY}&limit=$limit&language=$lang"
             val body = httpClient.get(url).bodyAsText()
             val response = json.decodeFromString<GeocodingResponse>(body)
             Result.success(response.features.mapNotNull { f ->
