@@ -344,7 +344,7 @@ private fun ReadyContent(
 
         // Geocoding search bar (always visible, replaces Refresh Area button)
         // statusBarPadding + 56dp = status bar + TopContextBar height + top inset padding
-        if (!showProfile) GeocodingSearchBar(
+        if (state.selectedPoi == null && !showProfile) GeocodingSearchBar(
             query = state.geocodingQuery,
             suggestions = state.geocodingSuggestions,
             isGeocodingLoading = state.isGeocodingLoading,

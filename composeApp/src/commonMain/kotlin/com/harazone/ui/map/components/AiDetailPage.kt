@@ -43,6 +43,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
@@ -101,11 +103,19 @@ internal fun AiDetailPage(
 ) {
     val listState = rememberLazyListState()
 
-    // Auto-scroll to latest content
+    // Auto-scroll only after user has manually scrolled down to chat area
+    val hasUserScrolled = remember(poi.savedId) { mutableStateOf(false) }
+    LaunchedEffect(listState.firstVisibleItemIndex) {
+        if (listState.firstVisibleItemIndex > 0) hasUserScrolled.value = true
+    }
     val scrollKey = Pair(chatState.bubbles.size, chatState.isStreaming)
     LaunchedEffect(scrollKey) {
+        if (!hasUserScrolled.value) return@LaunchedEffect
         val lastIndex = listState.layoutInfo.totalItemsCount - 1
-        if (lastIndex > 0) {
+        if (lastIndex <= 0) return@LaunchedEffect
+        val lastVisible = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        val isNearBottom = lastVisible >= lastIndex - 2
+        if (isNearBottom) {
             listState.animateScrollToItem(lastIndex)
         }
     }
