@@ -66,9 +66,9 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
-    savedPoiIds: Set<String>,
-    savedPois: List<SavedPoi>,
-    savedVibeFilter: Boolean,
+    visitedPoiIds: Set<String>,
+    visitedPois: List<SavedPoi>,
+    visitedFilter: Boolean,
     onPinTapped: (Int) -> Unit,
     selectedPinIndex: Int?,
 ) {
@@ -205,8 +205,8 @@ actual fun MapComposable(
         }
     }
 
-    // POI pins + glow zones — react to pois + activeVibe + savedPoiIds + savedPois + savedVibeFilter + style loaded changes
-    LaunchedEffect(pois, activeVibe, savedPoiIds, savedPois, savedVibeFilter, styleLoaded.value) {
+    // POI pins + glow zones — react to pois + activeVibe + visitedPoiIds + visitedPois + visitedFilter + style loaded changes
+    LaunchedEffect(pois, activeVibe, visitedPoiIds, visitedPois, visitedFilter, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val map = mapRef[0] ?: return@LaunchedEffect
         val style = styleRef[0] ?: return@LaunchedEffect
@@ -240,7 +240,7 @@ actual fun MapComposable(
             pois
         }.filter { it.latitude != null && it.longitude != null }
 
-        val suppressedIds = filterSuppressedPois(filteredPois, savedPois)
+        val suppressedIds = filterSuppressedPois(filteredPois, visitedPois)
 
         // Add symbols with stagger (runs inside LaunchedEffect — auto-cancelled on restart)
         for ((i, poi) in filteredPois.filter { it.savedId !in suppressedIds }.withIndex()) {
@@ -294,9 +294,9 @@ actual fun MapComposable(
         // Reset saved filter zoom flag when regular POIs are back
         if (pois.isNotEmpty()) savedFilterFitted[0] = false
 
-        // Force camera re-fit only when savedVibeFilter transitions true -> false
-        val forceRefit = wasSavedVibeFilter[0] && !savedVibeFilter && filteredPois.isNotEmpty()
-        wasSavedVibeFilter[0] = savedVibeFilter
+        // Force camera re-fit only when visitedFilter transitions true -> false
+        val forceRefit = wasSavedVibeFilter[0] && !visitedFilter && filteredPois.isNotEmpty()
+        wasSavedVibeFilter[0] = visitedFilter
         if (forceRefit) lastFittedPois.value = emptyList()
 
         // Fit camera to show all pins — when pois list changes or saved filter toggles off
@@ -331,9 +331,9 @@ actual fun MapComposable(
         }
 
         // Fit camera to saved POIs when saved filter is first activated
-        if (savedVibeFilter && pois.isEmpty() && savedPois.isNotEmpty() && !savedFilterFitted[0]) {
+        if (visitedFilter && pois.isEmpty() && visitedPois.isNotEmpty() && !savedFilterFitted[0]) {
             savedFilterFitted[0] = true
-            val validSaved = savedPois.filter { it.lat != 0.0 && it.lng != 0.0 }
+            val validSaved = visitedPois.filter { it.lat != 0.0 && it.lng != 0.0 }
             if (validSaved.isNotEmpty()) {
                 suppressCameraIdle[0] = true
                 if (validSaved.size >= 2) {
@@ -448,7 +448,7 @@ actual fun MapComposable(
     }
 
     // DB gold pins — independent layer from saved POIs in the database
-    LaunchedEffect(savedPois, styleLoaded.value) {
+    LaunchedEffect(visitedPois, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val style = styleRef[0] ?: return@LaunchedEffect
         val sm = symbolManagerRef[0] ?: return@LaunchedEffect
@@ -457,7 +457,7 @@ actual fun MapComposable(
         savedSymbolsRef.clear()
         symbolSavedPoiMap.clear()
 
-        savedPois
+        visitedPois
             .filter { it.lat != 0.0 && it.lng != 0.0 }
             .forEachIndexed { i, savedPoi ->
                 if (isDestroyed[0]) return@LaunchedEffect
@@ -636,11 +636,11 @@ private fun ensureIcon(
  */
 internal fun filterSuppressedPois(
     pois: List<POI>,
-    savedPois: List<SavedPoi>,
+    visitedPois: List<SavedPoi>,
     thresholdMeters: Double = 50.0,
 ): Set<String> = pois.filter { poi ->
     poi.latitude != null && poi.longitude != null &&
-    savedPois.any { saved ->
+    visitedPois.any { saved ->
         saved.lat != 0.0 && saved.lng != 0.0 &&
         haversineDistanceMeters(poi.latitude, poi.longitude, saved.lat, saved.lng) <= thresholdMeters
     }

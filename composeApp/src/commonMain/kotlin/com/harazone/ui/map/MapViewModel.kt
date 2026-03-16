@@ -10,6 +10,7 @@ import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.RecentPlace
 import com.harazone.domain.model.SavedPoi
+import com.harazone.domain.model.VisitState
 import com.harazone.domain.repository.RecentPlacesRepository
 import com.harazone.domain.repository.SavedPoiRepository
 import com.harazone.data.repository.UserPreferencesRepository
@@ -75,7 +76,7 @@ class MapViewModel(
     private var preSearchSnapshot: MapUiState.Ready? = null
     private var latestRecents: List<RecentPlace> = emptyList()
     private var latestSavedPois: List<SavedPoi> = emptyList()
-    private var latestSavedPoiIds: Set<String> = emptySet()
+    private var latestVisitedPoiIds: Set<String> = emptySet()
     private var vibeBeforeSavedFilter: DynamicVibe? = null
     private var lastWeatherFetchMs: Long = 0L
     private var currentDynamicVibes: List<DynamicVibe> = emptyList()
@@ -111,17 +112,17 @@ class MapViewModel(
                 latestSavedPois = pois
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
                 _uiState.value = current.copy(
-                    savedPois = pois,
-                    savedPoiCount = pois.size,
+                    visitedPois = pois,
+                    visitedPoiCount = pois.size,
                     dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(pois, current.areaName),
                 )
             }
         }
         viewModelScope.launch {
             savedPoiRepository.observeSavedIds().collect { ids ->
-                latestSavedPoiIds = ids
+                latestVisitedPoiIds = ids
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
-                _uiState.value = current.copy(savedPoiIds = ids)
+                _uiState.value = current.copy(visitedPoiIds = ids)
             }
         }
     }
@@ -197,54 +198,74 @@ class MapViewModel(
         }
         _uiState.value = current.copy(
             activeDynamicVibe = newVibe,
-            savedVibeFilter = false,
+            visitedFilter = false,
             pois = visiblePois,
         )
         analyticsTracker.trackEvent("vibe_switched", mapOf("vibe" to (newVibe?.label ?: "all")))
     }
 
-    fun savePoi(poi: POI, areaName: String) {
+    fun visitPoi(poi: POI, areaName: String): VisitState {
         val poiId = poi.savedId
-        val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(savedPoiIds = current.savedPoiIds + poiId)
+        val current = _uiState.value as? MapUiState.Ready ?: return VisitState.WANT_TO_GO
+        val status = resolveStatus(poi.liveStatus, poi.hours)
+        val visitState = when {
+            status == "open" || status == "closing soon" -> VisitState.GO_NOW
+            status == "closed" -> VisitState.PLAN_SOON
+            else -> VisitState.WANT_TO_GO
+        }
+        val savedPoiObj = SavedPoi(
+            id = poiId,
+            name = poi.name,
+            type = poi.type,
+            areaName = areaName,
+            lat = poi.latitude ?: 0.0,
+            lng = poi.longitude ?: 0.0,
+            whySpecial = poi.insight,
+            savedAt = 0L,
+            imageUrl = poi.imageUrl,
+            description = poi.description,
+            rating = poi.rating,
+            vibe = current.activeDynamicVibe?.label
+                ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
+            visitState = visitState,
+        )
+        _uiState.value = current.copy(
+            visitedPoiIds = current.visitedPoiIds + poiId,
+            visitedPois = current.visitedPois + savedPoiObj,
+        )
         viewModelScope.launch {
             try {
-                savedPoiRepository.save(
-                    SavedPoi(
-                        id = poiId,
-                        name = poi.name,
-                        type = poi.type,
-                        areaName = areaName,
-                        lat = poi.latitude ?: 0.0,
-                        lng = poi.longitude ?: 0.0,
-                        whySpecial = poi.insight,
-                        savedAt = 0L,
-                        imageUrl = poi.imageUrl,
-                        description = poi.description,
-                        rating = poi.rating,
-                        vibe = current.activeDynamicVibe?.label
-                            ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
-                    )
-                )
+                savedPoiRepository.visit(savedPoiObj)
             } catch (e: Exception) {
-                AppLogger.e(e) { "MapViewModel: save POI failed" }
+                AppLogger.e(e) { "MapViewModel: visit POI failed" }
                 val s = _uiState.value as? MapUiState.Ready ?: return@launch
-                _uiState.value = s.copy(savedPoiIds = s.savedPoiIds - poiId)
+                _uiState.value = s.copy(
+                    visitedPoiIds = s.visitedPoiIds - poiId,
+                    visitedPois = s.visitedPois.filter { it.id != poiId },
+                )
             }
         }
+        return visitState
     }
 
-    fun unsavePoi(poi: POI) {
+    fun unvisitPoi(poi: POI) {
         val poiId = poi.savedId
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(savedPoiIds = current.savedPoiIds - poiId)
+        val removedPoi = current.visitedPois.find { it.id == poiId }
+        _uiState.value = current.copy(
+            visitedPoiIds = current.visitedPoiIds - poiId,
+            visitedPois = current.visitedPois.filter { it.id != poiId },
+        )
         viewModelScope.launch {
             try {
                 savedPoiRepository.unsave(poiId)
             } catch (e: Exception) {
-                AppLogger.e(e) { "MapViewModel: unsave POI failed" }
+                AppLogger.e(e) { "MapViewModel: unvisit POI failed" }
                 val s = _uiState.value as? MapUiState.Ready ?: return@launch
-                _uiState.value = s.copy(savedPoiIds = s.savedPoiIds + poiId)
+                _uiState.value = s.copy(
+                    visitedPoiIds = s.visitedPoiIds + poiId,
+                    visitedPois = if (removedPoi != null) s.visitedPois + removedPoi else s.visitedPois,
+                )
             }
         }
     }
@@ -254,27 +275,27 @@ class MapViewModel(
         _uiState.value = current.copy(isFabExpanded = !current.isFabExpanded)
     }
 
-    fun openSavesSheet() {
+    fun openVisitsSheet() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(showSavesSheet = true)
+        _uiState.value = current.copy(showVisitsSheet = true)
     }
 
-    fun onSavedVibeSelected() {
+    fun onVisitedFilterSelected() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        val newFilter = !current.savedVibeFilter
+        val newFilter = !current.visitedFilter
         if (newFilter) {
             vibeBeforeSavedFilter = current.activeDynamicVibe
         }
         _uiState.value = current.copy(
-            savedVibeFilter = newFilter,
+            visitedFilter = newFilter,
             activeDynamicVibe = if (newFilter) null else vibeBeforeSavedFilter,
         )
         if (!newFilter) vibeBeforeSavedFilter = null
     }
 
-    fun closeSavesSheet() {
+    fun closeVisitsSheet() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(showSavesSheet = false)
+        _uiState.value = current.copy(showVisitsSheet = false)
         refreshWeatherIfStale()
     }
 
@@ -584,9 +605,9 @@ class MapViewModel(
                 geocodingQuery = "",
                 geocodingSuggestions = emptyList(),
                 geocodingSelectedPlace = null,
-                savedPois = latestSavedPois,
-                savedPoiIds = latestSavedPoiIds,
-                savedPoiCount = latestSavedPois.size,
+                visitedPois = latestSavedPois,
+                visitedPoiIds = latestVisitedPoiIds,
+                visitedPoiCount = latestSavedPois.size,
                 recentPlaces = latestRecents,
             )
             preSearchSnapshot = null
@@ -867,9 +888,9 @@ class MapViewModel(
                     isSearchingArea = true,
                 isLoadingVibes = true,
                     recentPlaces = latestRecents,
-                    savedPois = latestSavedPois,
-                    savedPoiIds = latestSavedPoiIds,
-                    savedPoiCount = latestSavedPois.size,
+                    visitedPois = latestSavedPois,
+                    visitedPoiIds = latestVisitedPoiIds,
+                    visitedPoiCount = latestSavedPois.size,
                 )
 
                 // Fetch weather in parallel

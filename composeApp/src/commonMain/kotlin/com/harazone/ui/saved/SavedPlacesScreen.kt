@@ -173,7 +173,7 @@ fun SavedPlacesScreen(
                             Box(modifier = Modifier.weight(1f)) {
                                 if (uiState.searchQuery.isEmpty()) {
                                     Text(
-                                        "Search saves...",
+                                        "Search visits...",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = Color.White.copy(alpha = 0.3f),
                                     )
@@ -283,7 +283,7 @@ fun SavedPlacesScreen(
                             contentAlignment = Alignment.Center,
                         ) {
                             Text(
-                                "No saved places yet — start exploring!",
+                                "No visited places yet — start exploring!",
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = Color.White.copy(alpha = 0.4f),
                             )
@@ -321,7 +321,7 @@ fun SavedPlacesScreen(
                         onStopEditingNote = { noteText -> viewModel.onStopEditingNote(noteText) },
                         onClick = { onPoiSelected(poi) },
                         onUnsave = {
-                            viewModel.unsavePoi(poi.id)
+                            viewModel.unvisitPoi(poi.id)
                             scope.launch {
                                 val result = snackbarHostState.showSnackbar(
                                     message = removedMessage,
@@ -368,7 +368,7 @@ fun SavedPlacesScreen(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "Ask AI about saves...",
+                    "Ask AI about visits...",
                     color = Color.White.copy(alpha = 0.6f),
                     style = MaterialTheme.typography.bodyMedium,
                 )

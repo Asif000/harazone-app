@@ -55,10 +55,10 @@ import kotlinx.coroutines.flow.drop
 fun PoiCarousel(
     pois: List<POI>,
     selectedIndex: Int?,
-    savedPoiIds: Set<String>,
+    visitedPoiIds: Set<String>,
     onCardSwiped: (Int) -> Unit,
     onSelectionCleared: () -> Unit,
-    onSaveTapped: (POI) -> Unit,
+    onVisitTapped: (POI) -> Unit,
     onDetailTapped: (POI) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -95,7 +95,7 @@ fun PoiCarousel(
             ) {
                 items(pois, key = { it.savedId }) { poi ->
                     val liveStatusColor = liveStatusToColor(resolveStatus(poi.liveStatus, poi.hours)).toComposeColor()
-                    val isSaved = poi.savedId in savedPoiIds
+                    val isVisited = poi.savedId in visitedPoiIds
                     Box(
                         Modifier
                             .width(screenWidth - 32.dp)
@@ -206,18 +206,14 @@ fun PoiCarousel(
                                 Spacer(Modifier.height(4.dp))
                                 // CTA row
                                 Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        Modifier
-                                            .size(36.dp)
-                                            .clip(CircleShape)
-                                            .clickable { onSaveTapped(poi) },
-                                        contentAlignment = Alignment.Center,
-                                    ) {
-                                        Text(
-                                            text = if (isSaved) "★" else "☆",
-                                            color = if (isSaved) Color(0xFFFFD700) else Color.White,
-                                            style = MaterialTheme.typography.titleMedium,
-                                        )
+                                    if (isVisited) {
+                                        TextButton(onClick = {}, enabled = false) {
+                                            Text("✓ Visited", color = Color(0xFF4CAF50).copy(alpha = 0.7f))
+                                        }
+                                    } else {
+                                        TextButton(onClick = { onVisitTapped(poi) }) {
+                                            Text("Visit", color = Color.White)
+                                        }
                                     }
                                     Spacer(Modifier.weight(1f))
                                     TextButton(onClick = { onDetailTapped(poi) }) {

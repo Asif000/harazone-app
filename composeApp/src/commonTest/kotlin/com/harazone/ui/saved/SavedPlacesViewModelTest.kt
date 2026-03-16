@@ -149,7 +149,7 @@ class SavedPlacesViewModelTest {
 
         assertEquals(2, vm.uiState.value.filteredSaves.size)
 
-        vm.unsavePoi("1")
+        vm.unvisitPoi("1")
 
         val filtered = vm.uiState.value.filteredSaves
         assertEquals(1, filtered.size)
@@ -162,7 +162,7 @@ class SavedPlacesViewModelTest {
         repo.save(makePoi("1"))
         val (vm, _) = createViewModel(repo)
 
-        vm.unsavePoi("1")
+        vm.unvisitPoi("1")
         assertEquals(0, vm.uiState.value.filteredSaves.size)
 
         vm.commitUnsave("1", undo = true)
@@ -176,7 +176,7 @@ class SavedPlacesViewModelTest {
         repo.save(makePoi("1"))
         val (vm, _) = createViewModel(repo)
 
-        vm.unsavePoi("1")
+        vm.unvisitPoi("1")
         vm.commitUnsave("1", undo = true)
 
         val allPois = vm.uiState.value.saves
@@ -223,7 +223,7 @@ class SavedPlacesViewModelTest {
 
         assertEquals(3, vm.uiState.value.capsules.first { it.label == "All" }.count)
 
-        vm.unsavePoi("1")
+        vm.unvisitPoi("1")
 
         // Capsule counts should reflect visible saves (excluding pending unsave)
         assertEquals(2, vm.uiState.value.capsules.first { it.label == "All" }.count)
@@ -236,7 +236,7 @@ class SavedPlacesViewModelTest {
         repo.save(makePoi("1"))
         val (vm, _) = createViewModel(repo)
 
-        vm.unsavePoi("1")
+        vm.unvisitPoi("1")
         repo.shouldThrow = true
         // Should not throw — error is caught internally
         vm.commitUnsave("1", undo = false)
@@ -252,8 +252,8 @@ class SavedPlacesViewModelTest {
         repo.save(makePoi("2"))
         val (vm, _) = createViewModel(repo)
 
-        vm.unsavePoi("1")
-        vm.unsavePoi("2")
+        vm.unvisitPoi("1")
+        vm.unvisitPoi("2")
         assertEquals(2, vm.uiState.value.pendingUnsaveIds.size)
 
         vm.commitAllPendingUnsaves()

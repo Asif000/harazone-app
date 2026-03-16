@@ -18,10 +18,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -58,12 +58,12 @@ fun POIListView(
     activeDynamicVibe: DynamicVibe?,
     onDynamicVibeSelected: (DynamicVibe) -> Unit,
     onPoiClick: (POI) -> Unit,
-    onSaveTapped: (POI) -> Unit,
-    onUnsaveTapped: (POI) -> Unit,
+    onVisitTapped: (POI) -> Unit,
+    onUnvisitTapped: (POI) -> Unit,
     onNavigateTapped: (POI) -> Unit,
     onChatTapped: (POI) -> Unit,
     modifier: Modifier = Modifier,
-    savedPoiIds: Set<String> = emptySet(),
+    visitedPoiIds: Set<String> = emptySet(),
 ) {
     Column(modifier = modifier) {
         // Dynamic vibe chip strip
@@ -103,12 +103,12 @@ fun POIListView(
         } else {
             LazyColumn(modifier = Modifier.weight(1f)) {
                 items(pois, key = { it.savedId }) { poi ->
-                    val isSaved = poi.savedId in savedPoiIds
+                    val isVisited = poi.savedId in visitedPoiIds
                     PoiListCard(
                         poi = poi,
-                        isSaved = isSaved,
+                        isVisited = isVisited,
                         onClick = { onPoiClick(poi) },
-                        onSaveToggled = { if (isSaved) onUnsaveTapped(poi) else onSaveTapped(poi) },
+                        onVisitToggled = { if (isVisited) onUnvisitTapped(poi) else onVisitTapped(poi) },
                         onNavigateTapped = { onNavigateTapped(poi) },
                         onChatTapped = { onChatTapped(poi) },
                     )
@@ -122,9 +122,9 @@ fun POIListView(
 @Composable
 private fun PoiListCard(
     poi: POI,
-    isSaved: Boolean,
+    isVisited: Boolean,
     onClick: () -> Unit,
-    onSaveToggled: () -> Unit,
+    onVisitToggled: () -> Unit,
     onNavigateTapped: () -> Unit,
     onChatTapped: () -> Unit,
 ) {
@@ -216,15 +216,15 @@ private fun PoiListCard(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 IconButton(
-                    onClick = onSaveToggled,
+                    onClick = onVisitToggled,
                     modifier = Modifier.semantics {
-                        contentDescription = if (isSaved) "Saved" else "Save"
+                        contentDescription = if (isVisited) "Visited" else "Mark as Visit"
                     },
                 ) {
                     Icon(
-                        imageVector = if (isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
+                        imageVector = if (isVisited) Icons.Filled.CheckCircle else Icons.Outlined.CheckCircle,
                         contentDescription = null,
-                        tint = if (isSaved) Color(0xFFFFD700) else Color.White,
+                        tint = if (isVisited) Color(0xFF4CAF50) else Color.White,
                     )
                 }
                 if (poi.latitude != null && poi.longitude != null) {

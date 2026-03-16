@@ -28,6 +28,11 @@ class FakeSavedPoiRepository : SavedPoiRepository {
         _pois.value = _pois.value.filter { it.id != poiId }
     }
 
+    override suspend fun visit(poi: SavedPoi) {
+        if (shouldThrow) throw RuntimeException("Test error")
+        _pois.value = _pois.value.filter { it.id != poi.id } + poi
+    }
+
     override suspend fun updateUserNote(poiId: String, note: String?) {
         if (shouldThrow) throw RuntimeException("Test error")
         lastUpdatedPoiId = poiId

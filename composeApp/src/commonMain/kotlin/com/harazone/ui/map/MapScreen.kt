@@ -170,7 +170,7 @@ private fun ReadyContent(
     fun dismissAllOverlays() {
         if (state.isFabExpanded) viewModel.toggleFab()
         if (chatState.isOpen) chatViewModel.closeChat()
-        if (state.showSavesSheet) viewModel.closeSavesSheet()
+        if (state.showVisitsSheet) viewModel.closeVisitsSheet()
         if (state.selectedPoi != null) viewModel.clearPoiSelection()
         showProfile = false
         showSettings = false
@@ -238,8 +238,8 @@ private fun ReadyContent(
                 activeDynamicVibe = state.activeDynamicVibe,
                 onDynamicVibeSelected = viewModel::switchDynamicVibe,
                 onPoiClick = { viewModel.selectPoi(it) },
-                onSaveTapped = { poi -> viewModel.savePoi(poi, state.areaName) },
-                onUnsaveTapped = { poi -> viewModel.unsavePoi(poi) },
+                onVisitTapped = { poi -> viewModel.visitPoi(poi, state.areaName) },
+                onUnvisitTapped = { poi -> viewModel.unvisitPoi(poi) },
                 onNavigateTapped = { poi ->
                     if (poi.latitude != null && poi.longitude != null) {
                         val handled = onNavigateToMaps(poi.latitude, poi.longitude, poi.name)
@@ -259,7 +259,7 @@ private fun ReadyContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = statusBarPadding + 112.dp),
-                savedPoiIds = state.savedPoiIds,
+                visitedPoiIds = state.visitedPoiIds,
             )
         } else {
             // TODO(BACKLOG-MEDIUM): Add +/- zoom control buttons as Compose overlays — MapLibre 11.x removed built-in zoom controls
@@ -269,14 +269,14 @@ private fun ReadyContent(
                 longitude = state.longitude,
                 zoomLevel = 14.0,
                 cameraMoveId = state.cameraMoveId,
-                pois = if (state.savedVibeFilter) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
+                pois = if (state.visitedFilter) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
                 activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled on map
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
                 onCameraIdle = { lat, lng -> viewModel.onCameraIdle(lat, lng) },
-                savedPoiIds = state.savedPoiIds,
-                savedPois = state.savedPois,
-                savedVibeFilter = state.savedVibeFilter,
+                visitedPoiIds = state.visitedPoiIds,
+                visitedPois = state.visitedPois,
+                visitedFilter = state.visitedFilter,
                 onPinTapped = { index -> viewModel.onPinTapped(index) },
                 selectedPinIndex = state.selectedPinIndex,
             )
@@ -392,12 +392,12 @@ private fun ReadyContent(
             PoiCarousel(
                 pois = state.pois,
                 selectedIndex = state.selectedPinIndex,
-                savedPoiIds = state.savedPoiIds,
+                visitedPoiIds = state.visitedPoiIds,
                 onCardSwiped = { index -> viewModel.onCarouselSwiped(index) },
                 onSelectionCleared = { viewModel.onCarouselSelectionCleared() },
-                onSaveTapped = { poi ->
-                    if (poi.savedId in state.savedPoiIds) viewModel.unsavePoi(poi)
-                    else viewModel.savePoi(poi, state.areaName)
+                onVisitTapped = { poi ->
+                    viewModel.visitPoi(poi, state.areaName)
+                    viewModel.selectPoiWithImageResolve(poi)
                 },
                 onDetailTapped = { poi -> viewModel.selectPoiWithImageResolve(poi) },
                 modifier = Modifier
@@ -413,13 +413,13 @@ private fun ReadyContent(
                 activeDynamicVibe = state.activeDynamicVibe,
                 dynamicVibePoiCounts = state.dynamicVibePoiCounts,
                 dynamicVibeAreaSaveCounts = state.dynamicVibeAreaSaveCounts,
-                savedVibeActive = state.savedVibeFilter,
-                totalAreaSaveCount = state.savedPois.size,
+                savedVibeActive = state.visitedFilter,
+                totalAreaSaveCount = state.visitedPois.size,
                 isLoadingVibes = state.isLoadingVibes,
                 isOfflineVibes = state.isOfflineVibes,
                 pinnedVibeLabels = viewModel.pinnedVibeLabels,
                 onVibeSelected = { viewModel.switchDynamicVibe(it) },
-                onSavedVibeSelected = { viewModel.onSavedVibeSelected() },
+                onSavedVibeSelected = viewModel::onVisitedFilterSelected,
                 onLongPressVibe = { viewModel.togglePin(it) },
                 onExploreRetry = { viewModel.retryAreaFetch() },
                 showCalloutDot = state.showOnboardingBubble,
@@ -437,10 +437,10 @@ private fun ReadyContent(
         PlatformBackHandler(enabled = state.showAllMode && state.selectedPoi == null) {
             viewModel.onPrevBatch()
         }
-        PlatformBackHandler(enabled = state.selectedPoi == null && state.savedVibeFilter) {
-            viewModel.onSavedVibeSelected()
+        PlatformBackHandler(enabled = state.selectedPoi == null && state.visitedFilter) {
+            viewModel.onVisitedFilterSelected()
         }
-        PlatformBackHandler(enabled = state.selectedPoi == null && !state.savedVibeFilter && state.isFabExpanded) {
+        PlatformBackHandler(enabled = state.selectedPoi == null && !state.visitedFilter && state.isFabExpanded) {
             viewModel.toggleFab()
         }
 
@@ -454,7 +454,7 @@ private fun ReadyContent(
                     showProfile = true
                 } else if (returnToSaves[0]) {
                     returnToSaves[0] = false
-                    viewModel.openSavesSheet()
+                    viewModel.openVisitsSheet()
                 } else if (!returnToChat[0]) {
                     chatViewModel.closeChat()
                 }
@@ -476,9 +476,14 @@ private fun ReadyContent(
                 areaName = state.areaName,
                 allPois = state.allDiscoveredPois,
                 activeDynamicVibe = state.activeDynamicVibe,
-                isSaved = state.selectedPoi.savedId in state.savedPoiIds,
-                onSave = { viewModel.savePoi(state.selectedPoi, state.areaName) },
-                onUnsave = { viewModel.unsavePoi(state.selectedPoi) },
+                isVisited = state.selectedPoi.savedId in state.visitedPoiIds,
+                visitState = state.visitedPois.find { it.id == state.selectedPoi.savedId }?.visitState,
+                onVisit = {
+                    val poi = state.selectedPoi
+                    val visitState = viewModel.visitPoi(poi, state.areaName)
+                    chatViewModel.sendVisitMessage(poi, visitState)
+                },
+                onUnvisit = { viewModel.unvisitPoi(state.selectedPoi) },
                 onDirectionsClick = { lat, lon, name ->
                     val handled = onNavigateToMaps(lat, lon, name)
                     if (!handled) {
@@ -501,6 +506,20 @@ private fun ReadyContent(
                         snackbarHostState.showSnackbar(noMapsAppMessage)
                     }
                 },
+                onPoiCardClick = { card ->
+                    val enriched = state.allDiscoveredPois.firstOrNull { it.name.equals(card.name, ignoreCase = true) }
+                    val fallbackPoi = POI(
+                        name = card.name,
+                        type = card.type,
+                        description = card.whySpecial,
+                        confidence = Confidence.HIGH,
+                        latitude = card.lat,
+                        longitude = card.lng,
+                        insight = card.whySpecial,
+                        imageUrl = card.imageUrl,
+                    )
+                    viewModel.selectPoiWithImageResolve(enriched ?: fallbackPoi)
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
@@ -512,9 +531,9 @@ private fun ReadyContent(
 
         // Saves nearby pill
         // Cross-reference current-area POIs against savedPoiIds for accurate nearby count.
-        // NOTE: state.savedPois contains ALL saves across all areas; the .count filter IS the area-scoping
+        // NOTE: state.visitedPois contains ALL saves across all areas; the .count filter IS the area-scoping
         // — do not simplify to savedPoiIds.size (that would count saves from every area ever visited).
-        val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.savedPoiIds }
+        val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.visitedPoiIds }
         val carouselVisible = state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null
         AnimatedVisibility(
             visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded && !carouselVisible && state.selectedPoi == null && !showProfile,
@@ -538,11 +557,11 @@ private fun ReadyContent(
         if (!showProfile) FabMenu(
             isExpanded = state.isFabExpanded,
             onToggle = { viewModel.toggleFab() },
-            onSavedPlaces = {
+            onVisitedPlaces = {
                 viewModel.toggleFab()
-                viewModel.openSavesSheet()
+                viewModel.openVisitsSheet()
             },
-            savedCount = state.savedPoiCount,
+            visitedCount = state.visitedPoiCount,
             onSettings = {
                 viewModel.toggleFab()
                 showSettings = true
@@ -648,16 +667,16 @@ private fun ReadyContent(
 
         // Saved places full-screen overlay
         AnimatedVisibility(
-            visible = state.showSavesSheet,
+            visible = state.showVisitsSheet,
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
             SavedPlacesScreen(
                 userLat = state.gpsLatitude.takeIf { state.showMyLocation },
                 userLng = state.gpsLongitude.takeIf { state.showMyLocation },
-                onDismiss = { viewModel.closeSavesSheet() },
+                onDismiss = { viewModel.closeVisitsSheet() },
                 onAskAi = { poi ->
-                    viewModel.closeSavesSheet()
+                    viewModel.closeVisitsSheet()
                     if (poi != null) {
                         chatViewModel.openChat(
                             state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
@@ -673,7 +692,7 @@ private fun ReadyContent(
                 onDirections = { lat, lng, name -> onNavigateToMaps(lat, lng, name) },
                 onShare = { /* TODO: platform share intent */ },
                 onPoiSelected = { saved ->
-                    viewModel.closeSavesSheet()
+                    viewModel.closeVisitsSheet()
                     returnToSaves[0] = true
                     viewModel.selectPoi(
                         POI(

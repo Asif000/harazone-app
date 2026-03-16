@@ -50,7 +50,7 @@ class SavedPlacesViewModel(
         recompute()
     }
 
-    fun unsavePoi(poiId: String) {
+    fun unvisitPoi(poiId: String) {
         _uiState.update { it.copy(pendingUnsaveIds = it.pendingUnsaveIds + poiId) }
         recompute()
     }

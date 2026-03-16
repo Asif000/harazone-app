@@ -1445,8 +1445,8 @@ class MapViewModelTest {
         val callsAfterInit = weatherProvider.callCount
 
         // Close saves sheet with fresh weather (<5 min) — should NOT refetch
-        viewModel.openSavesSheet()
-        viewModel.closeSavesSheet()
+        viewModel.openVisitsSheet()
+        viewModel.closeVisitsSheet()
         testScheduler.advanceUntilIdle()
         assertEquals(callsAfterInit, weatherProvider.callCount, "Fresh weather should not trigger refetch")
     }
@@ -1461,8 +1461,8 @@ class MapViewModelTest {
 
         // Advance fake clock past 5-min threshold
         fakeTimeMs += 6 * 60 * 1000L
-        viewModel.openSavesSheet()
-        viewModel.closeSavesSheet()
+        viewModel.openVisitsSheet()
+        viewModel.closeVisitsSheet()
         testScheduler.advanceUntilIdle()
         assertTrue(weatherProvider.callCount > callsAfterInit, "Stale weather should trigger refetch on saves sheet close")
     }
@@ -1529,7 +1529,7 @@ class MapViewModelTest {
             rating = 4.5f,
             imageUrl = "https://example.com/img.jpg",
         )
-        viewModel.savePoi(poi, "Test Area")
+        viewModel.visitPoi(poi, "Test Area")
         testScheduler.advanceUntilIdle()
 
         val saved = fakeRepo.observeAll().first()
@@ -1879,10 +1879,10 @@ class MapViewModelTest {
         )
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
 
-        viewModel.onSavedVibeSelected()
+        viewModel.onVisitedFilterSelected()
 
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(state.savedVibeFilter)
+        assertTrue(state.visitedFilter)
         assertNull(state.activeDynamicVibe)
     }
 
@@ -2003,15 +2003,15 @@ class MapViewModelTest {
         assertIs<MapUiState.Ready>(viewModel.uiState.value)
 
         // Activate saved filter first
-        viewModel.onSavedVibeSelected()
+        viewModel.onVisitedFilterSelected()
         val afterSaved = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(afterSaved.savedVibeFilter)
+        assertTrue(afterSaved.visitedFilter)
 
         // Now switch to a regular vibe
         viewModel.switchDynamicVibe(DynamicVibe(label = "CHARACTER", icon = ""))
 
         val afterSwitch = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(afterSwitch.savedVibeFilter)
+        assertFalse(afterSwitch.visitedFilter)
         assertEquals("CHARACTER", afterSwitch.activeDynamicVibe?.label)
     }
 
@@ -2115,11 +2115,11 @@ class MapViewModelTest {
             ),
             savedPoiRepository = savedRepo,
         )
-        viewModel.savePoi(batch0Pois[0], "Manhattan, New York")
+        viewModel.visitPoi(batch0Pois[0], "Manhattan, New York")
         val savedId = batch0Pois[0].savedId
         viewModel.onNextBatch()
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertTrue(savedId in state.savedPoiIds)
+        assertTrue(savedId in state.visitedPoiIds)
     }
 
     @Test

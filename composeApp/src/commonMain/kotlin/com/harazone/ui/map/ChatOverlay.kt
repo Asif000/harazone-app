@@ -467,26 +467,23 @@ internal fun ChatPoiMiniCard(
                 modifier = Modifier.padding(top = 8.dp),
             ) {
                 SuggestionChip(
-                    onClick = { if (isSaved) onUnsave() else onSave() },
+                    onClick = { if (!isSaved) onSave() },
                     label = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                                contentDescription = null,
-                                modifier = Modifier.size(14.dp),
-                                tint = Color.White,
+                            Text(
+                                if (isSaved) "✓ Visited" else "Visit",
+                                fontSize = 12.sp,
+                                color = if (isSaved) Color(0xFF4CAF50) else Color.White,
                             )
-                            Spacer(Modifier.width(4.dp))
-                            Text(if (isSaved) stringResource(Res.string.chat_poi_saved) else stringResource(Res.string.chat_poi_save), fontSize = 12.sp, color = Color.White)
                         }
                     },
                     colors = SuggestionChipDefaults.suggestionChipColors(
                         containerColor = if (isSaved)
-                            Color.White.copy(alpha = 0.25f)
+                            Color(0xFF4CAF50).copy(alpha = 0.15f)
                         else
                             Color.White.copy(alpha = 0.15f),
                     ),
-                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
+                    border = BorderStroke(1.dp, if (isSaved) Color(0xFF4CAF50).copy(alpha = 0.3f) else Color.White.copy(alpha = 0.3f)),
                 )
                 SuggestionChip(
                     onClick = onDirections,

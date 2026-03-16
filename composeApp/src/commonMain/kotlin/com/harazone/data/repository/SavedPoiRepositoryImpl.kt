@@ -4,6 +4,7 @@ import app.cash.sqldelight.coroutines.asFlow
 import app.cash.sqldelight.coroutines.mapToList
 import com.harazone.data.local.AreaDiscoveryDatabase
 import com.harazone.domain.model.SavedPoi
+import com.harazone.domain.model.VisitState
 import com.harazone.domain.repository.SavedPoiRepository
 import com.harazone.util.AppClock
 import kotlinx.coroutines.CoroutineDispatcher
@@ -39,6 +40,10 @@ class SavedPoiRepositoryImpl(
                         description = it.description,
                         rating = it.rating?.toFloat(),
                         vibe = it.vibe,
+                        visitState = it.visit_state?.let { raw ->
+                            VisitState.entries.find { e -> e.name == raw }
+                        },
+                        visitedAt = it.visited_at,
                     )
                 }
             }
@@ -73,6 +78,28 @@ class SavedPoiRepositoryImpl(
     override suspend fun unsave(poiId: String) {
         withContext(ioDispatcher) {
             database.saved_poisQueries.deleteById(poiId)
+        }
+    }
+
+    override suspend fun visit(poi: SavedPoi) {
+        withContext(ioDispatcher) {
+            database.saved_poisQueries.insertOrReplaceWithState(
+                poi_id = poi.id,
+                name = poi.name,
+                type = poi.type,
+                area_name = poi.areaName,
+                lat = poi.lat,
+                lng = poi.lng,
+                why_special = poi.whySpecial,
+                saved_at = poi.savedAt,
+                user_note = poi.userNote,
+                image_url = poi.imageUrl,
+                description = poi.description,
+                rating = poi.rating?.toDouble(),
+                vibe = poi.vibe,
+                visit_state = poi.visitState?.name,
+                visited_at = clock.nowMs(),
+            )
         }
     }
 

@@ -39,7 +39,7 @@
     <string name="poi_status_unknown">Unknown</string>
 
     <!-- Vibe Rail -->
-    <string name="vibe_rail_saved">Saved</string>
+    <string name="vibe_rail_saved">Visited</string>
     <string name="vibe_rail_offline">Offline · cached</string>
     <string name="vibe_rail_exploring">Exploring…</string>
 
@@ -48,12 +48,12 @@
     <string name="map_no_maps_app">No maps app available</string>
     <string name="map_sharing_coming_soon">Sharing coming soon</string>
     <plurals name="saved_places_nearby">
-        <item quantity="one">%1$d saved place nearby</item>
-        <item quantity="other">%1$d saved places nearby</item>
+        <item quantity="one">%1$d visited place nearby</item>
+        <item quantity="other">%1$d visited places nearby</item>
     </plurals>
 
     <!-- Saved Places -->
-    <string name="saved_places_title">Saved Places</string>
+    <string name="saved_places_title">Visited Places</string>
     <string name="saved_no_matches">No matching saves</string>
     <string name="saved_removed">Removed</string>
     <string name="saved_undo">Undo</string>
@@ -119,8 +119,8 @@
     <string name="pill_what_am_i_missing">What am I missing?</string>
 
     <!-- FAB Menu -->
-    <string name="fab_saved_places">Saved Places</string>
-    <string name="fab_saved_places_count">Saved Places (%1$d)</string>
+    <string name="fab_saved_places">Visited Places</string>
+    <string name="fab_saved_places_count">Visited Places (%1$d)</string>
     <string name="fab_settings">Settings</string>
 
     <!-- AI Search Bar ghost phrases -->

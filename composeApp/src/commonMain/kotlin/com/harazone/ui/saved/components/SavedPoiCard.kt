@@ -52,7 +52,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.harazone.domain.model.SavedPoi
+import com.harazone.domain.model.VisitState
 import com.harazone.ui.components.PlatformBackHandler
+import androidx.compose.material3.Surface
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
 
@@ -229,6 +231,27 @@ fun SavedPoiCard(
                         .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(4.dp))
                         .padding(horizontal = 6.dp, vertical = 2.dp),
                 )
+
+                // VisitState badge
+                if (poi.visitState != null) {
+                    Spacer(Modifier.width(6.dp))
+                    val (badgeColor, badgeLabel) = when (poi.visitState) {
+                        VisitState.GO_NOW -> Color(0xFF4CAF50) to "Go Now"
+                        VisitState.PLAN_SOON -> Color(0xFFFF9800) to "Plan Soon"
+                        VisitState.WANT_TO_GO -> Color(0xFF9E9E9E) to "Want to Visit"
+                    }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = badgeColor.copy(alpha = 0.2f),
+                    ) {
+                        Text(
+                            text = badgeLabel,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = badgeColor,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        )
+                    }
+                }
 
                 Spacer(Modifier.width(8.dp))
 

@@ -18,9 +18,9 @@ expect fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
-    savedPoiIds: Set<String> = emptySet(),
-    savedPois: List<SavedPoi> = emptyList(),
-    savedVibeFilter: Boolean = false,
+    visitedPoiIds: Set<String> = emptySet(),
+    visitedPois: List<SavedPoi> = emptyList(),
+    visitedFilter: Boolean = false,
     onPinTapped: (Int) -> Unit = {},
     selectedPinIndex: Int? = null,
 )

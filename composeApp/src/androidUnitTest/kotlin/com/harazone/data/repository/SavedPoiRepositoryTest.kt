@@ -4,6 +4,8 @@ import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import app.cash.turbine.test
 import com.harazone.data.local.AreaDiscoveryDatabase
 import com.harazone.domain.model.SavedPoi
+import com.harazone.domain.model.VisitState
+import kotlin.test.assertNull
 import com.harazone.fakes.FakeClock
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -116,6 +118,38 @@ class SavedPoiRepositoryTest {
             val list = awaitItem()
             assertEquals(1, list.size)
             assertEquals("Updated reason", list.first().whySpecial)
+        }
+    }
+
+    @Test
+    fun `visit stores visitState in DB`() = testScope.runTest {
+        val poi = poi().copy(visitState = VisitState.GO_NOW)
+        repository.visit(poi)
+        repository.observeAll().test {
+            val list = awaitItem()
+            assertEquals(1, list.size)
+            assertEquals(VisitState.GO_NOW, list.first().visitState)
+        }
+    }
+
+    @Test
+    fun `visit stores visitedAt from clock`() = testScope.runTest {
+        val poi = poi().copy(visitState = VisitState.PLAN_SOON)
+        repository.visit(poi)
+        repository.observeAll().test {
+            val list = awaitItem()
+            assertEquals(fakeClock.nowMs, list.first().visitedAt)
+        }
+    }
+
+    @Test
+    fun `legacy save rows have null visitState`() = testScope.runTest {
+        val poi = poi()
+        repository.save(poi)
+        repository.observeAll().test {
+            val list = awaitItem()
+            assertNull(list.first().visitState)
+            assertNull(list.first().visitedAt)
         }
     }
 

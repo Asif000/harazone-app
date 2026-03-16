@@ -44,9 +44,9 @@ import areadiscovery.composeapp.generated.resources.*
 fun FabMenu(
     isExpanded: Boolean,
     onToggle: () -> Unit,
-    onSavedPlaces: () -> Unit,
+    onVisitedPlaces: () -> Unit,
     onSettings: () -> Unit,
-    savedCount: Int = 0,
+    visitedCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -64,9 +64,9 @@ fun FabMenu(
                 modifier = Modifier.padding(bottom = 8.dp),
             ) {
                 FabMenuItem(
-                    label = if (savedCount > 0) stringResource(Res.string.fab_saved_places_count, savedCount) else stringResource(Res.string.fab_saved_places),
+                    label = if (visitedCount > 0) stringResource(Res.string.fab_saved_places_count, visitedCount) else stringResource(Res.string.fab_saved_places),
                     icon = Icons.Default.Bookmark,
-                    onClick = onSavedPlaces,
+                    onClick = onVisitedPlaces,
                 )
                 FabMenuItem(
                     label = stringResource(Res.string.fab_settings),

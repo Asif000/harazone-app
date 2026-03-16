@@ -1,5 +1,7 @@
 package com.harazone.domain.model
 
+enum class VisitState { WANT_TO_GO, GO_NOW, PLAN_SOON }
+
 data class SavedPoi(
     val id: String,
     val name: String,
@@ -14,4 +16,6 @@ data class SavedPoi(
     val description: String? = null,
     val rating: Float? = null,
     val vibe: String = "",
+    val visitState: VisitState? = null,
+    val visitedAt: Long? = null,
 )

@@ -12,6 +12,7 @@ import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfileBuilder
+import com.harazone.domain.model.VisitState
 import com.harazone.domain.provider.AreaIntelligenceProvider
 import com.harazone.domain.provider.LocaleProvider
 import com.harazone.domain.repository.SavedPoiRepository
@@ -122,6 +123,7 @@ internal class ChatViewModel(
                 "The user is currently looking at ${entryPoint.poi.name} — lead with context about that place."
             is ChatEntryPoint.SavedCard ->
                 "The user is currently looking at ${entryPoint.poiName} — lead with context about that place."
+            is ChatEntryPoint.VisitAction -> buildVisitFramingHint(entryPoint.poi, entryPoint.visitState)
             is ChatEntryPoint.Default -> null
         }
 
@@ -151,6 +153,52 @@ internal class ChatViewModel(
         poiContextJob?.cancel()
         poiContextJob = viewModelScope.launch {
             fetchPoiContext(poi, areaName)
+        }
+    }
+
+    fun openChatForPoiVisit(poi: POI, visitState: VisitState, areaName: String, pois: List<POI>, activeDynamicVibe: DynamicVibe?) {
+        openChat(areaName, pois, activeDynamicVibe, ChatEntryPoint.VisitAction(poi, visitState), forceReset = true)
+        tapIntentPill(ContextualPill(
+            label = poi.name,
+            message = "I want to visit ${poi.name}.",
+            intent = ChatIntent.DISCOVER,
+            emoji = "\uD83D\uDCCD",
+        ))
+        if (_uiState.value.contextBlurb == null && !_uiState.value.isContextLoading) {
+            poiContextJob?.cancel()
+            poiContextJob = viewModelScope.launch {
+                fetchPoiContext(poi, areaName)
+            }
+        }
+    }
+
+    private var pendingVisitMessage: String? = null
+
+    private fun drainPendingVisitMessage() {
+        val msg = pendingVisitMessage ?: return
+        pendingVisitMessage = null
+        sendMessage(msg)
+    }
+
+    fun sendVisitMessage(poi: POI, visitState: VisitState) {
+        val query = when (visitState) {
+            VisitState.GO_NOW -> "I want to visit ${poi.name} right now. What should I know before heading there?"
+            VisitState.PLAN_SOON -> "I want to visit ${poi.name} but it's currently closed. When's the best time to go?"
+            VisitState.WANT_TO_GO -> "I want to visit ${poi.name}. What makes it special and when should I go?"
+        }
+        if (_uiState.value.isStreaming) {
+            pendingVisitMessage = query
+        } else {
+            sendMessage(query)
+        }
+    }
+
+    private fun buildVisitFramingHint(poi: POI, visitState: VisitState): String {
+        val status = resolveStatus(poi.liveStatus, poi.hours)
+        return when (visitState) {
+            VisitState.GO_NOW -> "The user just tapped Visit on ${poi.name} — it is currently $status. Lead with a Go Now response: best approach right now, crowd level, one thing to do/order/see first. Conversational, not a checklist. End with a question."
+            VisitState.PLAN_SOON -> "The user just tapped Visit on ${poi.name} — it is currently closed. Lead with a Plan Soon response: best time to visit (day/time), what to anticipate, why worth the wait. Conversational. End with a question."
+            VisitState.WANT_TO_GO -> "The user just tapped Visit on ${poi.name}. Lead with an engaging overview — highlight what makes it special and the best time to visit."
         }
     }
 
@@ -352,6 +400,7 @@ internal class ChatViewModel(
                                 content = accumulated, timestamp = clock.nowMs(), sources = emptyList(),
                             )
                         )
+                        drainPendingVisitMessage()
                     } else {
                         accumulated += token.text
                         val displayText = extractStreamingProse(accumulated)
@@ -639,17 +688,20 @@ internal class ChatViewModel(
         is ChatEntryPoint.SavesSheet -> savesOverviewPills()
         is ChatEntryPoint.PoiCard -> poiCardPills(entryPoint.poi.name)
         is ChatEntryPoint.SavedCard -> poiCardPills(entryPoint.poiName)
+        is ChatEntryPoint.VisitAction -> poiCardPills(entryPoint.poi.name)
     }
 
     private fun preFillFor(entryPoint: ChatEntryPoint): String = when (entryPoint) {
         is ChatEntryPoint.PoiCard -> "Tell me more about ${entryPoint.poi.name}"
         is ChatEntryPoint.SavedCard -> "Tell me more about ${entryPoint.poiName}"
+        is ChatEntryPoint.VisitAction -> "I want to visit ${entryPoint.poi.name}"
         else -> ""
     }
 
     private fun bannerFor(entryPoint: ChatEntryPoint): String? = when (entryPoint) {
         is ChatEntryPoint.PoiCard -> "Asking about: ${entryPoint.poi.name}"
         is ChatEntryPoint.SavedCard -> "Asking about: ${entryPoint.poiName}"
+        is ChatEntryPoint.VisitAction -> "Planning visit: ${entryPoint.poi.name}"
         is ChatEntryPoint.SavesSheet -> "Using your saved places"
         is ChatEntryPoint.Default -> null
     }

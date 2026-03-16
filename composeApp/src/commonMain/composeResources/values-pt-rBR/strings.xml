@@ -39,7 +39,7 @@
     <string name="poi_status_unknown">Desconhecido</string>
 
     <!-- Vibe Rail -->
-    <string name="vibe_rail_saved">Salvos</string>
+    <string name="vibe_rail_saved">Visitados</string>
     <string name="vibe_rail_offline">Offline · salvo</string>
     <string name="vibe_rail_exploring">Explorando…</string>
 
@@ -48,12 +48,12 @@
     <string name="map_no_maps_app">Nenhum aplicativo de mapas disponível</string>
     <string name="map_sharing_coming_soon">Compartilhamento em breve</string>
     <plurals name="saved_places_nearby">
-        <item quantity="one">%1$d lugar salvo próximo</item>
-        <item quantity="other">%1$d lugares salvos próximos</item>
+        <item quantity="one">%1$d lugar visitado próximo</item>
+        <item quantity="other">%1$d lugares visitados próximos</item>
     </plurals>
 
     <!-- Saved Places -->
-    <string name="saved_places_title">Lugares Salvos</string>
+    <string name="saved_places_title">Lugares Visitados</string>
     <string name="saved_no_matches">Nenhuma correspondência</string>
     <string name="saved_removed">Removido</string>
     <string name="saved_undo">Desfazer</string>
@@ -119,8 +119,8 @@
     <string name="pill_what_am_i_missing">O que estou perdendo?</string>
 
     <!-- FAB Menu -->
-    <string name="fab_saved_places">Lugares Salvos</string>
-    <string name="fab_saved_places_count">Lugares Salvos (%1$d)</string>
+    <string name="fab_saved_places">Lugares Visitados</string>
+    <string name="fab_saved_places_count">Lugares Visitados (%1$d)</string>
     <string name="fab_settings">Configurações</string>
 
     <!-- AI Search Bar ghost phrases -->

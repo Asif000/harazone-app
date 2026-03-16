@@ -24,8 +24,8 @@ private fun POIListViewPreview() {
             activeDynamicVibe = null,
             onDynamicVibeSelected = {},
             onPoiClick = {},
-            onSaveTapped = {},
-            onUnsaveTapped = {},
+            onVisitTapped = {},
+            onUnvisitTapped = {},
             onNavigateTapped = {},
             onChatTapped = {},
         )
@@ -60,8 +60,8 @@ private fun POIListViewWithImagePreview() {
             activeDynamicVibe = null,
             onDynamicVibeSelected = {},
             onPoiClick = {},
-            onSaveTapped = {},
-            onUnsaveTapped = {},
+            onVisitTapped = {},
+            onUnvisitTapped = {},
             onNavigateTapped = {},
             onChatTapped = {},
         )
@@ -78,8 +78,8 @@ private fun POIListViewEmptyPreview() {
             activeDynamicVibe = null,
             onDynamicVibeSelected = {},
             onPoiClick = {},
-            onSaveTapped = {},
-            onUnsaveTapped = {},
+            onVisitTapped = {},
+            onUnvisitTapped = {},
             onNavigateTapped = {},
             onChatTapped = {},
         )

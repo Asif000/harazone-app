@@ -60,6 +60,7 @@ import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.Vibe
+import com.harazone.domain.model.VisitState
 import com.harazone.ui.map.ChatBubbleItem
 import com.harazone.ui.map.ChatInputBar
 import com.harazone.ui.map.ChatPoiCard
@@ -86,14 +87,16 @@ internal fun AiDetailPage(
     areaName: String,
     allPois: List<POI>,
     activeDynamicVibe: DynamicVibe?,
-    isSaved: Boolean,
-    onSave: () -> Unit,
-    onUnsave: () -> Unit,
+    isVisited: Boolean,
+    visitState: VisitState?,
+    onVisit: () -> Unit,
+    onUnvisit: () -> Unit,
     onDirectionsClick: (Double, Double, String) -> Unit,
     onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
     onNavigateToMaps: (Double, Double, String) -> Boolean,
     onDirectionsFailed: () -> Unit,
+    onPoiCardClick: (ChatPoiCard) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
@@ -107,9 +110,13 @@ internal fun AiDetailPage(
         }
     }
 
-    // Pre-seed AI intro for this POI
+    // Pre-seed AI intro for this POI — visit-aware when opened via Visit tap
     LaunchedEffect(poi.savedId) {
-        chatViewModel.openChatForPoi(poi, areaName, allPois, activeDynamicVibe)
+        if (visitState != null) {
+            chatViewModel.openChatForPoiVisit(poi, visitState, areaName, allPois, activeDynamicVibe)
+        } else {
+            chatViewModel.openChatForPoi(poi, areaName, allPois, activeDynamicVibe)
+        }
     }
 
     PlatformBackHandler(enabled = true) { onDismiss() }
@@ -129,9 +136,10 @@ internal fun AiDetailPage(
                 item(key = "header") {
                     PoiDetailHeader(
                         poi = poi,
-                        isSaved = isSaved,
-                        onSave = onSave,
-                        onUnsave = onUnsave,
+                        isVisited = isVisited,
+                        visitState = visitState,
+                        onVisit = onVisit,
+                        onUnvisit = onUnvisit,
                         onDirectionsClick = onDirectionsClick,
                         onShowOnMap = onShowOnMap,
                         onDismiss = onDismiss,
@@ -166,8 +174,9 @@ internal fun AiDetailPage(
                             )
                         }
                     }
-                    // Render POI cards inline after their associated AI bubble
+                    // Render POI cards inline — filter out the current detail page POI
                     val cards = chatState.bubblePoiCards[bubble.id]
+                        ?.filter { it.name != poi.name }
                     if (!cards.isNullOrEmpty()) {
                         items(cards, key = { "poi_${it.id}" }) { card ->
                             Row(
@@ -181,6 +190,7 @@ internal fun AiDetailPage(
                                     isSaved = card.id in chatState.savedPoiIds,
                                     onSave = { chatViewModel.savePoi(card, chatState.areaName) },
                                     onUnsave = { chatViewModel.unsavePoi(card.id) },
+                                    onClick = { onPoiCardClick(card) },
                                     onDirections = {
                                         val handled = onNavigateToMaps(card.lat, card.lng, card.name)
                                         if (!handled) onDirectionsFailed()
@@ -348,9 +358,10 @@ private fun PoiContextBlock(
 @Composable
 private fun PoiDetailHeader(
     poi: POI,
-    isSaved: Boolean,
-    onSave: () -> Unit,
-    onUnsave: () -> Unit,
+    isVisited: Boolean,
+    visitState: VisitState?,
+    onVisit: () -> Unit,
+    onUnvisit: () -> Unit,
     onDirectionsClick: (Double, Double, String) -> Unit,
     onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
@@ -524,19 +535,28 @@ private fun PoiDetailHeader(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                AssistChip(
-                    onClick = { if (isSaved) onUnsave() else onSave() },
-                    label = { Text(if (isSaved) stringResource(Res.string.poi_card_saved) else stringResource(Res.string.poi_card_save)) },
-                    leadingIcon = {
-                        Icon(
-                            if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                        )
-                    },
-                    colors = chipColors,
-                    border = chipBorder,
-                )
+                if (isVisited && visitState != null) {
+                    val (visitLabel, visitColor) = when (visitState) {
+                        VisitState.GO_NOW -> "✓ Go Now" to Color(0xFF4CAF50)
+                        VisitState.PLAN_SOON -> "✓ Plan Soon" to Color(0xFFFF9800)
+                        VisitState.WANT_TO_GO -> "✓ Want to Visit" to Color(0xFF9E9E9E)
+                    }
+                    AssistChip(
+                        onClick = onUnvisit,
+                        label = { Text(visitLabel) },
+                        colors = AssistChipDefaults.assistChipColors(
+                            labelColor = visitColor,
+                        ),
+                        border = BorderStroke(1.dp, visitColor.copy(alpha = 0.5f)),
+                    )
+                } else {
+                    AssistChip(
+                        onClick = onVisit,
+                        label = { Text("Visit") },
+                        colors = chipColors,
+                        border = chipBorder,
+                    )
+                }
                 if (poi.latitude != null && poi.longitude != null) {
                     AssistChip(
                         onClick = { onDirectionsClick(poi.latitude!!, poi.longitude!!, poi.name) },

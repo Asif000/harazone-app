@@ -67,9 +67,9 @@ actual fun MapComposable(
     onPoiSelected: (POI?) -> Unit,
     onMapRenderFailed: () -> Unit,
     onCameraIdle: (lat: Double, lng: Double) -> Unit,
-    savedPoiIds: Set<String>,
-    savedPois: List<SavedPoi>,
-    savedVibeFilter: Boolean,
+    visitedPoiIds: Set<String>,
+    visitedPois: List<SavedPoi>,
+    visitedFilter: Boolean,
     onPinTapped: (Int) -> Unit,
     selectedPinIndex: Int?,
 ) {
@@ -158,7 +158,7 @@ actual fun MapComposable(
     }
 
     // POI markers + text labels + glow zones
-    LaunchedEffect(pois, activeVibe, savedPoiIds, savedPois, savedVibeFilter, styleLoaded.value) {
+    LaunchedEffect(pois, activeVibe, visitedPoiIds, visitedPois, visitedFilter, styleLoaded.value) {
         if (!styleLoaded.value) return@LaunchedEffect
         val style = mapView.style ?: return@LaunchedEffect
 
@@ -181,7 +181,7 @@ actual fun MapComposable(
         }.filter { it.latitude != null && it.longitude != null }
 
         delegate.activeVibe = activeVibe
-        delegate.savedPoiIds = savedPoiIds
+        delegate.visitedPoiIds = visitedPoiIds
         delegate.selectedPinIndex = selectedPinIndex
         delegate.currentPois = pois
 
@@ -238,9 +238,9 @@ actual fun MapComposable(
         // Reset saved filter zoom flag when regular POIs are back
         if (pois.isNotEmpty()) savedFilterFitted[0] = false
 
-        // Force camera re-fit when savedVibeFilter transitions true -> false
-        val forceRefit = wasSavedVibeFilter[0] && !savedVibeFilter && filteredPois.isNotEmpty()
-        wasSavedVibeFilter[0] = savedVibeFilter
+        // Force camera re-fit when visitedFilter transitions true -> false
+        val forceRefit = wasSavedVibeFilter[0] && !visitedFilter && filteredPois.isNotEmpty()
+        wasSavedVibeFilter[0] = visitedFilter
         if (forceRefit) lastFittedPois.value = emptyList()
 
         // Fit camera to show all pins (only when the POI list itself changes)
@@ -252,9 +252,9 @@ actual fun MapComposable(
         }
 
         // Fit camera to saved POIs when saved filter is first activated
-        if (savedVibeFilter && pois.isEmpty() && savedPois.isNotEmpty() && !savedFilterFitted[0]) {
+        if (visitedFilter && pois.isEmpty() && visitedPois.isNotEmpty() && !savedFilterFitted[0]) {
             savedFilterFitted[0] = true
-            val validSaved = savedPois.filter { it.lat != 0.0 && it.lng != 0.0 }
+            val validSaved = visitedPois.filter { it.lat != 0.0 && it.lng != 0.0 }
             if (validSaved.isNotEmpty()) {
                 suppressCameraIdle[0] = true
                 val savedAnnotations = validSaved.map { sp ->
@@ -437,7 +437,7 @@ private class MapDelegate(
 ) : NSObject(), MLNMapViewDelegateProtocol {
 
     var activeVibe: Vibe? = null
-    var savedPoiIds: Set<String> = emptySet()
+    var visitedPoiIds: Set<String> = emptySet()
     var selectedPinIndex: Int? = null
     var currentPois: List<POI> = emptyList()
 
@@ -474,7 +474,7 @@ private class MapDelegate(
         val resolved = resolveStatus(poi.liveStatus, poi.hours)
         val status = liveStatusToColor(resolved)
         val closed = isClosed(resolved)
-        val isSaved = poi.savedId in savedPoiIds
+        val isSaved = poi.savedId in visitedPoiIds
         val poiIndex = currentPois.indexOfFirst { it.savedId == poi.savedId }
         val isSelected = poiIndex >= 0 && poiIndex == selectedPinIndex
 
