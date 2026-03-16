@@ -307,29 +307,6 @@ private fun ReadyContent(
         }
 
 
-        // Profile icon button (top-right)
-        if (state.selectedPoi == null && !showProfile) {
-            Surface(
-                onClick = { showProfile = true },
-                shape = RoundedCornerShape(50),
-                color = Color(0xFF1A1A2A).copy(alpha = 0.92f),
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = statusBarPadding + 8.dp, end = 12.dp)
-                    .size(48.dp)
-                    .zIndex(2f),
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = Icons.Default.Person,
-                        contentDescription = stringResource(Res.string.profile_open),
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp),
-                    )
-                }
-            }
-        }
-
         // Top context bar
         if (!showProfile) {
         TopContextBar(
@@ -420,6 +397,7 @@ private fun ReadyContent(
                 pinnedVibeLabels = viewModel.pinnedVibeLabels,
                 onVibeSelected = { viewModel.switchDynamicVibe(it) },
                 onSavedVibeSelected = viewModel::onVisitedFilterSelected,
+                onProfileSelected = { showProfile = true },
                 onLongPressVibe = { viewModel.togglePin(it) },
                 onExploreRetry = { viewModel.retryAreaFetch() },
                 showCalloutDot = state.showOnboardingBubble,

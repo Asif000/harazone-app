@@ -79,12 +79,12 @@ import com.harazone.ui.components.PlatformBackHandler
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
 
-private val BgColor = Color(0xFF111111)
-private val TextPrimary = Color.White
-private val TextSecondary = Color(0xFFB0B0B0)
-private val TealAccent = Color(0xFF4ECDC4)
-private val PurpleAccent = Color(0xFFA78BFA)
-private val ErrorBg = Color(0xFF3D1F1F)
+private val BgColor = Color(0xFFF5F2EE)
+private val TextPrimary = Color(0xFF2A2A2A)
+private val TextSecondary = Color(0xFF6B6B6B)
+private val TealAccent = Color(0xFF2E7D32)
+private val PurpleAccent = Color(0xFF7C4DFF)
+private val ErrorBg = Color(0xFFFFEBEE)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -258,7 +258,7 @@ fun ProfileScreen(
                                     onClick = { viewModel.tapSuggestionPill(pill) },
                                     enabled = !state.isStreaming,
                                     shape = RoundedCornerShape(16.dp),
-                                    color = Color(0xFF2A2A3A),
+                                    color = Color(0xFFE8E5E1),
                                     modifier = Modifier
                                         .defaultMinSize(48.dp, 48.dp)
                                         .alpha(if (state.isStreaming) 0.5f else 1f),
@@ -287,14 +287,14 @@ fun ProfileScreen(
             ) {
                 Surface(
                     onClick = { viewModel.retryConnection() },
-                    color = Color(0xFF3D1F1F),
+                    color = Color(0xFFFFEBEE),
                     modifier = Modifier
                         .fillMaxWidth()
                         .semantics { liveRegion = LiveRegionMode.Assertive },
                 ) {
                     Text(
                         text = stringResource(Res.string.profile_offline) + " · " + stringResource(Res.string.profile_offline_retry),
-                        color = Color(0xFFFF6B6B),
+                        color = Color(0xFFD32F2F),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                         textAlign = TextAlign.Center,
@@ -307,7 +307,7 @@ fun ProfileScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFF1A1A2A))
+                        .background(Color(0xFFE0DDD9))
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                         .padding(bottom = navBarPadding),
                     verticalAlignment = Alignment.CenterVertically,
@@ -376,7 +376,7 @@ private fun ShimmerIdentityStrip() {
             Modifier
                 .size(64.dp)
                 .clip(CircleShape)
-                .background(Color(0xFF2A2A3A)),
+                .background(Color(0xFFE8E5E1)),
         )
         Spacer(Modifier.height(12.dp))
         // Name placeholder
@@ -385,7 +385,7 @@ private fun ShimmerIdentityStrip() {
                 .width(120.dp)
                 .height(20.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFF2A2A3A)),
+                .background(Color(0xFFE8E5E1)),
         )
         Spacer(Modifier.height(8.dp))
         // Tagline placeholder
@@ -394,7 +394,7 @@ private fun ShimmerIdentityStrip() {
                 .width(180.dp)
                 .height(16.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFF2A2A3A)),
+                .background(Color(0xFFE8E5E1)),
         )
     }
 }
@@ -466,19 +466,19 @@ private fun IdentityStrip(
             Spacer(Modifier.height(8.dp))
             Text(
                 text = stringResource(Res.string.profile_error),
-                color = Color(0xFFFF6B6B),
+                color = Color(0xFFD32F2F),
                 style = MaterialTheme.typography.labelSmall,
             )
             Spacer(Modifier.height(4.dp))
             Surface(
                 onClick = onRetryIdentity,
                 shape = RoundedCornerShape(12.dp),
-                color = Color(0xFFFF6B6B).copy(alpha = 0.15f),
+                color = Color(0xFFD32F2F).copy(alpha = 0.15f),
                 modifier = Modifier.defaultMinSize(48.dp, 48.dp),
             ) {
                 Text(
                     text = stringResource(Res.string.profile_chat_retry),
-                    color = Color(0xFFFF6B6B),
+                    color = Color(0xFFD32F2F),
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 )
@@ -535,7 +535,7 @@ private fun GeoFootprintRow(geoFootprint: List<GeoEntry>) {
                 .replace("%2\$d", entry.poiCount.toString())
             Surface(
                 shape = RoundedCornerShape(16.dp),
-                color = Color(0xFF2A2A3A),
+                color = Color(0xFFE8E5E1),
                 modifier = Modifier
                     .defaultMinSize(48.dp, 48.dp)
                     .then(
@@ -577,7 +577,7 @@ private fun VibeCapsules(
                 Surface(
                     onClick = { onToggle(group.vibeName) },
                     shape = RoundedCornerShape(16.dp),
-                    color = if (isExpanded) PurpleAccent.copy(alpha = 0.2f) else Color(0xFF2A2A3A),
+                    color = if (isExpanded) PurpleAccent.copy(alpha = 0.2f) else Color(0xFFE8E5E1),
                     modifier = Modifier
                         .defaultMinSize(48.dp, 48.dp)
                         .then(
@@ -606,7 +606,7 @@ private fun VibeCapsules(
                     Modifier
                         .fillMaxWidth()
                         .padding(top = 8.dp)
-                        .background(Color(0xFF1A1A2A), RoundedCornerShape(12.dp))
+                        .background(Color(0xFFE0DDD9), RoundedCornerShape(12.dp))
                         .border(1.dp, PurpleAccent.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
                         .padding(12.dp)
                         .semantics { liveRegion = LiveRegionMode.Polite },
@@ -710,13 +710,13 @@ private fun ChatBubbleItem(
                     Icon(
                         Icons.Outlined.ErrorOutline,
                         contentDescription = null,
-                        tint = Color(0xFFFF6B6B),
+                        tint = Color(0xFFD32F2F),
                         modifier = Modifier.size(16.dp),
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
                         text = bubble.text,
-                        color = Color(0xFFFF6B6B),
+                        color = Color(0xFFD32F2F),
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.weight(1f),
                     )
@@ -725,14 +725,14 @@ private fun ChatBubbleItem(
                 Surface(
                     onClick = onRetry,
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFFFF6B6B).copy(alpha = 0.2f),
+                    color = Color(0xFFD32F2F).copy(alpha = 0.2f),
                     modifier = Modifier
                         .defaultMinSize(48.dp, 48.dp)
                         .semantics { contentDescription = retryDesc },
                 ) {
                     Text(
                         text = stringResource(Res.string.profile_chat_retry),
-                        color = Color(0xFFFF6B6B),
+                        color = Color(0xFFD32F2F),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                     )
