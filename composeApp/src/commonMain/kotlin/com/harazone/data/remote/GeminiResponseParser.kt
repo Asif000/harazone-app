@@ -130,6 +130,30 @@ internal data class PoiContextJson(
     val localTip: String = "",
 )
 
+@Serializable
+internal data class ProfileIdentityResponseJson(
+    val explorerName: String = "",
+    val tagline: String = "",
+    val avatarEmoji: String = "",
+    val totalVisits: Int = 0,
+    val totalAreas: Int = 0,
+    val totalVibes: Int = 0,
+    val geoFootprint: List<GeoFootprintJson> = emptyList(),
+    val vibeInsights: List<VibeInsightResponseJson> = emptyList(),
+)
+
+@Serializable
+internal data class GeoFootprintJson(
+    val areaName: String = "",
+    val countryCode: String = "",
+)
+
+@Serializable
+internal data class VibeInsightResponseJson(
+    val vibeName: String = "",
+    val insight: String = "",
+)
+
 internal class GeminiResponseParser {
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -390,6 +414,34 @@ internal class GeminiResponseParser {
             Triple(ctx.contextBlurb, ctx.whyNow, ctx.localTip)
         } catch (e: Exception) {
             AppLogger.e(e) { "GeminiResponseParser: failed to parse poi context response" }
+            null
+        }
+    }
+
+    fun parseProfileIdentityResponse(text: String, languageTag: String = "en"): com.harazone.domain.model.ProfileIdentity? {
+        return try {
+            val cleaned = stripMarkdownFences(text)
+            val parsed = json.decodeFromString<ProfileIdentityResponseJson>(cleaned)
+            if (parsed.explorerName.isBlank()) return null
+            if (!languageTag.startsWith("en")) {
+                AppLogger.w { "GeminiResponseParser: profile identity for non-English locale '$languageTag' — verify language quality" }
+            }
+            com.harazone.domain.model.ProfileIdentity(
+                explorerName = parsed.explorerName,
+                tagline = parsed.tagline,
+                avatarEmoji = parsed.avatarEmoji,
+                totalVisits = parsed.totalVisits,
+                totalAreas = parsed.totalAreas,
+                totalVibes = parsed.totalVibes,
+                geoFootprint = parsed.geoFootprint
+                    .filter { it.areaName.isNotBlank() }
+                    .map { com.harazone.domain.model.GeoArea(areaName = it.areaName, countryCode = it.countryCode) },
+                vibeInsights = parsed.vibeInsights
+                    .filter { it.vibeName.isNotBlank() }
+                    .map { com.harazone.domain.model.VibeInsight(vibeName = it.vibeName, insight = it.insight) },
+            )
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: failed to parse profile identity response: ${text.take(100)}" }
             null
         }
     }

@@ -139,6 +139,35 @@
     <string name="time_am">AM</string>
     <string name="time_pm">PM</string>
 
+    <!-- Profile -->
+    <string name="profile_title">Perfil</string>
+    <string name="profile_visits">visitas</string>
+    <string name="profile_areas">áreas</string>
+    <string name="profile_vibes">vibes</string>
+    <string name="profile_loading">Carregando seu perfil…</string>
+    <string name="profile_chat_placeholder">Pergunte sobre seus padrões…</string>
+    <!-- args: explorerName, totalVisits, totalAreas, totalVibes -->
+    <string name="profile_chat_greeting">Olá %1$s! Com %2$d salvos em %3$d áreas, você construiu um belo perfil de explorador. O que gostaria de saber sobre seus padrões?</string>
+    <string name="profile_chat_greeting_fallback">Olá! Sou seu espelho de IA. Pergunte qualquer coisa sobre seus padrões de exploração.</string>
+    <string name="profile_pill_blindspot">Qual é meu ponto cego?</string>
+    <string name="profile_pill_try_next">O que devo experimentar?</string>
+    <string name="profile_pill_why_name">Por que esse nome?</string>
+    <string name="profile_empty_state">Comece a salvar lugares para construir seu perfil de explorador! Quanto mais você explora, mais aprendo sobre você.</string>
+    <string name="profile_error">Não foi possível gerar seu perfil. Mostrando estatísticas básicas.</string>
+    <string name="profile_offline">Você está offline</string>
+    <string name="profile_offline_retry">Toque para tentar novamente</string>
+    <string name="profile_refresh_available">Perfil atualizado — toque para atualizar</string>
+    <string name="profile_chat_error">Algo deu errado</string>
+    <string name="profile_chat_retry">Tentar novamente</string>
+    <string name="profile_open">Abrir perfil</string>
+    <string name="profile_close">Fechar perfil</string>
+    <string name="profile_send">Enviar mensagem</string>
+    <string name="profile_geo_pill_cd">%1$s, %2$d lugares</string>
+    <string name="profile_geo_pill_home_cd">%1$s, %2$d lugares, área principal</string>
+    <string name="profile_bubble_user_role">Sua mensagem</string>
+    <string name="profile_bubble_ai_role">Resposta da IA</string>
+    <string name="profile_bubble_error_role">Erro</string>
+
     <!-- Accessibility -->
     <string name="action_close">Fechar</string>
 </resources>

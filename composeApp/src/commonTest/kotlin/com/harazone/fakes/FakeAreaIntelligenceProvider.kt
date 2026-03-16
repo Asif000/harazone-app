@@ -7,6 +7,12 @@ import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.EngagementLevel
+import com.harazone.domain.model.GeoArea
+import com.harazone.domain.model.ProfileIdentity
+import com.harazone.domain.model.SavedPoi
+import com.harazone.domain.model.TasteProfile
+import com.harazone.domain.model.VibeInsight
 import com.harazone.domain.provider.AreaIntelligenceProvider
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -68,6 +74,49 @@ class FakeAreaIntelligenceProvider : AreaIntelligenceProvider {
         return flow {
             if (shouldThrowChat) throw RuntimeException("Chat test error")
             chatTokens.forEach { emit(it) }
+        }
+    }
+    var profileIdentityResult: ProfileIdentity? = ProfileIdentity(
+        explorerName = "Test Explorer",
+        tagline = "Testing the unknown",
+        avatarEmoji = "🧪",
+        totalVisits = 5,
+        totalAreas = 2,
+        totalVibes = 3,
+        geoFootprint = listOf(GeoArea("TestArea", "XX")),
+        vibeInsights = listOf(VibeInsight("culture", "Test insight")),
+    )
+    var shouldReturnNullProfileIdentity: Boolean = false
+    var profileIdentityCallCount = 0
+
+    override suspend fun generateProfileIdentity(
+        savedPois: List<SavedPoi>,
+        tasteProfile: TasteProfile,
+        engagementLevel: EngagementLevel,
+        languageTag: String,
+    ): ProfileIdentity? {
+        profileIdentityCallCount++
+        return if (shouldReturnNullProfileIdentity) null else profileIdentityResult
+    }
+
+    var profileChatTokens: List<ChatToken> = listOf(
+        ChatToken(text = "Fake profile chat response", isComplete = false),
+        ChatToken(text = "", isComplete = true),
+    )
+    var shouldThrowProfileChat: Boolean = false
+    var profileChatCallCount = 0
+
+    override fun streamProfileChat(
+        query: String,
+        savedPois: List<SavedPoi>,
+        tasteProfile: TasteProfile,
+        conversationHistory: List<ChatMessage>,
+        languageTag: String,
+    ): Flow<ChatToken> {
+        profileChatCallCount++
+        return flow {
+            if (shouldThrowProfileChat) throw RuntimeException("Profile chat test error")
+            profileChatTokens.forEach { emit(it) }
         }
     }
 }

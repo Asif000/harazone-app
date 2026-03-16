@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS profile_identity_cache (
+    id             INTEGER NOT NULL PRIMARY KEY DEFAULT 1,
+    identity_json  TEXT NOT NULL,
+    input_hash     TEXT NOT NULL,
+    created_at     INTEGER NOT NULL
+);

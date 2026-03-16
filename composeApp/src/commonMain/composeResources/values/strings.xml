@@ -139,6 +139,35 @@
     <string name="time_am">AM</string>
     <string name="time_pm">PM</string>
 
+    <!-- Profile -->
+    <string name="profile_title">Profile</string>
+    <string name="profile_visits">visits</string>
+    <string name="profile_areas">areas</string>
+    <string name="profile_vibes">vibes</string>
+    <string name="profile_loading">Loading your profile…</string>
+    <string name="profile_chat_placeholder">Ask about your patterns…</string>
+    <!-- args: explorerName, totalVisits, totalAreas, totalVibes -->
+    <string name="profile_chat_greeting">Hey %1$s! With %2$d saves across %3$d areas, you've built quite the explorer profile. What would you like to know about your patterns?</string>
+    <string name="profile_chat_greeting_fallback">Hey there! I'm your AI mirror. Ask me anything about your exploration patterns.</string>
+    <string name="profile_pill_blindspot">What's my blind spot?</string>
+    <string name="profile_pill_try_next">What should I try next?</string>
+    <string name="profile_pill_why_name">Why that explorer name?</string>
+    <string name="profile_empty_state">Start saving places to build your explorer profile! The more you explore, the more I'll learn about you.</string>
+    <string name="profile_error">Couldn't generate your profile. Showing basic stats.</string>
+    <string name="profile_offline">You\'re offline</string>
+    <string name="profile_offline_retry">Tap to retry</string>
+    <string name="profile_refresh_available">Profile updated — tap to refresh</string>
+    <string name="profile_chat_error">Something went wrong</string>
+    <string name="profile_chat_retry">Retry</string>
+    <string name="profile_open">Open profile</string>
+    <string name="profile_close">Close profile</string>
+    <string name="profile_send">Send message</string>
+    <string name="profile_geo_pill_cd">%1$s, %2$d places</string>
+    <string name="profile_geo_pill_home_cd">%1$s, %2$d places, home area</string>
+    <string name="profile_bubble_user_role">Your message</string>
+    <string name="profile_bubble_ai_role">AI response</string>
+    <string name="profile_bubble_error_role">Error</string>
+
     <!-- Accessibility -->
     <string name="action_close">Close</string>
 </resources>

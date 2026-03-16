@@ -315,4 +315,83 @@ Rules:
 Example: {"prose":"Check out **Brick Lane** for incredible street art — it changes weekly.\nWhat mood are you in — edgy underground spots or the well-known walls?","pois":[{"n":"Brick Lane","t":"arts","lat":51.5215,"lng":-0.0714,"w":"London's densest open-air gallery, curated by the street itself","insight":"Every Sunday morning the whole street transforms — murals painted overnight, artists you'll never find on Google","rating":4.7,"priceRange":"$","status":"open","hours":"Open 24/7"}]}"""
 
     private fun framingBlock(framingHint: String?): String = framingHint ?: ""
+
+    fun buildProfileIdentityPrompt(
+        savedPois: List<SavedPoi>,
+        tasteProfile: TasteProfile,
+        engagementLevel: EngagementLevel,
+        languageTag: String = "en",
+    ): String {
+        val truncated = savedPois
+            .sortedWith(compareByDescending<SavedPoi> { 0 }.thenByDescending { it.savedAt })
+            .take(50)
+        val grouped = truncated.groupBy { it.areaName }
+        val areaSection = grouped.entries.joinToString("\n") { (area, pois) ->
+            val poiList = pois.joinToString("\n") { "  - ${it.name} (${it.type}, vibe: ${it.vibe})" }
+            "Area: $area (${pois.size} POIs)\n$poiList"
+        }
+        val vibeSection = truncated.groupBy { it.vibe }.filter { it.key.isNotBlank() }
+            .entries.sortedByDescending { it.value.size }
+            .joinToString(", ") { "${it.key} (${it.value.size})" }
+
+        return """You are an AI identity generator for an explorer's profile page.
+
+Analyze this user's saved places and generate their explorer identity.
+
+SAVED PLACES (${truncated.size} total):
+$areaSection
+
+VIBE DISTRIBUTION: $vibeSection
+
+TASTE PROFILE:
+- Strong affinities: ${tasteProfile.strongAffinities.joinToString(", ")}
+- Emerging interests: ${tasteProfile.emergingInterests.joinToString(", ")}
+- Notable absences: ${tasteProfile.notableAbsences.joinToString(", ")}
+${if (tasteProfile.diningStyle != null) "- Dining style: ${tasteProfile.diningStyle}" else ""}
+- Total saves: ${tasteProfile.totalSaves}
+
+ENGAGEMENT LEVEL: ${engagementLevel.name}
+
+Return ONLY a JSON object — no markdown, no other text.
+Schema: {"explorerName":"A creative 2-3 word explorer name","tagline":"A short witty tagline about their exploration style","avatarEmoji":"Single emoji that represents their explorer personality","totalVisits":0,"totalAreas":${grouped.size},"totalVibes":${truncated.map { it.vibe }.distinct().filter { it.isNotBlank() }.size},"geoFootprint":[{"areaName":"Exact area name","countryCode":"XX"}],"vibeInsights":[{"vibeName":"vibe name","insight":"2-3 sentence insight about their relationship with this vibe"}]}
+
+Rules:
+- explorerName: Creative, fun, 2-3 words. Based on their actual patterns.
+- tagline: Witty, under 60 chars. Reflects their unique style.
+- avatarEmoji: Single emoji. Match their dominant exploration type.
+- totalVisits: Set to ${truncated.size} (total saved places).
+- geoFootprint: Return areaName EXACTLY as provided in input (verbatim, no normalization). countryCode is ISO 3166-1 alpha-2.
+- vibeInsights: One per distinct vibe in their saves. Insight should reference specific places they saved.
+${if (!languageTag.startsWith("en")) "- LANGUAGE RULE: All text fields (explorerName, tagline, vibeInsights) MUST be in the language identified by locale '$languageTag'." else ""}"""
+    }
+
+    fun buildProfileChatSystemPrompt(
+        savedPois: List<SavedPoi>,
+        tasteProfile: TasteProfile,
+        languageTag: String = "en",
+    ): String {
+        val truncated = savedPois
+            .sortedWith(compareByDescending<SavedPoi> { 0 }.thenByDescending { it.savedAt })
+            .take(50)
+        val grouped = truncated.groupBy { it.areaName }
+        val areaSection = grouped.entries.joinToString("\n") { (area, pois) ->
+            val poiList = pois.joinToString(", ") { it.name }
+            "$area: $poiList"
+        }
+
+        return """You are the user's AI mirror — you know their exploration patterns intimately.
+
+SAVED PLACES (${truncated.size}):
+$areaSection
+
+TASTE PROFILE:
+- Strong affinities: ${tasteProfile.strongAffinities.joinToString(", ")}
+- Emerging interests: ${tasteProfile.emergingInterests.joinToString(", ")}
+- Notable absences: ${tasteProfile.notableAbsences.joinToString(", ")}
+${if (tasteProfile.diningStyle != null) "- Dining style: ${tasteProfile.diningStyle}" else ""}
+
+Tone: Insightful, warm, occasionally surprising. You reflect back patterns they might not see themselves.
+Keep responses concise — 2-4 sentences. Be conversational, not clinical.
+${if (!languageTag.startsWith("en")) "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '$languageTag'. Every word of your response must be in that language." else ""}"""
+    }
 }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -71,6 +72,8 @@ import com.harazone.ui.map.components.AISearchBar
 import com.harazone.ui.map.components.OnboardingBubble
 import com.harazone.ui.map.components.AiDetailPage
 import com.harazone.ui.map.components.GeocodingSearchBar
+import com.harazone.ui.profile.ProfileScreen
+import com.harazone.ui.profile.ProfileViewModel
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.ui.map.components.FabMenu
 import com.harazone.ui.map.components.MapListToggle
@@ -150,6 +153,10 @@ private fun ReadyContent(
     val noMapsAppMessage = stringResource(Res.string.map_no_maps_app)
     val returnToSaves = remember { booleanArrayOf(false) }
     val returnToChat = remember { booleanArrayOf(false) }
+    val returnToProfile = remember { booleanArrayOf(false) }
+
+    // Profile state
+    var showProfile by remember { mutableStateOf(false) }
 
     // Feedback / settings state
     val feedbackReporter: FeedbackReporter = koinInject()
@@ -165,6 +172,7 @@ private fun ReadyContent(
         if (chatState.isOpen) chatViewModel.closeChat()
         if (state.showSavesSheet) viewModel.closeSavesSheet()
         if (state.selectedPoi != null) viewModel.clearPoiSelection()
+        showProfile = false
         showSettings = false
         showFeedbackPreview = false
     }
@@ -299,7 +307,31 @@ private fun ReadyContent(
         }
 
 
+        // Profile icon button (top-right)
+        if (state.selectedPoi == null && !showProfile) {
+            Surface(
+                onClick = { showProfile = true },
+                shape = RoundedCornerShape(50),
+                color = Color(0xFF1A1A2A).copy(alpha = 0.92f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = statusBarPadding + 8.dp, end = 12.dp)
+                    .size(48.dp)
+                    .zIndex(2f),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.Person,
+                        contentDescription = stringResource(Res.string.profile_open),
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+            }
+        }
+
         // Top context bar
+        if (!showProfile) {
         TopContextBar(
             areaName = state.areaName,
             visitTag = state.visitTag,
@@ -308,10 +340,11 @@ private fun ReadyContent(
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 8.dp),
         )
+        }
 
         // Geocoding search bar (always visible, replaces Refresh Area button)
         // statusBarPadding + 56dp = status bar + TopContextBar height + top inset padding
-        GeocodingSearchBar(
+        if (!showProfile) GeocodingSearchBar(
             query = state.geocodingQuery,
             suggestions = state.geocodingSuggestions,
             isGeocodingLoading = state.isGeocodingLoading,
@@ -340,7 +373,7 @@ private fun ReadyContent(
         )
 
         // Ambient ticker — rotating area intel below search bar
-        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null) {
+        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null && !showProfile) {
             AmbientTicker(
                 pois = state.pois,
                 latitude = state.latitude,
@@ -355,7 +388,7 @@ private fun ReadyContent(
         }
 
         // Bottom carousel — snap-scroll POI cards
-        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null) {
+        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null && !showProfile) {
             PoiCarousel(
                 pois = state.pois,
                 selectedIndex = state.selectedPinIndex,
@@ -374,7 +407,7 @@ private fun ReadyContent(
         }
 
         // Vibe rail (right side, bottom-aligned above FAB) — map mode only
-        if (!state.showListView && state.selectedPoi == null) {
+        if (!state.showListView && state.selectedPoi == null && !showProfile) {
             VibeRail(
                 vibes = state.dynamicVibes,
                 activeDynamicVibe = state.activeDynamicVibe,
@@ -415,7 +448,11 @@ private fun ReadyContent(
         if (state.selectedPoi != null) {
             val dismissDetail: () -> Unit = {
                 viewModel.clearPoiSelection()
-                if (returnToSaves[0]) {
+                if (returnToProfile[0]) {
+                    returnToProfile[0] = false
+                    chatViewModel.closeChat()
+                    showProfile = true
+                } else if (returnToSaves[0]) {
                     returnToSaves[0] = false
                     viewModel.openSavesSheet()
                 } else if (!returnToChat[0]) {
@@ -480,7 +517,7 @@ private fun ReadyContent(
         val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.savedPoiIds }
         val carouselVisible = state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null
         AnimatedVisibility(
-            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded && !carouselVisible && state.selectedPoi == null,
+            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded && !carouselVisible && state.selectedPoi == null && !showProfile,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -493,12 +530,12 @@ private fun ReadyContent(
 
         // FAB scrim
         FabScrim(
-            visible = state.isFabExpanded,
+            visible = state.isFabExpanded && !showProfile,
             onClick = { viewModel.toggleFab() },
         )
 
         // FAB menu
-        FabMenu(
+        if (!showProfile) FabMenu(
             isExpanded = state.isFabExpanded,
             onToggle = { viewModel.toggleFab() },
             onSavedPlaces = {
@@ -520,7 +557,7 @@ private fun ReadyContent(
 
         // MyLocation button (Position C — left side, above AI bar)
         AnimatedVisibility(
-            visible = state.showMyLocation && !state.isSearchingArea && !chatState.isOpen && state.selectedPoi == null,
+            visible = state.showMyLocation && !state.isSearchingArea && !chatState.isOpen && state.selectedPoi == null && !showProfile,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -545,7 +582,7 @@ private fun ReadyContent(
         }
 
         // Map/List toggle
-        if (state.selectedPoi == null) {
+        if (state.selectedPoi == null && !showProfile) {
             MapListToggle(
                 showListView = state.showListView,
                 onToggle = { viewModel.toggleListView() },
@@ -556,7 +593,7 @@ private fun ReadyContent(
         }
 
         // AI search bar — tapping opens the ChatOverlay directly
-        if (state.selectedPoi == null) {
+        if (state.selectedPoi == null && !showProfile) {
             AISearchBar(
                 onTap = { chatViewModel.openChat(state.areaName, state.allDiscoveredPois, state.activeDynamicVibe) },
                 chatIsOpen = chatState.isOpen,
@@ -688,6 +725,22 @@ private fun ReadyContent(
                 },
             )
         }
+
+        // Profile full-screen overlay
+        if (showProfile) {
+            val profileViewModel: ProfileViewModel = koinViewModel()
+            ProfileScreen(
+                viewModel = profileViewModel,
+                onDismiss = { showProfile = false },
+                onOpenDetail = { savedPoi, _ ->
+                    showProfile = false
+                    returnToProfile[0] = true
+                    viewModel.selectPoi(profileViewModel.getPoiForDetail(savedPoi))
+                },
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        PlatformBackHandler(enabled = showProfile) { showProfile = false }
 
         // Onboarding bubble — first launch only
         OnboardingBubble(

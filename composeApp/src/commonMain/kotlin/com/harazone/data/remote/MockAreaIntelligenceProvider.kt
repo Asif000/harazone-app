@@ -7,7 +7,13 @@ import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.EngagementLevel
+import com.harazone.domain.model.GeoArea
+import com.harazone.domain.model.ProfileIdentity
+import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Source
+import com.harazone.domain.model.TasteProfile
+import com.harazone.domain.model.VibeInsight
 import com.harazone.domain.provider.AreaIntelligenceProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -54,6 +60,33 @@ class MockAreaIntelligenceProvider : AreaIntelligenceProvider {
         "Great time to visit.",
         "",
     )
+
+    override suspend fun generateProfileIdentity(
+        savedPois: List<SavedPoi>,
+        tasteProfile: TasteProfile,
+        engagementLevel: EngagementLevel,
+        languageTag: String,
+    ): ProfileIdentity = ProfileIdentity(
+        explorerName = "Urban Wanderer",
+        tagline = "Finds magic in the mundane",
+        avatarEmoji = "🧭",
+        totalVisits = savedPois.size,
+        totalAreas = savedPois.map { it.areaName }.distinct().size,
+        totalVibes = savedPois.map { it.vibe }.distinct().filter { it.isNotBlank() }.size,
+        geoFootprint = savedPois.groupBy { it.areaName }.keys.map { GeoArea(areaName = it, countryCode = "XX") },
+        vibeInsights = listOf(VibeInsight(vibeName = "culture", insight = "You're drawn to places with stories.")),
+    )
+
+    override fun streamProfileChat(
+        query: String,
+        savedPois: List<SavedPoi>,
+        tasteProfile: TasteProfile,
+        conversationHistory: List<ChatMessage>,
+        languageTag: String,
+    ): Flow<ChatToken> = flow {
+        emit(ChatToken(text = "Mock profile chat response for: $query", isComplete = false))
+        emit(ChatToken(text = "", isComplete = true))
+    }
 
     companion object {
         val mockPOIs = listOf(
