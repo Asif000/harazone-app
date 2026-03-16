@@ -17,7 +17,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.Create
@@ -276,9 +276,9 @@ fun SavedPoiCard(
                 Row(horizontalArrangement = Arrangement.spacedBy((-4).dp)) {
                     IconButton(onClick = onUnsave, modifier = Modifier.size(32.dp)) {
                         Icon(
-                            Icons.Default.Bookmark,
-                            contentDescription = "Unsave",
-                            tint = Color(0xFFFFD700),
+                            Icons.Filled.CheckCircle,
+                            contentDescription = "Unvisit",
+                            tint = Color(0xFF4CAF50),
                             modifier = Modifier.size(18.dp),
                         )
                     }

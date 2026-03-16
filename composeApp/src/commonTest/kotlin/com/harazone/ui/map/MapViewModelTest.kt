@@ -1540,6 +1540,60 @@ class MapViewModelTest {
         assertEquals("https://example.com/img.jpg", s.imageUrl)
     }
 
+    @Test
+    fun `visitPoi routes GO_NOW when resolveStatus returns open`() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+
+        val poi = POI("Open Cafe", "cafe", "A cafe", Confidence.HIGH, 40.0, -74.0,
+            liveStatus = "open")
+        val visitState = viewModel.visitPoi(poi, "Test Area")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(com.harazone.domain.model.VisitState.GO_NOW, visitState)
+    }
+
+    @Test
+    fun `visitPoi routes PLAN_SOON when resolveStatus returns closed`() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+
+        val poi = POI("Closed Bar", "bar", "A bar", Confidence.HIGH, 40.0, -74.0,
+            liveStatus = "closed")
+        val visitState = viewModel.visitPoi(poi, "Test Area")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(com.harazone.domain.model.VisitState.PLAN_SOON, visitState)
+    }
+
+    @Test
+    fun `visitPoi routes WANT_TO_GO when liveStatus and hours are null`() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+
+        val poi = POI("Mystery Spot", "attraction", "Unknown hours", Confidence.HIGH, 40.0, -74.0)
+        val visitState = viewModel.visitPoi(poi, "Test Area")
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(com.harazone.domain.model.VisitState.WANT_TO_GO, visitState)
+    }
+
+    @Test
+    fun `unvisitPoi removes poi from visitedPoiIds and visitedPois`() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+
+        val poi = POI("Test Place", "landmark", "A landmark", Confidence.HIGH, 40.0, -74.0)
+        viewModel.visitPoi(poi, "Manhattan, New York")
+        testScheduler.advanceUntilIdle()
+
+        val stateAfterVisit = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(poi.savedId in stateAfterVisit.visitedPoiIds)
+
+        viewModel.unvisitPoi(poi)
+        testScheduler.advanceUntilIdle()
+
+        val stateAfterUnvisit = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(poi.savedId in stateAfterUnvisit.visitedPoiIds)
+        assertFalse(stateAfterUnvisit.visitedPois.any { it.id == poi.savedId })
+    }
+
     // Regression: slow location provider (e.g. iOS permission dialog delay) must not trigger LocationFailed
     @Test
     fun slowLocationProvider_doesNotShowErrorStateBeforeTimeout() {

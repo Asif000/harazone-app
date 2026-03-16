@@ -1170,4 +1170,30 @@ Enjoy!"""
         assertTrue(vm.uiState.value.isOpen)
         assertTrue(vm.uiState.value.persistentPills.isNotEmpty(), "Pills must be preserved on reopen — they are persistent")
     }
+
+    @Test
+    fun `openChatForPoiVisit with GO_NOW inserts Go Now framing hint into system context`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Visit response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        val poi = testPoi().copy(liveStatus = "open", hours = "9am-10pm")
+        vm.openChatForPoiVisit(poi, com.harazone.domain.model.VisitState.GO_NOW, "Test Area", listOf(poi), null)
+
+        assertTrue(vm.systemContextForTest.contains("Go Now response"), "System context should contain Go Now framing hint")
+    }
+
+    @Test
+    fun `openChatForPoiVisit with PLAN_SOON inserts Plan Soon framing hint into system context`() = runTest {
+        fakeAiProvider.chatTokens = listOf(
+            ChatToken("Plan response", false),
+            ChatToken("", true),
+        )
+        val vm = createViewModel()
+        val poi = testPoi().copy(liveStatus = "closed", hours = "6pm-2am")
+        vm.openChatForPoiVisit(poi, com.harazone.domain.model.VisitState.PLAN_SOON, "Test Area", listOf(poi), null)
+
+        assertTrue(vm.systemContextForTest.contains("Plan Soon response"), "System context should contain Plan Soon framing hint")
+    }
 }
