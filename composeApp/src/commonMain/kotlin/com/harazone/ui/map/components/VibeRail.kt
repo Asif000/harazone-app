@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -63,6 +64,7 @@ fun VibeRail(
     pinnedVibeLabels: List<String> = emptyList(),
     onVibeSelected: (DynamicVibe) -> Unit,
     onSavedVibeSelected: () -> Unit = {},
+    onProfileSelected: () -> Unit = {},
     onLongPressVibe: (DynamicVibe) -> Unit = {},
     onExploreRetry: () -> Unit = {},
     showCalloutDot: Boolean = false,
@@ -75,6 +77,9 @@ fun VibeRail(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = modifier,
     ) {
+        // Profile orb — above Visited orb
+        ProfileOrb(onClick = onProfileSelected)
+
         // Saved orb — pinned, not reordered
         Box {
             SavedVibeOrb(
@@ -386,5 +391,38 @@ private fun SavedVibeOrb(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun ProfileOrb(onClick: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .minimumInteractiveComponentSize()
+            .clickable(onClick = onClick),
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(40.dp)
+                .background(
+                    brush = Brush.radialGradient(listOf(Color(0xFFB39DDB), Color(0xFF7C4DFF))),
+                    shape = CircleShape,
+                ),
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                tint = Color.White,
+                modifier = Modifier.size(20.dp),
+            )
+        }
+        Text(
+            text = stringResource(Res.string.profile_title),
+            fontSize = 10.sp,
+            color = Color(0xFFB39DDB),
+            maxLines = 1,
+        )
     }
 }
