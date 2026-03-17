@@ -235,7 +235,7 @@ private fun ReadyContent(
     // Idle detection for companion — TODO(BACKLOG-MEDIUM): Move to Remote Config (#55)
     var idleTimerKey by remember { mutableLongStateOf(0L) }
     LaunchedEffect(idleTimerKey) {
-        delay(10_000L)
+        delay(MapViewModel.IDLE_THRESHOLD_MS)
         viewModel.onIdleDetected()
     }
 
@@ -554,7 +554,7 @@ private fun ReadyContent(
         val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.visitedPoiIds }
         val carouselVisible = state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null
         AnimatedVisibility(
-            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !carouselVisible && state.selectedPoi == null && !showProfile,
+            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !carouselVisible && state.selectedPoi == null && !showProfile && state.companionNudge == null,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -568,7 +568,7 @@ private fun ReadyContent(
         // Companion Orb (replaces FAB)
         if (!showProfile) {
             CompanionOrb(
-                isPulsing = state.isCompanionPulsing || state.companionNudge != null,
+                isPulsing = state.isCompanionPulsing && state.companionNudge == null,
                 onClick = { viewModel.showCompanionCard() },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)

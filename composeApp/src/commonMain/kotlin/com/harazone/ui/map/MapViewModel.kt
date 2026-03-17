@@ -356,6 +356,7 @@ class MapViewModel(
     fun onIdleDetected() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         if (current.pois.isEmpty() || current.isSearchingArea) return
+        if (current.companionNudge != null) return // H1: don't start slideshow while card is open
         val carouselVisible = !current.showListView && current.selectedPoi == null
         if (carouselVisible) {
             startAutoSlideshow()
@@ -406,8 +407,12 @@ class MapViewModel(
                     }
 
                     val poi = state.pois[index]
+                    if (poi.latitude == null || poi.longitude == null) {
+                        index++
+                        continue
+                    }
                     _uiState.value = state.copy(autoSlideshowIndex = index)
-                    flyToCoordsWithZoom(poi.latitude ?: 0.0, poi.longitude ?: 0.0, SLIDESHOW_ZOOM_LEVEL)
+                    flyToCoordsWithZoom(poi.latitude, poi.longitude, SLIDESHOW_ZOOM_LEVEL)
                     delay(SLIDESHOW_INTERVAL_MS)
                     index++
                 }
@@ -1573,6 +1578,7 @@ class MapViewModel(
         internal const val LOCATION_TIMEOUT_MS = 10_000L
         // TODO(BACKLOG-MEDIUM): Move to Remote Config (#55) for server-side tuning
         private const val MAX_NUDGE_QUEUE_SIZE = 5
+        internal const val IDLE_THRESHOLD_MS = 10_000L
         internal const val SLIDESHOW_INTERVAL_MS = 10_000L
         internal const val SLIDESHOW_ZOOM_LEVEL = 16.0
         internal const val DEFAULT_ZOOM_LEVEL = 14.0
