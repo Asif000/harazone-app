@@ -88,6 +88,12 @@ class MockAreaIntelligenceProvider : AreaIntelligenceProvider {
         emit(ChatToken(text = "", isComplete = true))
     }
 
+    override suspend fun generateCompanionNudge(
+        promptType: String,
+        context: String,
+        languageTag: String,
+    ): String? = "Mock nudge for $promptType"
+
     companion object {
         val mockPOIs = listOf(
             com.harazone.domain.model.POI(

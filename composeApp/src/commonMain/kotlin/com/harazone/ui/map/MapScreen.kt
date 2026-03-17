@@ -258,6 +258,7 @@ private fun ReadyContent(
                 },
                 modifier = Modifier
                     .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
                     .padding(top = statusBarPadding + 112.dp),
                 visitedPoiIds = state.visitedPoiIds,
             )
