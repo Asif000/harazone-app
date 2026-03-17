@@ -2,6 +2,7 @@
 <resources>
     <!-- Search / Map -->
     <string name="search_placeholder">Search a place or refresh area</string>
+    <string name="search_this_area">Search this area</string>
     <string name="search_field_placeholder">Search a place…</string>
     <string name="search_clear_history">Clear history</string>
     <string name="search_refreshing">Refreshing area…</string>

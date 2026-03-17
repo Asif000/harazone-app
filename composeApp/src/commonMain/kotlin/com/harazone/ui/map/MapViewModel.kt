@@ -19,6 +19,10 @@ import com.harazone.domain.service.AreaContextFactory
 import com.harazone.domain.usecase.GetAreaPortraitUseCase
 import com.harazone.location.LocationProvider
 import com.harazone.util.AnalyticsTracker
+import com.harazone.domain.companion.CompanionNudgeEngine
+import com.harazone.domain.model.CompanionNudge
+import com.harazone.domain.model.NudgeType
+import com.harazone.domain.provider.LocaleProvider
 import com.harazone.util.AppLogger
 import com.harazone.util.haversineDistanceMeters
 import kotlinx.coroutines.Job
@@ -45,6 +49,8 @@ class MapViewModel(
     private val savedPoiRepository: SavedPoiRepository,
     private val wikipediaImageRepository: WikipediaImageRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
+    private val companionEngine: CompanionNudgeEngine,
+    private val localeProvider: LocaleProvider,
     private val clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
 ) : ViewModel() {
 
@@ -68,6 +74,14 @@ class MapViewModel(
         geocodingJob?.cancel()
         geocodingJob = null
         poiBatchesCache.clear()
+        // Clear stale companion state when switching areas
+        nudgeQueue.clear()
+        slideshowJob?.cancel()
+        slideshowJob = null
+        val current = _uiState.value as? MapUiState.Ready
+        if (current != null && (current.companionNudge != null || current.isCompanionPulsing || current.autoSlideshowIndex != null)) {
+            _uiState.value = current.copy(companionNudge = null, isCompanionPulsing = false, autoSlideshowIndex = null, cameraZoomLevel = DEFAULT_ZOOM_LEVEL)
+        }
     }
 
     private var pendingLat: Double = 0.0
@@ -85,6 +99,11 @@ class MapViewModel(
     private var pendingColdStart = false
     private var onboardingBubbleJob: Job? = null
     private val poiBatchesCache: MutableList<List<POI>> = mutableListOf()
+
+    // Companion nudge queue + slideshow
+    private val nudgeQueue = ArrayDeque<CompanionNudge>()
+    private var deltaCheckFired = false
+    private var slideshowJob: Job? = null
 
     // Cache for GPS home area — avoids re-querying Gemini on return-to-location
     private var gpsAreaNameCache: String? = null
@@ -121,6 +140,13 @@ class MapViewModel(
                     visitedPoiCount = pois.size,
                     dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(pois, current.areaName),
                 )
+                if (!deltaCheckFired && pois.isNotEmpty()) {
+                    deltaCheckFired = true
+                    viewModelScope.launch {
+                        companionEngine.checkRelaunched(pois, localeProvider.languageTag)
+                            ?.let { enqueueNudge(it) }
+                    }
+                }
             }
         }
         viewModelScope.launch {
@@ -155,6 +181,16 @@ class MapViewModel(
         _uiState.value = current.copy(
             latitude = lat,
             longitude = lng,
+            cameraMoveId = current.cameraMoveId + 1,
+        )
+    }
+
+    private fun flyToCoordsWithZoom(lat: Double, lng: Double, zoom: Double) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(
+            latitude = lat,
+            longitude = lng,
+            cameraZoomLevel = zoom,
             cameraMoveId = current.cameraMoveId + 1,
         )
     }
@@ -239,6 +275,15 @@ class MapViewModel(
             visitedPois = current.visitedPois + savedPoiObj,
         )
         viewModelScope.launch {
+            companionEngine.checkInstantNeighbor(savedPoiObj, current.allDiscoveredPois, current.visitedPoiIds)
+                ?.let { enqueueNudge(it) }
+            companionEngine.checkVibeReveal(current.visitedPois + savedPoiObj)
+                ?.let { enqueueNudge(it) }
+            if (visitState == VisitState.WANT_TO_GO) {
+                enqueueNudge(companionEngine.makeAnticipationSeed(poi))
+            }
+        }
+        viewModelScope.launch {
             try {
                 savedPoiRepository.visit(savedPoiObj)
             } catch (e: Exception) {
@@ -275,9 +320,118 @@ class MapViewModel(
         }
     }
 
-    fun toggleFab() {
+    // --- Companion Nudge Engine ---
+
+    private fun enqueueNudge(nudge: CompanionNudge) {
+        if (nudgeQueue.size >= MAX_NUDGE_QUEUE_SIZE) {
+            // Drop lowest-priority (highest ordinal) tail entry
+            val maxOrdinal = nudgeQueue.maxByOrNull { it.type.ordinal } ?: return
+            if (nudge.type.ordinal >= maxOrdinal.type.ordinal) return // new nudge is lower priority, discard
+            nudgeQueue.removeLastOrNull()
+        }
+        val insertIndex = nudgeQueue.indexOfFirst { it.type.ordinal > nudge.type.ordinal }
+            .takeIf { it >= 0 } ?: nudgeQueue.size
+        nudgeQueue.add(insertIndex, nudge)
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(isFabExpanded = !current.isFabExpanded)
+        if (current.companionNudge == null) {
+            _uiState.value = current.copy(isCompanionPulsing = true)
+        }
+    }
+
+    fun showCompanionCard() {
+        val nudge = nudgeQueue.removeFirstOrNull() ?: companionEngine.makeQuietNudge()
+        stopAutoSlideshowIfRunning()
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(companionNudge = nudge, isCompanionPulsing = false)
+    }
+
+    fun dismissCompanionCard() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(
+            companionNudge = null,
+            isCompanionPulsing = nudgeQueue.isNotEmpty(),
+        )
+    }
+
+    fun onIdleDetected() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        if (current.pois.isEmpty() || current.isSearchingArea) return
+        val carouselVisible = !current.showListView && current.selectedPoi == null
+        if (carouselVisible) {
+            startAutoSlideshow()
+        } else {
+            viewModelScope.launch {
+                companionEngine.checkAmbientWhisper(
+                    areaName = current.areaName,
+                    visiblePois = current.pois,
+                    languageTag = localeProvider.languageTag,
+                )?.let { enqueueNudge(it) }
+            }
+        }
+    }
+
+    private fun startAutoSlideshow() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        if (current.selectedPinIndex != null) return
+        if (current.pois.isEmpty()) return
+        slideshowJob?.cancel()
+
+        var thisJob: Job? = null
+        thisJob = viewModelScope.launch {
+            var index = 0
+            try {
+                while (true) {
+                    val state = _uiState.value as? MapUiState.Ready ?: break
+                    if (state.pois.isEmpty() || state.showListView || state.selectedPoi != null) break
+
+                    if (index >= state.pois.size) {
+                        // End of current pois — advance if more batches available
+                        if (!state.showAllMode && poiBatchesCache.size > state.activeBatchIndex + 1) {
+                            onNextBatch()
+                        } else if (state.showAllMode && poiBatchesCache.size > 1) {
+                            // Wrap back to first batch
+                            val firstBatch = poiBatchesCache.firstOrNull()
+                            if (firstBatch != null && firstBatch.isNotEmpty()) {
+                                _uiState.value = state.copy(
+                                    showAllMode = false,
+                                    activeBatchIndex = 0,
+                                    pois = firstBatch,
+                                    selectedPoi = null,
+                                )
+                            }
+                        }
+                        index = 0
+                        delay(500)
+                        continue
+                    }
+
+                    val poi = state.pois[index]
+                    _uiState.value = state.copy(autoSlideshowIndex = index)
+                    flyToCoordsWithZoom(poi.latitude ?: 0.0, poi.longitude ?: 0.0, SLIDESHOW_ZOOM_LEVEL)
+                    delay(SLIDESHOW_INTERVAL_MS)
+                    index++
+                }
+            } finally {
+                (_uiState.value as? MapUiState.Ready)?.let { s ->
+                    if (s.autoSlideshowIndex != null) {
+                        _uiState.value = s.copy(autoSlideshowIndex = null, cameraZoomLevel = DEFAULT_ZOOM_LEVEL)
+                    }
+                }
+                if (slideshowJob === thisJob) slideshowJob = null
+            }
+        }
+        slideshowJob = thisJob
+    }
+
+    /** Called from hot-path pointer input — skips if slideshow isn't running. */
+    fun stopAutoSlideshowIfRunning() {
+        if (slideshowJob == null) return
+        slideshowJob?.cancel()
+        slideshowJob = null
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        if (current.autoSlideshowIndex != null) {
+            _uiState.value = current.copy(autoSlideshowIndex = null, cameraZoomLevel = DEFAULT_ZOOM_LEVEL)
+        }
     }
 
     fun openVisitsSheet() {
@@ -515,6 +669,10 @@ class MapViewModel(
         }
     }
 
+    fun onSearchThisArea() {
+        onGeocodingSubmitEmpty() // already sets showSearchAreaPill = false
+    }
+
     fun onGeocodingSubmitEmpty() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         cancelAreaFetch()
@@ -530,6 +688,7 @@ class MapViewModel(
                 isLoadingVibes = true,
             isGeocodingInitiatedSearch = true,
             showMyLocation = isAwayFromGps(lat, lng, current),
+            showSearchAreaPill = false,
             dynamicVibePoiCounts = emptyMap(),
             pois = emptyList(),
             activeDynamicVibe = null,
@@ -681,6 +840,7 @@ class MapViewModel(
             pendingAreaName = if (isNew) newAreaName else current.areaName
             _uiState.value = current.copy(
                 showMyLocation = isAwayFromGps(lat, lng, current),
+                showSearchAreaPill = true,
             )
         }
     }
@@ -736,6 +896,12 @@ class MapViewModel(
                 else 0.0
                 val isStale = lastFetchMs > 0L && timeSinceLastFetch > STALE_REFRESH_THRESHOLD_MS
                 val hasMovedSignificantly = distanceFromLastFetch > DISTANCE_REFRESH_THRESHOLD_M
+
+                if (isStale || hasMovedSignificantly) {
+                    val savedPois = (_uiState.value as? MapUiState.Ready)?.visitedPois ?: emptyList()
+                    companionEngine.checkProximity(coords.latitude, coords.longitude, savedPois)
+                        ?.let { enqueueNudge(it) }
+                }
 
                 if (isSameArea && !isStale && !hasMovedSignificantly) {
                     // Restore pagination from home snapshot (cancelAreaFetch cleared poiBatchesCache)
@@ -1405,5 +1571,10 @@ class MapViewModel(
         // TODO(BACKLOG-LOW): Generic location error message — detect permission denial vs GPS off and show specific guidance
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."
         internal const val LOCATION_TIMEOUT_MS = 10_000L
+        // TODO(BACKLOG-MEDIUM): Move to Remote Config (#55) for server-side tuning
+        private const val MAX_NUDGE_QUEUE_SIZE = 5
+        internal const val SLIDESHOW_INTERVAL_MS = 10_000L
+        internal const val SLIDESHOW_ZOOM_LEVEL = 16.0
+        internal const val DEFAULT_ZOOM_LEVEL = 14.0
     }
 }

@@ -39,6 +39,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Icon
@@ -92,6 +93,7 @@ fun ProfileScreen(
     viewModel: ProfileViewModel,
     onDismiss: () -> Unit,
     onOpenDetail: (SavedPoi, String) -> Unit,
+    onShowSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -144,13 +146,20 @@ fun ProfileScreen(
             .padding(top = statusBarPadding),
     ) {
         Column(Modifier.fillMaxSize()) {
-            // Close button
-            Box(
+            // Header row: gear + close
+            Row(
                 Modifier
                     .fillMaxWidth()
                     .padding(end = 8.dp, top = 4.dp),
-                contentAlignment = Alignment.TopEnd,
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
+                IconButton(
+                    onClick = onShowSettings,
+                    modifier = Modifier.defaultMinSize(48.dp, 48.dp),
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = TextSecondary)
+                }
                 IconButton(
                     onClick = onDismiss,
                     modifier = Modifier

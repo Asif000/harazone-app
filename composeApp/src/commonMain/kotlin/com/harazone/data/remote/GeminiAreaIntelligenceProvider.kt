@@ -510,6 +510,43 @@ internal class GeminiAreaIntelligenceProvider(
         return responseParser.parseDynamicVibeResponse(fullText.toString())
     }
 
+    override suspend fun generateCompanionNudge(
+        promptType: String,
+        context: String,
+        languageTag: String,
+    ): String? {
+        return try {
+            val apiKey = apiKeyProvider.geminiApiKey
+            if (apiKey.isBlank()) return null
+            val prompt = buildCompanionNudgePrompt(promptType, context, languageTag) ?: return null
+            val requestBody = buildRequestBody(prompt)
+            val responseJson = httpClient.post("$BASE_URL/$GEMINI_MODEL:generateContent") {
+                parameter("key", apiKey)
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }.bodyAsText()
+            val text = responseParser.extractTextFromGenerateContent(responseJson)
+            text.ifBlank { null }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiAreaIntelligenceProvider: generateCompanionNudge failed" }
+            null
+        }
+    }
+
+    private fun buildCompanionNudgePrompt(promptType: String, context: String, languageTag: String): String? {
+        val langInstruction = if (languageTag != "en") "Respond in the language with tag: $languageTag." else ""
+        val toneInstruction = "You are a thoughtful travel companion. Write 1-2 sentences. Evocative but honest. Never hype. Never use exclamation marks."
+        return when (promptType) {
+            "relaunch_delta" ->
+                "$toneInstruction $langInstruction\nThe user has these saved places: $context.\nSurface one genuinely interesting observation or fact about any of them. Make it feel like you've been keeping watch."
+            "ambient_whisper" ->
+                "$toneInstruction $langInstruction\n$context\nThe user is looking at the map. Say something brief and evocative about this place or what's visible — like a knowledgeable friend leaning over their shoulder."
+            else -> null
+        }
+    }
+
     private fun buildRequestBody(prompt: String): String = json.encodeToString(
         GeminiRequest(contents = listOf(GeminiRequestContent(parts = listOf(GeminiRequestPart(text = prompt)))))
     )

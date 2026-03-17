@@ -2,6 +2,7 @@
 <resources>
     <!-- Search / Map -->
     <string name="search_placeholder">Procurar um lugar ou atualizar área</string>
+    <string name="search_this_area">Pesquisar esta área</string>
     <string name="search_field_placeholder">Procurar um lugar…</string>
     <string name="search_clear_history">Limpar histórico</string>
     <string name="search_refreshing">Atualizando área…</string>

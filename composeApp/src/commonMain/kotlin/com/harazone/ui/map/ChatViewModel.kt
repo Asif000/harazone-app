@@ -124,6 +124,8 @@ internal class ChatViewModel(
             is ChatEntryPoint.SavedCard ->
                 "The user is currently looking at ${entryPoint.poiName} — lead with context about that place."
             is ChatEntryPoint.VisitAction -> buildVisitFramingHint(entryPoint.poi, entryPoint.visitState)
+            is ChatEntryPoint.CompanionNudge ->
+                "Continue this thought as the user's travel companion: \"${entryPoint.nudgeText}\". Pick up naturally — expand on it, offer something connected, invite the user deeper."
             is ChatEntryPoint.Default -> null
         }
 
@@ -689,12 +691,14 @@ internal class ChatViewModel(
         is ChatEntryPoint.PoiCard -> poiCardPills(entryPoint.poi.name)
         is ChatEntryPoint.SavedCard -> poiCardPills(entryPoint.poiName)
         is ChatEntryPoint.VisitAction -> poiCardPills(entryPoint.poi.name)
+        is ChatEntryPoint.CompanionNudge -> defaultPills(areaName)
     }
 
     private fun preFillFor(entryPoint: ChatEntryPoint): String = when (entryPoint) {
         is ChatEntryPoint.PoiCard -> "Tell me more about ${entryPoint.poi.name}"
         is ChatEntryPoint.SavedCard -> "Tell me more about ${entryPoint.poiName}"
         is ChatEntryPoint.VisitAction -> "I want to visit ${entryPoint.poi.name}"
+        is ChatEntryPoint.CompanionNudge -> ""
         else -> ""
     }
 
@@ -703,6 +707,7 @@ internal class ChatViewModel(
         is ChatEntryPoint.SavedCard -> "Asking about: ${entryPoint.poiName}"
         is ChatEntryPoint.VisitAction -> "Planning visit: ${entryPoint.poi.name}"
         is ChatEntryPoint.SavesSheet -> "Using your saved places"
+        is ChatEntryPoint.CompanionNudge -> null
         is ChatEntryPoint.Default -> null
     }
 }

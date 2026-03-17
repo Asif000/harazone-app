@@ -27,4 +27,11 @@ interface AreaIntelligenceProvider {
         conversationHistory: List<ChatMessage>,
         languageTag: String = "en",
     ): Flow<ChatToken>
+
+    // promptType: "relaunch_delta" | "ambient_whisper"
+    suspend fun generateCompanionNudge(
+        promptType: String,
+        context: String,
+        languageTag: String = "en",
+    ): String?
 }

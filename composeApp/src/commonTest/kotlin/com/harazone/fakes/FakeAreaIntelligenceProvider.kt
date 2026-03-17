@@ -99,6 +99,18 @@ class FakeAreaIntelligenceProvider : AreaIntelligenceProvider {
         return if (shouldReturnNullProfileIdentity) null else profileIdentityResult
     }
 
+    var companionNudgeResult: String? = "Test companion nudge"
+    var companionNudgeCallCount = 0
+
+    override suspend fun generateCompanionNudge(
+        promptType: String,
+        context: String,
+        languageTag: String,
+    ): String? {
+        companionNudgeCallCount++
+        return companionNudgeResult
+    }
+
     var profileChatTokens: List<ChatToken> = listOf(
         ChatToken(text = "Fake profile chat response", isComplete = false),
         ChatToken(text = "", isComplete = true),

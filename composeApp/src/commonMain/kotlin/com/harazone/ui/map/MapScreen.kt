@@ -24,9 +24,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
@@ -75,9 +77,9 @@ import com.harazone.ui.map.components.GeocodingSearchBar
 import com.harazone.ui.profile.ProfileScreen
 import com.harazone.ui.profile.ProfileViewModel
 import com.harazone.ui.saved.SavedPlacesScreen
-import com.harazone.ui.map.components.FabMenu
+import com.harazone.ui.map.components.CompanionCard
+import com.harazone.ui.map.components.CompanionOrb
 import com.harazone.ui.map.components.MapListToggle
-import com.harazone.ui.map.components.FabScrim
 import com.harazone.ui.map.components.TopContextBar
 import com.harazone.ui.map.components.AmbientTicker
 import com.harazone.ui.map.components.PoiCarousel
@@ -87,6 +89,9 @@ import com.harazone.ui.theme.spacing
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -168,7 +173,7 @@ private fun ReadyContent(
     var pendingShakeCapture by remember { mutableStateOf(false) }
 
     fun dismissAllOverlays() {
-        if (state.isFabExpanded) viewModel.toggleFab()
+        if (state.companionNudge != null) viewModel.dismissCompanionCard()
         if (chatState.isOpen) chatViewModel.closeChat()
         if (state.showVisitsSheet) viewModel.closeVisitsSheet()
         if (state.selectedPoi != null) viewModel.clearPoiSelection()
@@ -227,7 +232,23 @@ private fun ReadyContent(
     var savedFabOffset by remember { mutableStateOf(Offset.Zero) }
     var searchBarOffset by remember { mutableStateOf(Offset.Zero) }
 
-    Box(Modifier.fillMaxSize().onGloballyPositioned { coords ->
+    // Idle detection for companion — TODO(BACKLOG-MEDIUM): Move to Remote Config (#55)
+    var idleTimerKey by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(idleTimerKey) {
+        delay(10_000L)
+        viewModel.onIdleDetected()
+    }
+
+    Box(Modifier.fillMaxSize()
+        .pointerInput(Unit) {
+            awaitPointerEventScope {
+                while (true) {
+                    awaitPointerEvent(PointerEventPass.Initial)
+                    idleTimerKey++
+                    viewModel.stopAutoSlideshowIfRunning()
+                }
+            }
+        }.onGloballyPositioned { coords ->
         screenHeightPx = coords.size.height.toFloat()
     }) {
         // Base: map or list
@@ -268,7 +289,7 @@ private fun ReadyContent(
                 modifier = Modifier.fillMaxSize(),
                 latitude = state.latitude,
                 longitude = state.longitude,
-                zoomLevel = 14.0,
+                zoomLevel = state.cameraZoomLevel,
                 cameraMoveId = state.cameraMoveId,
                 pois = if (state.visitedFilter) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
                 activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled on map
@@ -365,13 +386,31 @@ private fun ReadyContent(
             )
         }
 
+        // "Search this area" floating pill
+        if (state.showSearchAreaPill && !state.isSearchingArea && !state.showListView && state.selectedPoi == null && !showProfile) {
+            FilledTonalButton(
+                onClick = { viewModel.onSearchThisArea() },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = statusBarPadding + 56.dp + 48.dp + 32.dp),
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(stringResource(Res.string.search_this_area))
+            }
+        }
+
         // Bottom carousel — snap-scroll POI cards
         if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null && !showProfile) {
             PoiCarousel(
                 pois = state.pois,
-                selectedIndex = state.selectedPinIndex,
+                selectedIndex = state.autoSlideshowIndex ?: state.selectedPinIndex,
                 visitedPoiIds = state.visitedPoiIds,
-                onCardSwiped = { index -> viewModel.onCarouselSwiped(index) },
+                onCardSwiped = { index ->
+                    viewModel.stopAutoSlideshowIfRunning()
+                    viewModel.onCarouselSwiped(index)
+                },
                 onSelectionCleared = { viewModel.onCarouselSelectionCleared() },
                 onVisitTapped = { poi ->
                     viewModel.visitPoi(poi, state.areaName)
@@ -419,8 +458,8 @@ private fun ReadyContent(
         PlatformBackHandler(enabled = state.selectedPoi == null && state.visitedFilter) {
             viewModel.onVisitedFilterSelected()
         }
-        PlatformBackHandler(enabled = state.selectedPoi == null && !state.visitedFilter && state.isFabExpanded) {
-            viewModel.toggleFab()
+        PlatformBackHandler(enabled = state.companionNudge != null && !showProfile) {
+            viewModel.dismissCompanionCard()
         }
 
         // AI Detail Page — replaces ExpandablePoiCard + scrim
@@ -515,7 +554,7 @@ private fun ReadyContent(
         val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.visitedPoiIds }
         val carouselVisible = state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null
         AnimatedVisibility(
-            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !state.isFabExpanded && !carouselVisible && state.selectedPoi == null && !showProfile,
+            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !carouselVisible && state.selectedPoi == null && !showProfile,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
@@ -526,32 +565,43 @@ private fun ReadyContent(
             SavesNearbyPill(count = savedNearbyCount)
         }
 
-        // FAB scrim
-        FabScrim(
-            visible = state.isFabExpanded && !showProfile,
-            onClick = { viewModel.toggleFab() },
-        )
+        // Companion Orb (replaces FAB)
+        if (!showProfile) {
+            CompanionOrb(
+                isPulsing = state.isCompanionPulsing || state.companionNudge != null,
+                onClick = { viewModel.showCompanionCard() },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = navBarPadding + 16.dp, end = 16.dp)
+                    .onGloballyPositioned { coords ->
+                        savedFabOffset = coords.boundsInRoot().center
+                    },
+            )
+        }
 
-        // FAB menu
-        if (!showProfile) FabMenu(
-            isExpanded = state.isFabExpanded,
-            onToggle = { viewModel.toggleFab() },
-            onVisitedPlaces = {
-                viewModel.toggleFab()
-                viewModel.openVisitsSheet()
-            },
-            visitedCount = state.visitedPoiCount,
-            onSettings = {
-                viewModel.toggleFab()
-                showSettings = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = navBarPadding + 16.dp, end = 16.dp)
-                .onGloballyPositioned { coords ->
-                    savedFabOffset = coords.boundsInRoot().center
+        // Companion Card
+        if (state.companionNudge != null && !showProfile) {
+            CompanionCard(
+                nudge = state.companionNudge,
+                onTellMeMore = {
+                    val nudge = state.companionNudge
+                    viewModel.dismissCompanionCard()
+                    if (nudge != null) {
+                        chatViewModel.openChat(
+                            areaName = state.areaName,
+                            pois = state.pois,
+                            activeDynamicVibe = state.activeDynamicVibe,
+                            entryPoint = ChatEntryPoint.CompanionNudge(nudge.chatContext),
+                            forceReset = true,
+                        )
+                    }
                 },
-        )
+                onDismiss = { viewModel.dismissCompanionCard() },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = navBarPadding),
+            )
+        }
 
         // MyLocation button (Position C — left side, above AI bar)
         AnimatedVisibility(
@@ -734,6 +784,9 @@ private fun ReadyContent(
                     showProfile = false
                     returnToProfile[0] = true
                     viewModel.selectPoi(profileViewModel.getPoiForDetail(savedPoi))
+                },
+                onShowSettings = {
+                    showSettings = true
                 },
                 modifier = Modifier.fillMaxSize(),
             )

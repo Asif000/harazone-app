@@ -1,5 +1,6 @@
 package com.harazone.ui.map
 
+import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.POI
@@ -20,7 +21,6 @@ sealed class MapUiState {
         val dynamicVibePoiCounts: Map<String, Int> = emptyMap(),
         val weather: WeatherState? = null,
         val visitTag: String = "First visit",
-        val isFabExpanded: Boolean = false,
         val mapRenderFailed: Boolean = false,
         val isSearchingArea: Boolean = false,
         val isEnrichingArea: Boolean = false,
@@ -51,6 +51,11 @@ sealed class MapUiState {
         val showAllMode: Boolean = false,
         val selectedPinIndex: Int? = null,
         val areaHighlights: List<String> = emptyList(),
+        val companionNudge: CompanionNudge? = null,
+        val isCompanionPulsing: Boolean = false,
+        val autoSlideshowIndex: Int? = null,
+        val cameraZoomLevel: Double = 14.0,
+        val showSearchAreaPill: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

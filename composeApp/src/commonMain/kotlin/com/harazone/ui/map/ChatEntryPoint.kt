@@ -9,4 +9,5 @@ sealed class ChatEntryPoint {
     data class PoiCard(val poi: POI) : ChatEntryPoint()
     data class SavedCard(val poiName: String) : ChatEntryPoint()
     data class VisitAction(val poi: POI, val visitState: VisitState) : ChatEntryPoint()
+    data class CompanionNudge(val nudgeText: String) : ChatEntryPoint()
 }
