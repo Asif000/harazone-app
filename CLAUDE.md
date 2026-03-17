@@ -49,6 +49,14 @@ Every dismissible overlay, modal, bottom sheet, or card **must** handle the Andr
 ### iOS Navigation
 iOS back navigation is handled by the system navigation controller (swipe-back gesture). No additional back button handling is needed in Compose code for iOS.
 
+## Multi-Agent Coordination
+
+When working in this repo, other Claude instances may be active in parallel terminals. Follow these rules strictly:
+
+1. DISCUSS BEFORE CODING — present your plan and wait for user approval before writing any code. Never jump straight to implementation.
+2. If your task overlaps with files another window is actively editing, create a patch file at `~/Desktop/<feature>.patch` instead of modifying files directly. The user decides when and how to merge.
+3. Never assume you are the only agent working. If you see uncommitted changes in `git status` that you didn't make, STOP and ask the user before proceeding.
+
 ## Configuration
 
 - **User**: Asifchauhan
