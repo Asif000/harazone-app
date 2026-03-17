@@ -92,6 +92,10 @@ class MapViewModelTest {
         savedPoiRepository = savedPoiRepository,
         wikipediaImageRepository = wikipediaImageRepository,
         userPreferencesRepository = userPreferencesRepository,
+        companionEngine = com.harazone.domain.companion.CompanionNudgeEngine(
+            userPreferencesRepository, com.harazone.fakes.FakeAreaIntelligenceProvider(), com.harazone.fakes.FakeClock()
+        ),
+        localeProvider = com.harazone.fakes.FakeLocaleProvider(),
         clockMs = clockMs,
     )
 
@@ -516,13 +520,13 @@ class MapViewModelTest {
     }
 
     @Test
-    fun toggleFab_flipsExpanded() = runTest(testDispatcher) {
+    fun showCompanionCard_showsQuietNudgeWhenQueueEmpty() = runTest(testDispatcher) {
         val (viewModel, _) = createReadyViewModel()
-        assertFalse((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)
-        viewModel.toggleFab()
-        assertTrue((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)
-        viewModel.toggleFab()
-        assertFalse((viewModel.uiState.value as MapUiState.Ready).isFabExpanded)
+        assertNull((viewModel.uiState.value as MapUiState.Ready).companionNudge)
+        viewModel.showCompanionCard()
+        val nudge = (viewModel.uiState.value as MapUiState.Ready).companionNudge
+        assertNotNull(nudge)
+        assertTrue(nudge.text.contains("Nothing yet"))
     }
 
     @Test
