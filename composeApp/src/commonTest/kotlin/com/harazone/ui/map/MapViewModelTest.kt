@@ -2594,6 +2594,114 @@ class MapViewModelTest {
         assertEquals(emptyList(), state.areaHighlights)
     }
 
+    // Regression: same area but stale (>1hr) should trigger refresh instead of restoring snapshot
+    @Test
+    fun returnToCurrentLocation_sameArea_staleTime_triggersRefresh() = runTest(testDispatcher) {
+        var now = 1_000_000L
+        val initialPois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0),
+        )
+        var fetchCount = 0
+        val areaRepository = FakeAreaRepository(
+            updatesFactory = {
+                fetchCount++
+                listOf(BucketUpdate.PortraitComplete(initialPois))
+            }
+        )
+        val locationProvider = FakeLocationProvider(
+            locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+            geocodeResult = Result.success("Manhattan, New York"),
+        )
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = areaRepository,
+            clockMs = { now },
+        )
+        testScheduler.advanceUntilIdle()
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        // Advance clock past stale threshold (1 hour + 1 second)
+        now += MapViewModel.STALE_REFRESH_THRESHOLD_MS + 1_000L
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(fetchCount >= 2, "Expected re-fetch when time is stale, but fetchCount=$fetchCount")
+    }
+
+    // Regression: same area name but moved >100m should trigger refresh
+    @Test
+    fun returnToCurrentLocation_sameArea_distanceMoved_triggersRefresh() = runTest(testDispatcher) {
+        var now = 1_000_000L
+        val initialPois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0),
+        )
+        var fetchCount = 0
+        val areaRepository = FakeAreaRepository(
+            updatesFactory = {
+                fetchCount++
+                listOf(BucketUpdate.PortraitComplete(initialPois))
+            }
+        )
+        var gpsLat = 40.7128
+        var gpsLng = -74.0060
+        val locationProvider = object : com.harazone.location.LocationProvider {
+            override suspend fun getCurrentLocation() =
+                Result.success(GpsCoordinates(gpsLat, gpsLng))
+            override suspend fun reverseGeocode(latitude: Double, longitude: Double) =
+                Result.success("Manhattan, New York")
+        }
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = areaRepository,
+            clockMs = { now },
+        )
+        testScheduler.advanceUntilIdle()
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(1, fetchCount, "Initial load should have fetched once")
+
+        // Move ~200m north (well past 100m threshold), small time advance
+        gpsLat = 40.7146
+        now += 60_000L // 1 minute later (not stale, but moved)
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        assertTrue(fetchCount >= 2, "Expected re-fetch when distance > threshold, but fetchCount=$fetchCount")
+    }
+
+    // Regression: same area, fresh time, no movement — should restore snapshot (existing behavior preserved)
+    @Test
+    fun returnToCurrentLocation_sameArea_freshAndClose_restoresSnapshot() = runTest(testDispatcher) {
+        val initialPois = listOf(
+            POI("Place A", "landmark", "desc", Confidence.HIGH, 1.0, 2.0),
+        )
+        var fetchCount = 0
+        val areaRepository = FakeAreaRepository(
+            updatesFactory = {
+                fetchCount++
+                listOf(BucketUpdate.PortraitComplete(initialPois))
+            }
+        )
+        val locationProvider = FakeLocationProvider(
+            locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+            geocodeResult = Result.success("Manhattan, New York"),
+        )
+        val viewModel = createViewModel(
+            locationProvider = locationProvider,
+            areaRepository = areaRepository,
+        )
+        testScheduler.advanceUntilIdle()
+        assertIs<MapUiState.Ready>(viewModel.uiState.value)
+
+        viewModel.returnToCurrentLocation()
+        testScheduler.advanceUntilIdle()
+
+        assertEquals(1, fetchCount, "Should NOT re-fetch when same area, fresh, and nearby")
+        val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(initialPois, state2.pois)
+    }
+
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {

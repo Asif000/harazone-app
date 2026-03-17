@@ -91,6 +91,11 @@ class MapViewModel(
     private var gpsAreaPoisCache: List<POI> = emptyList()
     private var gpsAreaCacheMs: Long = 0L
 
+    // Track last fetch coordinates + time for stale-area detection
+    private var lastFetchLat: Double = 0.0
+    private var lastFetchLng: Double = 0.0
+    private var lastFetchMs: Long = 0L
+
     init {
         loadLocation()
         viewModelScope.launch {
@@ -724,7 +729,15 @@ class MapViewModel(
 
                 val homeSnapshot = preSearchSnapshot
                 preSearchSnapshot = null
-                if (isSameArea) {
+
+                val timeSinceLastFetch = clockMs() - lastFetchMs
+                val distanceFromLastFetch = if (lastFetchLat != 0.0 || lastFetchLng != 0.0)
+                    haversineKm(coords.latitude, coords.longitude, lastFetchLat, lastFetchLng) * 1000
+                else 0.0
+                val isStale = lastFetchMs > 0L && timeSinceLastFetch > STALE_REFRESH_THRESHOLD_MS
+                val hasMovedSignificantly = distanceFromLastFetch > DISTANCE_REFRESH_THRESHOLD_M
+
+                if (isSameArea && !isStale && !hasMovedSignificantly) {
                     // Restore pagination from home snapshot (cancelAreaFetch cleared poiBatchesCache)
                     val homeBatches = homeSnapshot?.poiBatches ?: state.poiBatches
                     poiBatchesCache.clear()
@@ -753,7 +766,8 @@ class MapViewModel(
                     val hasCachedPois = gpsAreaNameCache != null &&
                         gpsAreaName.equals(gpsAreaNameCache, ignoreCase = true) &&
                         gpsAreaPoisCache.isNotEmpty() &&
-                        (clockMs() - gpsAreaCacheMs) < GPS_CACHE_STALE_MS
+                        (clockMs() - gpsAreaCacheMs) < GPS_CACHE_STALE_MS &&
+                        !hasMovedSignificantly
 
                     if (hasCachedPois) {
                         val counts = computeDynamicVibePoiCounts(gpsAreaPoisCache)
@@ -820,6 +834,9 @@ class MapViewModel(
                                 gpsAreaNameCache = gpsAreaName
                                 gpsAreaPoisCache = pois
                                 gpsAreaCacheMs = clockMs()
+                                lastFetchLat = coords.latitude
+                                lastFetchLng = coords.longitude
+                                lastFetchMs = clockMs()
                             },
                             onError = { e ->
                                 AppLogger.e(e) { "Return to location: portrait fetch failed" }
@@ -913,6 +930,9 @@ class MapViewModel(
                         gpsAreaNameCache = areaName
                         gpsAreaPoisCache = pois
                         gpsAreaCacheMs = clockMs()
+                        lastFetchLat = coords.latitude
+                        lastFetchLng = coords.longitude
+                        lastFetchMs = clockMs()
                         analyticsTracker.trackEvent(
                             "map_opened",
                             mapOf("area_name" to areaName, "poi_count" to pois.size.toString()),
@@ -1380,6 +1400,8 @@ class MapViewModel(
         internal const val MAX_BATCH_SLOTS = 4 // 3 POI batches + 1 Show All slot
         private const val WEATHER_STALE_MS = 5 * 60 * 1000L // 5 minutes
         private const val GPS_CACHE_STALE_MS = 30 * 60 * 1000L // 30 minutes
+        internal const val STALE_REFRESH_THRESHOLD_MS = 60 * 60 * 1000L // 1 hour
+        internal const val DISTANCE_REFRESH_THRESHOLD_M = 100.0 // 100m (low for testing, increase via Remote Config #55)
         // TODO(BACKLOG-LOW): Generic location error message — detect permission denial vs GPS off and show specific guidance
         internal const val LOCATION_FAILURE_MESSAGE = "Can't find your location. Please try again."
         internal const val LOCATION_TIMEOUT_MS = 10_000L
