@@ -1,0 +1,1877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Category A: Streaming, Discovery & Safety UX</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; background: #0a0a0a; color: #fff; overflow-x: hidden; }
+
+  /* Nav */
+  .nav { display: flex; gap: 8px; padding: 12px 16px; background: #111; border-bottom: 1px solid #222; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+  .nav-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid #333; background: #1a1a1a; color: #aaa; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .nav-btn:hover { border-color: #555; color: #fff; }
+  .nav-btn.active { background: #2a6b3f; border-color: #3a8b5f; color: #fff; }
+
+  /* Scenes */
+  .scene { display: none; min-height: 100vh; padding: 0; }
+  .scene.active { display: block; }
+
+  /* Phone frame */
+  .phone { width: 375px; height: 812px; margin: 24px auto; border-radius: 40px; overflow: hidden; position: relative; background: #0d1117; border: 2px solid #222; }
+  .phone-screen { width: 100%; height: 100%; position: relative; overflow: hidden; }
+
+  /* Map background */
+  .map-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #0d1117 0%, #131a24 50%, #0d1117 100%); }
+  .map-grid { position: absolute; inset: 0; opacity: 0.08; background-image: linear-gradient(#2a4a6b 1px, transparent 1px), linear-gradient(90deg, #2a4a6b 1px, transparent 1px); background-size: 40px 40px; }
+  .map-road { position: absolute; background: #1a2a3a; border-radius: 2px; }
+
+  /* Area header */
+  .area-header { position: absolute; top: 48px; left: 12px; right: 12px; z-index: 10; }
+  .area-strip { background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; color: #aaa; }
+  .area-name { display: flex; align-items: center; gap: 6px; }
+  .area-name .flag { font-size: 16px; }
+  .area-name .name { color: #fff; font-weight: 600; font-size: 14px; }
+  .area-name .meta { color: #888; font-size: 11px; margin-left: 4px; }
+  .area-right { display: flex; align-items: center; gap: 8px; font-size: 11px; }
+  .safety-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+  .safety-dot.green { background: #3fb950; }
+  .safety-dot.yellow { background: #d29922; }
+  .safety-dot.orange { background: #db6d28; }
+  .safety-dot.red { background: #f85149; animation: pulse-red 1.5s infinite; }
+  @keyframes pulse-red { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+  /* Search bar */
+  .search-bar { position: absolute; top: 96px; left: 12px; right: 12px; z-index: 10; }
+  .search-pill { background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 24px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .search-left { display: flex; align-items: center; gap: 8px; }
+  .search-icon { color: #f0883e; font-size: 14px; }
+  .search-text { color: #fff; font-size: 14px; font-weight: 500; }
+  .search-mid { display: flex; align-items: center; gap: 6px; }
+  .search-divider { width: 1px; height: 20px; background: #333; margin: 0 2px; }
+  .dice-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 2px 6px; transition: all 0.3s; border-radius: 8px; }
+  .dice-btn:hover { background: rgba(240,192,64,0.15); transform: scale(1.15); }
+  .dice-btn.active { background: rgba(240,192,64,0.25); animation: dice-wiggle 0.5s ease; }
+  @keyframes dice-wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-15deg)} 75%{transform:rotate(15deg)} }
+  .search-close { background: none; border: none; color: #666; font-size: 16px; cursor: pointer; }
+  .pin-counter { color: #888; font-size: 12px; min-width: 20px; text-align: center; }
+  .pin-counter.streaming { color: #3fb950; }
+  .pin-counter .spinner { display: inline-block; width: 10px; height: 10px; border: 1.5px solid #3fb950; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-left: 4px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Discovering label */
+  .discovering-label { position: absolute; top: 140px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(42, 107, 63, 0.9); backdrop-filter: blur(8px); border-radius: 16px; padding: 6px 14px; font-size: 12px; color: #fff; display: flex; align-items: center; gap: 6px; opacity: 0; transition: opacity 0.3s; }
+  .discovering-label.visible { opacity: 1; }
+  .discovering-label .dot { width: 6px; height: 6px; background: #3fb950; border-radius: 50%; animation: pulse-dot 1s infinite; }
+  @keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.7); } }
+
+  /* Map pins */
+  .map-pin { position: absolute; z-index: 5; opacity: 0; transform: translateY(-20px) scale(0); transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer; }
+  .map-pin.visible { opacity: 1; transform: translateY(0) scale(1); }
+  .map-pin.focused { z-index: 6; transform: scale(1.2); }
+  .pin-marker { width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  .pin-marker .icon { transform: rotate(45deg); font-size: 14px; }
+  .pin-marker.historic { background: #a371f7; }
+  .pin-marker.nature { background: #3fb950; }
+  .pin-marker.food { background: #f0883e; }
+  .pin-marker.culture { background: #58a6ff; }
+  .pin-marker.adventure { background: #f47067; }
+  .pin-marker.luxury { background: #d2a8ff; }
+
+  /* Companion orb */
+  .companion-orb { position: absolute; right: 14px; bottom: 230px; z-index: 15; width: 48px; height: 48px; border-radius: 50%; background: radial-gradient(circle at 30% 30%, #f0c040, #d4942a); box-shadow: 0 0 20px rgba(240, 192, 64, 0.3); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; transition: all 0.3s; }
+  .companion-orb:hover { transform: scale(1.1); box-shadow: 0 0 30px rgba(240, 192, 64, 0.5); }
+  .companion-orb.nudge { animation: orb-nudge 0.5s ease; }
+  @keyframes orb-nudge { 0%,100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+  .companion-bubble { position: absolute; right: 60px; bottom: 0; background: rgba(30,30,30,0.95); backdrop-filter: blur(8px); border-radius: 16px 16px 4px 16px; padding: 10px 14px; font-size: 12px; color: #e0e0e0; max-width: 200px; opacity: 0; transform: translateX(10px); transition: all 0.3s; pointer-events: none; white-space: nowrap; }
+  .companion-bubble.visible { opacity: 1; transform: translateX(0); }
+
+  /* Surprise Me - lives as toggle pill (Concept D) */
+
+  /* Open nearby pill */
+  .open-nearby { position: absolute; top: 136px; left: 12px; z-index: 10; background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 16px; padding: 6px 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: #ccc; }
+  .open-nearby .count-badge { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; }
+  .open-nearby .cb-green { color: #3fb950; }
+  .open-nearby .cb-yellow { color: #d29922; }
+  .open-nearby .cb-red { color: #f47067; }
+
+  /* Toggle pill — Search here / Surprise me */
+  .toggle-pill-track { position: absolute; top: 168px; left: 50%; transform: translateX(-50%); z-index: 10; width: 270px; }
+  .toggle-pill { background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 22px; padding: 0; display: flex; overflow: hidden; border: 1px solid #333; position: relative; }
+  .toggle-indicator { position: absolute; top: 2px; bottom: 2px; width: 50%; border-radius: 20px; transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); pointer-events: none; }
+  .toggle-indicator.left { left: 2px; background: rgba(42,107,63,0.5); }
+  .toggle-indicator.right { left: calc(50% - 2px); background: rgba(240,192,64,0.3); }
+  .toggle-option { flex: 1; padding: 10px 0; text-align: center; font-size: 13px; cursor: pointer; transition: color 0.2s; position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .toggle-option.active { color: #fff; }
+  .toggle-option:not(.active) { color: #777; }
+
+  /* Right-side FAB stack */
+  .fab-stack { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .fab-btn { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; border: none; transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .fab-btn:hover { transform: scale(1.1); }
+  .fab-btn.profile { background: #3fb950; }
+  .fab-btn.visited { background: #a371f7; }
+  .fab-label { font-size: 9px; color: #aaa; margin-top: -4px; text-align: center; }
+
+  /* Right-side vibe buttons */
+  .vibe-stack { position: absolute; right: 12px; bottom: 240px; z-index: 8; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .vibe-fab { padding: 5px 10px; border-radius: 12px; background: rgba(30,30,30,0.85); backdrop-filter: blur(8px); border: 1px solid #333; font-size: 10px; color: #aaa; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+  .vibe-fab:hover { border-color: #555; color: #fff; }
+
+  /* Bottom input bar */
+  .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 12; background: rgba(20,20,20,0.95); backdrop-filter: blur(12px); padding: 8px 12px 20px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #222; }
+  .bottom-input { flex: 1; background: rgba(40,40,40,0.9); border: 1px solid #333; border-radius: 20px; padding: 10px 14px; font-size: 13px; color: #888; cursor: pointer; }
+  .bottom-bar-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #333; background: rgba(40,40,40,0.9); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; transition: all 0.2s; }
+  .bottom-bar-btn:hover { border-color: #555; }
+  .bottom-bar-btn.companion-btn { background: radial-gradient(circle at 30% 30%, #f0c040, #d4942a); border: none; box-shadow: 0 0 12px rgba(240,192,64,0.3); }
+
+  /* Card action row */
+  .card-action-row { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid #333; }
+  .card-action-link { font-size: 12px; color: #58a6ff; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+  .card-action-link:hover { color: #79c0ff; }
+
+  /* Bottom card */
+  .bottom-card { position: absolute; bottom: 120px; left: 12px; right: 12px; z-index: 10; background: rgba(25,25,25,0.95); backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden; transform: translateY(120%); transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+  .bottom-card.visible { transform: translateY(0); }
+  .card-bg { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+  .card-bg .fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 60px; opacity: 0.25; }
+  .card-bg-overlay { position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(20,20,20,0.5) 0%, rgba(20,20,20,0.92) 50%); }
+  .card-image { width: 100%; height: 120px; object-fit: cover; background: linear-gradient(135deg, #1a2a1a, #2a3a2a); position: relative; }
+  .card-image img { width: 100%; height: 100%; object-fit: cover; }
+  .card-image .fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+  .card-image .fallback.historic { background: linear-gradient(135deg, #2a1a3a, #3a2a4a); }
+  .card-image .fallback.nature { background: linear-gradient(135deg, #1a2a1a, #2a3a2a); }
+  .card-image .fallback.food { background: linear-gradient(135deg, #2a1a0a, #3a2a1a); }
+  .card-image .fallback.culture { background: linear-gradient(135deg, #1a2a3a, #2a3a4a); }
+  .card-image .fallback.adventure { background: linear-gradient(135deg, #2a1a1a, #3a2a2a); }
+  .card-image .photo-count { position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); border-radius: 8px; padding: 2px 8px; font-size: 10px; color: #fff; }
+  .card-body { padding: 12px 14px; }
+  .card-title { font-size: 16px; font-weight: 600; margin-bottom: 2px; }
+  .card-subtitle { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .card-vibes { display: flex; gap: 6px; margin-bottom: 8px; }
+  .vibe-tag { font-size: 10px; padding: 3px 8px; border-radius: 10px; background: rgba(163, 113, 247, 0.2); color: #a371f7; }
+  .vibe-tag.nature { background: rgba(63, 185, 80, 0.2); color: #3fb950; }
+  .vibe-tag.food { background: rgba(240, 136, 62, 0.2); color: #f0883e; }
+  .vibe-tag.culture { background: rgba(88, 166, 255, 0.2); color: #58a6ff; }
+  .vibe-tag.adventure { background: rgba(244, 112, 103, 0.2); color: #f47067; }
+  .card-meta { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #888; }
+  .card-meta .rating { color: #f0c040; }
+  .card-meta .open { color: #3fb950; }
+  .card-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .card-action-btn { padding: 6px 14px; border-radius: 16px; border: 1px solid #333; background: transparent; color: #fff; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.2s; }
+  .card-action-btn:hover { border-color: #555; }
+  .card-action-btn.primary { background: #2a6b3f; border-color: #3a8b5f; }
+  .card-action-btn .directions-icon { font-size: 14px; }
+
+  /* Carousel dots */
+  .carousel-dots { position: absolute; bottom: 108px; left: 50%; transform: translateX(-50%); z-index: 11; display: flex; gap: 6px; align-items: center; padding: 6px 12px; background: rgba(15,15,15,0.8); border-radius: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; opacity: 0; transform: scale(0); transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); cursor: pointer; position: relative; }
+  .dot.visible { opacity: 1; transform: scale(1); }
+  .dot.active { width: 10px; height: 10px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.3); }
+  .dot-ring { position: absolute; inset: -3px; border-radius: 50%; border: 2px solid transparent; border-top-color: #f0c040; }
+  .dot.active .dot-ring { animation: dot-timer 10s linear; }
+  @keyframes dot-timer { to { transform: rotate(360deg); } }
+
+  /* Vibe rail */
+  .vibe-rail { position: absolute; bottom: 12px; left: 0; right: 0; z-index: 10; display: flex; gap: 8px; padding: 8px 14px; overflow-x: auto; }
+  .vibe-rail::-webkit-scrollbar { display: none; }
+  .rail-chip { padding: 6px 14px; border-radius: 16px; background: rgba(30,30,30,0.9); border: 1px solid #333; font-size: 12px; color: #aaa; white-space: nowrap; cursor: pointer; transition: all 0.2s; }
+  .rail-chip:hover { border-color: #555; color: #fff; }
+
+  /* Safety banner */
+  .safety-banner { position: absolute; top: 48px; left: 0; right: 0; z-index: 50; background: rgba(248, 81, 73, 0.95); backdrop-filter: blur(8px); padding: 12px 16px; display: flex; align-items: flex-start; gap: 10px; transform: translateY(-100%); transition: transform 0.4s ease; }
+  .safety-banner.visible { transform: translateY(0); }
+  .safety-banner.yellow-banner { background: rgba(210, 153, 34, 0.95); }
+  .safety-banner.orange-banner { background: rgba(219, 109, 40, 0.95); }
+  .safety-banner .icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+  .safety-banner .text { flex: 1; }
+  .safety-banner .title { font-weight: 600; font-size: 13px; }
+  .safety-banner .desc { font-size: 11px; opacity: 0.9; margin-top: 2px; }
+  .safety-banner .actions { display: flex; gap: 8px; margin-top: 8px; }
+  .safety-banner .actions button { padding: 5px 12px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.15); color: #fff; font-size: 11px; cursor: pointer; }
+  .safety-banner .close-btn { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 18px; cursor: pointer; flex-shrink: 0; }
+
+  /* Teleport overlay */
+  .teleport-overlay { position: absolute; inset: 0; z-index: 40; background: #0d1117; opacity: 0; pointer-events: none; transition: opacity 0.6s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .teleport-overlay.active { opacity: 1; pointer-events: auto; }
+  .teleport-destination { font-size: 28px; font-weight: 700; opacity: 0; transform: translateY(20px); transition: all 0.5s ease 0.3s; }
+  .teleport-overlay.active .teleport-destination { opacity: 1; transform: translateY(0); }
+  .teleport-subtitle { font-size: 14px; color: #888; margin-top: 8px; opacity: 0; transition: opacity 0.5s ease 0.5s; }
+  .teleport-overlay.active .teleport-subtitle { opacity: 1; }
+  .teleport-distance { font-size: 11px; color: #555; margin-top: 4px; opacity: 0; transition: opacity 0.5s ease 0.6s; }
+  .teleport-overlay.active .teleport-distance { opacity: 1; }
+
+  /* Safety gate modal */
+  .safety-gate { position: absolute; inset: 0; z-index: 45; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  .safety-gate.active { opacity: 1; pointer-events: auto; }
+  .safety-gate-card { background: #1a1a1a; border-radius: 20px; padding: 24px; max-width: 320px; width: 90%; border: 1px solid #333; }
+  .safety-gate-card .warning-icon { font-size: 48px; text-align: center; margin-bottom: 12px; }
+  .safety-gate-card h3 { font-size: 18px; text-align: center; margin-bottom: 8px; }
+  .safety-gate-card .advisory-level { text-align: center; padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 600; display: inline-block; margin: 0 auto 12px; }
+  .safety-gate-card .advisory-level.red { background: rgba(248,81,73,0.2); color: #f85149; }
+  .safety-gate-card .advisory-level.orange { background: rgba(219,109,40,0.2); color: #db6d28; }
+  .safety-gate-card .advisory-details { font-size: 12px; color: #999; line-height: 1.5; margin-bottom: 16px; }
+  .safety-gate-card .gate-actions { display: flex; flex-direction: column; gap: 8px; }
+  .safety-gate-card .gate-actions button { padding: 10px 16px; border-radius: 12px; border: none; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+  .safety-gate-card .gate-actions .proceed { background: rgba(248,81,73,0.2); color: #f85149; border: 1px solid rgba(248,81,73,0.3); }
+  .safety-gate-card .gate-actions .proceed:hover { background: rgba(248,81,73,0.3); }
+  .safety-gate-card .gate-actions .goback { background: #2a6b3f; color: #fff; }
+
+  /* Get There bottom sheet */
+  .get-there-sheet { position: absolute; bottom: 0; left: 0; right: 0; z-index: 30; background: #1a1a1a; border-radius: 20px 20px 0 0; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1); }
+  .get-there-sheet.visible { transform: translateY(0); }
+  .sheet-handle { width: 36px; height: 4px; background: #444; border-radius: 2px; margin: 10px auto; }
+  .sheet-tabs { display: flex; border-bottom: 1px solid #333; }
+  .sheet-tab { flex: 1; padding: 12px; text-align: center; font-size: 14px; color: #888; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.2s; }
+  .sheet-tab.active { color: #fff; border-bottom-color: #3fb950; }
+  .sheet-content { padding: 16px; }
+  .transport-modes { display: flex; gap: 8px; margin-bottom: 16px; }
+  .transport-mode { flex: 1; padding: 10px; border-radius: 12px; border: 1px solid #333; background: transparent; color: #aaa; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .transport-mode .icon { font-size: 20px; display: block; margin-bottom: 4px; }
+  .transport-mode .time { font-size: 11px; }
+  .transport-mode.selected { border-color: #3fb950; color: #fff; background: rgba(42,107,63,0.2); }
+  .go-btn { width: 100%; padding: 14px; border-radius: 14px; border: none; background: #2a6b3f; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; margin-top: 8px; }
+  .calendar-section { display: flex; flex-direction: column; gap: 10px; }
+  .calendar-input { padding: 12px; border-radius: 12px; border: 1px solid #333; background: #222; color: #fff; font-size: 14px; }
+  .reminder-toggle { display: flex; align-items: center; justify-content: space-between; padding: 12px; border-radius: 12px; border: 1px solid #333; background: #222; }
+  .reminder-toggle .label { font-size: 13px; }
+  .toggle-switch { width: 44px; height: 24px; border-radius: 12px; background: #444; position: relative; cursor: pointer; }
+  .toggle-switch.on { background: #2a6b3f; }
+  .toggle-switch::after { content: ''; position: absolute; width: 20px; height: 20px; border-radius: 50%; background: #fff; top: 2px; left: 2px; transition: left 0.2s; }
+  .toggle-switch.on::after { left: 22px; }
+  .ai-tip { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(240,192,64,0.1); border: 1px solid rgba(240,192,64,0.2); font-size: 11px; color: #ccc; display: flex; align-items: flex-start; gap: 8px; }
+  .ai-tip .tip-icon { font-size: 16px; flex-shrink: 0; }
+
+  /* Scene descriptions */
+  .scene-header { padding: 20px 24px; background: #111; border-bottom: 1px solid #222; }
+  .scene-header h2 { font-size: 18px; margin-bottom: 4px; }
+  .scene-header p { font-size: 13px; color: #888; line-height: 1.5; }
+  .scene-grid { display: flex; flex-wrap: wrap; gap: 20px; padding: 24px; justify-content: center; }
+
+  /* Annotation callouts */
+  .callout { position: absolute; z-index: 20; padding: 6px 10px; background: rgba(240,192,64,0.9); border-radius: 8px; font-size: 10px; color: #000; font-weight: 600; white-space: nowrap; pointer-events: none; }
+  .callout::after { content: ''; position: absolute; width: 0; height: 0; border: 5px solid transparent; }
+  .callout.arrow-down::after { bottom: -10px; left: 50%; transform: translateX(-50%); border-top-color: rgba(240,192,64,0.9); }
+  .callout.arrow-up::after { top: -10px; left: 50%; transform: translateX(-50%); border-bottom-color: rgba(240,192,64,0.9); }
+  .callout.arrow-left::after { left: -10px; top: 50%; transform: translateY(-50%); border-right-color: rgba(240,192,64,0.9); }
+  .callout.arrow-right::after { right: -10px; top: 50%; transform: translateY(-50%); border-left-color: rgba(240,192,64,0.9); }
+
+  /* Escalation indicator */
+  .escalation-indicator { position: absolute; top: 180px; left: 50%; transform: translateX(-50%); z-index: 15; background: rgba(30,30,30,0.9); border-radius: 12px; padding: 6px 14px; font-size: 11px; color: #f0c040; display: flex; align-items: center; gap: 6px; opacity: 0; transition: opacity 0.3s; }
+  .escalation-indicator.visible { opacity: 1; }
+
+  /* Responsive */
+  @media (max-width: 420px) {
+    .phone { width: 100%; height: 100vh; border-radius: 0; border: none; margin: 0; }
+  }
+
+  /* Image carousel fullscreen */
+  .fullscreen-image { position: absolute; inset: 0; z-index: 50; background: #000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.3s; }
+  .fullscreen-image.active { opacity: 1; pointer-events: auto; }
+  .fullscreen-image img { max-width: 100%; max-height: 80%; object-fit: contain; }
+  .fullscreen-image .close { position: absolute; top: 50px; right: 16px; background: rgba(255,255,255,0.2); border: none; color: #fff; width: 36px; height: 36px; border-radius: 50%; font-size: 18px; cursor: pointer; }
+  .fullscreen-image .img-counter { position: absolute; bottom: 50px; left: 50%; transform: translateX(-50%); font-size: 13px; color: #888; }
+
+  /* Slideshow progress on dots */
+  .dot .progress-ring { position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px); }
+  .dot .progress-ring circle { fill: none; stroke-width: 2; transform: rotate(-90deg); transform-origin: center; }
+  .dot .progress-ring .bg { stroke: #333; }
+  .dot .progress-ring .fg { stroke: #f0c040; stroke-dasharray: 44; stroke-dashoffset: 44; }
+  .dot.active.slideshow .progress-ring .fg { animation: ring-fill 10s linear forwards; }
+  @keyframes ring-fill { to { stroke-dashoffset: 0; } }
+  /* Escalation top offset for toggle pill */
+  .escalation-indicator { top: 210px; }
+  /* Discovering label below toggle pill */
+  .discovering-label { top: 210px; }
+
+  /* Ghost pins — saved/visited at 50% opacity with badge */
+  .map-pin.ghost { opacity: 0.45; }
+  .map-pin.ghost .pin-marker { filter: saturate(0.5); }
+  .ghost-badge { position: absolute; top: -6px; right: -8px; width: 16px; height: 16px; border-radius: 50%; background: #3fb950; display: flex; align-items: center; justify-content: center; font-size: 9px; color: #fff; border: 2px solid #0d1117; z-index: 2; }
+  .ghost-badge.saved { background: #58a6ff; }
+
+  /* Simplified card actions — Save / Go / Details */
+  .card-action-simple { display: flex; align-items: center; justify-content: space-around; margin-top: 8px; padding-top: 8px; border-top: 1px solid #333; }
+  .action-pill { display: flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 14px; font-size: 12px; cursor: pointer; transition: all 0.2s; border: 1px solid #333; background: transparent; color: #ccc; }
+  .action-pill:hover { border-color: #555; color: #fff; }
+  .action-pill.go { background: #2a6b3f; border-color: #3a8b5f; color: #fff; }
+  .action-pill .icon { font-size: 14px; }
+
+  /* Ghost pin legend */
+  .ghost-legend { position: absolute; top: 210px; left: 12px; z-index: 10; background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 12px; padding: 8px 12px; font-size: 11px; color: #aaa; display: flex; flex-direction: column; gap: 4px; }
+  .legend-row { display: flex; align-items: center; gap: 6px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .legend-dot.fresh { background: #a371f7; }
+  .legend-dot.ghost-vis { background: #a371f7; opacity: 0.4; position: relative; }
+  .legend-dot.ghost-saved { background: #58a6ff; opacity: 0.4; }
+
+  /* Teleportation ambient — day/night map styles */
+  .map-bg.night { background: linear-gradient(135deg, #050810 0%, #0a0f1a 50%, #050810 100%); }
+  .map-bg.night .map-grid { opacity: 0.04; background-image: linear-gradient(#1a2a4b 1px, transparent 1px), linear-gradient(90deg, #1a2a4b 1px, transparent 1px); }
+  .map-bg.golden { background: linear-gradient(135deg, #1a1408 0%, #2a1f10 50%, #1a1408 100%); }
+  .map-bg.golden .map-grid { opacity: 0.06; background-image: linear-gradient(#4a3a1b 1px, transparent 1px), linear-gradient(90deg, #4a3a1b 1px, transparent 1px); }
+  .map-bg.day { background: linear-gradient(135deg, #0d1a17 0%, #132a24 50%, #0d1a17 100%); }
+  .map-bg.day .map-grid { opacity: 0.1; background-image: linear-gradient(#2a5a4b 1px, transparent 1px), linear-gradient(90deg, #2a5a4b 1px, transparent 1px); }
+
+  /* Sky gradient strip — ambient time-of-day color */
+  .sky-gradient { position: absolute; top: 0; left: 0; right: 0; height: 48px; z-index: 1; transition: background 0.8s ease; }
+  .sky-gradient.night { background: linear-gradient(180deg, #0a0e1a 0%, transparent 100%); }
+  .sky-gradient.golden { background: linear-gradient(180deg, rgba(200,140,40,0.15) 0%, transparent 100%); }
+  .sky-gradient.day { background: linear-gradient(180deg, rgba(80,160,220,0.08) 0%, transparent 100%); }
+  .sky-gradient.predawn { background: linear-gradient(180deg, rgba(60,40,100,0.12) 0%, transparent 100%); }
+
+  /* Ambient meta — extended area strip info */
+  .ambient-meta { display: flex; align-items: center; gap: 4px; font-size: 10px; color: #666; margin-top: 2px; }
+  .ambient-meta .offset { color: #888; }
+  .ambient-meta .currency { color: #d29922; }
+  .ambient-meta .lang { color: #888; }
+
+  /* Night overlay dim */
+  .night-dim { position: absolute; inset: 0; background: rgba(0,0,20,0.15); pointer-events: none; z-index: 0; }
+
+  /* Ambient transition flash */
+  .ambient-flash { position: absolute; inset: 0; z-index: 30; opacity: 0; pointer-events: none; transition: opacity 0.4s ease; }
+  .ambient-flash.warm { background: radial-gradient(circle, rgba(200,140,40,0.2), transparent 70%); }
+  .ambient-flash.cool { background: radial-gradient(circle, rgba(40,60,140,0.2), transparent 70%); }
+  .ambient-flash.active { opacity: 1; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showScene('streaming')">1. Streaming Pins</button>
+  <button class="nav-btn" onclick="showScene('slideshow')">2. Slideshow + Dots</button>
+  <button class="nav-btn" onclick="showScene('surprise')">3. Surprise Me</button>
+  <button class="nav-btn" onclick="showScene('safety')">4. Safety Gate</button>
+  <button class="nav-btn" onclick="showScene('images')">5. Images</button>
+  <button class="nav-btn" onclick="showScene('getthere')">6. Get There</button>
+  <button class="nav-btn" onclick="showScene('fullflow')">7. Full Flow Demo</button>
+  <button class="nav-btn" onclick="showScene('ghostcards')">8. Cards + Pin States</button>
+  <button class="nav-btn" onclick="showScene('ambient')">9. Teleport Ambient</button>
+</nav>
+
+<!-- SCENE 1: Streaming Pins -->
+<div class="scene active" id="scene-streaming">
+  <div class="scene-header">
+    <h2>1. Streaming Pin Arrival</h2>
+    <p>Pins arrive one-by-one from Gemini. Counter updates live (no arrows). Dots appear per pin. "Discovering..." label shows during stream.</p>
+  </div>
+  <div class="scene-grid">
+    <div class="phone" id="phone-streaming">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+        <div class="area-header"><div class="area-strip"><div class="area-name"><span class="flag">🇦🇪</span><span class="name">Dubai</span><span class="meta">· First visit · ☁ 76°F · 9:18 PM</span></div><div class="area-right"><span class="safety-dot green"></span></div></div></div>
+        <div class="search-bar"><div class="search-pill"><div class="search-left"><span class="search-icon">📍</span><span class="search-text">Dubai</span></div><span class="pin-counter" id="s1-counter">0</span><button class="search-close">✕</button></div></div>
+        <div class="open-nearby"><span>3 open nearby</span> <span class="count-badge"><span class="cb-green">●3</span></span></div>
+        <div class="toggle-pill-track"><div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div></div>
+        <div class="discovering-label" id="s1-discovering"><span class="dot"></span><span>Discovering...</span></div>
+
+        <div class="map-pin" id="s1-pin1" style="top: 280px; left: 80px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin" id="s1-pin2" style="top: 350px; left: 200px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+        <div class="map-pin" id="s1-pin3" style="top: 240px; left: 260px;"><div class="pin-marker luxury"><span class="icon">✨</span></div></div>
+        <div class="map-pin" id="s1-pin4" style="top: 400px; left: 140px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+        <div class="map-pin" id="s1-pin5" style="top: 310px; left: 310px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+
+        <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Visited</div></div>
+        <div class="vibe-stack"><div class="vibe-fab">Luxury</div><div class="vibe-fab">Modern</div><div class="vibe-fab">Desert</div></div>
+
+        <div class="bottom-card" id="s1-card">
+          <div class="card-image"><div class="fallback historic">🏛</div><div class="photo-count">1/3</div></div>
+          <div class="card-body">
+            <div class="card-title" id="s1-card-title">Dubai Museum</div>
+            <div class="card-subtitle" id="s1-card-sub">Al Fahidi Fort · Historic</div>
+            <div class="card-vibes"><span class="vibe-tag">Historic</span><span class="vibe-tag culture">Culture</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.5</span><span class="open">● Open</span><span>· $$</span></div>
+            <div class="card-action-row"><span class="card-action-link">🏷 Visit</span><span class="card-action-link">🧭 Get There</span><span class="card-action-link">Details →</span></div>
+          </div>
+        </div>
+
+        <div class="carousel-dots" id="s1-dots">
+          <div class="dot" id="s1-dot1"></div><div class="dot" id="s1-dot2"></div><div class="dot" id="s1-dot3"></div><div class="dot" id="s1-dot4"></div><div class="dot" id="s1-dot5"></div>
+        </div>
+
+        <div class="callout arrow-down" style="top: 196px; left: 50%; transform: translateX(-50%);" id="s1-callout-discover">Appears during streaming</div>
+        <div class="callout arrow-up" id="s1-callout-counter" style="top: 105px; right: 50px; display: none;">Count only — no arrows</div>
+        <div class="callout arrow-up" id="s1-callout-dots" style="bottom: 88px; left: 50%; transform: translateX(-50%); display: none;">1 dot per pin, appears on arrival</div>
+
+        <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align: center; padding: 16px;">
+    <button class="nav-btn" onclick="runStreamingDemo()" style="background: #2a6b3f; border-color: #3a8b5f; color: #fff; padding: 12px 24px; font-size: 14px;">▶ Play Streaming Demo</button>
+    <button class="nav-btn" onclick="resetStreamingDemo()" style="margin-left: 8px;">↺ Reset</button>
+  </div>
+</div>
+
+<!-- SCENE 2: Slideshow + Dots -->
+<div class="scene" id="scene-slideshow">
+  <div class="scene-header">
+    <h2>2. Slideshow + Dot Sync</h2>
+    <p>After 3+ pins and idle time, slideshow begins. Active dot shows progress ring (10s timer). Camera zooms to focused pin. Late-arriving pins join the rotation seamlessly.</p>
+  </div>
+  <div class="scene-grid">
+    <div class="phone" id="phone-slideshow">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+        <div class="area-header"><div class="area-strip"><div class="area-name"><span class="flag">🇧🇿</span><span class="name">Belize</span><span class="meta">· First visit · ☀ 82°F · 11:45 AM</span></div><div class="area-right"><span class="safety-dot green"></span></div></div></div>
+        <div class="search-bar"><div class="search-pill"><div class="search-left"><span class="search-icon">📍</span><span class="search-text">Belize</span></div><span class="pin-counter">5</span><button class="search-close">✕</button></div></div>
+        <div class="open-nearby"><span>5 places found</span> <span class="count-badge"><span class="cb-green">●4</span> <span class="cb-yellow">●1</span></span></div>
+        <div class="toggle-pill-track"><div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div></div>
+
+        <div class="map-pin visible" id="ss-pin1" style="top: 260px; left: 60px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin visible" id="ss-pin2" style="top: 320px; left: 180px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+        <div class="map-pin visible" id="ss-pin3" style="top: 240px; left: 270px;"><div class="pin-marker adventure"><span class="icon">🏔</span></div></div>
+        <div class="map-pin visible" id="ss-pin4" style="top: 380px; left: 120px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+        <div class="map-pin visible" id="ss-pin5" style="top: 360px; left: 290px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+
+        <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Visited</div></div>
+        <div class="vibe-stack"><div class="vibe-fab">Nature</div><div class="vibe-fab">Historic</div><div class="vibe-fab">Adventure</div></div>
+
+        <div class="bottom-card visible" id="ss-card">
+          <div class="card-image"><div class="fallback historic" id="ss-card-img">🏛</div><div class="photo-count">1/5</div></div>
+          <div class="card-body">
+            <div class="card-title" id="ss-card-title">Caracol Maya Site</div>
+            <div class="card-subtitle" id="ss-card-sub">Ancient Maya Ruins · Historic</div>
+            <div class="card-vibes" id="ss-card-vibes"><span class="vibe-tag">Historic</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.8</span><span class="open">● Open</span><span>· $$</span></div>
+            <div class="card-action-row"><span class="card-action-link">🏷 Visit</span><span class="card-action-link">🧭 Get There</span><span class="card-action-link">Details →</span></div>
+          </div>
+        </div>
+
+        <div class="carousel-dots">
+          <div class="dot visible active slideshow" id="ss-dot1" onclick="slideshowGoTo(0)" style="width:10px;height:10px;background:#fff;"><svg class="progress-ring" viewBox="0 0 18 18"><circle class="bg" cx="9" cy="9" r="7"/><circle class="fg" cx="9" cy="9" r="7"/></svg></div>
+          <div class="dot visible" id="ss-dot2" onclick="slideshowGoTo(1)"></div>
+          <div class="dot visible" id="ss-dot3" onclick="slideshowGoTo(2)"></div>
+          <div class="dot visible" id="ss-dot4" onclick="slideshowGoTo(3)"></div>
+          <div class="dot visible" id="ss-dot5" onclick="slideshowGoTo(4)"></div>
+        </div>
+
+        <div class="callout arrow-down" style="bottom: 86px; left: 50%; transform: translateX(-50%);">Progress ring = slideshow timer (10s)</div>
+
+        <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align: center; padding: 16px;">
+    <button class="nav-btn" onclick="runSlideshowDemo()" style="background: #2a6b3f; border-color: #3a8b5f; color: #fff; padding: 12px 24px; font-size: 14px;">▶ Play Slideshow</button>
+    <button class="nav-btn" onclick="resetSlideshowDemo()" style="margin-left: 8px;">↺ Reset</button>
+  </div>
+</div>
+
+<!-- SCENE 3: Surprise Me -->
+<div class="scene" id="scene-surprise">
+  <div class="scene-header">
+    <h2>3. Surprise Me — Taste-Based Discovery</h2>
+    <p>Toggle pill replaces "Search this area" — two modes: "Search here" (discover THIS area) and "Surprise me" (teleport SOMEWHERE). Surprise escalates: nearby → city → country → continent. Fade transition. Companion nudges on idle.</p>
+  </div>
+  <div class="scene-grid">
+    <div class="phone" id="phone-surprise">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+
+        <!-- Area header strip -->
+        <div class="area-header">
+          <div class="area-strip" id="surp-area">
+            <div class="area-name">
+              <span class="flag" id="surp-flag">🇦🇪</span>
+              <span class="name" id="surp-name">Dubai</span>
+              <span class="meta" id="surp-meta">· First visit · ☁ 76°F · 9:18 PM</span>
+            </div>
+            <div class="area-right"><span class="safety-dot green" id="surp-safety"></span></div>
+          </div>
+        </div>
+
+        <!-- Search bar (count only, no arrows) -->
+        <div class="search-bar">
+          <div class="search-pill">
+            <div class="search-left">
+              <span class="search-icon">📍</span>
+              <span class="search-text" id="surp-search">Dubai</span>
+            </div>
+            <div class="search-count">
+              <span class="pin-counter" id="surp-counter">5</span>
+            </div>
+            <button class="search-close">✕</button>
+          </div>
+        </div>
+
+        <!-- Open nearby pill -->
+        <div class="open-nearby">
+          <span>3 open nearby</span>
+          <span class="count-badge"><span class="cb-green">●3</span> <span class="cb-yellow">●0</span> <span class="cb-red">●0</span></span>
+        </div>
+
+        <!-- Toggle pill: Search here / Surprise me -->
+        <div class="toggle-pill-track">
+          <div class="toggle-pill">
+            <div class="toggle-indicator left" id="surp-indicator"></div>
+            <div class="toggle-option active" id="surp-opt-search" onclick="toggleDiscoveryMode('search')">
+              <span>↻</span> Search here
+            </div>
+            <div class="toggle-option" id="surp-opt-surprise" onclick="toggleDiscoveryMode('surprise')">
+              <span>🎲</span> Surprise me
+            </div>
+          </div>
+        </div>
+
+        <!-- Escalation indicator (hidden by default) -->
+        <div class="escalation-indicator" id="surp-escalation">
+          <span>🧭</span>
+          <span id="surp-esc-text">Nearby</span>
+        </div>
+
+        <!-- Map pins -->
+        <div class="map-pin visible" style="top: 280px; left: 60px;">
+          <div class="pin-marker food"><span class="icon">🍽</span></div>
+        </div>
+        <div class="map-pin visible" style="top: 330px; left: 170px;">
+          <div class="pin-marker luxury"><span class="icon">✨</span></div>
+        </div>
+        <div class="map-pin visible" style="top: 260px; left: 240px;">
+          <div class="pin-marker historic"><span class="icon">🏛</span></div>
+        </div>
+        <div class="map-pin visible" style="top: 380px; left: 100px;">
+          <div class="pin-marker culture"><span class="icon">🎭</span></div>
+        </div>
+        <div class="map-pin visible" style="top: 350px; left: 280px;">
+          <div class="pin-marker nature"><span class="icon">🌿</span></div>
+        </div>
+
+        <!-- Right-side FAB stack -->
+        <div class="fab-stack">
+          <button class="fab-btn profile">👤</button>
+          <div class="fab-label">Profile</div>
+          <button class="fab-btn visited">📍</button>
+          <div class="fab-label">Visited</div>
+        </div>
+
+        <!-- Right-side vibe buttons -->
+        <div class="vibe-stack">
+          <div class="vibe-fab">Luxury</div>
+          <div class="vibe-fab">Modern</div>
+          <div class="vibe-fab">Desert</div>
+        </div>
+
+        <!-- Companion bubble -->
+        <div class="companion-bubble" id="surp-bubble" style="bottom: 60px; right: 60px;"></div>
+
+        <!-- Teleport overlay -->
+        <div class="teleport-overlay" id="surp-teleport">
+          <div class="teleport-destination" id="surp-dest-name"></div>
+          <div class="teleport-subtitle" id="surp-dest-sub"></div>
+          <div class="teleport-distance" id="surp-dest-dist"></div>
+        </div>
+
+        <!-- Bottom POI card -->
+        <div class="bottom-card visible" id="surp-card" style="bottom: 120px; transform: translateY(0);">
+          <div class="card-image">
+            <div class="fallback food">🍽</div>
+            <div class="photo-count">1/4 photos</div>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Al Fanar Restaurant</div>
+            <div class="card-subtitle">Traditional Emirati · Food</div>
+            <div class="card-vibes">
+              <span class="vibe-tag food">Food</span>
+              <span class="vibe-tag culture">Culture</span>
+            </div>
+            <div class="card-meta">
+              <span class="rating">⭐ 4.6</span>
+              <span class="open">● Open</span>
+              <span>· $$ · 10am-12am</span>
+            </div>
+            <div class="card-action-row">
+              <span class="card-action-link">🏷 Visit</span>
+              <span class="card-action-link">🧭 Get There</span>
+              <span class="card-action-link">Details →</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Carousel dots -->
+        <div class="carousel-dots" style="bottom: 108px;">
+          <div class="dot visible active" style="opacity:1;transform:scale(1);width:10px;height:10px;background:#fff;"></div>
+          <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+          <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+          <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+          <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+        </div>
+
+        <!-- Bottom bar with input + controls -->
+        <div class="bottom-bar">
+          <div class="bottom-input">Hidden gems nearby?</div>
+          <div class="bottom-bar-btn">⏸</div>
+          <div class="bottom-bar-btn companion-btn" onclick="toggleOrbMenu()">✦</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align: center; padding: 16px;">
+    <button class="nav-btn" onclick="toggleDiscoveryMode('surprise')" style="background: #2a6b3f; border-color: #3a8b5f; color: #fff; padding: 12px 24px; font-size: 14px;">
+      🎲 Toggle to Surprise Me (then tap again to escalate)
+    </button>
+    <button class="nav-btn" onclick="resetSurprise()" style="margin-left: 8px;">
+      ↺ Reset
+    </button>
+    <p style="color: #666; font-size: 12px; margin-top: 8px;">Toggle pill: "Search here" = discover this area · "Surprise me" = teleport somewhere new (escalates each tap)</p>
+  </div>
+</div>
+
+<!-- SCENE 4: Safety Gate -->
+<div class="scene" id="scene-safety">
+  <div class="scene-header">
+    <h2>4. Safety Warnings & Gate</h2>
+    <p>Safety dot in header (green/yellow/orange/red). Banner on area load for advisory zones. Red zones require explicit "I understand" gate. Government API data only — never AI-generated.</p>
+  </div>
+  <div class="scene-grid">
+    <div class="phone" id="phone-safety">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+
+        <div class="safety-banner" id="safety-banner">
+          <span class="icon">⚠️</span>
+          <div class="text">
+            <div class="title" id="safety-title">Travel Advisory — Level 4: Do Not Travel</div>
+            <div class="desc" id="safety-desc">Armed conflict and terrorism. US State Dept advises against all travel.</div>
+            <div class="actions"><button onclick="showSafetyDetail()">Learn More</button><button onclick="dismissBanner()">Dismiss</button></div>
+          </div>
+          <button class="close-btn" onclick="dismissBanner()">✕</button>
+        </div>
+
+        <div class="area-header" style="top: 120px;" id="safety-area-header"><div class="area-strip"><div class="area-name"><span class="flag" id="sf-flag">🇾🇪</span><span class="name" id="sf-name">Sana'a</span><span class="meta" id="sf-meta">· ☁ 68°F · 10:30 PM</span></div><div class="area-right"><span class="safety-dot red" id="sf-dot"></span></div></div></div>
+        <div class="search-bar" style="top: 168px;"><div class="search-pill"><div class="search-left"><span class="search-icon">📍</span><span class="search-text" id="sf-search-text">Sana'a</span></div><span class="pin-counter">0</span><button class="search-close">✕</button></div></div>
+        <div class="toggle-pill-track" style="top: 240px;"><div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div></div>
+
+        <div class="map-pin visible" style="top: 320px; left: 100px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin visible" style="top: 380px; left: 220px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+
+        <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Visited</div></div>
+        <div class="vibe-stack"><div class="vibe-fab">Historic</div><div class="vibe-fab">Culture</div></div>
+
+        <div class="companion-bubble" id="sf-bubble" style="bottom: 60px; right: 60px;">Heads up — active advisory zone. Please check before exploring.</div>
+
+        <div class="safety-gate" id="safety-gate">
+          <div class="safety-gate-card">
+            <div class="warning-icon">⚠️</div>
+            <h3 id="gate-title">Active Travel Advisory</h3>
+            <div style="text-align:center;margin-bottom:12px;"><span class="advisory-level red" id="gate-level">Level 4: Do Not Travel</span></div>
+            <div class="advisory-details" id="gate-details"><strong>Yemen — US State Department</strong><br><br>Do not travel to Yemen due to terrorism, civil unrest, health risks, kidnapping, armed conflict, and landmines.<br><br><strong>Last updated:</strong> March 15, 2026<br><strong>Source:</strong> US State Dept + UK FCDO</div>
+            <div class="gate-actions"><button class="goback" onclick="closeSafetyGate()">← Go Back to Safety</button><button class="proceed" onclick="proceedPastGate()">I Understand the Risks — Continue</button></div>
+          </div>
+        </div>
+
+        <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align: center; padding: 16px;">
+    <button class="nav-btn" onclick="showSafetyDemo('red')" style="background: #f85149; border-color: #f85149; color: #fff; padding: 10px 20px;">Red Zone (Level 4)</button>
+    <button class="nav-btn" onclick="showSafetyDemo('orange')" style="background: #db6d28; border-color: #db6d28; color: #fff; padding: 10px 20px;">Orange (Level 3)</button>
+    <button class="nav-btn" onclick="showSafetyDemo('yellow')" style="background: #d29922; border-color: #d29922; color: #fff; padding: 10px 20px;">Yellow (Level 2)</button>
+    <button class="nav-btn" onclick="showSafetyDemo('green')" style="background: #2a6b3f; border-color: #3a8b5f; color: #fff; padding: 10px 20px;">Green (Safe)</button>
+  </div>
+</div>
+
+<!-- SCENE 5: Images -->
+<div class="scene" id="scene-images">
+  <div class="scene-header">
+    <h2>5. POI Images — Source Hierarchy & Fallbacks</h2>
+    <p>Google Places Photos API as primary source (multiple images). Gemini URL as backup (try it, fall through on 404). Vibe gradient as final fallback. Tap hero → fullscreen with swipe.</p>
+  </div>
+  <div class="scene-grid">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+        <div class="area-header"><div class="area-strip"><div class="area-name"><span class="flag">🇧🇿</span><span class="name">Belize</span><span class="meta">· First visit · ☀ 82°F · 11:45 AM</span></div><div class="area-right"><span class="safety-dot green"></span></div></div></div>
+        <div class="search-bar"><div class="search-pill"><div class="search-left"><span class="search-icon">📍</span><span class="search-text">Belize</span></div><span class="pin-counter">3</span><button class="search-close">✕</button></div></div>
+        <div class="open-nearby"><span>3 places found</span> <span class="count-badge"><span class="cb-green">●3</span></span></div>
+        <div class="toggle-pill-track"><div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div></div>
+
+        <div class="map-pin visible" style="top: 300px; left: 100px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+        <div class="map-pin visible" style="top: 340px; left: 220px;"><div class="pin-marker adventure"><span class="icon">🏔</span></div></div>
+        <div class="map-pin visible" style="top: 280px; left: 280px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+
+        <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Visited</div></div>
+        <div class="vibe-stack"><div class="vibe-fab">Nature</div><div class="vibe-fab">Adventure</div><div class="vibe-fab">Beach</div></div>
+
+        <div class="bottom-card visible" style="transform:translateY(0);">
+          <div class="card-image" onclick="showFullscreen()" style="cursor:pointer; height:140px;">
+            <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a4a2a,#2a6a3a);position:relative;">
+              <div style="font-size:60px;opacity:0.6;">🌿</div>
+              <div style="position:absolute;top:8px;left:8px;background:rgba(63,185,80,0.9);border-radius:6px;padding:2px 8px;font-size:10px;color:#fff;">Google Places</div>
+            </div>
+            <div class="photo-count">1/6 photos</div>
+          </div>
+          <div class="card-body">
+            <div class="card-title">Ambergris Caye</div>
+            <div class="card-subtitle">Beach · Barrier Reef Wonders</div>
+            <div class="card-vibes"><span class="vibe-tag nature">Nature</span><span class="vibe-tag adventure">Adventure</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.6</span><span class="open">● Open</span></div>
+            <div class="card-action-row"><span class="card-action-link">🏷 Visit</span><span class="card-action-link">🧭 Get There</span><span class="card-action-link">Details →</span></div>
+          </div>
+        </div>
+
+        <div class="callout arrow-down" style="bottom: 310px; left: 50%; transform: translateX(-50%);">Tap image → fullscreen carousel</div>
+
+        <div class="fullscreen-image" id="fullscreen-img">
+          <div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#1a4a2a,#2a6a3a);"><div style="font-size:120px;opacity:0.4;">🌿</div></div>
+          <button class="close" onclick="hideFullscreen()">✕</button>
+          <div class="img-counter">1 / 6</div>
+          <div style="position:absolute;bottom:100px;left:50%;transform:translateX(-50%);display:flex;gap:6px;"><div style="width:8px;height:8px;border-radius:50%;background:#fff;"></div><div style="width:8px;height:8px;border-radius:50%;background:#555;"></div><div style="width:8px;height:8px;border-radius:50%;background:#555;"></div><div style="width:8px;height:8px;border-radius:50%;background:#555;"></div><div style="width:8px;height:8px;border-radius:50%;background:#555;"></div><div style="width:8px;height:8px;border-radius:50%;background:#555;"></div></div>
+        </div>
+
+        <div class="carousel-dots"><div class="dot visible active" style="opacity:1;transform:scale(1);width:10px;height:10px;background:#fff;"></div><div class="dot visible" style="opacity:1;transform:scale(1);"></div><div class="dot visible" style="opacity:1;transform:scale(1);"></div></div>
+
+        <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+      </div>
+    </div>
+
+    <!-- Fallback comparison sidebar -->
+    <div style="padding: 24px; max-width: 400px;">
+      <h3 style="margin-bottom: 16px; font-size: 16px;">Image Source Hierarchy</h3>
+      <div style="background:#1a1a1a;border-radius:12px;padding:16px;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="background:#3fb950;color:#000;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;">1st</span><span style="font-size:14px;font-weight:600;">Google Places Photos</span></div><div style="font-size:12px;color:#888;">Multiple real photos. Verified. Fast CDN. Up to 10 per POI.</div></div>
+      <div style="background:#1a1a1a;border-radius:12px;padding:16px;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="background:#d29922;color:#000;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;">2nd</span><span style="font-size:14px;font-weight:600;">Gemini Image URL</span></div><div style="font-size:12px;color:#888;">Try the URL Gemini returns. If 404/error, fall through to gradient. Simple <code style="color:#aaa;">onError</code> handler.</div><div style="font-size:11px;color:#d29922;margin-top:6px;">Sometimes hallucinates — always have fallback ready.</div></div>
+      <div style="background:#1a1a1a;border-radius:12px;padding:16px;margin-bottom:12px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;"><span style="background:#666;color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600;">3rd</span><span style="font-size:14px;font-weight:600;">Vibe Gradient + Icon</span></div><div style="font-size:12px;color:#888;">Beautiful fallback. Never broken. Matches vibe color.</div><div style="display:flex;gap:8px;margin-top:10px;"><div style="width:60px;height:40px;border-radius:8px;background:linear-gradient(135deg,#2a1a3a,#3a2a4a);display:flex;align-items:center;justify-content:center;font-size:16px;">🏛</div><div style="width:60px;height:40px;border-radius:8px;background:linear-gradient(135deg,#1a2a1a,#2a3a2a);display:flex;align-items:center;justify-content:center;font-size:16px;">🌿</div><div style="width:60px;height:40px;border-radius:8px;background:linear-gradient(135deg,#2a1a0a,#3a2a1a);display:flex;align-items:center;justify-content:center;font-size:16px;">🍽</div><div style="width:60px;height:40px;border-radius:8px;background:linear-gradient(135deg,#1a2a3a,#2a3a4a);display:flex;align-items:center;justify-content:center;font-size:16px;">🎭</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 6: Get There -->
+<div class="scene" id="scene-getthere">
+  <div class="scene-header">
+    <h2>6. "Get There" — Go Now + Go Later</h2>
+    <p>Map card has "Get There" action. Tap opens two-tab sheet: Go Now (transport modes + deep link to maps) and Go Later (calendar + AI timing + reminders).</p>
+  </div>
+  <div class="scene-grid">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+        <div class="area-header"><div class="area-strip"><div class="area-name"><span class="flag">🇧🇿</span><span class="name">Belize</span><span class="meta">· First visit · ☀ 82°F · 11:45 AM</span></div><div class="area-right"><span class="safety-dot green"></span></div></div></div>
+        <div class="search-bar"><div class="search-pill"><div class="search-left"><span class="search-icon">📍</span><span class="search-text">Belize</span></div><span class="pin-counter">3</span><button class="search-close">✕</button></div></div>
+        <div class="open-nearby"><span>3 places found</span> <span class="count-badge"><span class="cb-green">●3</span></span></div>
+        <div class="toggle-pill-track"><div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div></div>
+
+        <div class="map-pin visible" style="top: 280px; left: 80px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin visible" style="top: 340px; left: 200px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+        <div class="map-pin visible" style="top: 300px; left: 280px;"><div class="pin-marker adventure"><span class="icon">🏔</span></div></div>
+
+        <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Visited</div></div>
+        <div class="vibe-stack"><div class="vibe-fab">Historic</div><div class="vibe-fab">Nature</div><div class="vibe-fab">Adventure</div></div>
+
+        <div class="bottom-card visible" style="transform:translateY(0);">
+          <div class="card-image"><div class="fallback historic">🏛</div><div class="photo-count">1/5</div></div>
+          <div class="card-body">
+            <div class="card-title">Caracol Maya Site</div>
+            <div class="card-subtitle">Ancient Maya Ruins · Historic</div>
+            <div class="card-vibes"><span class="vibe-tag">Historic</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.8</span><span class="open">● Open</span><span>· $$</span></div>
+            <div class="card-action-row">
+              <span class="card-action-link">🏷 Visit</span>
+              <span class="card-action-link" onclick="showGetThereSheet()" style="font-weight:600;color:#3fb950;">🧭 Get There</span>
+              <span class="card-action-link">Details →</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout arrow-up" style="bottom: 118px; left: 130px;">Tap "Get There" → opens sheet</div>
+
+        <div class="carousel-dots"><div class="dot visible active" style="opacity:1;transform:scale(1);width:10px;height:10px;background:#fff;"></div><div class="dot visible" style="opacity:1;transform:scale(1);"></div><div class="dot visible" style="opacity:1;transform:scale(1);"></div></div>
+
+        <!-- Get There bottom sheet -->
+        <div class="get-there-sheet" id="gt-sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-tabs"><div class="sheet-tab active" id="gt-tab-now" onclick="switchGetThereTab('now')">🧭 Go Now</div><div class="sheet-tab" id="gt-tab-later" onclick="switchGetThereTab('later')">📅 Go Later</div></div>
+          <div class="sheet-content" id="gt-now">
+            <div class="transport-modes"><div class="transport-mode" onclick="selectTransport(this)"><span class="icon">🚶</span><span class="time">45 min</span></div><div class="transport-mode selected" onclick="selectTransport(this)"><span class="icon">🚗</span><span class="time">15 min</span></div><div class="transport-mode" onclick="selectTransport(this)"><span class="icon">🚌</span><span class="time">25 min</span></div><div class="transport-mode" onclick="selectTransport(this)"><span class="icon">🚕</span><span class="time">12 min</span></div></div>
+            <div class="ai-tip"><span class="tip-icon">✦</span><span>Pro tip: The entrance is from the back road off the Western Highway. Save 20 minutes vs the main route.</span></div>
+            <button class="go-btn" onclick="alert('Opens Google Maps / Apple Maps')">Open in Maps →</button>
+          </div>
+          <div class="sheet-content" id="gt-later" style="display:none;">
+            <div class="calendar-section">
+              <input type="date" class="calendar-input" value="2026-03-20">
+              <div class="ai-tip"><span class="tip-icon">✦</span><span>Weekday mornings are least crowded. Golden hour (5:30 PM) is best for photos of Caana pyramid.</span></div>
+              <div class="reminder-toggle"><span class="label">🔔 Push notification reminder</span><div class="toggle-switch on" onclick="this.classList.toggle('on')"></div></div>
+              <div class="reminder-toggle"><span class="label">📅 Add to device calendar</span><div class="toggle-switch" onclick="this.classList.toggle('on')"></div></div>
+              <button class="go-btn">Save Plan ✓</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCENE 7: Full Flow -->
+<div class="scene" id="scene-fullflow">
+  <div class="scene-header">
+    <h2>7. Full Flow Demo — Streaming → Discovery → Surprise → Safety</h2>
+    <p>Complete user journey: Pins stream in → companion nudge → toggle to Surprise Me → teleport → safety banner → new area. The engagement flywheel.</p>
+  </div>
+  <div class="scene-grid">
+    <div class="phone" id="phone-fullflow">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+        <div class="area-header"><div class="area-strip" id="ff-strip"><div class="area-name"><span class="flag" id="ff-flag">🇦🇪</span><span class="name" id="ff-name">Dubai</span><span class="meta" id="ff-meta">· First visit · ☁ 76°F · 9:18 PM</span></div><div class="area-right"><span class="safety-dot green" id="ff-safety-dot"></span></div></div></div>
+        <div class="search-bar"><div class="search-pill"><div class="search-left"><span class="search-icon">📍</span><span class="search-text" id="ff-search">Dubai</span></div><span class="pin-counter" id="ff-counter">0</span><button class="search-close">✕</button></div></div>
+        <div class="open-nearby" id="ff-nearby"><span>0 open nearby</span></div>
+        <div class="toggle-pill-track"><div class="toggle-pill"><div class="toggle-indicator left" id="ff-toggle-ind"></div><div class="toggle-option active" id="ff-toggle-search"><span>↻</span> Search here</div><div class="toggle-option" id="ff-toggle-surprise"><span>🎲</span> Surprise me</div></div></div>
+        <div class="discovering-label" id="ff-discovering"><span class="dot"></span><span>Discovering...</span></div>
+        <div class="escalation-indicator" id="ff-escalation"><span>🧭</span><span id="ff-esc-text">Further out</span></div>
+
+        <div class="map-pin" id="ff-pin1" style="top: 300px; left: 80px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin" id="ff-pin2" style="top: 370px; left: 200px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+        <div class="map-pin" id="ff-pin3" style="top: 260px; left: 260px;"><div class="pin-marker luxury"><span class="icon">✨</span></div></div>
+
+        <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Visited</div></div>
+        <div class="vibe-stack"><div class="vibe-fab">Luxury</div><div class="vibe-fab">Modern</div><div class="vibe-fab">Desert</div></div>
+
+        <div class="companion-bubble" id="ff-bubble" style="bottom: 60px; right: 60px;"></div>
+
+        <div class="teleport-overlay" id="ff-teleport"><div class="teleport-destination" id="ff-dest-name"></div><div class="teleport-subtitle" id="ff-dest-sub"></div><div class="teleport-distance" id="ff-dest-dist"></div></div>
+
+        <div class="safety-banner orange-banner" id="ff-safety-banner">
+          <span class="icon">⚠️</span>
+          <div class="text"><div class="title">Travel Advisory — Level 3: Reconsider Travel</div><div class="desc">Parts of this region have active security concerns.</div><div class="actions"><button>Learn More</button><button onclick="document.getElementById('ff-safety-banner').classList.remove('visible')">Dismiss</button></div></div>
+          <button class="close-btn" onclick="document.getElementById('ff-safety-banner').classList.remove('visible')">✕</button>
+        </div>
+
+        <div class="bottom-card" id="ff-card">
+          <div class="card-image"><div class="fallback historic">🏛</div><div class="photo-count">1/3</div></div>
+          <div class="card-body">
+            <div class="card-title" id="ff-card-title">Dubai Museum</div>
+            <div class="card-subtitle" id="ff-card-sub">Al Fahidi Fort · Historic</div>
+            <div class="card-vibes"><span class="vibe-tag">Historic</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.5</span><span class="open">● Open</span></div>
+            <div class="card-action-row"><span class="card-action-link">🏷 Visit</span><span class="card-action-link">🧭 Get There</span><span class="card-action-link">Details →</span></div>
+          </div>
+        </div>
+
+        <div class="carousel-dots" id="ff-dots"><div class="dot" id="ff-dot1"></div><div class="dot" id="ff-dot2"></div><div class="dot" id="ff-dot3"></div></div>
+
+        <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align: center; padding: 16px;">
+    <button class="nav-btn" onclick="runFullFlowDemo()" style="background: #2a6b3f; border-color: #3a8b5f; color: #fff; padding: 12px 24px; font-size: 14px;">▶ Play Full Flow</button>
+    <button class="nav-btn" onclick="resetFullFlow()" style="margin-left: 8px;">↺ Reset</button>
+    <p style="color: #666; font-size: 12px; margin-top: 8px;">Watch: Stream 3 pins → companion nudge → teleport to Istanbul → safety banner → new streaming</p>
+  </div>
+</div>
+
+<!-- SCENE 8: Simplified Card Actions + Ghost Pins -->
+<div class="scene" id="scene-ghostcards">
+  <div class="scene-header">
+    <h2>8. Simplified Card Actions + Pin States</h2>
+    <p>All results shown — nothing filtered. <strong>Saved</strong> POIs are HIGHLIGHTED (glow + badge). <strong>Visited/closed</strong> are DIMMED (ghost, 50% opacity). Map card simplified to 3 actions: <strong>Save</strong> / <strong>Go</strong> / <strong>Details</strong>.</p>
+    <div style="margin-top: 8px; font-size: 12px; color: #888; line-height: 1.6;">
+      <span style="color: #3fb950;">Decision:</span> Never filter results — users perceive fewer results as low quality. Saved = highlighted (they matter). Visited/closed = dimmed (done/unavailable).<br>
+      <span style="color: #f0c040;">Key insight:</span> Saved pins should stand out MORE not less. They're places the user actively cares about.
+    </div>
+  </div>
+  <div class="scene-grid">
+    <!-- Phone 1: All results shown — saved highlighted, visited dimmed -->
+    <div style="text-align: center;">
+      <div style="font-size: 13px; color: #888; margin-bottom: 8px;">All results shown — saved highlighted, visited dimmed</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="map-bg"><div class="map-grid"></div></div>
+
+          <!-- Area header (matching Scene 3) -->
+          <div class="area-header">
+            <div class="area-strip">
+              <div class="area-name"><span class="flag">🇧🇿</span><span class="name">Belize City</span><span class="meta">· 2nd visit · ☀ 84°F · 2:30 PM</span></div>
+              <div class="area-right"><span class="safety-dot green"></span></div>
+            </div>
+          </div>
+
+          <!-- Search bar (matching Scene 3) -->
+          <div class="search-bar">
+            <div class="search-pill">
+              <div class="search-left"><span class="search-icon">📍</span><span class="search-text">Belize City</span></div>
+              <div class="search-count"><span class="pin-counter">5</span></div>
+              <button class="search-close">✕</button>
+            </div>
+          </div>
+
+          <!-- Open nearby (matching Scene 3) -->
+          <div class="open-nearby">
+            <span>3 open nearby</span>
+            <span class="count-badge"><span class="cb-green">●3</span></span>
+          </div>
+
+          <!-- Toggle pill (matching Scene 3) -->
+          <div class="toggle-pill-track">
+            <div class="toggle-pill">
+              <div class="toggle-indicator left"></div>
+              <div class="toggle-option active"><span>↻</span> Search here</div>
+              <div class="toggle-option"><span>🎲</span> Surprise me</div>
+            </div>
+          </div>
+
+          <!-- Pin legend -->
+          <div class="ghost-legend" style="top: 250px;">
+            <div class="legend-row"><div class="legend-dot fresh"></div> Fresh discovery</div>
+            <div class="legend-row"><div class="legend-dot fresh" style="box-shadow: 0 0 8px 2px #58a6ff;"></div> Saved <span style="color:#58a6ff;">♡</span></div>
+            <div class="legend-row"><div class="legend-dot ghost-vis"></div> Visited <span style="color:#888;">✓</span></div>
+          </div>
+
+          <!-- Fresh pins (full opacity — new discoveries) -->
+          <div class="map-pin visible" style="top: 310px; left: 60px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+          <div class="map-pin visible" style="top: 380px; left: 180px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+          <div class="map-pin visible" style="top: 330px; left: 270px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+
+          <!-- Saved pin — HIGHLIGHTED with glow + badge -->
+          <div class="map-pin visible saved-pin" style="top: 290px; left: 160px;">
+            <div class="pin-marker food" style="box-shadow: 0 0 14px 4px rgba(88,166,255,0.5);"><span class="icon">🍽</span></div>
+            <div class="ghost-badge saved">♡</div>
+          </div>
+
+          <!-- Visited pin — DIMMED ghost -->
+          <div class="map-pin visible ghost" style="top: 410px; left: 80px;">
+            <div class="pin-marker historic"><span class="icon">🏛</span></div>
+            <div class="ghost-badge">✓</div>
+          </div>
+
+          <div class="callout arrow-left" style="top: 406px; left: 108px;">Visited — dimmed (50% opacity + ✓)</div>
+          <div class="callout arrow-left" style="top: 286px; left: 195px;">Saved — HIGHLIGHTED (glow + ♡)</div>
+          <div class="callout arrow-right" style="top: 326px; right: 108px;">Fresh — full opacity, normal</div>
+
+          <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Saved</div></div>
+
+          <!-- Info card — compact with bg image + ♡ -->
+          <div class="bottom-card visible" style="cursor: pointer;">
+            <div class="card-image" style="height: 60px; position: relative;">
+              <div class="fallback food" style="background: linear-gradient(135deg, #2a1a0a, #3a2a1a); font-size: 30px;">🍽</div>
+              <div onclick="toggleSave(this); event.stopPropagation();" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;z-index:2;">♡</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Nerie's Tacos</div>
+              <div class="card-subtitle">Street Food · Belize City · 350m</div>
+              <div class="card-vibes"><span class="vibe-tag food">Food</span><span class="vibe-tag" style="background:rgba(63,185,80,0.2);color:#3fb950;">Local Gem</span></div>
+              <div class="card-meta"><span class="rating">⭐ 4.8</span><span class="open">● Open</span><span>· $</span></div>
+              <div style="font-size:11px;color:#999;margin-top:4px;font-style:italic;">"Best street tacos in Belize — locals line up at lunch"</div>
+            </div>
+          </div>
+          <div class="callout arrow-up" style="bottom: 118px; right: 30px;">♡ = quick save · tap card = detail page</div>
+
+          <div class="carousel-dots">
+            <div class="dot visible active" style="width:10px;height:10px;background:#fff;"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);background:#58a6ff;"></div>
+          </div>
+          <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phone 2: Tapping a visited ghost pin -->
+    <div style="text-align: center;">
+      <div style="font-size: 13px; color: #888; margin-bottom: 8px;">Tapping a visited ghost pin — dimmed, "Go Again"</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="map-bg"><div class="map-grid"></div></div>
+
+          <!-- Area header (matching Scene 3) -->
+          <div class="area-header">
+            <div class="area-strip">
+              <div class="area-name"><span class="flag">🇧🇿</span><span class="name">Belize City</span><span class="meta">· 2nd visit · ☀ 84°F · 2:30 PM</span></div>
+              <div class="area-right"><span class="safety-dot green"></span></div>
+            </div>
+          </div>
+
+          <!-- Search bar (matching Scene 3) -->
+          <div class="search-bar">
+            <div class="search-pill">
+              <div class="search-left"><span class="search-icon">📍</span><span class="search-text">Belize City</span></div>
+              <div class="search-count"><span class="pin-counter">5</span></div>
+              <button class="search-close">✕</button>
+            </div>
+          </div>
+
+          <!-- Open nearby (matching Scene 3) -->
+          <div class="open-nearby">
+            <span>3 open nearby</span>
+            <span class="count-badge"><span class="cb-green">●3</span></span>
+          </div>
+
+          <!-- Toggle pill (matching Scene 3) -->
+          <div class="toggle-pill-track">
+            <div class="toggle-pill">
+              <div class="toggle-indicator left"></div>
+              <div class="toggle-option active"><span>↻</span> Search here</div>
+              <div class="toggle-option"><span>🎲</span> Surprise me</div>
+            </div>
+          </div>
+
+          <!-- Fresh pins -->
+          <div class="map-pin visible" style="top: 310px; left: 60px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+          <div class="map-pin visible" style="top: 380px; left: 180px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+          <div class="map-pin visible" style="top: 330px; left: 270px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+
+          <!-- Saved pin — highlighted -->
+          <div class="map-pin visible saved-pin" style="top: 290px; left: 160px;">
+            <div class="pin-marker food" style="box-shadow: 0 0 14px 4px rgba(88,166,255,0.5);"><span class="icon">🍽</span></div>
+            <div class="ghost-badge saved">♡</div>
+          </div>
+
+          <!-- Visited pin — ghost, FOCUSED/TAPPED -->
+          <div class="map-pin visible ghost focused" style="top: 410px; left: 80px;">
+            <div class="pin-marker historic"><span class="icon">🏛</span></div>
+            <div class="ghost-badge">✓</div>
+          </div>
+
+          <div class="callout arrow-down" style="top: 366px; left: 50%; transform: translateX(-50%);">Ghost pin tapped — shows visited card</div>
+
+          <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Saved</div></div>
+
+          <!-- Card for ghost pin — visited state -->
+          <div class="bottom-card visible">
+            <div class="card-image" style="height: 60px; position: relative;">
+              <div class="fallback historic" style="font-size: 30px;">🏛</div>
+              <div style="position:absolute;top:8px;right:8px;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(63,185,80,0.15);color:#3fb950;">✓ Visited</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Caracol Maya Site</div>
+              <div class="card-subtitle">Ancient Maya Ruins · Cayo District</div>
+              <div class="card-vibes"><span class="vibe-tag">Historic</span><span class="vibe-tag" style="background:rgba(244,112,103,0.2);color:#f47067;">Adventure</span></div>
+              <div class="card-meta"><span class="rating">⭐ 4.7</span><span style="color: #888;">Visited Mar 12</span></div>
+            </div>
+          </div>
+          <div class="callout arrow-up" style="bottom: 118px; left: 50%; transform: translateX(-50%);">Already saved → "Go Again" instead of "Save"</div>
+
+          <div class="carousel-dots">
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+          </div>
+          <div class="bottom-bar"><div class="bottom-input">Hidden gems nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div style="padding: 16px 24px; background: #111; border-top: 1px solid #222;">
+    <h3 style="font-size: 14px; margin-bottom: 8px;">Design Decisions Captured</h3>
+    <ul style="font-size: 12px; color: #aaa; line-height: 1.8; padding-left: 20px;">
+      <li><strong style="color:#fff;">All results shown</strong> — NEVER filter results. Fewer results = perceived low quality. Saved and visited POIs appear in search alongside fresh ones.</li>
+      <li><strong style="color:#fff;">Saved pins = HIGHLIGHTED</strong> — glow effect + ♡ badge. These are places the user cares about — they should stand out MORE.</li>
+      <li><strong style="color:#fff;">Visited/closed = DIMMED</strong> — ghost pin at 50% opacity + ✓ badge. De-prioritized but visible for spatial awareness.</li>
+      <li><strong style="color:#fff;">Card = info preview + ♡ only</strong> — no action buttons. Rich info display: image, name, vibes, rating, status, price, distance, AI snippet. One ♡ heart for quick save. Tap card body → detail page.</li>
+      <li><strong style="color:#fff;">Detail page = action center</strong> — Save/Unsave, Go Now, Go Later, AI planning, image carousel, full narrative. All CTAs live where the AI agent has full context.</li>
+      <li><strong style="color:#fff;">Saved places list</strong> = personal collection with Go Now / Go Later / Remove. Planning workflow lives here.</li>
+      <li><strong style="color:#fff;">Quick ♡ during slideshow</strong> — tap heart without interrupting rotation. Like Instagram double-tap.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- SCENE 9: Teleportation Ambient UX -->
+<div class="scene" id="scene-ambient">
+  <div class="scene-header">
+    <h2>9. Teleportation Ambient — "Being There"</h2>
+    <p>When exploring remote areas, the map adapts to the local time of day. Area header extends with timezone offset, currency, language. Sky gradient tints the top edge. The whole screen whispers "it's 3 AM there."</p>
+    <div style="margin-top: 8px; font-size: 12px; color: #888; line-height: 1.6;">
+      <span style="color: #3fb950;">Key:</span> Day/night map style is the highest-impact single feature — instant sense of place. Ambient strip consolidates all contextual info.<br>
+      <span style="color: #f0c040;">Tap buttons below</span> to teleport between locations and see the ambient shift.
+    </div>
+  </div>
+  <div class="scene-grid">
+    <!-- Phone 1: Tokyo at 3 AM (deep night) -->
+    <div style="text-align: center;">
+      <div style="font-size: 13px; color: #888; margin-bottom: 8px;">Tokyo · 3:17 AM — deep night</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="map-bg night" id="amb1-map"><div class="map-grid"></div></div>
+          <div class="sky-gradient night" id="amb1-sky"></div>
+          <div class="night-dim" id="amb1-dim"></div>
+
+          <div class="area-header">
+            <div class="area-strip">
+              <div class="area-name">
+                <span class="flag" id="amb1-flag">🇯🇵</span>
+                <span class="name" id="amb1-name">Tokyo</span>
+                <span class="meta" id="amb1-meta">· First visit · 🌙 41°F</span>
+              </div>
+              <div class="area-right"><span class="safety-dot green"></span></div>
+            </div>
+            <div class="ambient-meta" id="amb1-ambient">
+              <span class="offset" id="amb1-offset">3:17 AM · +14h from you</span>
+              <span>·</span>
+              <span class="currency" id="amb1-currency">¥ JPY</span>
+              <span>·</span>
+              <span class="lang" id="amb1-lang">Japanese</span>
+            </div>
+          </div>
+
+          <div class="search-bar">
+            <div class="search-pill">
+              <div class="search-left"><span class="search-icon">📍</span><span class="search-text" id="amb1-search">Tokyo</span></div>
+              <div class="search-count"><span class="pin-counter">5</span></div>
+              <button class="search-close">✕</button>
+            </div>
+          </div>
+
+          <div class="open-nearby">
+            <span id="amb1-nearby">1 open nearby</span>
+            <span class="count-badge"><span class="cb-green">●1</span> <span class="cb-red">●4</span></span>
+          </div>
+
+          <div class="toggle-pill-track">
+            <div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div>
+          </div>
+
+          <!-- Pins — muted at night -->
+          <div class="map-pin visible" style="top: 310px; left: 60px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+          <div class="map-pin visible" style="top: 360px; left: 170px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+          <div class="map-pin visible" style="top: 290px; left: 250px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+          <div class="map-pin visible" style="top: 400px; left: 100px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+          <div class="map-pin visible" style="top: 340px; left: 290px;"><div class="pin-marker luxury"><span class="icon">✨</span></div></div>
+
+          <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Saved</div></div>
+
+          <!-- Companion bubble — night context -->
+          <div class="companion-orb" style="right: 14px; bottom: 230px;">✦</div>
+          <div class="companion-bubble visible" style="bottom: 232px; right: 70px; opacity: 1; transform: translateX(0);">It's 3 AM in Tokyo — the izakayas are closing, but the ramen shops glow.</div>
+
+          <div class="callout arrow-down" style="top: 72px; left: 12px;">Ambient strip: time + offset + currency + language</div>
+          <div class="callout arrow-right" style="top: 4px; right: 60px;">Sky gradient — dark navy at night</div>
+
+          <div class="bottom-card visible" style="cursor: pointer;">
+            <div class="card-image" style="height: 60px; position: relative;">
+              <div class="fallback food" style="background: linear-gradient(135deg, #1a1008, #2a1a0a); font-size: 30px;">🍜</div>
+              <div style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;z-index:2;">♡</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Ichiran Ramen Shibuya</div>
+              <div class="card-subtitle">Tonkotsu Ramen · Shibuya · 200m</div>
+              <div class="card-vibes"><span class="vibe-tag food">Food</span></div>
+              <div class="card-meta"><span class="rating">⭐ 4.7</span><span class="open">● Open 24h</span><span>· ¥ $$</span></div>
+              <div style="font-size:11px;color:#999;margin-top:4px;font-style:italic;">"Solo ramen booth — slurp in peace at 3 AM"</div>
+            </div>
+          </div>
+
+          <div class="carousel-dots">
+            <div class="dot visible active" style="width:10px;height:10px;background:#fff;opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+          </div>
+          <div class="bottom-bar"><div class="bottom-input">Late night spots?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phone 2: Santorini at golden hour -->
+    <div style="text-align: center;">
+      <div style="font-size: 13px; color: #888; margin-bottom: 8px;">Santorini · 7:45 PM — golden hour</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="map-bg golden"><div class="map-grid"></div></div>
+          <div class="sky-gradient golden"></div>
+
+          <div class="area-header">
+            <div class="area-strip">
+              <div class="area-name">
+                <span class="flag">🇬🇷</span>
+                <span class="name">Santorini</span>
+                <span class="meta">· First visit · ☀ 72°F</span>
+              </div>
+              <div class="area-right"><span class="safety-dot green"></span></div>
+            </div>
+            <div class="ambient-meta">
+              <span class="offset">7:45 PM · +4h from you</span>
+              <span>·</span>
+              <span class="currency">€ EUR</span>
+              <span>·</span>
+              <span class="lang">Greek</span>
+            </div>
+          </div>
+
+          <div class="search-bar">
+            <div class="search-pill">
+              <div class="search-left"><span class="search-icon">📍</span><span class="search-text">Santorini</span></div>
+              <div class="search-count"><span class="pin-counter">4</span></div>
+              <button class="search-close">✕</button>
+            </div>
+          </div>
+
+          <div class="open-nearby">
+            <span>4 open nearby</span>
+            <span class="count-badge"><span class="cb-green">●4</span></span>
+          </div>
+
+          <div class="toggle-pill-track">
+            <div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div>
+          </div>
+
+          <div class="map-pin visible" style="top: 300px; left: 80px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+          <div class="map-pin visible" style="top: 350px; left: 200px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+          <div class="map-pin visible" style="top: 280px; left: 260px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+          <div class="map-pin visible" style="top: 390px; left: 120px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+
+          <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Saved</div></div>
+
+          <div class="companion-orb" style="right: 14px; bottom: 230px;">✦</div>
+          <div class="companion-bubble visible" style="bottom: 232px; right: 70px; opacity: 1; transform: translateX(0);">Golden hour in Santorini — the caldera glows. Perfect timing.</div>
+
+          <div class="callout arrow-right" style="top: 4px; right: 60px;">Warm golden sky gradient</div>
+          <div class="callout arrow-left" style="top: 300px; left: 20px;">Map tinted warm amber</div>
+
+          <div class="bottom-card visible" style="cursor: pointer;">
+            <div class="card-image" style="height: 60px; position: relative;">
+              <div class="fallback culture" style="background: linear-gradient(135deg, #2a2010, #3a3020); font-size: 30px;">🏛</div>
+              <div style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;z-index:2;">♡</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Oia Sunset Point</div>
+              <div class="card-subtitle">Iconic Viewpoint · Oia · 1.2 km</div>
+              <div class="card-vibes"><span class="vibe-tag" style="background:rgba(210,168,255,0.2);color:#d2a8ff;">Scenic</span><span class="vibe-tag culture">Culture</span></div>
+              <div class="card-meta"><span class="rating">⭐ 4.9</span><span class="open">● Open</span><span>· Free</span></div>
+              <div style="font-size:11px;color:#999;margin-top:4px;font-style:italic;">"Arrive 30 min early — the crowd builds fast at sunset"</div>
+            </div>
+          </div>
+
+          <div class="carousel-dots">
+            <div class="dot visible active" style="width:10px;height:10px;background:#fff;opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+          </div>
+          <div class="bottom-bar"><div class="bottom-input">Best sunset spots?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phone 3: Reykjavik at midday (bright day) -->
+    <div style="text-align: center;">
+      <div style="font-size: 13px; color: #888; margin-bottom: 8px;">Reykjavik · 12:30 PM — bright day</div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="map-bg day"><div class="map-grid"></div></div>
+          <div class="sky-gradient day"></div>
+
+          <div class="area-header">
+            <div class="area-strip">
+              <div class="area-name">
+                <span class="flag">🇮🇸</span>
+                <span class="name">Reykjavik</span>
+                <span class="meta">· First visit · ❄ 34°F</span>
+              </div>
+              <div class="area-right"><span class="safety-dot green"></span></div>
+            </div>
+            <div class="ambient-meta">
+              <span class="offset">12:30 PM · +5h from you</span>
+              <span>·</span>
+              <span class="currency">ISK</span>
+              <span>·</span>
+              <span class="lang">Icelandic</span>
+            </div>
+          </div>
+
+          <div class="search-bar">
+            <div class="search-pill">
+              <div class="search-left"><span class="search-icon">📍</span><span class="search-text">Reykjavik</span></div>
+              <div class="search-count"><span class="pin-counter">4</span></div>
+              <button class="search-close">✕</button>
+            </div>
+          </div>
+
+          <div class="open-nearby">
+            <span>4 open nearby</span>
+            <span class="count-badge"><span class="cb-green">●4</span></span>
+          </div>
+
+          <div class="toggle-pill-track">
+            <div class="toggle-pill"><div class="toggle-indicator left"></div><div class="toggle-option active"><span>↻</span> Search here</div><div class="toggle-option"><span>🎲</span> Surprise me</div></div>
+          </div>
+
+          <div class="map-pin visible" style="top: 310px; left: 70px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+          <div class="map-pin visible" style="top: 350px; left: 190px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+          <div class="map-pin visible" style="top: 280px; left: 260px;"><div class="pin-marker adventure"><span class="icon">🏔</span></div></div>
+          <div class="map-pin visible" style="top: 390px; left: 110px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+
+          <div class="fab-stack"><button class="fab-btn profile">👤</button><div class="fab-label">Profile</div><button class="fab-btn visited">📍</button><div class="fab-label">Saved</div></div>
+
+          <div class="companion-orb" style="right: 14px; bottom: 230px;">✦</div>
+          <div class="companion-bubble visible" style="bottom: 232px; right: 70px; opacity: 1; transform: translateX(0);">Iceland in winter — only 5 hours of daylight. Make them count!</div>
+
+          <div class="callout arrow-right" style="top: 4px; right: 60px;">Cooler blue-green tint — day</div>
+
+          <div class="bottom-card visible" style="cursor: pointer;">
+            <div class="card-image" style="height: 60px; position: relative;">
+              <div class="fallback nature" style="background: linear-gradient(135deg, #0a1a1a, #1a2a2a); font-size: 30px;">🏔</div>
+              <div style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;z-index:2;">♡</div>
+            </div>
+            <div class="card-body">
+              <div class="card-title">Blue Lagoon</div>
+              <div class="card-subtitle">Geothermal Spa · Grindavík · 45 km</div>
+              <div class="card-vibes"><span class="vibe-tag nature">Nature</span><span class="vibe-tag" style="background:rgba(210,168,255,0.2);color:#d2a8ff;">Luxury</span></div>
+              <div class="card-meta"><span class="rating">⭐ 4.6</span><span class="open">● Open</span><span>· $$$</span></div>
+              <div style="font-size:11px;color:#999;margin-top:4px;font-style:italic;">"Book 2 weeks ahead — walk-ins almost never available"</div>
+            </div>
+          </div>
+
+          <div class="carousel-dots">
+            <div class="dot visible active" style="width:10px;height:10px;background:#fff;opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+            <div class="dot visible" style="opacity:1;transform:scale(1);"></div>
+          </div>
+          <div class="bottom-bar"><div class="bottom-input">Adventure spots nearby?</div><div class="bottom-bar-btn">⏸</div><div class="bottom-bar-btn companion-btn">✦</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding: 16px 24px; background: #111; border-top: 1px solid #222;">
+    <h3 style="font-size: 14px; margin-bottom: 8px;">Ambient UX Components</h3>
+    <table style="font-size: 12px; color: #aaa; width: 100%; border-collapse: collapse;">
+      <tr style="border-bottom: 1px solid #333;">
+        <td style="padding: 6px; color: #fff; font-weight: 600;">Component</td>
+        <td style="padding: 6px; color: #fff; font-weight: 600;">Night (3 AM)</td>
+        <td style="padding: 6px; color: #fff; font-weight: 600;">Golden (7:45 PM)</td>
+        <td style="padding: 6px; color: #fff; font-weight: 600;">Day (12:30 PM)</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #222;">
+        <td style="padding: 6px;">Map tint</td>
+        <td style="padding: 6px;">Deep navy/black</td>
+        <td style="padding: 6px;">Warm amber</td>
+        <td style="padding: 6px;">Cool blue-green</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #222;">
+        <td style="padding: 6px;">Sky gradient</td>
+        <td style="padding: 6px;">Dark navy edge</td>
+        <td style="padding: 6px;">Golden glow</td>
+        <td style="padding: 6px;">Light blue hint</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #222;">
+        <td style="padding: 6px;">Weather icon</td>
+        <td style="padding: 6px;">🌙</td>
+        <td style="padding: 6px;">☀ (setting)</td>
+        <td style="padding: 6px;">❄ (winter)</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #222;">
+        <td style="padding: 6px;">Ambient strip</td>
+        <td style="padding: 6px;">3:17 AM · +14h · ¥ JPY · Japanese</td>
+        <td style="padding: 6px;">7:45 PM · +4h · € EUR · Greek</td>
+        <td style="padding: 6px;">12:30 PM · +5h · ISK · Icelandic</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #222;">
+        <td style="padding: 6px;">Companion tone</td>
+        <td style="padding: 6px;">Intimate, quiet</td>
+        <td style="padding: 6px;">Romantic, excited</td>
+        <td style="padding: 6px;">Adventurous, practical</td>
+      </tr>
+      <tr>
+        <td style="padding: 6px;">Open nearby</td>
+        <td style="padding: 6px;">1 open (most closed)</td>
+        <td style="padding: 6px;">4 open (evening)</td>
+        <td style="padding: 6px;">4 open (midday)</td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<script>
+  // --- Save toggle for ghost cards demo ---
+  function toggleSave(el) {
+    if (el.classList.contains('saved-state')) {
+      el.classList.remove('saved-state');
+      el.innerHTML = '<span class="icon">♡</span> Save';
+      el.style.color = '';
+      el.style.borderColor = '';
+    } else {
+      el.classList.add('saved-state');
+      el.innerHTML = '<span class="icon">✓</span> Saved';
+      el.style.color = '#3fb950';
+      el.style.borderColor = 'rgba(63,185,80,0.3)';
+    }
+  }
+
+  // --- Scene navigation ---
+  function showScene(id) {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('scene-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  // --- Scene 1: Streaming Demo ---
+  let streamingTimer = null;
+  const s1Pois = [
+    { title: 'Dubai Museum', sub: 'Al Fahidi Fort · Historic' },
+    { title: 'Pierchic', sub: 'Seafood · Al Qasr · Food' },
+    { title: 'The Dubai Mall', sub: 'Luxury Shopping · Downtown' },
+    { title: 'Ras Al Khor Wildlife', sub: 'Flamingo Sanctuary · Nature' },
+    { title: 'Dubai Opera', sub: 'Performing Arts · Culture' }
+  ];
+
+  function runStreamingDemo() {
+    resetStreamingDemo();
+    const counter = document.getElementById('s1-counter');
+    const discovering = document.getElementById('s1-discovering');
+    const card = document.getElementById('s1-card');
+    const calloutCounter = document.getElementById('s1-callout-counter');
+    const calloutDots = document.getElementById('s1-callout-dots');
+    const calloutDiscover = document.getElementById('s1-callout-discover');
+
+    discovering.classList.add('visible');
+    counter.classList.add('streaming');
+    calloutDiscover.style.display = 'block';
+
+    let pinIndex = 0;
+    streamingTimer = setInterval(() => {
+      if (pinIndex >= 5) {
+        clearInterval(streamingTimer);
+        discovering.classList.remove('visible');
+        counter.classList.remove('streaming');
+        calloutDiscover.style.display = 'none';
+        // Show companion bubble
+        return;
+      }
+
+      // Show pin
+      document.getElementById('s1-pin' + (pinIndex + 1)).classList.add('visible');
+      // Show dot
+      const dot = document.getElementById('s1-dot' + (pinIndex + 1));
+      dot.classList.add('visible');
+      // Update active dot
+      document.querySelectorAll('#s1-dots .dot').forEach(d => {
+        d.classList.remove('active');
+        d.style.width = '';
+        d.style.height = '';
+        d.style.background = '';
+      });
+      dot.classList.add('active');
+      dot.style.width = '10px';
+      dot.style.height = '10px';
+      dot.style.background = '#fff';
+
+      // Update counter
+      counter.textContent = pinIndex + 1;
+      if (pinIndex < 4) {
+        counter.innerHTML = (pinIndex + 1) + '<span class="spinner"></span>';
+      }
+
+      // Show card on first pin
+      if (pinIndex === 0) {
+        card.classList.add('visible');
+      }
+
+      // Update card
+      document.getElementById('s1-card-title').textContent = s1Pois[pinIndex].title;
+      document.getElementById('s1-card-sub').textContent = s1Pois[pinIndex].sub;
+
+      // Show callouts at right times
+      if (pinIndex === 1) {
+        calloutCounter.style.display = 'block';
+      }
+      if (pinIndex === 2) {
+        calloutDots.style.display = 'block';
+      }
+
+      pinIndex++;
+    }, 1500);
+  }
+
+  function resetStreamingDemo() {
+    if (streamingTimer) clearInterval(streamingTimer);
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById('s1-pin' + i).classList.remove('visible', 'focused');
+      const dot = document.getElementById('s1-dot' + i);
+      dot.classList.remove('visible', 'active');
+      dot.style.width = '';
+      dot.style.height = '';
+      dot.style.background = '';
+    }
+    document.getElementById('s1-counter').textContent = '0';
+    document.getElementById('s1-counter').classList.remove('streaming');
+    document.getElementById('s1-discovering').classList.remove('visible');
+    document.getElementById('s1-card').classList.remove('visible');
+    document.getElementById('s1-callout-counter').style.display = 'none';
+    document.getElementById('s1-callout-dots').style.display = 'none';
+  }
+
+  // --- Scene 2: Slideshow ---
+  let slideshowIdx = 0;
+  let slideshowTimer = null;
+  const ssPois = [
+    { title: 'Caracol Maya Site', sub: 'Ancient Maya Ruins · Historic', icon: '🏛', vibe: 'historic', vibeTag: 'Historic' },
+    { title: 'Blue Hole', sub: 'Natural Wonder · Nature', icon: '🌿', vibe: 'nature', vibeTag: 'Nature' },
+    { title: 'ATM Cave', sub: 'Archaeological · Adventure', icon: '🏔', vibe: 'adventure', vibeTag: 'Adventure' },
+    { title: 'Lamanai Temples', sub: 'Ancient Ruins · Culture', icon: '🎭', vibe: 'culture', vibeTag: 'Culture' },
+    { title: 'Elvi\'s Kitchen', sub: 'Local Cuisine · Food', icon: '🍽', vibe: 'food', vibeTag: 'Food' }
+  ];
+
+  function slideshowGoTo(idx) {
+    slideshowIdx = idx;
+    updateSlideshow();
+  }
+
+  function slideshowNext() {
+    slideshowIdx = (slideshowIdx + 1) % 5;
+    updateSlideshow();
+  }
+
+  function slideshowPrev() {
+    slideshowIdx = (slideshowIdx - 1 + 5) % 5;
+    updateSlideshow();
+  }
+
+  function updateSlideshow() {
+    const poi = ssPois[slideshowIdx];
+    document.getElementById('ss-card-title').textContent = poi.title;
+    document.getElementById('ss-card-sub').textContent = poi.sub;
+    document.getElementById('ss-card-img').textContent = poi.icon;
+    document.getElementById('ss-card-img').className = 'fallback ' + poi.vibe;
+    document.getElementById('ss-card-vibes').innerHTML = '<span class="vibe-tag ' + poi.vibe + '">' + poi.vibeTag + '</span>';
+
+    // Update dots
+    for (let i = 0; i < 5; i++) {
+      const dot = document.getElementById('ss-dot' + (i + 1));
+      dot.classList.remove('active', 'slideshow');
+      dot.style.width = '';
+      dot.style.height = '';
+      dot.style.background = '';
+      dot.innerHTML = '<svg class="progress-ring" viewBox="0 0 18 18"><circle class="bg" cx="9" cy="9" r="7"/><circle class="fg" cx="9" cy="9" r="7"/></svg>';
+    }
+    const activeDot = document.getElementById('ss-dot' + (slideshowIdx + 1));
+    activeDot.classList.add('active', 'slideshow');
+    activeDot.style.width = '10px';
+    activeDot.style.height = '10px';
+    activeDot.style.background = '#fff';
+
+    // Update pin focus
+    for (let i = 1; i <= 5; i++) {
+      document.getElementById('ss-pin' + i).classList.remove('focused');
+    }
+    document.getElementById('ss-pin' + (slideshowIdx + 1)).classList.add('focused');
+  }
+
+  function runSlideshowDemo() {
+    if (slideshowTimer) clearInterval(slideshowTimer);
+    slideshowIdx = 0;
+    updateSlideshow();
+    slideshowTimer = setInterval(() => {
+      slideshowIdx = (slideshowIdx + 1) % 5;
+      updateSlideshow();
+    }, 4000); // 4s for demo speed
+  }
+
+  function resetSlideshowDemo() {
+    if (slideshowTimer) clearInterval(slideshowTimer);
+    slideshowIdx = 0;
+    updateSlideshow();
+  }
+
+  // --- Scene 3: Toggle Pill + Surprise Me ---
+  let discoveryMode = 'search';
+
+  function toggleDiscoveryMode(mode) {
+    const indicator = document.getElementById('surp-indicator');
+    const optSearch = document.getElementById('surp-opt-search');
+    const optSurprise = document.getElementById('surp-opt-surprise');
+
+    if (mode === 'search') {
+      discoveryMode = 'search';
+      indicator.className = 'toggle-indicator left';
+      optSearch.classList.add('active');
+      optSurprise.classList.remove('active');
+    } else {
+      indicator.className = 'toggle-indicator right';
+      optSurprise.classList.add('active');
+      optSearch.classList.remove('active');
+      if (discoveryMode === 'surprise') {
+        // Already in surprise mode — escalate
+        triggerSurprise();
+      }
+      discoveryMode = 'surprise';
+    }
+  }
+
+  let surpriseLevel = 0;
+  const surpriseDestinations = [
+    { flag: '🇦🇪', name: 'Abu Dhabi', meta: '· ☁ 78°F · 9:45 PM', sub: 'United Arab Emirates', dist: '130 km from Dubai', level: 'Nearby', safety: 'green' },
+    { flag: '🇴🇲', name: 'Muscat', meta: '· ☀ 82°F · 10:18 PM', sub: 'Oman', dist: '450 km east', level: 'Further out', safety: 'green' },
+    { flag: '🇬🇷', name: 'Santorini', meta: '· ☀ 65°F · 7:18 PM', sub: 'Greece', dist: '3,200 km northwest', level: 'Across the world', safety: 'green' },
+  ];
+
+  function triggerSurprise() {
+    const dest = surpriseDestinations[surpriseLevel % 3];
+    const overlay = document.getElementById('surp-teleport');
+    const esc = document.getElementById('surp-escalation');
+    const bubble = document.getElementById('surp-bubble');
+
+    // Show companion bubble first
+    bubble.textContent = surpriseLevel === 0 ? 'I know a place nearby...' : surpriseLevel === 1 ? 'Let me take you further...' : 'How about across the world?';
+    bubble.classList.add('visible');
+
+    setTimeout(() => {
+      bubble.classList.remove('visible');
+
+      // Show escalation indicator
+      document.getElementById('surp-esc-text').textContent = dest.level;
+      esc.classList.add('visible');
+
+      // Teleport transition
+      document.getElementById('surp-dest-name').textContent = dest.flag + ' ' + dest.name;
+      document.getElementById('surp-dest-sub').textContent = dest.sub;
+      document.getElementById('surp-dest-dist').textContent = dest.dist;
+      overlay.classList.add('active');
+
+      setTimeout(() => {
+        overlay.classList.remove('active');
+        esc.classList.remove('visible');
+
+        // Update area header
+        document.getElementById('surp-flag').textContent = dest.flag;
+        document.getElementById('surp-name').textContent = dest.name;
+        document.getElementById('surp-meta').textContent = dest.meta;
+        document.getElementById('surp-search').textContent = dest.name;
+        document.getElementById('surp-counter').textContent = '0';
+        document.getElementById('surp-safety').className = 'safety-dot ' + dest.safety;
+      }, 2000);
+    }, 1200);
+
+    surpriseLevel++;
+  }
+
+  function resetSurprise() {
+    discoveryMode = 'search';
+    document.getElementById('surp-indicator').className = 'toggle-indicator left';
+    document.getElementById('surp-opt-search').classList.add('active');
+    document.getElementById('surp-opt-surprise').classList.remove('active');
+    surpriseLevel = 0;
+    document.getElementById('surp-flag').textContent = '🇦🇪';
+    document.getElementById('surp-name').textContent = 'Dubai';
+    document.getElementById('surp-meta').textContent = '· First visit · ☁ 76°F · 9:18 PM';
+    document.getElementById('surp-search').textContent = 'Dubai';
+    document.getElementById('surp-counter').textContent = '5';
+    document.getElementById('surp-safety').className = 'safety-dot green';
+    document.getElementById('surp-teleport').classList.remove('active');
+    document.getElementById('surp-escalation').classList.remove('visible');
+    document.getElementById('surp-bubble').classList.remove('visible');
+  }
+
+  // --- Scene 4: Safety ---
+  const safetyLevels = {
+    red: { flag: '🇾🇪', name: "Sana'a", meta: '· ☁ 68°F · 10:30 PM', dotClass: 'red', bannerClass: '', title: 'Travel Advisory — Level 4: Do Not Travel', desc: 'Armed conflict and terrorism. US State Dept advises against all travel.', gateLevel: 'Level 4: Do Not Travel', gateClass: 'red', showGate: true },
+    orange: { flag: '🇵🇰', name: 'Peshawar', meta: '· ☁ 72°F · 12:48 AM', dotClass: 'orange', bannerClass: 'orange-banner', title: 'Travel Advisory — Level 3: Reconsider Travel', desc: 'Terrorism and sectarian violence in border regions.', gateLevel: 'Level 3: Reconsider Travel', gateClass: 'orange', showGate: false },
+    yellow: { flag: '🇲🇽', name: 'Mexico City', meta: '· ☀ 70°F · 1:18 PM', dotClass: 'yellow', bannerClass: 'yellow-banner', title: 'Travel Advisory — Level 2: Exercise Caution', desc: 'Increased crime in certain areas. Standard precautions advised.', gateLevel: 'Level 2: Exercise Caution', gateClass: 'orange', showGate: false },
+    green: { flag: '🇯🇵', name: 'Kyoto', meta: '· ☀ 58°F · 4:18 AM', dotClass: 'green', bannerClass: '', title: '', desc: '', showGate: false },
+  };
+
+  function showSafetyDemo(level) {
+    const data = safetyLevels[level];
+    const banner = document.getElementById('safety-banner');
+    const gate = document.getElementById('safety-gate');
+    const bubble = document.getElementById('sf-bubble');
+
+    // Update area
+    document.getElementById('sf-flag').textContent = data.flag;
+    document.getElementById('sf-name').textContent = data.name;
+    document.getElementById('sf-meta').textContent = data.meta;
+    document.getElementById('sf-dot').className = 'safety-dot ' + data.dotClass;
+
+    // Reset
+    banner.classList.remove('visible', 'yellow-banner', 'orange-banner');
+    gate.classList.remove('active');
+    bubble.classList.remove('visible');
+
+    if (level === 'green') {
+      bubble.textContent = 'All clear! Japan is one of the safest countries to explore.';
+      bubble.classList.add('visible');
+      return;
+    }
+
+    // Show banner
+    setTimeout(() => {
+      if (data.bannerClass) banner.classList.add(data.bannerClass);
+      document.getElementById('safety-title').textContent = data.title;
+      document.getElementById('safety-desc').textContent = data.desc;
+      banner.classList.add('visible');
+
+      // Companion warning
+      bubble.textContent = 'Heads up — active advisory zone. Please check before exploring.';
+      bubble.classList.add('visible');
+    }, 300);
+
+    // Show gate for red zones
+    if (data.showGate) {
+      setTimeout(() => {
+        document.getElementById('gate-level').textContent = data.gateLevel;
+        document.getElementById('gate-level').className = 'advisory-level ' + data.gateClass;
+        gate.classList.add('active');
+      }, 1500);
+    }
+  }
+
+  function dismissBanner() {
+    document.getElementById('safety-banner').classList.remove('visible');
+  }
+
+  function showSafetyDetail() {
+    document.getElementById('safety-gate').classList.add('active');
+  }
+
+  function closeSafetyGate() {
+    document.getElementById('safety-gate').classList.remove('active');
+  }
+
+  function proceedPastGate() {
+    document.getElementById('safety-gate').classList.remove('active');
+    document.getElementById('sf-bubble').textContent = 'Proceeding with caution. Stay safe.';
+  }
+
+  // --- Scene 5: Images ---
+  function showFullscreen() {
+    document.getElementById('fullscreen-img').classList.add('active');
+  }
+
+  function hideFullscreen() {
+    document.getElementById('fullscreen-img').classList.remove('active');
+  }
+
+  // --- Scene 6: Get There ---
+  function showGetThereSheet() {
+    document.getElementById('gt-sheet').classList.add('visible');
+  }
+
+  function switchGetThereTab(tab) {
+    document.getElementById('gt-tab-now').classList.toggle('active', tab === 'now');
+    document.getElementById('gt-tab-later').classList.toggle('active', tab === 'later');
+    document.getElementById('gt-now').style.display = tab === 'now' ? 'block' : 'none';
+    document.getElementById('gt-later').style.display = tab === 'later' ? 'block' : 'none';
+  }
+
+  function selectTransport(el) {
+    el.parentElement.querySelectorAll('.transport-mode').forEach(m => m.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  // --- Scene 7: Full Flow ---
+  let ffTimer = null;
+
+  function runFullFlowDemo() {
+    resetFullFlow();
+    const counter = document.getElementById('ff-counter');
+    const discovering = document.getElementById('ff-discovering');
+    const card = document.getElementById('ff-card');
+    const bubble = document.getElementById('ff-bubble');
+    const orb = document.getElementById('ff-orb');
+
+    discovering.classList.add('visible');
+    counter.classList.add('streaming');
+
+    // Phase 1: Stream 3 pins
+    let pinIdx = 0;
+    ffTimer = setInterval(() => {
+      if (pinIdx >= 3) {
+        clearInterval(ffTimer);
+        discovering.classList.remove('visible');
+        counter.classList.remove('streaming');
+        counter.textContent = '3';
+
+        // Phase 2: Companion nudge after "idle"
+        setTimeout(() => {
+          bubble.textContent = 'Seen everything here? I know a place...';
+          bubble.classList.add('visible');
+          orb.classList.add('nudge');
+
+          // Phase 3: Auto-surprise
+          setTimeout(() => {
+            bubble.classList.remove('visible');
+            runFullFlowSurprise();
+          }, 2500);
+        }, 2000);
+        return;
+      }
+
+      document.getElementById('ff-pin' + (pinIdx + 1)).classList.add('visible');
+      const dot = document.getElementById('ff-dot' + (pinIdx + 1));
+      dot.classList.add('visible');
+      document.querySelectorAll('#ff-dots .dot').forEach(d => { d.classList.remove('active'); d.style.width=''; d.style.height=''; d.style.background=''; });
+      dot.classList.add('active');
+      dot.style.width = '10px';
+      dot.style.height = '10px';
+      dot.style.background = '#fff';
+
+      counter.innerHTML = (pinIdx + 1) + (pinIdx < 2 ? '<span class="spinner"></span>' : '');
+
+      if (pinIdx === 0) card.classList.add('visible');
+
+      pinIdx++;
+    }, 1200);
+  }
+
+  function runFullFlowSurprise() {
+    const overlay = document.getElementById('ff-teleport');
+    const esc = document.getElementById('ff-escalation');
+    const banner = document.getElementById('ff-safety-banner');
+
+    document.getElementById('ff-esc-text').textContent = 'Further out';
+    esc.classList.add('visible');
+
+    document.getElementById('ff-dest-name').textContent = '🇹🇷 Istanbul';
+    document.getElementById('ff-dest-sub').textContent = 'Turkey';
+    document.getElementById('ff-dest-dist').textContent = '2,900 km northwest of Dubai';
+    overlay.classList.add('active');
+
+    setTimeout(() => {
+      overlay.classList.remove('active');
+      esc.classList.remove('visible');
+
+      // Update to Istanbul
+      document.getElementById('ff-flag').textContent = '🇹🇷';
+      document.getElementById('ff-name').textContent = 'Istanbul';
+      document.getElementById('ff-meta').textContent = '· ☀ 52°F · 7:18 PM';
+      document.getElementById('ff-search').textContent = 'Istanbul';
+      document.getElementById('ff-counter').textContent = '0';
+      document.getElementById('ff-safety-dot').className = 'safety-dot yellow';
+
+      // Show safety banner
+      setTimeout(() => {
+        banner.classList.add('visible');
+
+        // Start streaming new pins
+        setTimeout(() => {
+          document.getElementById('ff-counter').classList.add('streaming');
+          document.getElementById('ff-discovering').classList.add('visible');
+        }, 1000);
+      }, 500);
+    }, 2000);
+  }
+
+  function resetFullFlow() {
+    if (ffTimer) clearInterval(ffTimer);
+    for (let i = 1; i <= 3; i++) {
+      document.getElementById('ff-pin' + i).classList.remove('visible', 'focused');
+      const dot = document.getElementById('ff-dot' + i);
+      dot.classList.remove('visible', 'active');
+      dot.style.width = '';
+      dot.style.height = '';
+      dot.style.background = '';
+    }
+    document.getElementById('ff-counter').textContent = '0';
+    document.getElementById('ff-counter').classList.remove('streaming');
+    document.getElementById('ff-discovering').classList.remove('visible');
+    document.getElementById('ff-card').classList.remove('visible');
+    document.getElementById('ff-teleport').classList.remove('active');
+    document.getElementById('ff-escalation').classList.remove('visible');
+    document.getElementById('ff-safety-banner').classList.remove('visible');
+    document.getElementById('ff-bubble').classList.remove('visible');
+    document.getElementById('ff-flag').textContent = '🇦🇪';
+    document.getElementById('ff-name').textContent = 'Dubai';
+    document.getElementById('ff-meta').textContent = '· First visit · ☁ 76°F · 9:18 PM';
+    document.getElementById('ff-search').textContent = 'Dubai';
+    document.getElementById('ff-safety-dot').className = 'safety-dot green';
+  }
+</script>
+
+</body>
+</html>
