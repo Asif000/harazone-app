@@ -120,8 +120,8 @@ private fun bannerTitle(level: AdvisoryLevel): String = when (level) {
 }
 
 private fun AdvisoryLevel.bannerBackgroundColor(): Color = when (this) {
-    AdvisoryLevel.CAUTION -> Color(0xCCD29922)
+    AdvisoryLevel.CAUTION -> Color(0xCCE3B341)
     AdvisoryLevel.RECONSIDER -> Color(0xCCDB6D28)
-    AdvisoryLevel.DO_NOT_TRAVEL -> Color(0xCCF85149)
+    AdvisoryLevel.DO_NOT_TRAVEL -> Color(0xCCDA3633)
     else -> Color(0xCC888888)
 }

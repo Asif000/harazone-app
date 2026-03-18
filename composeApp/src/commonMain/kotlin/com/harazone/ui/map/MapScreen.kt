@@ -358,8 +358,9 @@ private fun ReadyContent(
                 onDismiss = { viewModel.dismissAdvisoryBanner() },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 44.dp)
-                    .padding(horizontal = 16.dp),
+                    .padding(top = statusBarPadding + 96.dp)
+                    .padding(horizontal = 16.dp)
+                    .zIndex(1f),
             )
         }
 

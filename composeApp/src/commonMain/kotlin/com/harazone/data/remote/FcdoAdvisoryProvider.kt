@@ -71,18 +71,31 @@ class FcdoAdvisoryProvider(
         val countryName = title.replace(" travel advice", "").trim()
 
         val details = root["details"]?.jsonObject
-        val summaryHtml = details?.get("summary")?.jsonPrimitive?.content ?: ""
-        val summary = stripHtml(summaryHtml)
 
         val lastUpdatedStr = root["public_updated_at"]?.jsonPrimitive?.content
         val lastUpdated = parseIso8601(lastUpdatedStr)
 
-        val level = classifyAdvisoryLevel(summary)
+        // Primary: use alert_status array (e.g. ["avoid_all_travel_to_whole_country"])
+        val alertStatus = details?.get("alert_status")?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.content }
+            ?: emptyList()
 
-        val parts = root["parts"]?.jsonArray ?: emptyList()
+        // Parts are under details, not root
+        val parts = details?.get("parts")?.jsonArray ?: emptyList()
+
+        // Summary comes from warnings-and-insurance part, not details.summary
+        val warningsPart = parts.firstOrNull { part ->
+            part.jsonObject["slug"]?.jsonPrimitive?.content == "warnings-and-insurance"
+        }
+        val warningsBody = warningsPart?.jsonObject?.get("body")?.jsonPrimitive?.content ?: ""
+        val summary = stripHtml(warningsBody).take(300)
+
+        // Classify level: alert_status first, fall back to keyword matching
+        val level = classifyAlertStatus(alertStatus)
+            ?: classifyAdvisoryLevel(summary)
+
         val safetyPart = parts.firstOrNull { part ->
-            val partObj = part.jsonObject
-            partObj["slug"]?.jsonPrimitive?.content == "safety-and-security"
+            part.jsonObject["slug"]?.jsonPrimitive?.content == "safety-and-security"
         }
 
         val safetyBody = safetyPart?.jsonObject?.get("body")?.jsonPrimitive?.content ?: ""
@@ -104,6 +117,17 @@ class FcdoAdvisoryProvider(
         return resolveSubNational(baseAdvisory, regionName)
     }
 
+    internal fun classifyAlertStatus(alertStatus: List<String>): AdvisoryLevel? {
+        if (alertStatus.isEmpty()) return null
+        return when {
+            alertStatus.any { "avoid_all_travel_to_whole_country" in it } -> AdvisoryLevel.DO_NOT_TRAVEL
+            alertStatus.any { "avoid_all_travel_to_parts" in it } -> AdvisoryLevel.DO_NOT_TRAVEL
+            alertStatus.any { "avoid_all_but_essential_travel_to_whole_country" in it } -> AdvisoryLevel.RECONSIDER
+            alertStatus.any { "avoid_all_but_essential_travel_to_parts" in it } -> AdvisoryLevel.RECONSIDER
+            else -> null // Unknown alert_status — fall through to keyword matching
+        }
+    }
+
     internal fun classifyAdvisoryLevel(summary: String): AdvisoryLevel {
         val lower = summary.lowercase()
         return when {
@@ -115,7 +139,6 @@ class FcdoAdvisoryProvider(
                 "high degree of caution" in lower -> AdvisoryLevel.CAUTION
             summary.isBlank() -> AdvisoryLevel.SAFE
             else -> {
-                // If summary exists but doesn't match known patterns, log and default to SAFE
                 if (summary.isNotBlank()) {
                     log.w { "Unmatched FCDO summary phrasing: ${summary.take(120)}" }
                 }

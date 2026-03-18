@@ -120,9 +120,9 @@ private fun SafetyDot(color: Color, pulse: Boolean) {
 
 private fun AdvisoryLevel.dotColor(): Color? = when (this) {
     AdvisoryLevel.SAFE -> null
-    AdvisoryLevel.CAUTION -> Color(0xFFD29922)
+    AdvisoryLevel.CAUTION -> Color(0xFFE3B341)
     AdvisoryLevel.RECONSIDER -> Color(0xFFDB6D28)
-    AdvisoryLevel.DO_NOT_TRAVEL -> Color(0xFFF85149)
+    AdvisoryLevel.DO_NOT_TRAVEL -> Color(0xFFDA3633)
     AdvisoryLevel.UNKNOWN -> Color(0xFF888888)
 }
 

@@ -526,8 +526,12 @@ class MapViewModel(
             activeDynamicVibe = null,
             selectedPinIndex = null,
             areaHighlights = emptyList(),
+            advisory = null,
+            isAdvisoryBannerDismissed = false,
+            hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
+        fetchAdvisory(suggestion.latitude, suggestion.longitude, previousArea = current.areaName)
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -611,8 +615,12 @@ class MapViewModel(
             activeDynamicVibe = null,
             selectedPinIndex = null,
             areaHighlights = emptyList(),
+            advisory = null,
+            isAdvisoryBannerDismissed = false,
+            hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(recent.latitude, recent.longitude)
+        fetchAdvisory(recent.latitude, recent.longitude, previousArea = current.areaName)
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -702,9 +710,12 @@ class MapViewModel(
             activeDynamicVibe = null,
             selectedPinIndex = null,
             areaHighlights = emptyList(),
+            advisory = null,
+            isAdvisoryBannerDismissed = false,
+            hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(lat, lng)
-        fetchAdvisory(lat, lng)
+        fetchAdvisory(lat, lng, previousArea = current.areaName)
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -1574,22 +1585,23 @@ class MapViewModel(
 
     // --- Safety Advisory ---
 
-    private fun fetchAdvisory(lat: Double, lng: Double) {
+    private fun fetchAdvisory(lat: Double, lng: Double, previousArea: String? = null) {
         viewModelScope.launch {
             try {
                 val geoInfo = geocodingProvider.reverseGeocodeInfo(lat, lng).getOrNull()
                     ?: return@launch
                 if (geoInfo.countryCode.isBlank()) return@launch
 
-                val oldAreaName = (_uiState.value as? MapUiState.Ready)?.areaName
                 advisoryProvider.getAdvisory(geoInfo.countryCode, geoInfo.regionName)
                     .onSuccess { advisory ->
                         val current = _uiState.value as? MapUiState.Ready ?: return@onSuccess
+                        // Only set previousAreaName if not already set (avoid overwriting on re-fetch of same area)
+                        val prevArea = if (current.previousAreaName.isNullOrBlank()) previousArea else current.previousAreaName
                         _uiState.value = current.copy(
                             advisory = advisory,
                             isAdvisoryBannerDismissed = false,
                             hasAcknowledgedGate = false,
-                            previousAreaName = oldAreaName,
+                            previousAreaName = prevArea,
                             hasPendingSafetyNudge = advisory.level.isAtLeast(AdvisoryLevel.CAUTION),
                         )
                     }
@@ -1616,10 +1628,18 @@ class MapViewModel(
     fun goBackToSafety() {
         val prev = (_uiState.value as? MapUiState.Ready)?.previousAreaName
         if (!prev.isNullOrBlank()) {
-            // Uses onGeocodingSubmitEmpty() instead of a direct searchArea() because it
-            // handles all area-switch state (cancellation, weather, advisory, camera move).
-            pendingAreaName = prev
-            onGeocodingSubmitEmpty()
+            // Search for the previous area by name — this triggers geocoding which
+            // resolves coordinates and loads the area properly.
+            viewModelScope.launch {
+                val results = geocodingProvider.search(prev, limit = 1).getOrNull()
+                val first = results?.firstOrNull()
+                if (first != null) {
+                    onGeocodingSuggestionSelected(first)
+                } else {
+                    // Fallback: just dismiss the gate
+                    acknowledgeGate()
+                }
+            }
         } else {
             // No previous area (cold launch) — just dismiss the gate, show banner
             acknowledgeGate()

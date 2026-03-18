@@ -14,7 +14,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class FcdoAdvisoryProviderTest {
@@ -22,7 +22,7 @@ class FcdoAdvisoryProviderTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     private fun createProvider(
-        responseText: String = "{}",
+        responseText: String = SAFE_COUNTRY_RESPONSE,
         statusCode: HttpStatusCode = HttpStatusCode.OK,
         prefs: FakeUserPreferencesRepository = FakeUserPreferencesRepository(),
         clock: FakeClock = FakeClock(),
@@ -38,7 +38,57 @@ class FcdoAdvisoryProviderTest {
         return Triple(provider, prefs, clock)
     }
 
-    // --- classifyAdvisoryLevel ---
+    // --- classifyAlertStatus ---
+
+    @Test
+    fun classifyAlertStatus_avoid_all_travel_whole_country_returns_DO_NOT_TRAVEL() {
+        val (provider, _, _) = createProvider()
+        assertEquals(
+            AdvisoryLevel.DO_NOT_TRAVEL,
+            provider.classifyAlertStatus(listOf("avoid_all_travel_to_whole_country")),
+        )
+    }
+
+    @Test
+    fun classifyAlertStatus_avoid_all_travel_parts_returns_DO_NOT_TRAVEL() {
+        val (provider, _, _) = createProvider()
+        assertEquals(
+            AdvisoryLevel.DO_NOT_TRAVEL,
+            provider.classifyAlertStatus(listOf("avoid_all_travel_to_parts")),
+        )
+    }
+
+    @Test
+    fun classifyAlertStatus_avoid_but_essential_whole_returns_RECONSIDER() {
+        val (provider, _, _) = createProvider()
+        assertEquals(
+            AdvisoryLevel.RECONSIDER,
+            provider.classifyAlertStatus(listOf("avoid_all_but_essential_travel_to_whole_country")),
+        )
+    }
+
+    @Test
+    fun classifyAlertStatus_avoid_but_essential_parts_returns_RECONSIDER() {
+        val (provider, _, _) = createProvider()
+        assertEquals(
+            AdvisoryLevel.RECONSIDER,
+            provider.classifyAlertStatus(listOf("avoid_all_but_essential_travel_to_parts")),
+        )
+    }
+
+    @Test
+    fun classifyAlertStatus_empty_returns_null() {
+        val (provider, _, _) = createProvider()
+        assertNull(provider.classifyAlertStatus(emptyList()))
+    }
+
+    @Test
+    fun classifyAlertStatus_unknown_value_returns_null() {
+        val (provider, _, _) = createProvider()
+        assertNull(provider.classifyAlertStatus(listOf("some_new_unknown_status")))
+    }
+
+    // --- classifyAdvisoryLevel (keyword fallback) ---
 
     @Test
     fun classifyAdvisoryLevel_advises_against_all_travel_returns_DO_NOT_TRAVEL() {
@@ -79,19 +129,33 @@ class FcdoAdvisoryProviderTest {
     @Test
     fun classifyAdvisoryLevel_empty_returns_SAFE() {
         val (provider, _, _) = createProvider()
-        assertEquals(
-            AdvisoryLevel.SAFE,
-            provider.classifyAdvisoryLevel(""),
-        )
+        assertEquals(AdvisoryLevel.SAFE, provider.classifyAdvisoryLevel(""))
+    }
+
+    // --- parseFcdoResponse with real structure ---
+
+    @Test
+    fun parseFcdoResponse_yemen_returns_DO_NOT_TRAVEL() {
+        val (provider, _, _) = createProvider()
+        val advisory = provider.parseFcdoResponse(YEMEN_RESPONSE, "YE", null)
+        assertEquals(AdvisoryLevel.DO_NOT_TRAVEL, advisory.level)
+        assertEquals("Yemen", advisory.countryName)
+        assertTrue(advisory.summary.contains("advises against all travel"))
     }
 
     @Test
-    fun classifyAdvisoryLevel_unexpected_phrasing_returns_SAFE() {
+    fun parseFcdoResponse_safe_country_returns_SAFE() {
         val (provider, _, _) = createProvider()
-        assertEquals(
-            AdvisoryLevel.SAFE,
-            provider.classifyAdvisoryLevel("Check local conditions before traveling."),
-        )
+        val advisory = provider.parseFcdoResponse(SAFE_COUNTRY_RESPONSE, "JP", null)
+        assertEquals(AdvisoryLevel.SAFE, advisory.level)
+        assertEquals("Japan", advisory.countryName)
+    }
+
+    @Test
+    fun parseFcdoResponse_reconsider_country_returns_RECONSIDER() {
+        val (provider, _, _) = createProvider()
+        val advisory = provider.parseFcdoResponse(RECONSIDER_RESPONSE, "PK", null)
+        assertEquals(AdvisoryLevel.RECONSIDER, advisory.level)
     }
 
     // --- Cache behavior ---
@@ -109,7 +173,7 @@ class FcdoAdvisoryProviderTest {
             subNationalZones = emptyList(),
             sourceUrl = "https://www.gov.uk/foreign-travel-advice/japan",
             lastUpdated = 0L,
-            cachedAt = clock.nowMs - 1_000_000L, // cached 1000s ago (well within 24h)
+            cachedAt = clock.nowMs - 1_000_000L,
         )
         prefs.setAdvisoryCache("JP", json.encodeToString(AreaAdvisory.serializer(), cachedAdvisory))
 
@@ -135,22 +199,13 @@ class FcdoAdvisoryProviderTest {
             subNationalZones = emptyList(),
             sourceUrl = "",
             lastUpdated = 0L,
-            cachedAt = clock.nowMs - 25 * 3_600_000L, // 25 hours ago (expired)
+            cachedAt = clock.nowMs - 25 * 3_600_000L,
         )
         prefs.setAdvisoryCache("JP", json.encodeToString(AreaAdvisory.serializer(), staleAdvisory))
         prefs.setAdvisoryCachedCountryName("JP", "Japan")
 
-        val fcdoResponse = """
-        {
-            "title": "Japan travel advice",
-            "public_updated_at": "2026-01-01T00:00:00Z",
-            "details": { "summary": "Most visits are trouble-free." },
-            "parts": []
-        }
-        """.trimIndent()
-
         val (provider, _, _) = createProvider(
-            responseText = fcdoResponse,
+            responseText = SAFE_COUNTRY_RESPONSE,
             prefs = prefs,
             clock = clock,
         )
@@ -162,16 +217,14 @@ class FcdoAdvisoryProviderTest {
     @Test
     fun getAdvisory_does_not_cache_UNKNOWN() = runTest {
         val prefs = FakeUserPreferencesRepository()
-        val clock = FakeClock()
         val (provider, _, _) = createProvider(
             responseText = "not json at all",
             prefs = prefs,
-            clock = clock,
         )
         val result = provider.getAdvisory("XX")
         assertTrue(result.isSuccess)
         assertEquals(AdvisoryLevel.UNKNOWN, result.getOrThrow().level)
-        assertEquals(null, prefs.getAdvisoryCache("XX"))
+        assertNull(prefs.getAdvisoryCache("XX"))
     }
 
     // --- Error handling ---
@@ -195,7 +248,7 @@ class FcdoAdvisoryProviderTest {
         val engine = MockEngine { request ->
             requestedUrl = request.url.toString()
             respond(
-                content = """{"title":"UAE travel advice","details":{"summary":"Most visits are trouble-free."},"parts":[]}""",
+                content = SAFE_COUNTRY_RESPONSE,
                 status = HttpStatusCode.OK,
                 headers = headersOf(HttpHeaders.ContentType, "application/json"),
             )
@@ -205,5 +258,73 @@ class FcdoAdvisoryProviderTest {
         val provider = FcdoAdvisoryProvider(HttpClient(engine), prefs, FakeClock())
         provider.getAdvisory("AE")
         assertTrue(requestedUrl.contains("united-arab-emirates"))
+    }
+
+    companion object {
+        // Real FCDO response structure for Yemen (DO_NOT_TRAVEL)
+        val YEMEN_RESPONSE = """
+        {
+            "title": "Yemen travel advice",
+            "public_updated_at": "2026-03-09T17:16:38+00:00",
+            "details": {
+                "alert_status": ["avoid_all_travel_to_whole_country"],
+                "country": {"name": "Yemen", "slug": "yemen"},
+                "parts": [
+                    {
+                        "slug": "warnings-and-insurance",
+                        "body": "<h2>FCDO advises against all travel to Yemen</h2><p>FCDO advises against all travel to Yemen due to the ongoing conflict.</p>"
+                    },
+                    {
+                        "slug": "safety-and-security",
+                        "body": "<h2>Terrorism</h2><p>There is a high threat of terrorism.</p><h2>Civil unrest</h2><p>Armed conflict is ongoing.</p>"
+                    }
+                ]
+            }
+        }
+        """.trimIndent()
+
+        // Safe country (no alert_status)
+        val SAFE_COUNTRY_RESPONSE = """
+        {
+            "title": "Japan travel advice",
+            "public_updated_at": "2026-01-15T10:00:00+00:00",
+            "details": {
+                "alert_status": [],
+                "country": {"name": "Japan", "slug": "japan"},
+                "parts": [
+                    {
+                        "slug": "warnings-and-insurance",
+                        "body": "<p>Most visits to Japan are trouble-free.</p>"
+                    },
+                    {
+                        "slug": "safety-and-security",
+                        "body": "<p>Japan is generally safe.</p>"
+                    }
+                ]
+            }
+        }
+        """.trimIndent()
+
+        // Reconsider travel (partial)
+        val RECONSIDER_RESPONSE = """
+        {
+            "title": "Pakistan travel advice",
+            "public_updated_at": "2026-02-20T08:00:00+00:00",
+            "details": {
+                "alert_status": ["avoid_all_but_essential_travel_to_parts"],
+                "country": {"name": "Pakistan", "slug": "pakistan"},
+                "parts": [
+                    {
+                        "slug": "warnings-and-insurance",
+                        "body": "<h2>FCDO advises against all but essential travel to parts of Pakistan</h2><p>The FCDO advises against all but essential travel to Balochistan and KPK.</p>"
+                    },
+                    {
+                        "slug": "safety-and-security",
+                        "body": "<p>FCDO advises against all travel to Balochistan province.</p>"
+                    }
+                ]
+            }
+        }
+        """.trimIndent()
     }
 }

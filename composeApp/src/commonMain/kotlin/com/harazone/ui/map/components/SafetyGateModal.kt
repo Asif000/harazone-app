@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -31,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.harazone.domain.model.AreaAdvisory
 import com.harazone.ui.components.PlatformBackHandler
@@ -58,76 +60,85 @@ fun SafetyGateModal(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.85f)
+                .fillMaxWidth(0.9f)
+                .heightIn(max = 560.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(Color(0xFF1A1A1A))
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Icon(
-                imageVector = Icons.Default.Warning,
-                contentDescription = null,
-                tint = Color(0xFFF85149),
-                modifier = Modifier.size(48.dp),
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = stringResource(Res.string.advisory_banner_title_4),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Red badge
-            Text(
-                text = advisory.countryName,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
+            // Scrollable content area
+            Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color(0xFFF85149))
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Details bullets
-            if (advisory.details.isNotEmpty()) {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    for (detail in advisory.details.take(5)) {
-                        Text(
-                            text = "\u2022 $detail",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.85f),
-                        )
-                    }
-                }
+                    .weight(1f, fill = false)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFF85149),
+                    modifier = Modifier.size(48.dp),
+                )
                 Spacer(modifier = Modifier.height(12.dp))
-            }
 
-            // Source attribution
-            Text(
-                text = stringResource(Res.string.advisory_source),
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.5f),
-            )
-            if (advisory.lastUpdated > 0) {
                 Text(
-                    text = stringResource(Res.string.advisory_last_updated, formatTimestamp(advisory.lastUpdated)),
+                    text = stringResource(Res.string.advisory_banner_title_4),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Red badge
+                Text(
+                    text = advisory.countryName,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color(0xFFF85149))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Details bullets — full text, scrollable
+                if (advisory.details.isNotEmpty()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        for (detail in advisory.details.take(5)) {
+                            Text(
+                                text = "\u2022 $detail",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.White.copy(alpha = 0.85f),
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Source attribution
+                Text(
+                    text = stringResource(Res.string.advisory_source),
                     style = MaterialTheme.typography.labelSmall,
                     color = Color.White.copy(alpha = 0.5f),
                 )
+                if (advisory.lastUpdated > 0) {
+                    Text(
+                        text = stringResource(Res.string.advisory_last_updated, formatTimestamp(advisory.lastUpdated)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White.copy(alpha = 0.5f),
+                    )
+                }
             }
-            Spacer(modifier = Modifier.height(20.dp))
 
-            // Go Back button
+            // Fixed buttons at bottom
+            Spacer(modifier = Modifier.height(16.dp))
+
             Button(
                 onClick = onGoBack,
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2EA043)),
@@ -144,7 +155,6 @@ fun SafetyGateModal(
             }
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Continue button
             OutlinedButton(
                 onClick = onContinue,
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFF85149)),
