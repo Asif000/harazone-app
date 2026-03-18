@@ -2761,40 +2761,16 @@ class MapViewModelTest {
     }
 
     @Test
-    fun goBackToSafety_withPreviousArea_triggersGeocodingSearch() = runTest(testDispatcher) {
+    fun goBackToSafety_noPreviousCoordinates_acknowledgesGate() = runTest(testDispatcher) {
         val geocodingProvider = com.harazone.fakes.FakeMapTilerGeocodingProvider()
         geocodingProvider.reverseGeocodeResult = Result.failure(Exception("no geo"))
-        // Provide a search result so goBackToSafety can navigate
-        geocodingProvider.result = Result.success(listOf(
-            com.harazone.domain.model.GeocodingSuggestion(
-                name = "Safe Place",
-                fullAddress = "Safe Place, Safe Country",
-                latitude = 10.0,
-                longitude = 20.0,
-                distanceKm = null,
-            )
-        ))
         val viewModel = createViewModel(geocodingProvider = geocodingProvider)
         testScheduler.advanceUntilIdle()
 
-        // Manually set previousAreaName via state copy to simulate area navigation
-        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        // Use acknowledgeGate path first to verify it's not being called
-        // Then set advisory + previousAreaName directly
-        val dangerAdvisory = com.harazone.domain.model.AreaAdvisory(
-            level = com.harazone.domain.model.AdvisoryLevel.DO_NOT_TRAVEL,
-            countryName = "DangerLand", countryCode = "DL",
-            summary = "Do not travel", details = emptyList(),
-            subNationalZones = emptyList(), sourceUrl = "",
-            lastUpdated = 0L, cachedAt = 0L,
-        )
-        viewModel.enqueueSafetyNudge("test") // no-op but exercises path
-        // We can't easily set state externally, so test the geocoding search was triggered
-        val prevCallCount = geocodingProvider.callCount
+        // No advisory fetch succeeded → previousAreaLat/Lng are null → fallback to acknowledgeGate
         viewModel.goBackToSafety()
         testScheduler.advanceUntilIdle()
 
-        // previousAreaName is null (no advisory fetch succeeded), so it falls into acknowledgeGate
         val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(true, updated.hasAcknowledgedGate)
     }

@@ -55,6 +55,8 @@ class FcdoAdvisoryProvider(
             }
 
             Result.success(advisory)
+        } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+            throw e
         } catch (e: Exception) {
             log.w(e) { "Failed to fetch advisory for $countryCode" }
             Result.success(makeUnknownAdvisory(countryCode))
@@ -263,7 +265,6 @@ class FcdoAdvisoryProvider(
 
     companion object {
         private const val FCDO_BASE_URL = "https://www.gov.uk/api/content/foreign-travel-advice"
-        private const val FCDO_HUMAN_URL = "https://www.gov.uk/foreign-travel-advice"
         private const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L // 24 hours
     }
 }

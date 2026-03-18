@@ -41,6 +41,12 @@ class FcdoCountrySlugsTest {
     }
 
     @Test
+    fun getSlug_CI_returns_correct_fcdo_slug() {
+        // CI is in the static map — returns the correct FCDO slug, not fallback
+        assertEquals("cote-d-ivoire", FcdoCountrySlugs.getSlug("CI", "Côte d'Ivoire"))
+    }
+
+    @Test
     fun getSlug_fallback_strips_dots() {
         assertEquals("st-somewhere", FcdoCountrySlugs.getSlug("ZZ", "St. Somewhere"))
     }

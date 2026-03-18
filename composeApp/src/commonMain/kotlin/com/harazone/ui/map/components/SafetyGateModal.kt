@@ -110,7 +110,7 @@ fun SafetyGateModal(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        for (detail in advisory.details.take(5)) {
+                        for (detail in advisory.details) {
                             Text(
                                 text = "\u2022 $detail",
                                 style = MaterialTheme.typography.bodySmall,

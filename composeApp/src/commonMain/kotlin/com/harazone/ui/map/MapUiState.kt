@@ -62,6 +62,8 @@ sealed class MapUiState {
         val hasAcknowledgedGate: Boolean = false,
         val hasPendingSafetyNudge: Boolean = false,
         val previousAreaName: String? = null,
+        val previousAreaLat: Double? = null,
+        val previousAreaLng: Double? = null,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

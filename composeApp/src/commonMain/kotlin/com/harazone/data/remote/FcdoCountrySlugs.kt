@@ -34,7 +34,7 @@ object FcdoCountrySlugs {
         "CD" to "democratic-republic-of-the-congo",
         "CG" to "congo",
         "CR" to "costa-rica",
-        "CI" to "cote-divoire",
+        "CI" to "cote-d-ivoire",
         "HR" to "croatia",
         "CU" to "cuba",
         "CY" to "cyprus",

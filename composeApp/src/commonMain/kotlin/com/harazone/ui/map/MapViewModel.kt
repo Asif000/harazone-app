@@ -531,7 +531,7 @@ class MapViewModel(
             hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
-        fetchAdvisory(suggestion.latitude, suggestion.longitude, previousArea = current.areaName)
+        fetchAdvisory(suggestion.latitude, suggestion.longitude, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -620,7 +620,7 @@ class MapViewModel(
             hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(recent.latitude, recent.longitude)
-        fetchAdvisory(recent.latitude, recent.longitude, previousArea = current.areaName)
+        fetchAdvisory(recent.latitude, recent.longitude, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -715,7 +715,7 @@ class MapViewModel(
             hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(lat, lng)
-        fetchAdvisory(lat, lng, previousArea = current.areaName)
+        fetchAdvisory(lat, lng, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -1585,7 +1585,9 @@ class MapViewModel(
 
     // --- Safety Advisory ---
 
-    private fun fetchAdvisory(lat: Double, lng: Double, previousArea: String? = null) {
+    private data class PreviousAreaInfo(val name: String, val lat: Double, val lng: Double)
+
+    private fun fetchAdvisory(lat: Double, lng: Double, previousArea: PreviousAreaInfo? = null) {
         viewModelScope.launch {
             try {
                 val geoInfo = geocodingProvider.reverseGeocodeInfo(lat, lng).getOrNull()
@@ -1595,13 +1597,13 @@ class MapViewModel(
                 advisoryProvider.getAdvisory(geoInfo.countryCode, geoInfo.regionName)
                     .onSuccess { advisory ->
                         val current = _uiState.value as? MapUiState.Ready ?: return@onSuccess
-                        // Only set previousAreaName if not already set (avoid overwriting on re-fetch of same area)
-                        val prevArea = if (current.previousAreaName.isNullOrBlank()) previousArea else current.previousAreaName
                         _uiState.value = current.copy(
                             advisory = advisory,
                             isAdvisoryBannerDismissed = false,
                             hasAcknowledgedGate = false,
-                            previousAreaName = prevArea,
+                            previousAreaName = previousArea?.name,
+                            previousAreaLat = previousArea?.lat,
+                            previousAreaLng = previousArea?.lng,
                             hasPendingSafetyNudge = advisory.level.isAtLeast(AdvisoryLevel.CAUTION),
                         )
                     }
@@ -1626,20 +1628,17 @@ class MapViewModel(
     }
 
     fun goBackToSafety() {
-        val prev = (_uiState.value as? MapUiState.Ready)?.previousAreaName
-        if (!prev.isNullOrBlank()) {
-            // Search for the previous area by name — this triggers geocoding which
-            // resolves coordinates and loads the area properly.
-            viewModelScope.launch {
-                val results = geocodingProvider.search(prev, limit = 1).getOrNull()
-                val first = results?.firstOrNull()
-                if (first != null) {
-                    onGeocodingSuggestionSelected(first)
-                } else {
-                    // Fallback: just dismiss the gate
-                    acknowledgeGate()
-                }
-            }
+        val state = _uiState.value as? MapUiState.Ready ?: return
+        val prevLat = state.previousAreaLat
+        val prevLng = state.previousAreaLng
+        val prevName = state.previousAreaName
+        if (prevLat != null && prevLng != null && !prevName.isNullOrBlank()) {
+            // Navigate back using saved coordinates — no network round-trip needed
+            flyToCoords(prevLat, prevLng)
+            pendingAreaName = prevName
+            pendingLat = prevLat
+            pendingLng = prevLng
+            onGeocodingSubmitEmpty()
         } else {
             // No previous area (cold launch) — just dismiss the gate, show banner
             acknowledgeGate()
@@ -1647,10 +1646,10 @@ class MapViewModel(
     }
 
     fun enqueueSafetyNudge(text: String) {
-        val advisory = (_uiState.value as? MapUiState.Ready)?.advisory ?: return
-        companionEngine.buildSafetyNudge(advisory, text)?.let { enqueueNudge(it) }
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(hasPendingSafetyNudge = false)
+        val advisory = current.advisory ?: return
+        companionEngine.buildSafetyNudge(advisory, text)?.let { enqueueNudge(it) }
+        _uiState.value = (_uiState.value as? MapUiState.Ready)?.copy(hasPendingSafetyNudge = false) ?: return
     }
 
     companion object {
