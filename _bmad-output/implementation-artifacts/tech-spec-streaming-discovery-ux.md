@@ -4,7 +4,7 @@ slug: 'streaming-discovery-ux'
 created: '2026-03-17'
 status: 'ready-for-dev'
 stepsCompleted: [1, 2, 3, 4]
-reviewFindings: '2C+5H+5M+5L — all fixed 2026-03-17'
+reviewFindings: '2C+5H+5M+5L fixed 2026-03-17; re-review C3+H6+M6+M7 fixed 2026-03-17'
 tech_stack: ['Kotlin Multiplatform', 'Compose Multiplatform', 'Koin', 'Coroutines/Flow', 'MapLibre']
 files_to_modify:
   - 'composeApp/src/commonMain/kotlin/com/harazone/ui/map/MapUiState.kt'
@@ -135,7 +135,11 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
 | L2 | Low | T12 | PlatformBackHandler not needed — pill is not an overlay; documented explicitly |
 | L3 | Low | T8/T14 | `showSurpriseMe` condition: `.any { it.vibe.isNotBlank() }` |
 | L4 | Low | T11 | `MAX_DOTS = 9` stays `private` in `PoiCarousel.kt` |
-| L5 | Low | T8/T1 | Error string uses `surprise_me_error` string resource; dev agent to match existing error emission pattern |
+| L5 | Low | T8/T1 | ~~Error string uses string resource~~ — **superseded by C3** |
+| **C3** | **Critical** | T8 | Reverted L5 fix: `_errorEvents: MutableSharedFlow<String>` can't accept `Res.string.*`; use hardcoded literal `"Discovery failed — try again"`. `surprise_me_error` string resource removed from T1. |
+| **H6** | **High** | AC2 | AC2 rewritten to reference `pois` (carousel-scrollable); added vibe-filter scenario showing `pois=3` → 3 dots, not 9 |
+| **M6** | **Medium** | T7 | `cancelAreaFetch()` now resets `pendingPostSearchSlideshow = false`; prevents ghost slideshow after pan-cancels a Search This Area fetch |
+| **M7** | **Medium** | T8 | `collectPortraitWithRetry` pseudocode `onComplete` signature corrected: `suspend (pois: List<Poi>, finalAreaName: String) -> Unit` (was wrong `List<Vibe>`) |
 
 ---
 
@@ -149,7 +153,6 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
   ```xml
   <string name="search_discovering">Discovering…</string>
   <string name="vibe_surprise_me">Surprise Me</string>
-  <string name="surprise_me_error">Discovery failed — try again</string>
   <!-- L1: plurals for "1 place" / "N places" -->
   <plurals name="search_n_places">
       <item quantity="one">%1$d place</item>
@@ -251,11 +254,12 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
   }
   ```
 - Call `animatePoiCounter(state.allDiscoveredPois.size)` after each `PinsReady` / `VibesReady` state update (using the updated state's `allDiscoveredPois.size`, not the raw batch size).
-- **H2 fix — unconditional reset in `cancelAreaFetch()`**: `cancelAreaFetch()` currently has a conditional guard (early return when no active job) that skips state cleanup. Add an unconditional `poiStreamingCount = 0` reset AND cancel `counterAnimJob` BEFORE the existing guard:
+- **H2 fix + M6 fix — unconditional reset in `cancelAreaFetch()`**: `cancelAreaFetch()` currently has a conditional guard (early return when no active job) that skips state cleanup. Add unconditional resets BEFORE the existing guard — including `pendingPostSearchSlideshow` (M6: avoids ghost slideshow on next unrelated submit after a cancelled "Search this area"):
   ```kotlin
   fun cancelAreaFetch() {
       counterAnimJob?.cancel()
       counterAnimJob = null
+      pendingPostSearchSlideshow = false  // M6: reset flag so cancelled searches don't ghost-trigger slideshow
       val current = _uiState.value as? MapUiState.Ready
       if (current != null) {
           _uiState.value = current.copy(poiStreamingCount = 0)
@@ -273,7 +277,7 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
   private suspend fun collectPortraitWithRetry(
       areaName: String,
       tasteProfile: List<String> = emptyList(),  // C1: new param
-      onComplete: (List<Poi>, List<Vibe>) -> Unit,
+      onComplete: suspend (pois: List<Poi>, finalAreaName: String) -> Unit,  // M7: real signature — second param is String, not List<Vibe>
       onError: (Exception) -> Unit,
   ) {
       // At line ~1307, change to:
@@ -328,12 +332,12 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
               areaName = areaName,
               tasteProfile = tasteProfile,  // C1: pass taste data
               onComplete = { _, _ -> schedulePostSearchSlideshow() },
-              onError = { _ -> _errorEvents.tryEmit(Res.string.surprise_me_error) }, // L5: string resource
+              onError = { _ -> _errorEvents.tryEmit("Discovery failed — try again") }, // C3: hardcoded literal — Res.string.* can't resolve in ViewModel
           )
       }
   }
   ```
-- Note on L5: `_errorEvents.tryEmit(...)` currently takes a `String`. If the channel emits string IDs or resolved strings, resolve via the appropriate pattern already in use in `MapViewModel`. The dev agent should check how existing `onError` lambdas emit strings and match that pattern — the intent is to use `surprise_me_error` string resource rather than a hardcoded literal.
+- **C3 note**: `_errorEvents: MutableSharedFlow<String>`. KMP string resources (`Res.string.*`) require a Composable context and cannot be resolved inside a ViewModel. All existing `onError` lambdas in `MapViewModel` use hardcoded string literals — match that pattern. The `surprise_me_error` string resource added in T1 is **not needed** — remove that entry from T1's strings.xml changes.
 
 **T9 — `GeminiPromptBuilder.kt`: Inject taste profile** *(depends on T2)*
 - File: `composeApp/src/commonMain/kotlin/com/harazone/data/remote/GeminiPromptBuilder.kt`
@@ -465,12 +469,15 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
 - Then: counter resets to 0 and "Discovering…" appears again
 
 **AC2 — Carousel dots (T11)**
-- Given: 5 POIs in `allDiscoveredPois`
+- Given: `pois` (vibe-filtered carousel list) has 5 items
 - When: carousel renders
 - Then: 5 dots shown; active dot is 8dp white, inactive are 6dp 40% white
-- Given: 12 POIs in `allDiscoveredPois`
+- Given: `pois` has 12 items (no vibe filter active)
 - When: carousel renders
 - Then: exactly 9 dots shown (silent cap); no "+N" label
+- Given: `pois` has 3 items (vibe filter active) and `allDiscoveredPois` has 12
+- When: carousel renders
+- Then: exactly 3 dots shown — dots must never exceed what the carousel can scroll to
 - When: user swipes to card 3
 - Then: dot at index 2 becomes active
 
