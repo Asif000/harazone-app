@@ -4,7 +4,7 @@ slug: 'streaming-discovery-ux'
 created: '2026-03-17'
 status: 'ready-for-dev'
 stepsCompleted: [1, 2, 3, 4]
-reviewFindings: '2C+5H+5M+5L fixed 2026-03-17; re-review C3+H6+M6+M7 fixed 2026-03-17'
+reviewFindings: '2C+5H+5M+5L fixed 2026-03-17; re-review C3+H6+M6+M7 fixed 2026-03-17; re-review#4 M8+L6+L7+L8 fixed 2026-03-17'
 tech_stack: ['Kotlin Multiplatform', 'Compose Multiplatform', 'Koin', 'Coroutines/Flow', 'MapLibre']
 files_to_modify:
   - 'composeApp/src/commonMain/kotlin/com/harazone/ui/map/MapUiState.kt'
@@ -139,7 +139,11 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
 | **C3** | **Critical** | T8 | Reverted L5 fix: `_errorEvents: MutableSharedFlow<String>` can't accept `Res.string.*`; use hardcoded literal `"Discovery failed — try again"`. `surprise_me_error` string resource removed from T1. |
 | **H6** | **High** | AC2 | AC2 rewritten to reference `pois` (carousel-scrollable); added vibe-filter scenario showing `pois=3` → 3 dots, not 9 |
 | **M6** | **Medium** | T7 | `cancelAreaFetch()` now resets `pendingPostSearchSlideshow = false`; prevents ghost slideshow after pan-cancels a Search This Area fetch |
-| **M7** | **Medium** | T8 | `collectPortraitWithRetry` pseudocode `onComplete` signature corrected: `suspend (pois: List<Poi>, finalAreaName: String) -> Unit` (was wrong `List<Vibe>`) |
+| **M7** | **Medium** | T8 | `collectPortraitWithRetry` pseudocode `onComplete` signature corrected: `suspend (pois: List<POI>, finalAreaName: String) -> Unit` (was wrong `List<Vibe>`; re-review also fixed `Poi` → `List<POI>` per L6) |
+| **M8** | **Medium** | T10 | SpinningState instruction corrected: replace `search_refreshing` with `search_discovering` (removed false claim that `InlineBatchNav` was ever in SpinningState) |
+| **L6** | **Low** | T8 | `List<Poi>` → `List<POI>` in `collectPortraitWithRetry` pseudocode (type `Poi` doesn't exist) |
+| **L7** | **Low** | T7 | `cancelAreaFetch()` pseudocode now has `private` modifier |
+| **L8** | **Low** | T12 | Segment 1 label now explicitly uses `stringResource(Res.string.vibe_surprise_me)` in T12 composable comment |
 
 ---
 
@@ -256,7 +260,7 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
 - Call `animatePoiCounter(state.allDiscoveredPois.size)` after each `PinsReady` / `VibesReady` state update (using the updated state's `allDiscoveredPois.size`, not the raw batch size).
 - **H2 fix + M6 fix — unconditional reset in `cancelAreaFetch()`**: `cancelAreaFetch()` currently has a conditional guard (early return when no active job) that skips state cleanup. Add unconditional resets BEFORE the existing guard — including `pendingPostSearchSlideshow` (M6: avoids ghost slideshow on next unrelated submit after a cancelled "Search this area"):
   ```kotlin
-  fun cancelAreaFetch() {
+  private fun cancelAreaFetch() {
       counterAnimJob?.cancel()
       counterAnimJob = null
       pendingPostSearchSlideshow = false  // M6: reset flag so cancelled searches don't ghost-trigger slideshow
@@ -277,7 +281,7 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
   private suspend fun collectPortraitWithRetry(
       areaName: String,
       tasteProfile: List<String> = emptyList(),  // C1: new param
-      onComplete: suspend (pois: List<Poi>, finalAreaName: String) -> Unit,  // M7: real signature — second param is String, not List<Vibe>
+      onComplete: suspend (pois: List<POI>, finalAreaName: String) -> Unit,  // M7: real signature — second param is String, not List<Vibe>
       onError: (Exception) -> Unit,
   ) {
       // At line ~1307, change to:
@@ -364,7 +368,7 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
       )
   }
   ```
-- In `SpinningState` content (where `InlineBatchNav` used to render during searches):
+- In `SpinningState` content, replace `stringResource(Res.string.search_refreshing)` with:
   ```kotlin
   Text(
       text = stringResource(Res.string.search_discovering),
@@ -422,6 +426,8 @@ All 17 findings from adversarial review resolved inline. Summary for dev agent a
       // Background highlight Box at fractional offset (highlightOffset * halfWidth)
       // Tap logic:
       //   segment i: if activeMode == i → execute action; else activeMode = i
+      // Segment 0 label: "↻ Search here" (hardcoded — no string resource needed, existing pattern)
+      // Segment 1 label: stringResource(Res.string.vibe_surprise_me)  // L8: use the string resource
       // 🎲 segment: ContentAlpha = if (surpriseMeEnabled) 1f else 0.35f; clickable = surpriseMeEnabled
       // Style: MapFloatingUiDark background, active highlight Color.White.copy(alpha = 0.15f)
   }
