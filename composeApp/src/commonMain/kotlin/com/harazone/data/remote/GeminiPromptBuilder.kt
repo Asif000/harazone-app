@@ -83,7 +83,7 @@ Each bucket JSON must have this structure:
 {"type":"BUCKET_TYPE","highlight":"1-2 sentence whoa fact","content":"2-4 sentences supporting context"}
 
 The 6 bucket types IN ORDER are:
-1. SAFETY - Current safety conditions, alerts, crime levels
+1. SAFETY - Neighborhood-level safety context: crime levels, areas to avoid, time-of-day considerations, tourist scam warnings, local emergency numbers. Be specific to this exact area, not country-level generalizations. Include practical tips.
 2. CHARACTER - Neighborhood vibe, demographics, culture
 3. WHATS_HAPPENING - Current events, activities, what's going on now
 4. COST - Cost of living, prices, affordability

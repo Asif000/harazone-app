@@ -81,6 +81,16 @@ class MapViewModelTest {
         clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
         wikipediaImageRepository: com.harazone.data.remote.WikipediaImageRepository = stubWikipediaImageRepository,
         userPreferencesRepository: com.harazone.data.repository.UserPreferencesRepository = com.harazone.fakes.FakeUserPreferencesRepository(),
+        advisoryProvider: com.harazone.domain.provider.AdvisoryProvider = object : com.harazone.domain.provider.AdvisoryProvider {
+            override suspend fun getAdvisory(countryCode: String, regionName: String?): Result<com.harazone.domain.model.AreaAdvisory> =
+                Result.success(com.harazone.domain.model.AreaAdvisory(
+                    level = com.harazone.domain.model.AdvisoryLevel.SAFE,
+                    countryName = "", countryCode = countryCode,
+                    summary = "", details = emptyList(),
+                    subNationalZones = emptyList(), sourceUrl = "",
+                    lastUpdated = 0L, cachedAt = 0L,
+                ))
+        },
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
@@ -96,6 +106,7 @@ class MapViewModelTest {
             userPreferencesRepository, com.harazone.fakes.FakeAreaIntelligenceProvider(), com.harazone.fakes.FakeClock()
         ),
         localeProvider = com.harazone.fakes.FakeLocaleProvider(),
+        advisoryProvider = advisoryProvider,
         clockMs = clockMs,
     )
 
@@ -2704,6 +2715,132 @@ class MapViewModelTest {
         assertEquals(1, fetchCount, "Should NOT re-fetch when same area, fresh, and nearby")
         val state2 = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(initialPois, state2.pois)
+    }
+
+    // --- Safety Advisory Tests ---
+
+    @Test
+    fun dismissAdvisoryBanner_setsFlag() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(false, state.isAdvisoryBannerDismissed)
+
+        viewModel.dismissAdvisoryBanner()
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(true, updated.isAdvisoryBannerDismissed)
+    }
+
+    @Test
+    fun acknowledgeGate_setsFlag() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(false, state.hasAcknowledgedGate)
+
+        viewModel.acknowledgeGate()
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(true, updated.hasAcknowledgedGate)
+    }
+
+    @Test
+    fun goBackToSafety_withoutPreviousArea_acknowledgesGate() = runTest(testDispatcher) {
+        // Use a geocoding provider that returns failure for reverseGeocodeInfo
+        // so advisory fetch doesn't set previousAreaName
+        val geocodingProvider = com.harazone.fakes.FakeMapTilerGeocodingProvider()
+        geocodingProvider.reverseGeocodeResult = Result.failure(Exception("no geo"))
+        val viewModel = createViewModel(geocodingProvider = geocodingProvider)
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        // previousAreaName should be null since advisory fetch failed
+        assertNull(state.previousAreaName)
+
+        viewModel.goBackToSafety()
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(true, updated.hasAcknowledgedGate)
+    }
+
+    @Test
+    fun goBackToSafety_withPreviousArea_triggersAreaSearch() = runTest(testDispatcher) {
+        val dangerAdvisory = com.harazone.domain.model.AreaAdvisory(
+            level = com.harazone.domain.model.AdvisoryLevel.DO_NOT_TRAVEL,
+            countryName = "DangerLand",
+            countryCode = "DL",
+            summary = "Do not travel",
+            details = emptyList(),
+            subNationalZones = emptyList(),
+            sourceUrl = "",
+            lastUpdated = 0L,
+            cachedAt = 0L,
+        )
+        val advisoryProvider = object : com.harazone.domain.provider.AdvisoryProvider {
+            override suspend fun getAdvisory(countryCode: String, regionName: String?): Result<com.harazone.domain.model.AreaAdvisory> =
+                Result.success(dangerAdvisory)
+        }
+        val geocodingProvider = com.harazone.fakes.FakeMapTilerGeocodingProvider()
+        geocodingProvider.reverseGeocodeResult = Result.success(
+            com.harazone.data.remote.ReverseGeocodeInfo("DL", "DangerLand", null)
+        )
+        val viewModel = createViewModel(
+            advisoryProvider = advisoryProvider,
+            geocodingProvider = geocodingProvider,
+        )
+        testScheduler.advanceUntilIdle()
+
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        // Advisory fetch sets previousAreaName to the initial area name
+        assertNotNull(state.previousAreaName)
+        assertEquals("Alfama, Lisbon", state.previousAreaName)
+
+        // goBackToSafety should trigger area search (not just acknowledge)
+        viewModel.goBackToSafety()
+        testScheduler.advanceUntilIdle()
+
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        // hasAcknowledgedGate should NOT be true — we navigated, not acknowledged
+        // The area search was triggered (isSearchingArea may have toggled)
+        // Key: we did NOT fall into the acknowledgeGate() else branch
+        assertEquals(false, updated.hasAcknowledgedGate)
+    }
+
+    @Test
+    fun enqueueSafetyNudge_withActiveAdvisory_enqueuesNudge() = runTest(testDispatcher) {
+        val cautionAdvisory = com.harazone.domain.model.AreaAdvisory(
+            level = com.harazone.domain.model.AdvisoryLevel.CAUTION,
+            countryName = "TestCountry",
+            countryCode = "TC",
+            summary = "Exercise caution",
+            details = emptyList(),
+            subNationalZones = emptyList(),
+            sourceUrl = "",
+            lastUpdated = 0L,
+            cachedAt = 0L,
+        )
+        val advisoryProvider = object : com.harazone.domain.provider.AdvisoryProvider {
+            override suspend fun getAdvisory(countryCode: String, regionName: String?): Result<com.harazone.domain.model.AreaAdvisory> =
+                Result.success(cautionAdvisory)
+        }
+        val geocodingProvider = com.harazone.fakes.FakeMapTilerGeocodingProvider()
+        geocodingProvider.reverseGeocodeResult = Result.success(
+            com.harazone.data.remote.ReverseGeocodeInfo("TC", "TestCountry", null)
+        )
+        val viewModel = createViewModel(
+            advisoryProvider = advisoryProvider,
+            geocodingProvider = geocodingProvider,
+        )
+        testScheduler.advanceUntilIdle()
+
+        // After area load, advisory should be set and hasPendingSafetyNudge true
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(state.advisory)
+        assertEquals(com.harazone.domain.model.AdvisoryLevel.CAUTION, state.advisory!!.level)
+        // hasPendingSafetyNudge may be true if advisory was fetched
+        // Now enqueue nudge text
+        viewModel.enqueueSafetyNudge("Test safety nudge text")
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(false, updated.hasPendingSafetyNudge)
+        // Companion should be pulsing (nudge was enqueued)
+        assertEquals(true, updated.isCompanionPulsing)
     }
 
 }

@@ -9,6 +9,8 @@ class FakeUserPreferencesRepository : UserPreferencesRepository(db = null) {
     private var lastProximityPingKey = ""
     private var vibeMilestonesSeenSet = emptySet<String>()
     private var whisperShownForArea = ""
+    private val advisoryCache = mutableMapOf<String, String>()
+    private val advisoryCountryNames = mutableMapOf<String, String>()
 
     override fun getColdStartSeen(): Boolean = coldStartSeen
     override fun setColdStartSeen() { coldStartSeen = true }
@@ -23,4 +25,9 @@ class FakeUserPreferencesRepository : UserPreferencesRepository(db = null) {
     override fun setVibeMilestonesSeenSet(milestones: Set<String>) { vibeMilestonesSeenSet = milestones }
     override fun getWhisperShownForArea(): String = whisperShownForArea
     override fun setWhisperShownForArea(area: String) { whisperShownForArea = area }
+
+    override fun getAdvisoryCache(countryCode: String): String? = advisoryCache[countryCode]
+    override fun setAdvisoryCache(countryCode: String, advisoryJson: String) { advisoryCache[countryCode] = advisoryJson }
+    override fun getAdvisoryCachedCountryName(countryCode: String): String? = advisoryCountryNames[countryCode]
+    override fun setAdvisoryCachedCountryName(countryCode: String, name: String) { advisoryCountryNames[countryCode] = name }
 }

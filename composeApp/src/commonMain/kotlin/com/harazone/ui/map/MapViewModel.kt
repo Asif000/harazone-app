@@ -20,8 +20,10 @@ import com.harazone.domain.usecase.GetAreaPortraitUseCase
 import com.harazone.location.LocationProvider
 import com.harazone.util.AnalyticsTracker
 import com.harazone.domain.companion.CompanionNudgeEngine
+import com.harazone.domain.model.AdvisoryLevel
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.NudgeType
+import com.harazone.domain.provider.AdvisoryProvider
 import com.harazone.domain.provider.LocaleProvider
 import com.harazone.util.AppLogger
 import com.harazone.util.haversineDistanceMeters
@@ -51,6 +53,7 @@ class MapViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val companionEngine: CompanionNudgeEngine,
     private val localeProvider: LocaleProvider,
+    private val advisoryProvider: AdvisoryProvider,
     private val clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
 ) : ViewModel() {
 
@@ -701,6 +704,7 @@ class MapViewModel(
             areaHighlights = emptyList(),
         )
         fetchWeatherForLocation(lat, lng)
+        fetchAdvisory(lat, lng)
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -1081,8 +1085,9 @@ class MapViewModel(
                     visitedPoiCount = latestSavedPois.size,
                 )
 
-                // Fetch weather in parallel
+                // Fetch weather + advisory in parallel
                 fetchWeatherForLocation(coords.latitude, coords.longitude)
+                fetchAdvisory(coords.latitude, coords.longitude)
 
                 collectPortraitWithRetry(
                     areaName = areaName,
@@ -1565,6 +1570,67 @@ class MapViewModel(
     private fun isAwayFromGps(cameraLat: Double, cameraLng: Double, state: MapUiState.Ready): Boolean {
         return kotlin.math.abs(cameraLat - state.gpsLatitude) > 0.0009 ||
                kotlin.math.abs(cameraLng - state.gpsLongitude) > 0.0009
+    }
+
+    // --- Safety Advisory ---
+
+    private fun fetchAdvisory(lat: Double, lng: Double) {
+        viewModelScope.launch {
+            try {
+                val geoInfo = geocodingProvider.reverseGeocodeInfo(lat, lng).getOrNull()
+                    ?: return@launch
+                if (geoInfo.countryCode.isBlank()) return@launch
+
+                val oldAreaName = (_uiState.value as? MapUiState.Ready)?.areaName
+                advisoryProvider.getAdvisory(geoInfo.countryCode, geoInfo.regionName)
+                    .onSuccess { advisory ->
+                        val current = _uiState.value as? MapUiState.Ready ?: return@onSuccess
+                        _uiState.value = current.copy(
+                            advisory = advisory,
+                            isAdvisoryBannerDismissed = false,
+                            hasAcknowledgedGate = false,
+                            previousAreaName = oldAreaName,
+                            hasPendingSafetyNudge = advisory.level.isAtLeast(AdvisoryLevel.CAUTION),
+                        )
+                    }
+                    .onFailure { e ->
+                        AppLogger.w(e) { "Advisory fetch failed" }
+                    }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                AppLogger.w(e) { "Advisory fetch error" }
+            }
+        }
+    }
+
+    fun dismissAdvisoryBanner() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(isAdvisoryBannerDismissed = true)
+    }
+
+    fun acknowledgeGate() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(hasAcknowledgedGate = true)
+    }
+
+    fun goBackToSafety() {
+        val prev = (_uiState.value as? MapUiState.Ready)?.previousAreaName
+        if (!prev.isNullOrBlank()) {
+            // Uses onGeocodingSubmitEmpty() instead of a direct searchArea() because it
+            // handles all area-switch state (cancellation, weather, advisory, camera move).
+            pendingAreaName = prev
+            onGeocodingSubmitEmpty()
+        } else {
+            // No previous area (cold launch) — just dismiss the gate, show banner
+            acknowledgeGate()
+        }
+    }
+
+    fun enqueueSafetyNudge(text: String) {
+        val advisory = (_uiState.value as? MapUiState.Ready)?.advisory ?: return
+        companionEngine.buildSafetyNudge(advisory, text)?.let { enqueueNudge(it) }
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(hasPendingSafetyNudge = false)
     }
 
     companion object {

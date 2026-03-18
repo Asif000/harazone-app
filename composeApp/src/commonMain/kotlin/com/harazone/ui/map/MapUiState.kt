@@ -1,5 +1,6 @@
 package com.harazone.ui.map
 
+import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
@@ -56,6 +57,11 @@ sealed class MapUiState {
         val autoSlideshowIndex: Int? = null,
         val cameraZoomLevel: Double = 14.0,
         val showSearchAreaPill: Boolean = false,
+        val advisory: AreaAdvisory? = null,
+        val isAdvisoryBannerDismissed: Boolean = false,
+        val hasAcknowledgedGate: Boolean = false,
+        val hasPendingSafetyNudge: Boolean = false,
+        val previousAreaName: String? = null,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

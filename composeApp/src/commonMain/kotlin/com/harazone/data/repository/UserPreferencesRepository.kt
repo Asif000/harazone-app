@@ -71,6 +71,21 @@ open class UserPreferencesRepository(private val db: AreaDiscoveryDatabase?) {
         db!!.user_preferencesQueries.set("companion_whisper_area", area)
     }
 
+    // Advisory cache — JSON string of AreaAdvisory keyed by country code
+    open fun getAdvisoryCache(countryCode: String): String? =
+        getPreference("advisory_$countryCode")
+
+    open fun setAdvisoryCache(countryCode: String, advisoryJson: String) {
+        db!!.user_preferencesQueries.set("advisory_$countryCode", advisoryJson)
+    }
+
+    open fun getAdvisoryCachedCountryName(countryCode: String): String? =
+        getPreference("advisory_name_$countryCode")
+
+    open fun setAdvisoryCachedCountryName(countryCode: String, name: String) {
+        db!!.user_preferencesQueries.set("advisory_name_$countryCode", name)
+    }
+
     private fun getPreference(key: String): String? =
         db!!.user_preferencesQueries.get(key).executeAsOneOrNull()
 }

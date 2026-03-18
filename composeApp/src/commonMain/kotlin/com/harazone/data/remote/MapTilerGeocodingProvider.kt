@@ -20,6 +20,26 @@ private data class GeocodingFeature(
     val text: String,
     @SerialName("place_name") val placeName: String,
     val center: List<Double>,
+    val context: List<GeocodingContext>? = null,
+    val properties: GeocodingProperties? = null,
+)
+
+@Serializable
+private data class GeocodingContext(
+    val id: String? = null,
+    val text: String? = null,
+    @SerialName("short_code") val shortCode: String? = null,
+)
+
+@Serializable
+private data class GeocodingProperties(
+    @SerialName("country_code") val countryCode: String? = null,
+)
+
+data class ReverseGeocodeInfo(
+    val countryCode: String,
+    val countryName: String,
+    val regionName: String?,
 )
 
 open class MapTilerGeocodingProvider(
@@ -48,6 +68,32 @@ open class MapTilerGeocodingProvider(
                     distanceKm = null,
                 )
             })
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    open suspend fun reverseGeocodeInfo(latitude: Double, longitude: Double): Result<ReverseGeocodeInfo> {
+        return try {
+            val lang = localeProvider.languageTag.substringBefore("-")
+            val url = "https://api.maptiler.com/geocoding/$longitude,$latitude.json" +
+                "?key=${BuildKonfig.MAPTILER_API_KEY}&limit=1&language=$lang"
+            val body = httpClient.get(url).bodyAsText()
+            val response = json.decodeFromString<GeocodingResponse>(body)
+            val feature = response.features.firstOrNull()
+                ?: return Result.failure(Exception("No reverse geocode result"))
+
+            // Extract country code from properties or context
+            val countryCode = feature.properties?.countryCode?.uppercase()
+                ?: feature.context?.firstOrNull { it.id?.startsWith("country") == true }?.shortCode?.uppercase()
+                ?: ""
+
+            val countryName = feature.context?.firstOrNull { it.id?.startsWith("country") == true }?.text ?: ""
+            val regionName = feature.context?.firstOrNull { it.id?.startsWith("region") == true }?.text
+
+            Result.success(ReverseGeocodeInfo(countryCode, countryName, regionName))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

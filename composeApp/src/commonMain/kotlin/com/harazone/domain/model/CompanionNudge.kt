@@ -1,6 +1,7 @@
 package com.harazone.domain.model
 
 enum class NudgeType {
+    SAFETY_ALERT,       // #9  — travel advisory warning (highest priority)
     PROXIMITY,          // #17 — near a saved place
     RELAUNCH_DELTA,     // #8  — interesting fact on session start
     VIBE_REVEAL,        // #39 — pattern milestone
