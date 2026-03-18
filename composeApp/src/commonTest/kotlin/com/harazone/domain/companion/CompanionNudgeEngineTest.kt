@@ -1,5 +1,7 @@
 package com.harazone.domain.companion
 
+import com.harazone.domain.model.AdvisoryLevel
+import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.NudgeType
 import com.harazone.domain.model.POI
@@ -146,5 +148,65 @@ class CompanionNudgeEngineTest {
         val result = engine.checkAmbientWhisper("Lisbon", listOf(poi()), "en")
         assertNull(result)
         assertEquals(0, aiProvider.companionNudgeCallCount)
+    }
+
+    // --- buildSafetyNudge ---
+
+    private fun advisory(level: AdvisoryLevel) = AreaAdvisory(
+        level = level,
+        countryName = "TestCountry",
+        countryCode = "TC",
+        summary = "Test summary",
+        details = emptyList(),
+        subNationalZones = emptyList(),
+        sourceUrl = "",
+        lastUpdated = 0L,
+        cachedAt = 0L,
+    )
+
+    @Test
+    fun buildSafetyNudge_returns_nudge_for_CAUTION() {
+        val (engine, _, _) = createEngine()
+        val result = engine.buildSafetyNudge(advisory(AdvisoryLevel.CAUTION), "Be careful")
+        assertNotNull(result)
+        assertEquals(NudgeType.SAFETY_ALERT, result.type)
+        assertEquals("Be careful", result.text)
+    }
+
+    @Test
+    fun buildSafetyNudge_returns_nudge_for_RECONSIDER() {
+        val (engine, _, _) = createEngine()
+        val result = engine.buildSafetyNudge(advisory(AdvisoryLevel.RECONSIDER), "Reconsider travel")
+        assertNotNull(result)
+        assertEquals(NudgeType.SAFETY_ALERT, result.type)
+    }
+
+    @Test
+    fun buildSafetyNudge_returns_nudge_for_DO_NOT_TRAVEL() {
+        val (engine, _, _) = createEngine()
+        val result = engine.buildSafetyNudge(advisory(AdvisoryLevel.DO_NOT_TRAVEL), "Do not travel")
+        assertNotNull(result)
+        assertEquals(NudgeType.SAFETY_ALERT, result.type)
+    }
+
+    @Test
+    fun buildSafetyNudge_returns_null_for_SAFE() {
+        val (engine, _, _) = createEngine()
+        val result = engine.buildSafetyNudge(advisory(AdvisoryLevel.SAFE), "Safe")
+        assertNull(result)
+    }
+
+    @Test
+    fun buildSafetyNudge_returns_null_for_UNKNOWN() {
+        val (engine, _, _) = createEngine()
+        val result = engine.buildSafetyNudge(advisory(AdvisoryLevel.UNKNOWN), "Unknown")
+        assertNull(result)
+    }
+
+    @Test
+    fun buildSafetyNudge_returns_null_for_null_advisory() {
+        val (engine, _, _) = createEngine()
+        val result = engine.buildSafetyNudge(null, "No advisory")
+        assertNull(result)
     }
 }

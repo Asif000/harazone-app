@@ -3,6 +3,8 @@ package com.harazone.domain.companion
 import com.harazone.data.repository.UserPreferencesRepository
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.NudgeType
+import com.harazone.domain.model.AdvisoryLevel
+import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.provider.AreaIntelligenceProvider
@@ -64,6 +66,16 @@ class CompanionNudgeEngine(
             ?: return null
         val text = "There's also ${neighbor.name} nearby — same vibe as ${savedPoi.name}."
         return CompanionNudge(NudgeType.INSTANT_NEIGHBOR, text, "Tell me about ${neighbor.name}.")
+    }
+
+    // #9 Safety Alert — call when advisory is active for an area
+    fun buildSafetyNudge(advisory: AreaAdvisory?, nudgeText: String): CompanionNudge? {
+        if (advisory == null || advisory.level == AdvisoryLevel.SAFE || advisory.level == AdvisoryLevel.UNKNOWN) return null
+        return CompanionNudge(
+            type = NudgeType.SAFETY_ALERT,
+            text = nudgeText,
+            chatContext = "Safety advisory for ${advisory.countryName}: ${advisory.summary}",
+        )
     }
 
     // Quiet orb tap — nothing in the queue

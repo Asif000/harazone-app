@@ -177,6 +177,25 @@
     <string name="profile_bubble_ai_role">AI response</string>
     <string name="profile_bubble_error_role">Error</string>
 
+    <!-- Safety Advisory -->
+    <string name="advisory_safe">Safe</string>
+    <string name="advisory_caution">Exercise Caution</string>
+    <string name="advisory_reconsider">Reconsider Travel</string>
+    <string name="advisory_do_not_travel">Do Not Travel</string>
+    <string name="advisory_unknown">Safety data unavailable</string>
+    <string name="advisory_banner_title_2">Travel Advisory — Exercise Caution</string>
+    <string name="advisory_banner_title_3">Travel Advisory — Reconsider Travel</string>
+    <string name="advisory_banner_title_4">Travel Advisory — Do Not Travel</string>
+    <string name="advisory_learn_more">Learn More</string>
+    <string name="advisory_go_back">Go Back to Safety</string>
+    <string name="advisory_understand_risks">I Understand the Risks — Continue</string>
+    <string name="advisory_last_updated">FCDO last updated %1$s</string>
+    <string name="advisory_source">Source: UK FCDO</string>
+    <string name="advisory_ai_disclaimer">AI-generated safety context</string>
+    <string name="advisory_nudge_caution">⚠ Heads up — exercise caution in %1$s. Tap for details.</string>
+    <string name="advisory_nudge_reconsider">⚠ %1$s has an active travel advisory. Please review before exploring.</string>
+    <string name="advisory_nudge_danger">🚨 %1$s — official advice is DO NOT TRAVEL. Tap for details.</string>
+
     <!-- Accessibility -->
     <string name="action_close">Close</string>
 </resources>

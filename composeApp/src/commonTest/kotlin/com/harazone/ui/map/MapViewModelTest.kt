@@ -81,6 +81,16 @@ class MapViewModelTest {
         clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
         wikipediaImageRepository: com.harazone.data.remote.WikipediaImageRepository = stubWikipediaImageRepository,
         userPreferencesRepository: com.harazone.data.repository.UserPreferencesRepository = com.harazone.fakes.FakeUserPreferencesRepository(),
+        advisoryProvider: com.harazone.domain.provider.AdvisoryProvider = object : com.harazone.domain.provider.AdvisoryProvider {
+            override suspend fun getAdvisory(countryCode: String, regionName: String?): Result<com.harazone.domain.model.AreaAdvisory> =
+                Result.success(com.harazone.domain.model.AreaAdvisory(
+                    level = com.harazone.domain.model.AdvisoryLevel.SAFE,
+                    countryName = "", countryCode = countryCode,
+                    summary = "", details = emptyList(),
+                    subNationalZones = emptyList(), sourceUrl = "",
+                    lastUpdated = 0L, cachedAt = 0L,
+                ))
+        },
     ) = MapViewModel(
         locationProvider = locationProvider,
         getAreaPortrait = GetAreaPortraitUseCase(areaRepository),
@@ -96,6 +106,7 @@ class MapViewModelTest {
             userPreferencesRepository, com.harazone.fakes.FakeAreaIntelligenceProvider(), com.harazone.fakes.FakeClock()
         ),
         localeProvider = com.harazone.fakes.FakeLocaleProvider(),
+        advisoryProvider = advisoryProvider,
         clockMs = clockMs,
     )
 

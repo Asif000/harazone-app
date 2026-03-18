@@ -26,6 +26,8 @@ import com.harazone.domain.provider.WeatherProvider
 import com.harazone.util.AppClock
 import com.harazone.util.ConnectivityMonitor
 import com.harazone.domain.companion.CompanionNudgeEngine
+import com.harazone.domain.provider.AdvisoryProvider
+import com.harazone.data.remote.FcdoAdvisoryProvider
 import com.harazone.util.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,4 +69,5 @@ val dataModule = module {
     single { UserPreferencesRepository(get()) }
     single { ProfileIdentityCacheRepository(get(), get()) }
     single { CompanionNudgeEngine(get(), get(), get()) }
+    single<AdvisoryProvider> { FcdoAdvisoryProvider(get(), get(), get()) }
 }

@@ -79,8 +79,11 @@ import com.harazone.ui.map.components.GeocodingSearchBar
 import com.harazone.ui.profile.ProfileScreen
 import com.harazone.ui.profile.ProfileViewModel
 import com.harazone.ui.saved.SavedPlacesScreen
+import com.harazone.domain.model.AdvisoryLevel
 import com.harazone.ui.map.components.CompanionCard
 import com.harazone.ui.map.components.CompanionOrb
+import com.harazone.ui.map.components.SafetyBanner
+import com.harazone.ui.map.components.SafetyGateModal
 import com.harazone.ui.map.components.MapListToggle
 import com.harazone.ui.map.components.TopContextBar
 import com.harazone.ui.map.components.AmbientTicker
@@ -337,10 +340,30 @@ private fun ReadyContent(
             areaName = state.areaName,
             visitTag = state.visitTag,
             weather = state.weather,
+            advisoryLevel = state.advisory?.level,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 8.dp),
         )
+        }
+
+        // Safety banner (below TopContextBar)
+        val advisory = state.advisory
+        val showBanner = advisory != null &&
+            advisory.level.isAtLeast(AdvisoryLevel.CAUTION) &&
+            !state.isAdvisoryBannerDismissed &&
+            !showProfile
+        if (!showProfile && advisory != null && advisory.level.isAtLeast(AdvisoryLevel.CAUTION)) {
+            SafetyBanner(
+                advisory = advisory,
+                isVisible = showBanner,
+                onDismiss = { viewModel.dismissAdvisoryBanner() },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = statusBarPadding + 96.dp)
+                    .padding(horizontal = 16.dp)
+                    .zIndex(1f),
+            )
         }
 
         // Geocoding search bar (always visible, replaces Refresh Area button)
@@ -808,6 +831,34 @@ private fun ReadyContent(
         // Suppressed when AiDetailPage is open (AiDetailPage has its own back handler)
         PlatformBackHandler(enabled = chatState.isOpen && state.selectedPoi == null) {
             chatViewModel.closeChat()
+        }
+
+        // Safety Gate Modal (Level 4: Do Not Travel)
+        if (advisory != null &&
+            advisory.level == AdvisoryLevel.DO_NOT_TRAVEL &&
+            !state.hasAcknowledgedGate
+        ) {
+            SafetyGateModal(
+                advisory = advisory,
+                hasPreviousArea = !state.previousAreaName.isNullOrBlank(),
+                onGoBack = { viewModel.goBackToSafety() },
+                onContinue = { viewModel.acknowledgeGate() },
+            )
+        }
+
+        // Resolve safety nudge text in Composable scope
+        if (state.hasPendingSafetyNudge && advisory != null) {
+            val nudgeText = when (advisory.level) {
+                AdvisoryLevel.CAUTION -> stringResource(Res.string.advisory_nudge_caution, advisory.countryName)
+                AdvisoryLevel.RECONSIDER -> stringResource(Res.string.advisory_nudge_reconsider, advisory.countryName)
+                AdvisoryLevel.DO_NOT_TRAVEL -> stringResource(Res.string.advisory_nudge_danger, advisory.countryName)
+                else -> null
+            }
+            if (nudgeText != null) {
+                LaunchedEffect(state.hasPendingSafetyNudge) {
+                    viewModel.enqueueSafetyNudge(nudgeText)
+                }
+            }
         }
 
         // Snackbar host

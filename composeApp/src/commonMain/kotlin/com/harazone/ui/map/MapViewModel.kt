@@ -20,8 +20,10 @@ import com.harazone.domain.usecase.GetAreaPortraitUseCase
 import com.harazone.location.LocationProvider
 import com.harazone.util.AnalyticsTracker
 import com.harazone.domain.companion.CompanionNudgeEngine
+import com.harazone.domain.model.AdvisoryLevel
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.NudgeType
+import com.harazone.domain.provider.AdvisoryProvider
 import com.harazone.domain.provider.LocaleProvider
 import com.harazone.util.AppLogger
 import com.harazone.util.haversineDistanceMeters
@@ -51,6 +53,7 @@ class MapViewModel(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val companionEngine: CompanionNudgeEngine,
     private val localeProvider: LocaleProvider,
+    private val advisoryProvider: AdvisoryProvider,
     private val clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
 ) : ViewModel() {
 
@@ -556,8 +559,12 @@ class MapViewModel(
             activeDynamicVibe = null,
             selectedPinIndex = null,
             areaHighlights = emptyList(),
+            advisory = null,
+            isAdvisoryBannerDismissed = false,
+            hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
+        fetchAdvisory(suggestion.latitude, suggestion.longitude, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -641,8 +648,12 @@ class MapViewModel(
             activeDynamicVibe = null,
             selectedPinIndex = null,
             areaHighlights = emptyList(),
+            advisory = null,
+            isAdvisoryBannerDismissed = false,
+            hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(recent.latitude, recent.longitude)
+        fetchAdvisory(recent.latitude, recent.longitude, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -733,8 +744,12 @@ class MapViewModel(
             activeDynamicVibe = null,
             selectedPinIndex = null,
             areaHighlights = emptyList(),
+            advisory = null,
+            isAdvisoryBannerDismissed = false,
+            hasAcknowledgedGate = false,
         )
         fetchWeatherForLocation(lat, lng)
+        fetchAdvisory(lat, lng, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
             try {
                 collectPortraitWithRetry(
@@ -1158,8 +1173,9 @@ class MapViewModel(
                     visitedPoiCount = latestSavedPois.size,
                 )
 
-                // Fetch weather in parallel
+                // Fetch weather + advisory in parallel
                 fetchWeatherForLocation(coords.latitude, coords.longitude)
+                fetchAdvisory(coords.latitude, coords.longitude)
 
                 collectPortraitWithRetry(
                     areaName = areaName,
@@ -1649,6 +1665,77 @@ class MapViewModel(
     private fun isAwayFromGps(cameraLat: Double, cameraLng: Double, state: MapUiState.Ready): Boolean {
         return kotlin.math.abs(cameraLat - state.gpsLatitude) > 0.0009 ||
                kotlin.math.abs(cameraLng - state.gpsLongitude) > 0.0009
+    }
+
+    // --- Safety Advisory ---
+
+    private data class PreviousAreaInfo(val name: String, val lat: Double, val lng: Double)
+
+    private fun fetchAdvisory(lat: Double, lng: Double, previousArea: PreviousAreaInfo? = null) {
+        viewModelScope.launch {
+            try {
+                val geoInfo = geocodingProvider.reverseGeocodeInfo(lat, lng).getOrNull()
+                    ?: return@launch
+                if (geoInfo.countryCode.isBlank()) return@launch
+
+                advisoryProvider.getAdvisory(geoInfo.countryCode, geoInfo.regionName)
+                    .onSuccess { advisory ->
+                        val current = _uiState.value as? MapUiState.Ready ?: return@onSuccess
+                        _uiState.value = current.copy(
+                            advisory = advisory,
+                            isAdvisoryBannerDismissed = false,
+                            hasAcknowledgedGate = false,
+                            previousAreaName = previousArea?.name,
+                            previousAreaLat = previousArea?.lat,
+                            previousAreaLng = previousArea?.lng,
+                            hasPendingSafetyNudge = advisory.level.isAtLeast(AdvisoryLevel.CAUTION),
+                        )
+                    }
+                    .onFailure { e ->
+                        AppLogger.w(e) { "Advisory fetch failed" }
+                    }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) {
+                AppLogger.w(e) { "Advisory fetch error" }
+            }
+        }
+    }
+
+    fun dismissAdvisoryBanner() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(isAdvisoryBannerDismissed = true)
+    }
+
+    fun acknowledgeGate() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(hasAcknowledgedGate = true)
+    }
+
+    fun goBackToSafety() {
+        val state = _uiState.value as? MapUiState.Ready ?: return
+        val prevLat = state.previousAreaLat
+        val prevLng = state.previousAreaLng
+        val prevName = state.previousAreaName
+        if (prevLat != null && prevLng != null && !prevName.isNullOrBlank()) {
+            // Navigate back using saved coordinates — no network round-trip needed
+            flyToCoords(prevLat, prevLng)
+            pendingAreaName = prevName
+            pendingLat = prevLat
+            pendingLng = prevLng
+            onGeocodingSubmitEmpty()
+        } else {
+            // No previous area (cold launch) — just dismiss the gate, show banner
+            acknowledgeGate()
+        }
+    }
+
+    fun enqueueSafetyNudge(text: String) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val advisory = current.advisory ?: return
+        companionEngine.buildSafetyNudge(advisory, text)?.let { enqueueNudge(it) }
+        // Re-read after enqueueNudge — it mutates _uiState (sets isCompanionPulsing)
+        val updated = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = updated.copy(hasPendingSafetyNudge = false)
     }
 
     companion object {

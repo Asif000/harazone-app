@@ -1,5 +1,6 @@
 package com.harazone.ui.map
 
+import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
