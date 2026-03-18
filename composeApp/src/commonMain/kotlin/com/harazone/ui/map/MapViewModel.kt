@@ -66,6 +66,13 @@ class MapViewModel(
     private var geocodingJob: Job? = null
 
     private fun cancelAreaFetch() {
+        counterAnimJob?.cancel()
+        counterAnimJob = null
+        pendingPostSearchSlideshow = false
+        val pre = _uiState.value as? MapUiState.Ready
+        if (pre != null) {
+            _uiState.value = pre.copy(poiStreamingCount = 0)
+        }
         areaFetchJob?.cancel()
         areaFetchJob = null
         cameraIdleJob?.cancel()
@@ -104,6 +111,8 @@ class MapViewModel(
     private val nudgeQueue = ArrayDeque<CompanionNudge>()
     private var deltaCheckFired = false
     private var slideshowJob: Job? = null
+    private var counterAnimJob: Job? = null
+    private var pendingPostSearchSlideshow = false
 
     // Cache for GPS home area — avoids re-querying Gemini on return-to-location
     private var gpsAreaNameCache: String? = null
@@ -135,10 +144,12 @@ class MapViewModel(
             savedPoiRepository.observeAll().collect { pois ->
                 latestSavedPois = pois
                 val current = _uiState.value as? MapUiState.Ready ?: return@collect
+                val showSurpriseMe = pois.any { it.vibe.isNotBlank() }
                 _uiState.value = current.copy(
                     visitedPois = pois,
                     visitedPoiCount = pois.size,
                     dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(pois, current.areaName),
+                    showSurpriseMe = showSurpriseMe,
                 )
                 if (!deltaCheckFired && pois.isNotEmpty()) {
                     deltaCheckFired = true
@@ -373,7 +384,6 @@ class MapViewModel(
 
     private fun startAutoSlideshow() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        if (current.selectedPinIndex != null) return
         if (current.pois.isEmpty()) return
         slideshowJob?.cancel()
 
@@ -429,6 +439,29 @@ class MapViewModel(
     }
 
     /** Called from hot-path pointer input — skips if slideshow isn't running. */
+    private fun animatePoiCounter(targetCount: Int) {
+        counterAnimJob?.cancel()
+        counterAnimJob = viewModelScope.launch {
+            val current = _uiState.value as? MapUiState.Ready ?: return@launch
+            val startCount = current.poiStreamingCount
+            for (i in (startCount + 1)..targetCount) {
+                delay(150L)
+                val s = _uiState.value as? MapUiState.Ready ?: break
+                _uiState.value = s.copy(poiStreamingCount = i)
+            }
+        }
+    }
+
+    private fun schedulePostSearchSlideshow() {
+        viewModelScope.launch {
+            delay(IDLE_THRESHOLD_MS)
+            val state = _uiState.value as? MapUiState.Ready ?: return@launch
+            if (state.pois.isNotEmpty() && !state.isSearchingArea && !state.showListView && state.selectedPoi == null) {
+                startAutoSlideshow()
+            }
+        }
+    }
+
     fun stopAutoSlideshowIfRunning() {
         if (slideshowJob == null) return
         slideshowJob?.cancel()
@@ -675,6 +708,7 @@ class MapViewModel(
     }
 
     fun onSearchThisArea() {
+        pendingPostSearchSlideshow = true
         onGeocodingSubmitEmpty() // already sets showSearchAreaPill = false
     }
 
@@ -720,6 +754,10 @@ class MapViewModel(
                             showMyLocation = isAwayFromGps(lat, lng, state),
                             dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, areaName),
                         )
+                        if (pendingPostSearchSlideshow) {
+                            pendingPostSearchSlideshow = false
+                            schedulePostSearchSlideshow()
+                        }
                     },
                     onError = { e ->
                         AppLogger.e(e) { "Empty submit: portrait fetch failed" }
@@ -805,10 +843,49 @@ class MapViewModel(
         _uiState.value = state.copy(selectedPinIndex = index.coerceIn(0, state.pois.size - 1))
     }
 
+    fun onSurpriseMe() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val hasTasteData = latestSavedPois.any { it.vibe.isNotBlank() }
+        if (!hasTasteData) return
+        val tasteProfile = latestSavedPois
+            .map { it.vibe }
+            .filter { it.isNotBlank() }
+            .groupingBy { it }
+            .eachCount()
+            .entries
+            .sortedByDescending { it.value }
+            .take(3)
+            .map { it.key }
+        cancelAreaFetch()
+        val areaName = current.areaName
+        _uiState.value = current.copy(
+            isSearchingArea = true,
+            isLoadingVibes = true,
+            pois = emptyList(),
+            poiStreamingCount = 0,
+            activeDynamicVibe = null,
+            selectedPinIndex = null,
+            visitedPois = current.visitedPois,
+            visitedPoiIds = current.visitedPoiIds,
+            visitedPoiCount = current.visitedPoiCount,
+        )
+        areaFetchJob = viewModelScope.launch {
+            collectPortraitWithRetry(
+                areaName = areaName,
+                tasteProfile = tasteProfile,
+                onComplete = { _, _ -> schedulePostSearchSlideshow() },
+                onError = { _ -> _errorEvents.tryEmit("Discovery failed — try again") },
+            )
+        }
+    }
+
     fun onCarouselSwiped(index: Int) {
         val state = _uiState.value as? MapUiState.Ready ?: return
         if (state.pois.isEmpty()) return
-        _uiState.value = state.copy(selectedPinIndex = index.coerceIn(0, state.pois.size - 1))
+        _uiState.value = state.copy(
+            selectedPinIndex = index.coerceIn(0, state.pois.size - 1),
+            cameraZoomLevel = DEFAULT_ZOOM_LEVEL,
+        )
     }
 
     fun onCarouselSelectionCleared() {
@@ -1296,10 +1373,14 @@ class MapViewModel(
 
     private suspend fun collectPortraitWithRetry(
         areaName: String,
+        tasteProfile: List<String> = emptyList(),
         onComplete: suspend (pois: List<POI>, finalAreaName: String) -> Unit,
         onError: suspend (Exception) -> Unit,
     ) {
-        val context = areaContextFactory.create().copy(isNewUser = pendingColdStart)
+        val context = areaContextFactory.create().copy(
+            isNewUser = pendingColdStart,
+            tasteProfile = tasteProfile,
+        )
         try {
             var pois = emptyList<POI>()
             var stage1Pois = emptyList<POI>()
@@ -1348,6 +1429,7 @@ class MapViewModel(
                                 showAllMode = false,
                                 areaHighlights = update.areaHighlights,
                             )
+                            animatePoiCounter(update.pois.size)
                         }
                         is BucketUpdate.PinsReady -> {
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect
@@ -1366,6 +1448,7 @@ class MapViewModel(
                                 showAllMode = false,
                                 areaHighlights = update.areaHighlights,
                             )
+                            animatePoiCounter(update.pois.size)
                         }
                         is BucketUpdate.DynamicVibeComplete -> {
                             currentDynamicVibes = currentDynamicVibes.map { dv ->
@@ -1434,6 +1517,7 @@ class MapViewModel(
                                 allDiscoveredPois = allPois,
                                 dynamicVibePoiCounts = computeDynamicVibePoiCounts(allPois),
                             )
+                            animatePoiCounter(allPois.size)
                         }
                         is BucketUpdate.BackgroundEnrichmentComplete -> {
                             if (update.batchIndex < 1 || update.batchIndex >= poiBatchesCache.size) return@collect

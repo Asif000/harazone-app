@@ -56,6 +56,15 @@ sealed class MapUiState {
         val autoSlideshowIndex: Int? = null,
         val cameraZoomLevel: Double = 14.0,
         val showSearchAreaPill: Boolean = false,
+        val advisory: AreaAdvisory? = null,
+        val isAdvisoryBannerDismissed: Boolean = false,
+        val hasAcknowledgedGate: Boolean = false,
+        val hasPendingSafetyNudge: Boolean = false,
+        val previousAreaName: String? = null,
+        val previousAreaLat: Double? = null,
+        val previousAreaLng: Double? = null,
+        val poiStreamingCount: Int = 0,
+        val showSurpriseMe: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

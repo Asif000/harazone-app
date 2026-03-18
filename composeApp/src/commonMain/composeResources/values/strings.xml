@@ -133,6 +133,14 @@
     <!-- Batch Nav -->
     <string name="batch_all">All</string>
 
+    <!-- Streaming Discovery -->
+    <string name="search_discovering">Discovering…</string>
+    <string name="vibe_surprise_me">Surprise Me</string>
+    <plurals name="search_n_places">
+        <item quantity="one">%1$d place</item>
+        <item quantity="other">%1$d places</item>
+    </plurals>
+
     <!-- Top Context Bar -->
     <string name="visit_first">First visit</string>
 

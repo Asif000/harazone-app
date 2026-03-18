@@ -76,6 +76,7 @@ Context:
 - Day of week: ${context.dayOfWeek}
 - Preferred language: ${context.preferredLanguage}
 ${if (!context.preferredLanguage.startsWith("en")) "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '${context.preferredLanguage}'. Every word of your response must be in that language." else ""}
+${if (context.tasteProfile.isNotEmpty()) "User taste profile: ${context.tasteProfile.joinToString(", ")}. Prioritise surprising, lesser-known places matching these vibes." else ""}
 Output EXACTLY 6 JSON objects, one per bucket, separated by the delimiter line:
 ---BUCKET---
 

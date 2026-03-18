@@ -8,4 +8,5 @@ data class AreaContext(
     val isNewUser: Boolean = false,
     val isRtl: Boolean = false,
     val homeCurrencyCode: String = "USD",
+    val tasteProfile: List<String> = emptyList(),
 )

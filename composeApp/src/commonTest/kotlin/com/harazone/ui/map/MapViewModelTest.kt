@@ -2706,6 +2706,261 @@ class MapViewModelTest {
         assertEquals(initialPois, state2.pois)
     }
 
+    // --- Safety Advisory Tests ---
+
+    @Test
+    fun dismissAdvisoryBanner_setsFlag() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(false, state.isAdvisoryBannerDismissed)
+
+        viewModel.dismissAdvisoryBanner()
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(true, updated.isAdvisoryBannerDismissed)
+    }
+
+    @Test
+    fun acknowledgeGate_setsFlag() = runTest(testDispatcher) {
+        val viewModel = createViewModel()
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(false, state.hasAcknowledgedGate)
+
+        viewModel.acknowledgeGate()
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(true, updated.hasAcknowledgedGate)
+    }
+
+    @Test
+    fun goBackToSafety_withoutPreviousArea_acknowledgesGate() = runTest(testDispatcher) {
+        // Use a geocoding provider that returns failure for reverseGeocodeInfo
+        // so advisory fetch doesn't set previousAreaName
+        val geocodingProvider = com.harazone.fakes.FakeMapTilerGeocodingProvider()
+        geocodingProvider.reverseGeocodeResult = Result.failure(Exception("no geo"))
+        val viewModel = createViewModel(geocodingProvider = geocodingProvider)
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        // previousAreaName should be null since advisory fetch failed
+        assertNull(state.previousAreaName)
+
+        viewModel.goBackToSafety()
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(true, updated.hasAcknowledgedGate)
+    }
+
+    @Test
+    fun goBackToSafety_noPreviousCoordinates_acknowledgesGate() = runTest(testDispatcher) {
+        val geocodingProvider = com.harazone.fakes.FakeMapTilerGeocodingProvider()
+        geocodingProvider.reverseGeocodeResult = Result.failure(Exception("no geo"))
+        val viewModel = createViewModel(geocodingProvider = geocodingProvider)
+        testScheduler.advanceUntilIdle()
+
+        // No advisory fetch succeeded → previousAreaLat/Lng are null → fallback to acknowledgeGate
+        viewModel.goBackToSafety()
+        testScheduler.advanceUntilIdle()
+
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(true, updated.hasAcknowledgedGate)
+    }
+
+    @Test
+    fun enqueueSafetyNudge_withActiveAdvisory_enqueuesNudge() = runTest(testDispatcher) {
+        val cautionAdvisory = com.harazone.domain.model.AreaAdvisory(
+            level = com.harazone.domain.model.AdvisoryLevel.CAUTION,
+            countryName = "TestCountry",
+            countryCode = "TC",
+            summary = "Exercise caution",
+            details = emptyList(),
+            subNationalZones = emptyList(),
+            sourceUrl = "",
+            lastUpdated = 0L,
+            cachedAt = 0L,
+        )
+        val advisoryProvider = object : com.harazone.domain.provider.AdvisoryProvider {
+            override suspend fun getAdvisory(countryCode: String, regionName: String?): Result<com.harazone.domain.model.AreaAdvisory> =
+                Result.success(cautionAdvisory)
+        }
+        val geocodingProvider = com.harazone.fakes.FakeMapTilerGeocodingProvider()
+        geocodingProvider.reverseGeocodeResult = Result.success(
+            com.harazone.data.remote.ReverseGeocodeInfo("TC", "TestCountry", null)
+        )
+        val viewModel = createViewModel(
+            advisoryProvider = advisoryProvider,
+            geocodingProvider = geocodingProvider,
+        )
+        testScheduler.advanceUntilIdle()
+
+        // After area load, advisory should be set and hasPendingSafetyNudge true
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(state.advisory)
+        assertEquals(com.harazone.domain.model.AdvisoryLevel.CAUTION, state.advisory!!.level)
+        // hasPendingSafetyNudge may be true if advisory was fetched
+        // Now enqueue nudge text
+        viewModel.enqueueSafetyNudge("Test safety nudge text")
+        val updated = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(false, updated.hasPendingSafetyNudge)
+        // Companion should be pulsing (nudge was enqueued)
+        assertEquals(true, updated.isCompanionPulsing)
+    }
+
+    // --- Streaming Discovery UX Tests ---
+
+    @Test
+    fun onCarouselSwiped_resetsZoomToDefault() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        // Simulate slideshow zoom
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        // Swipe to card 1
+        viewModel.onCarouselSwiped(1)
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(MapViewModel.DEFAULT_ZOOM_LEVEL, after.cameraZoomLevel)
+        assertEquals(1, after.selectedPinIndex)
+    }
+
+    @Test
+    fun startAutoSlideshow_startsEvenWhenSelectedPinIndexSet() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        // Set selectedPinIndex (simulate previous carousel swipe)
+        viewModel.onCarouselSwiped(1)
+        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(before.selectedPinIndex)
+
+        // Trigger idle → should still start slideshow
+        viewModel.onIdleDetected()
+        testScheduler.advanceTimeBy(500)
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(after.autoSlideshowIndex)
+    }
+
+    @Test
+    fun onSurpriseMe_doesNothingWhenNoSaves() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(before.isSearchingArea)
+        viewModel.onSurpriseMe()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(after.isSearchingArea)
+    }
+
+    @Test
+    fun onSurpriseMe_doesNothingWhenSavesHaveNoVibe() = runTest(testDispatcher) {
+        val savedRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+            savedPoiRepository = savedRepo,
+        )
+        // Add save with blank vibe
+        savedRepo.save(
+            SavedPoi(
+                id = "s1", name = "No Vibe Place", type = "food", vibe = "",
+                whySpecial = "test", lat = 1.0, lng = 2.0, areaName = "Manhattan, New York", savedAt = 1000L,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+
+        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(before.showSurpriseMe)
+        viewModel.onSurpriseMe()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(after.isSearchingArea)
+    }
+
+    @Test
+    fun showSurpriseMe_trueWhenSavesHaveVibes() = runTest(testDispatcher) {
+        val savedRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+            savedPoiRepository = savedRepo,
+        )
+        savedRepo.save(
+            SavedPoi(
+                id = "s2", name = "Vibed Place", type = "food", vibe = "Nightlife",
+                whySpecial = "test", lat = 1.0, lng = 2.0, areaName = "Manhattan, New York", savedAt = 1000L,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.showSurpriseMe)
+    }
+
+    @Test
+    fun animatePoiCounter_incrementsToTargetCount() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        // After VibesReady, counter animation starts. Advance enough time (3 pois * 150ms).
+        testScheduler.advanceTimeBy(500)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(batch0Pois.size, state.poiStreamingCount)
+    }
+
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {
