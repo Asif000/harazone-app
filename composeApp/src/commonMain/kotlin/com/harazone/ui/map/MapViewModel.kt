@@ -1649,7 +1649,9 @@ class MapViewModel(
         val current = _uiState.value as? MapUiState.Ready ?: return
         val advisory = current.advisory ?: return
         companionEngine.buildSafetyNudge(advisory, text)?.let { enqueueNudge(it) }
-        _uiState.value = (_uiState.value as? MapUiState.Ready)?.copy(hasPendingSafetyNudge = false) ?: return
+        // Re-read after enqueueNudge — it mutates _uiState (sets isCompanionPulsing)
+        val updated = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = updated.copy(hasPendingSafetyNudge = false)
     }
 
     companion object {
