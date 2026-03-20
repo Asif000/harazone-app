@@ -1,8 +1,6 @@
 package com.harazone.ui.map
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,7 +17,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
@@ -305,7 +301,7 @@ private fun ReadyContent(
                 visitedPois = state.visitedPois,
                 visitedFilter = state.visitedFilter,
                 onPinTapped = { index -> viewModel.onPinTapped(index) },
-                selectedPinIndex = state.selectedPinIndex,
+                selectedPinIndex = state.autoSlideshowIndex ?: state.selectedPinIndex,
             )
         }
 
@@ -383,7 +379,7 @@ private fun ReadyContent(
             recentPlaces = state.recentPlaces,
             onRecentSelected = { viewModel.onRecentSelected(it) },
             onClearRecents = { viewModel.onClearRecents() },
-            poiCount = state.poiStreamingCount,
+            poiCount = state.pois.size,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 56.dp)
@@ -879,71 +875,39 @@ private fun SearchSurpriseTogglePill(
     surpriseMeEnabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    var activeMode by remember { mutableStateOf(0) } // 0 = Search, 1 = Surprise
-    val highlightOffset by animateFloatAsState(
-        targetValue = activeMode.toFloat(),
-        animationSpec = tween(durationMillis = 200),
-        label = "pillHighlight",
-    )
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = MapFloatingUiDark.copy(alpha = 0.92f),
-        modifier = modifier,
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(MapFloatingUiDark.copy(alpha = 0.92f))
+            .padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        BoxWithConstraints {
-            val segmentWidth = maxWidth / 2
-            Row(Modifier.fillMaxWidth()) {
-                // Sliding highlight
-                Box(
-                    Modifier
-                        .width(segmentWidth)
-                        .height(40.dp)
-                        .padding(2.dp)
-                        .offset(x = segmentWidth * highlightOffset)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color.White.copy(alpha = 0.15f))
-                )
-            }
-            Row(
-                Modifier.fillMaxWidth().height(40.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // Segment 0: Search here
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .clickable {
-                            if (activeMode == 0) onSearchHere() else activeMode = 0
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "↻ Search here",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White,
-                    )
-                }
-                // Segment 1: Surprise Me
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .then(
-                            if (surpriseMeEnabled) Modifier.clickable {
-                                if (activeMode == 1) onSurpriseMe() else activeMode = 1
-                            } else Modifier
-                        ),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = "\uD83C\uDFB2 ${stringResource(Res.string.vibe_surprise_me)}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = if (surpriseMeEnabled) 1f else 0.35f),
-                    )
-                }
-            }
+        // Search here — single tap executes
+        Surface(
+            onClick = onSearchHere,
+            shape = RoundedCornerShape(17.dp),
+            color = Color.White.copy(alpha = 0.15f),
+        ) {
+            Text(
+                text = "↻ Search here",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        // Surprise Me — single tap executes
+        Surface(
+            onClick = onSurpriseMe,
+            shape = RoundedCornerShape(17.dp),
+            color = Color.Transparent,
+        ) {
+            Text(
+                text = "\uD83C\uDFB2 ${stringResource(Res.string.vibe_surprise_me)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
         }
     }
 }

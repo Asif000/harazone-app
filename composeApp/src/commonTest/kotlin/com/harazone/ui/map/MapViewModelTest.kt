@@ -2869,7 +2869,7 @@ class MapViewModelTest {
     }
 
     @Test
-    fun onSurpriseMe_doesNothingWhenNoSaves() = runTest(testDispatcher) {
+    fun onSurpriseMe_worksWithNoSaves() = runTest(testDispatcher) {
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(
                 locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
@@ -2883,44 +2883,9 @@ class MapViewModelTest {
                 )
             ),
         )
-        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(before.isSearchingArea)
         viewModel.onSurpriseMe()
         val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(after.isSearchingArea)
-    }
-
-    @Test
-    fun onSurpriseMe_doesNothingWhenSavesHaveNoVibe() = runTest(testDispatcher) {
-        val savedRepo = com.harazone.fakes.FakeSavedPoiRepository()
-        val viewModel = createViewModel(
-            locationProvider = FakeLocationProvider(
-                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
-                geocodeResult = Result.success("Manhattan, New York"),
-            ),
-            areaRepository = FakeAreaRepository(
-                updates = listOf(
-                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
-                    BucketUpdate.PortraitComplete(batch0Pois),
-                    BucketUpdate.BackgroundFetchComplete,
-                )
-            ),
-            savedPoiRepository = savedRepo,
-        )
-        // Add save with blank vibe
-        savedRepo.save(
-            SavedPoi(
-                id = "s1", name = "No Vibe Place", type = "food", vibe = "",
-                whySpecial = "test", lat = 1.0, lng = 2.0, areaName = "Manhattan, New York", savedAt = 1000L,
-            )
-        )
-        testScheduler.advanceUntilIdle()
-
-        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(before.showSurpriseMe)
-        viewModel.onSurpriseMe()
-        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
-        assertFalse(after.isSearchingArea)
+        assertTrue(after.isSearchingArea)
     }
 
     @Test

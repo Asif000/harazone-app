@@ -68,138 +68,120 @@ internal class AreaRepositoryImpl(
         val language = context.preferredLanguage
         val now = clock.nowMs()
 
-        val cached = database.area_bucket_cacheQueries
-            .getBucketsByAreaAndLanguage(areaName, language)
-            .executeAsList()
+        // skipCache: bypass ALL cache paths (Surprise here!) — go straight to AI with enrichment
+        if (!context.skipCache) {
+            val cached = database.area_bucket_cacheQueries
+                .getBucketsByAreaAndLanguage(areaName, language)
+                .executeAsList()
 
-        // Clean up expired cache entries after reading current area's data
-        database.area_bucket_cacheQueries.deleteExpiredBuckets(now)
-        database.area_poi_cacheQueries.deleteExpiredPois(now)
+            database.area_bucket_cacheQueries.deleteExpiredBuckets(now)
+            database.area_poi_cacheQueries.deleteExpiredPois(now)
 
-        // L2: Parse once, reuse — avoids duplicate type lookups
-        val validParsed = cached.filter { it.expires_at > now }.mapNotNull { it.toBucketContent() }
-        val staleParsed = cached.filter { it.expires_at <= now }.mapNotNull { it.toBucketContent() }
+            val validParsed = cached.filter { it.expires_at > now }.mapNotNull { it.toBucketContent() }
+            val staleParsed = cached.filter { it.expires_at <= now }.mapNotNull { it.toBucketContent() }
 
-        if (validParsed.size == BucketType.entries.size) {
-            // Full cache hit — emit all from cache
-            AppLogger.d { "Cache HIT for '$areaName' — ${validParsed.size} buckets" }
-            validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
-            val cachedPois = resolveTileRefs(loadPoisFromCache(areaName, language, now))
-            val cachedVibes = loadVibesFromCache(areaName, language, now)
-            if (cachedVibes.isNotEmpty()) {
-                emit(BucketUpdate.VibesReady(cachedVibes, cachedPois, fromCache = true))
-            }
-            emit(BucketUpdate.PortraitComplete(pois = cachedPois))
-            return@flow
-        }
-
-        // POI-only cache hit — two-stage pipeline doesn't emit BucketComplete,
-        // so bucket cache is empty but POI cache may be valid.
-        // Only use this path when there are NO bucket entries at all (pure two-stage flow).
-        // TODO(BACKLOG-MEDIUM): Guard skips when stale bucket entries exist — if bucket cache is expired but POI cache is fresh,
-        // staleParsed is non-empty so we fall through to stale-while-revalidate and re-call Gemini unnecessarily.
-        // Fix: check validParsed.isEmpty() only, or separate the POI cache hit check from the bucket cache guard.
-        if (validParsed.isEmpty() && staleParsed.isEmpty()) {
-            val cachedPois = loadPoisFromCache(areaName, language, now)
-            if (cachedPois.isNotEmpty()) {
-                AppLogger.d { "POI cache HIT for '$areaName' — ${cachedPois.size} POIs (no bucket cache)" }
-                // Split cached POIs into batches of 3 for progressive discovery pagination
-                val batches = cachedPois.chunked(3)
-                val batch0 = batches.first()
-                // TODO(BACKLOG-LOW): Stage 2-only POIs (no coords, wiki fails) keep imageUrl=null after enrichment,
-                // causing needsEnrichment=true on every cache hit and repeated background enrichment calls.
-                // Fix: track enrichment attempts per POI (e.g. store a flag or sentinel URL) to avoid re-enriching permanently null images.
-                // H1 fix: emit cached vibes so the vibe rail populates on revisit
+            if (validParsed.size == BucketType.entries.size) {
+                AppLogger.d { "Cache HIT for '$areaName' — ${validParsed.size} buckets" }
+                validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
+                val cachedPois = resolveTileRefs(loadPoisFromCache(areaName, language, now))
                 val cachedVibes = loadVibesFromCache(areaName, language, now)
                 if (cachedVibes.isNotEmpty()) {
-                    emit(BucketUpdate.VibesReady(cachedVibes, batch0, fromCache = true))
+                    emit(BucketUpdate.VibesReady(cachedVibes, cachedPois, fromCache = true))
                 }
-                // Emit batch 0 via PortraitComplete (triggers onComplete in ViewModel)
-                emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(batch0)))
-                // Re-constitute background batches from cache so pagination works on relaunch
-                for (i in 1 until batches.size) {
-                    emit(BucketUpdate.BackgroundBatchReady(batches[i], batchIndex = i))
-                }
-                if (batches.size > 1) {
-                    emit(BucketUpdate.BackgroundFetchComplete)
-                }
-                // Enrich images in background if any POIs lack them
-                val needsEnrichment = cachedPois.any { it.imageUrl == null }
-                if (needsEnrichment) {
-                    scope.launch {
-                        try {
-                            val enriched = enrichPoisWithImages(cachedPois)
-                            withContext(ioDispatcher) { writePoisToCache(enriched, areaName, language) }
-                        } catch (e: CancellationException) { throw e }
-                        catch (e: Exception) {
-                            AppLogger.e(e) { "Background POI enrichment failed for '$areaName'" }
-                        }
-                    }
-                }
+                emit(BucketUpdate.PortraitComplete(pois = cachedPois))
                 return@flow
             }
-        }
 
-        // Check connectivity before attempting AI call
-        val connectivity = connectivityObserver().first()
-
-        if (connectivity is ConnectivityState.Offline) {
-            // Emit cached vibes even if expired when offline
-            val cachedVibes = loadVibesFromCache(areaName, language, now)
-            val cachedPoisForVibes = loadPoisFromCache(areaName, language, now)
-            if (cachedVibes.isNotEmpty() && cachedPoisForVibes.isNotEmpty()) {
-                emit(BucketUpdate.VibesReady(vibes = cachedVibes, pois = cachedPoisForVibes, fromCache = true))
-            }
-            val allCached = validParsed + staleParsed
-            if (allCached.isNotEmpty()) {
-                allCached.forEach { emit(BucketUpdate.BucketComplete(it)) }
-                emit(BucketUpdate.ContentAvailabilityNote("You're offline — showing last known content"))
-            } else if (cachedVibes.isEmpty()) {
-                emit(BucketUpdate.ContentAvailabilityNote("No content available offline for this area"))
-            }
-            emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPoisForVibes)))
-            return@flow
-        }
-
-        if (staleParsed.isNotEmpty()) {
-            // Stale-while-revalidate: emit cached content immediately, refresh in background.
-            // Errors in the background refresh are silently logged — intentional:
-            // the caller already has stale content to display; propagating a refresh
-            // failure would disrupt the UI for no user benefit.
-            staleParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
-            validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
-            val staleVibes = loadVibesFromCache(areaName, language, now)
-            val stalePois = resolveTileRefs(loadPoisFromCache(areaName, language, now))
-            if (staleVibes.isNotEmpty()) {
-                emit(BucketUpdate.VibesReady(staleVibes, stalePois, fromCache = true))
-            }
-            scope.launch {
-                aiProvider.streamAreaPortrait(areaName, context)
-                    .catch { e -> AppLogger.e(e) { "Background refresh failed for area: $areaName" } }
-                    .collect { update ->
-                        if (update is BucketUpdate.PinsReady) return@collect // Skip — user has stale data already
-                        if (update is BucketUpdate.BucketComplete) {
-                            withContext(ioDispatcher) {
-                                writeToCache(update.content, areaName, language)
+            // POI-only cache hit
+            if (validParsed.isEmpty() && staleParsed.isEmpty()) {
+                val cachedPois = loadPoisFromCache(areaName, language, now)
+                if (cachedPois.isNotEmpty()) {
+                    AppLogger.d { "POI cache HIT for '$areaName' — ${cachedPois.size} POIs (no bucket cache)" }
+                    val batches = cachedPois.chunked(3)
+                    val batch0 = batches.first()
+                    val cachedVibes = loadVibesFromCache(areaName, language, now)
+                    if (cachedVibes.isNotEmpty()) {
+                        emit(BucketUpdate.VibesReady(cachedVibes, batch0, fromCache = true))
+                    }
+                    emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(batch0)))
+                    for (i in 1 until batches.size) {
+                        emit(BucketUpdate.BackgroundBatchReady(batches[i], batchIndex = i))
+                    }
+                    if (batches.size > 1) {
+                        emit(BucketUpdate.BackgroundFetchComplete)
+                    }
+                    val needsEnrichment = cachedPois.any { it.imageUrl == null }
+                    if (needsEnrichment) {
+                        scope.launch {
+                            try {
+                                val enriched = enrichPoisWithImages(cachedPois)
+                                withContext(ioDispatcher) { writePoisToCache(enriched, areaName, language) }
+                            } catch (e: CancellationException) { throw e }
+                            catch (e: Exception) {
+                                AppLogger.e(e) { "Background POI enrichment failed for '$areaName'" }
                             }
                         }
-                        if (update is BucketUpdate.PortraitComplete && update.pois.isNotEmpty()) {
-                            val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
-                            if (hasCoords) {
-                                withContext(ioDispatcher) {
-                                    val enriched = enrichPoisWithImages(update.pois)
-                                    writePoisToCache(enriched, areaName, language)
+                    }
+                    return@flow
+                }
+            }
+
+            // Offline check
+            val connectivity = connectivityObserver().first()
+            if (connectivity is ConnectivityState.Offline) {
+                val cachedVibes = loadVibesFromCache(areaName, language, now)
+                val cachedPoisForVibes = loadPoisFromCache(areaName, language, now)
+                if (cachedVibes.isNotEmpty() && cachedPoisForVibes.isNotEmpty()) {
+                    emit(BucketUpdate.VibesReady(vibes = cachedVibes, pois = cachedPoisForVibes, fromCache = true))
+                }
+                val allCached = validParsed + staleParsed
+                if (allCached.isNotEmpty()) {
+                    allCached.forEach { emit(BucketUpdate.BucketComplete(it)) }
+                    emit(BucketUpdate.ContentAvailabilityNote("You're offline — showing last known content"))
+                } else if (cachedVibes.isEmpty()) {
+                    emit(BucketUpdate.ContentAvailabilityNote("No content available offline for this area"))
+                }
+                emit(BucketUpdate.PortraitComplete(pois = resolveTileRefs(cachedPoisForVibes)))
+                return@flow
+            }
+
+            // Stale-while-revalidate
+            if (staleParsed.isNotEmpty()) {
+                staleParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
+                validParsed.forEach { emit(BucketUpdate.BucketComplete(it)) }
+                val staleVibes = loadVibesFromCache(areaName, language, now)
+                val stalePois = resolveTileRefs(loadPoisFromCache(areaName, language, now))
+                if (staleVibes.isNotEmpty()) {
+                    emit(BucketUpdate.VibesReady(staleVibes, stalePois, fromCache = true))
+                }
+                scope.launch {
+                    aiProvider.streamAreaPortrait(areaName, context)
+                        .catch { e -> AppLogger.e(e) { "Background refresh failed for area: $areaName" } }
+                        .collect { update ->
+                            if (update is BucketUpdate.PinsReady) return@collect
+                            if (update is BucketUpdate.BucketComplete) {
+                                withContext(ioDispatcher) { writeToCache(update.content, areaName, language) }
+                            }
+                            if (update is BucketUpdate.PortraitComplete && update.pois.isNotEmpty()) {
+                                val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
+                                if (hasCoords) {
+                                    withContext(ioDispatcher) {
+                                        val enriched = enrichPoisWithImages(update.pois)
+                                        writePoisToCache(enriched, areaName, language)
+                                    }
                                 }
                             }
                         }
-                    }
+                }
+                emit(BucketUpdate.PortraitComplete(pois = stalePois))
+                return@flow
             }
-            emit(BucketUpdate.PortraitComplete(pois = stalePois))
-            return@flow
+        } else {
+            AppLogger.d { "Cache SKIP for '$areaName' (skipCache=true)" }
         }
 
-        // Cache miss — stream from AI with error fallback
-        AppLogger.d { "Cache MISS for '$areaName' — valid=${validParsed.size}, stale=${staleParsed.size}, needed=${BucketType.entries.size}" }
+        // Cache miss (or skipCache) — stream from AI with image enrichment + caching
+        AppLogger.d { "Fetching fresh portrait for '$areaName'" }
         try {
             aiProvider.streamAreaPortrait(areaName, context).collect { update ->
                 when (update) {

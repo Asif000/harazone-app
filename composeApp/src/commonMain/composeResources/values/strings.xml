@@ -135,7 +135,7 @@
 
     <!-- Streaming Discovery -->
     <string name="search_discovering">Discovering…</string>
-    <string name="vibe_surprise_me">Surprise Me</string>
+    <string name="vibe_surprise_me">Surprise here!</string>
     <plurals name="search_n_places">
         <item quantity="one">%1$d place</item>
         <item quantity="other">%1$d places</item>
