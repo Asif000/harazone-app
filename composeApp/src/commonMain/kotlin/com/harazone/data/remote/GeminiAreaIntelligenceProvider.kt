@@ -154,7 +154,7 @@ internal class GeminiAreaIntelligenceProvider(
                 val stage1Names = stage1Result.names
                 val stage1Vibes = stage1Result.vibes
                 val prompt = if (stage1Names.isNotEmpty() && stage1Vibes.isNotEmpty()) {
-                    promptBuilder.buildDynamicVibeEnrichmentPrompt(areaName, stage1Vibes.map { it.label }, stage1Names, languageTag = context.preferredLanguage)
+                    promptBuilder.buildDynamicVibeEnrichmentPrompt(areaName, stage1Vibes.map { it.label }, stage1Names, languageTag = context.preferredLanguage, tasteProfile = context.tasteProfile)
                 } else if (stage1Names.isNotEmpty()) {
                     promptBuilder.buildEnrichmentPrompt(areaName, stage1Names, context)
                 } else {
@@ -230,7 +230,7 @@ internal class GeminiAreaIntelligenceProvider(
             try {
                 val stage1Result = stage1Deferred.await()
                 // Check AFTER await so BackgroundFetchComplete fires after VibesReady
-                if (context.tasteProfile.isNotEmpty()) {
+                if (context.hasTasteProfile) {
                     return@launch
                 }
                 val stage1Names = stage1Result.names

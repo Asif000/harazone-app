@@ -10,4 +10,11 @@ data class AreaContext(
     val homeCurrencyCode: String = "USD",
     val tasteProfile: List<String> = emptyList(),
     val skipCache: Boolean = false,
-)
+) {
+    val isSurpriseQuery: Boolean get() = tasteProfile == listOf(SURPRISE_SENTINEL)
+    val hasTasteProfile: Boolean get() = tasteProfile.isNotEmpty()
+
+    companion object {
+        const val SURPRISE_SENTINEL = "surprise"
+    }
+}

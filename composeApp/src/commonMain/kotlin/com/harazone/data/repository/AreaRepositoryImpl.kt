@@ -192,29 +192,33 @@ internal class AreaRepositoryImpl(
                             update.pois.count { it.vibe == dv.label } >= minCount
                         }
                         emit(BucketUpdate.VibesReady(vibes = qualityVibes, pois = update.pois, fromCache = false))
-                        if (update.pois.isNotEmpty()) writePoisToCache(update.pois, areaName, language)
-                        if (qualityVibes.isNotEmpty()) writeVibesToCache(qualityVibes, areaName, language)
+                        // M1: skip cache writes for surprise queries — don't overwrite normal area cache
+                        if (!context.skipCache) {
+                            if (update.pois.isNotEmpty()) writePoisToCache(update.pois, areaName, language)
+                            if (qualityVibes.isNotEmpty()) writeVibesToCache(qualityVibes, areaName, language)
+                        }
                     }
                     is BucketUpdate.PinsReady -> {
                         emit(update)
-                        // Cache Stage 1 POIs (with coords) so restarts don't re-query
-                        if (update.pois.isNotEmpty()) writePoisToCache(update.pois, areaName, language)
+                        if (!context.skipCache && update.pois.isNotEmpty()) writePoisToCache(update.pois, areaName, language)
                     }
                     is BucketUpdate.PortraitComplete -> {
                         val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
                         if (hasCoords) {
-                            // Full portrait POIs (Stage 1 fallback) — enrich images + cache as normal
                             val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
-                            if (enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
+                            if (!context.skipCache && enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
                             emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched)))
                         } else {
-                            // Stage 2 enrichment-only POIs (no coords) — merge onto cached Stage 1 POIs
                             val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
-                            val cachedStage1 = loadPoisFromCache(areaName, language, clock.nowMs())
-                            if (cachedStage1.isNotEmpty() && enriched.isNotEmpty()) {
-                                val merged = mergeStage2OntoCached(cachedStage1, enriched)
-                                writePoisToCache(merged, areaName, language)
-                                emit(BucketUpdate.PortraitComplete(resolveTileRefs(merged)))
+                            if (!context.skipCache) {
+                                val cachedStage1 = loadPoisFromCache(areaName, language, clock.nowMs())
+                                if (cachedStage1.isNotEmpty() && enriched.isNotEmpty()) {
+                                    val merged = mergeStage2OntoCached(cachedStage1, enriched)
+                                    writePoisToCache(merged, areaName, language)
+                                    emit(BucketUpdate.PortraitComplete(resolveTileRefs(merged)))
+                                } else {
+                                    emit(BucketUpdate.PortraitComplete(enriched))
+                                }
                             } else {
                                 emit(BucketUpdate.PortraitComplete(enriched))
                             }
@@ -225,15 +229,16 @@ internal class AreaRepositoryImpl(
                     }
                     is BucketUpdate.BackgroundEnrichmentComplete -> {
                         val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
-                        if (enriched.isNotEmpty()) mergePoisIntoCache(enriched, areaName, language)
+                        if (!context.skipCache && enriched.isNotEmpty()) mergePoisIntoCache(enriched, areaName, language)
                         emit(BucketUpdate.BackgroundEnrichmentComplete(enriched, update.batchIndex))
                     }
                     else -> {
                         emit(update)
-                        if (update is BucketUpdate.BucketComplete) writeToCache(update.content, areaName, language)
-                        // Cache background batch POIs so pagination survives relaunch
-                        if (update is BucketUpdate.BackgroundBatchReady && update.pois.isNotEmpty()) {
-                            mergePoisIntoCache(update.pois, areaName, language)
+                        if (!context.skipCache) {
+                            if (update is BucketUpdate.BucketComplete) writeToCache(update.content, areaName, language)
+                            if (update is BucketUpdate.BackgroundBatchReady && update.pois.isNotEmpty()) {
+                                mergePoisIntoCache(update.pois, areaName, language)
+                            }
                         }
                     }
                 }

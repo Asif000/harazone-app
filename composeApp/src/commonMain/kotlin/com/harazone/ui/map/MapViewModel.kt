@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.harazone.data.remote.MapTilerGeocodingProvider
 import com.harazone.data.remote.WikipediaImageRepository
+import com.harazone.domain.model.AreaContext
 import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
@@ -893,8 +894,8 @@ class MapViewModel(
             .sortedByDescending { it.value }
             .take(3)
             .map { it.key }
-        // Always include "surprise" hint — specific vibes if user has taste data
-        val tasteProfile = vibeProfile.ifEmpty { listOf("surprise") }
+        // Always include surprise hint — specific vibes if user has taste data
+        val tasteProfile = vibeProfile.ifEmpty { listOf(AreaContext.SURPRISE_SENTINEL) }
         // Use pendingAreaName (set by onCameraIdle when user pans) — matches onGeocodingSubmitEmpty behavior
         val areaName = pendingAreaName.ifBlank { current.areaName }
         cancelAreaFetch()
@@ -1606,7 +1607,10 @@ class MapViewModel(
                         }
                         is BucketUpdate.BackgroundFetchComplete -> {
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect
-                            // Only clear if we still have batches (guards against stale event after onSearchDeeper)
+                            // Only clear if we still have batches — guards against:
+                            // 1. Stale event after onSearchDeeper clears batches
+                            // 2. Surprise queries where Stage 3 skips (no batches added) —
+                            //    BackgroundFetchComplete fires early but is harmlessly absorbed here
                             if (s.poiBatches.isNotEmpty()) {
                                 _uiState.value = s.copy(isBackgroundFetching = false)
                             }
