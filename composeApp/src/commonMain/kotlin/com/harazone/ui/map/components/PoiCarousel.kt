@@ -51,6 +51,8 @@ import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.drop
 
+private const val MAX_DOTS = 9
+
 @Composable
 fun PoiCarousel(
     pois: List<POI>,
@@ -232,7 +234,8 @@ fun PoiCarousel(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val visibleIndex by remember { derivedStateOf { listState.firstVisibleItemIndex } }
-                pois.indices.forEach { i ->
+                val dotCount = minOf(pois.size, MAX_DOTS)
+                (0 until dotCount).forEach { i ->
                     Box(
                         Modifier
                             .size(if (i == visibleIndex) 8.dp else 6.dp)

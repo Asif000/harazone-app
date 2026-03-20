@@ -64,6 +64,8 @@ sealed class MapUiState {
         val previousAreaName: String? = null,
         val previousAreaLat: Double? = null,
         val previousAreaLng: Double? = null,
+        val poiStreamingCount: Int = 0,
+        val showSurpriseMe: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

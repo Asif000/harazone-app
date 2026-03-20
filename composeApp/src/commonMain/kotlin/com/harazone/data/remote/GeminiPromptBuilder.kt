@@ -9,9 +9,16 @@ import com.harazone.domain.model.TasteProfile
 
 internal class GeminiPromptBuilder {
 
-    fun buildPinOnlyPrompt(areaName: String, isNewUser: Boolean = false, languageTag: String = "en"): String {
+    fun buildPinOnlyPrompt(areaName: String, isNewUser: Boolean = false, languageTag: String = "en", tasteProfile: List<String> = emptyList()): String {
         val newUserHint = if (isNewUser) {
             "\n- NEW USER MODE: Return 3 POIs that showcase the DIVERSITY of this area — one food/drink, one culture/arts, one outdoor/activity. No taste profile yet."
+        } else ""
+        val tasteHint = if (tasteProfile.isNotEmpty()) {
+            if (tasteProfile == listOf(AreaContext.SURPRISE_SENTINEL)) {
+                "\n- LOCAL SURPRISES: Return 3 hidden gems only locals know. No tourist spots, no chains, no landmarks."
+            } else {
+                "\n- TASTE MODE: Vibes: ${tasteProfile.joinToString(", ")}. Return 3 lesser-known places matching these — skip obvious choices."
+            }
         } else ""
         return """
 Area: "$areaName". Return JSON only, no other text.
@@ -22,7 +29,7 @@ Rules:
 - ah: REQUIRED — 2-3 short area highlights (recurring events, seasonal notes, trending now, local tips). Max 80 chars each. ALWAYS include at least 2 highlights. Examples: "Live jazz every Friday at Praça do Comércio", "Flea market Sat 8am-2pm", "Best pastel de nata in the city".
 - t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 - GPS to 4 decimal places. Prefer accurate placement; if unsure of exact location, use the city center coordinates as fallback. Never omit a POI for lack of coordinates.
-- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.$newUserHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
+- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.$newUserHint$tasteHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 
@@ -76,6 +83,7 @@ Context:
 - Day of week: ${context.dayOfWeek}
 - Preferred language: ${context.preferredLanguage}
 ${if (!context.preferredLanguage.startsWith("en")) "LANGUAGE RULE: You MUST respond ONLY in the language identified by locale '${context.preferredLanguage}'. Every word of your response must be in that language." else ""}
+${if (context.tasteProfile.isNotEmpty()) { if (context.tasteProfile == listOf(AreaContext.SURPRISE_SENTINEL)) "LOCAL SURPRISES: Hidden gems only. No tourist spots, no chains, no landmarks." else "TASTE MODE: Vibes: ${context.tasteProfile.joinToString(", ")}. Lesser-known places matching these — skip obvious choices." } else ""}
 Output EXACTLY 6 JSON objects, one per bucket, separated by the delimiter line:
 ---BUCKET---
 
@@ -118,7 +126,7 @@ IMPORTANT:
         """.trimIndent()
     }
 
-    fun buildDynamicVibeEnrichmentPrompt(areaName: String, vibeLabels: List<String>, poiNames: List<String>, languageTag: String = "en"): String {
+    fun buildDynamicVibeEnrichmentPrompt(areaName: String, vibeLabels: List<String>, poiNames: List<String>, languageTag: String = "en", tasteProfile: List<String> = emptyList()): String {
         val vibeList = vibeLabels.joinToString(", ")
         val poiList = poiNames.joinToString(", ")
         return """
@@ -141,7 +149,7 @@ Rules:
 - "h" is current hours (e.g. "9am-10pm"). "s" is current status: open, busy, or closed. Adapt to current time of day.
 - Valid s values: open, busy, closed
 - GPS to 4 decimal places. t values: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
-- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels, highlights, content, and 'w' fields MUST be in the language identified by locale '$languageTag'." else ""}
+- LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.${if (tasteProfile.isNotEmpty()) "\n- TONE: These are hidden-gem, lesser-known places. Describe them as a local insider would — avoid tourist-guide language like 'popular with visitors' or 'well-known attraction'." else ""}${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels, highlights, content, and 'w' fields MUST be in the language identified by locale '$languageTag'." else ""}
         """.trimIndent()
     }
 

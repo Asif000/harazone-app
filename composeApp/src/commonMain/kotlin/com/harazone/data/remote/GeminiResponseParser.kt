@@ -197,6 +197,38 @@ internal class GeminiResponseParser {
         return Pair(result.vibes, result.pois)
     }
 
+    /** Fallback parser for background batch responses — extracts JSON from text and parses pois. */
+    fun parseBackgroundBatchPois(text: String): List<POI> {
+        return try {
+            // Extract first JSON object from text (handles Gemini prefixing prose before JSON)
+            val jsonStart = text.indexOf('{')
+            val jsonEnd = text.lastIndexOf('}')
+            if (jsonStart < 0 || jsonEnd <= jsonStart) return emptyList()
+            val jsonText = text.substring(jsonStart, jsonEnd + 1)
+            val wrapper = json.decodeFromString<Stage1Response>(jsonText)
+            wrapper.pois
+                .filter { it.n.isNotBlank() && it.lat != null && it.lng != null }
+                .map { poiJson ->
+                    POI(
+                        name = poiJson.n,
+                        type = poiJson.t,
+                        description = "",
+                        confidence = Confidence.MEDIUM,
+                        latitude = poiJson.lat,
+                        longitude = poiJson.lng,
+                        vibe = poiJson.v,
+                        insight = "",
+                        priceRange = poiJson.p,
+                        hours = poiJson.h,
+                        liveStatus = poiJson.s,
+                    )
+                }
+        } catch (e: Exception) {
+            AppLogger.e(e) { "GeminiResponseParser: background batch fallback parse failed" }
+            emptyList()
+        }
+    }
+
     fun parseStage1WithHighlights(text: String): Stage1ParseResult {
         return try {
             val cleaned = stripMarkdownFences(text)

@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Search + Surprise Me — Unified Concepts</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', sans-serif; background: #0a0a0a; color: #fff; overflow-x: hidden; }
+
+  .nav { display: flex; gap: 8px; padding: 12px 16px; background: #111; border-bottom: 1px solid #222; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+  .nav-btn { padding: 8px 16px; border-radius: 20px; border: 1px solid #333; background: #1a1a1a; color: #aaa; cursor: pointer; font-size: 13px; transition: all 0.2s; }
+  .nav-btn:hover { border-color: #555; color: #fff; }
+  .nav-btn.active { background: #2a6b3f; border-color: #3a8b5f; color: #fff; }
+
+  .scene { display: none; min-height: 100vh; }
+  .scene.active { display: block; }
+  .scene-header { padding: 20px 24px; background: #111; border-bottom: 1px solid #222; }
+  .scene-header h2 { font-size: 18px; margin-bottom: 4px; }
+  .scene-header p { font-size: 13px; color: #888; line-height: 1.5; }
+  .scene-grid { display: flex; flex-wrap: wrap; gap: 20px; padding: 24px; justify-content: center; }
+
+  .phone { width: 375px; height: 812px; margin: 0 auto; border-radius: 40px; overflow: hidden; position: relative; background: #0d1117; border: 2px solid #222; }
+  .phone-screen { width: 100%; height: 100%; position: relative; overflow: hidden; }
+  .map-bg { position: absolute; inset: 0; background: linear-gradient(135deg, #0d1117 0%, #131a24 50%, #0d1117 100%); }
+  .map-grid { position: absolute; inset: 0; opacity: 0.08; background-image: linear-gradient(#2a4a6b 1px, transparent 1px), linear-gradient(90deg, #2a4a6b 1px, transparent 1px); background-size: 40px 40px; }
+
+  /* Area header */
+  .area-header { position: absolute; top: 48px; left: 12px; right: 12px; z-index: 10; }
+  .area-strip { background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 12px; padding: 8px 12px; display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+  .area-name { display: flex; align-items: center; gap: 6px; }
+  .area-name .flag { font-size: 16px; }
+  .area-name .name { color: #fff; font-weight: 600; font-size: 14px; }
+  .area-name .meta { color: #888; font-size: 11px; margin-left: 4px; }
+  .safety-dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; display: inline-block; }
+
+  /* Search bar */
+  .search-bar { position: absolute; top: 96px; left: 12px; right: 12px; z-index: 10; }
+  .search-pill { background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 24px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .search-left { display: flex; align-items: center; gap: 8px; }
+  .search-icon { color: #f0883e; font-size: 14px; }
+  .search-text { color: #fff; font-size: 14px; font-weight: 500; }
+  .pin-counter { color: #888; font-size: 12px; }
+  .search-close { background: none; border: none; color: #666; font-size: 16px; cursor: pointer; }
+
+  /* Open nearby */
+  .open-nearby { position: absolute; top: 136px; left: 12px; z-index: 10; background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 16px; padding: 6px 12px; font-size: 12px; color: #ccc; display: flex; align-items: center; gap: 6px; }
+  .cb-green { color: #3fb950; font-size: 11px; font-weight: 600; }
+
+  /* Map pins */
+  .map-pin { position: absolute; z-index: 5; }
+  .pin-marker { width: 32px; height: 32px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+  .pin-marker .icon { transform: rotate(45deg); font-size: 14px; }
+  .pin-marker.historic { background: #a371f7; }
+  .pin-marker.nature { background: #3fb950; }
+  .pin-marker.food { background: #f0883e; }
+  .pin-marker.culture { background: #58a6ff; }
+  .pin-marker.luxury { background: #d2a8ff; }
+
+  /* FAB stack */
+  .fab-stack { position: absolute; right: 12px; top: 45%; transform: translateY(-50%); z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .fab-btn { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; border: none; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .fab-btn.profile { background: #3fb950; }
+  .fab-btn.visited { background: #a371f7; }
+  .fab-label { font-size: 9px; color: #aaa; margin-top: -4px; }
+
+  /* Vibe buttons right */
+  .vibe-stack { position: absolute; right: 12px; bottom: 280px; z-index: 8; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .vibe-fab { padding: 5px 10px; border-radius: 12px; background: rgba(30,30,30,0.85); border: 1px solid #333; font-size: 10px; color: #aaa; cursor: pointer; }
+
+  /* Bottom card */
+  .bottom-card { position: absolute; bottom: 120px; left: 12px; right: 12px; z-index: 10; background: rgba(25,25,25,0.95); backdrop-filter: blur(12px); border-radius: 16px; overflow: hidden; }
+  .card-image { width: 100%; height: 100px; position: relative; }
+  .card-image .fallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 36px; }
+  .card-image .fallback.food { background: linear-gradient(135deg, #2a1a0a, #3a2a1a); }
+  .card-image .photo-count { position: absolute; bottom: 6px; right: 8px; background: rgba(0,0,0,0.7); border-radius: 6px; padding: 2px 6px; font-size: 10px; }
+  .card-body { padding: 10px 14px; }
+  .card-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+  .card-subtitle { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .card-vibes { display: flex; gap: 4px; margin-bottom: 6px; }
+  .vibe-tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+  .vibe-tag.food { background: rgba(240,136,62,0.2); color: #f0883e; }
+  .vibe-tag.culture { background: rgba(88,166,255,0.2); color: #58a6ff; }
+  .card-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #888; }
+  .card-meta .rating { color: #f0c040; }
+  .card-meta .open { color: #3fb950; }
+  .card-action-row { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; padding-top: 6px; border-top: 1px solid #333; }
+  .card-action-link { font-size: 11px; color: #58a6ff; cursor: pointer; }
+
+  /* Carousel dots */
+  .carousel-dots { position: absolute; bottom: 108px; left: 50%; transform: translateX(-50%); z-index: 11; display: flex; gap: 6px; align-items: center; padding: 6px 12px; background: rgba(15,15,15,0.8); border-radius: 12px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #444; }
+  .dot.active { width: 10px; height: 10px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.3); }
+
+  /* Bottom bar */
+  .bottom-bar { position: absolute; bottom: 0; left: 0; right: 0; z-index: 12; background: rgba(20,20,20,0.95); backdrop-filter: blur(12px); padding: 8px 12px 20px; display: flex; align-items: center; gap: 8px; border-top: 1px solid #222; }
+  .bottom-input { flex: 1; background: rgba(40,40,40,0.9); border: 1px solid #333; border-radius: 20px; padding: 10px 14px; font-size: 13px; color: #888; cursor: pointer; }
+  .bottom-bar-btn { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #333; background: rgba(40,40,40,0.9); display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; }
+  .bottom-bar-btn.companion-btn { background: radial-gradient(circle at 30% 30%, #f0c040, #d4942a); border: none; box-shadow: 0 0 12px rgba(240,192,64,0.3); }
+
+  /* ========== CONCEPT-SPECIFIC STYLES ========== */
+
+  /* --- Concept A: Dual pill --- */
+  .dual-pill { position: absolute; top: 168px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 22px; overflow: hidden; border: 1px solid #333; }
+  .dual-pill .pill-option { padding: 9px 16px; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: all 0.25s; color: #aaa; }
+  .dual-pill .pill-option:first-child { border-right: 1px solid #333; }
+  .dual-pill .pill-option:hover { color: #fff; }
+  .dual-pill .pill-option.active-search { background: rgba(42,107,63,0.4); color: #fff; }
+  .dual-pill .pill-option.active-surprise { background: rgba(240,192,64,0.25); color: #f0c040; }
+
+  /* --- Concept B: Morphing pill --- */
+  .morph-pill { position: absolute; top: 168px; left: 50%; transform: translateX(-50%); z-index: 10; background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 22px; padding: 9px 18px; font-size: 13px; color: #fff; cursor: pointer; display: flex; align-items: center; gap: 8px; border: 1px solid #333; transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1); white-space: nowrap; }
+  .morph-pill .pill-text { transition: opacity 0.2s; }
+  .morph-pill .pill-icon { transition: transform 0.3s; }
+  .morph-pill.surprise-mode { border-color: rgba(240,192,64,0.5); background: rgba(40,30,10,0.9); }
+  .morph-pill.surprise-mode .pill-icon { transform: rotate(360deg); }
+
+  /* --- Concept C: Search bar with integrated dice --- */
+  .search-pill-c { background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 24px; padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; }
+  .search-mid { display: flex; align-items: center; gap: 6px; }
+  .search-divider { width: 1px; height: 20px; background: #333; margin: 0 4px; }
+  .dice-btn { background: none; border: none; font-size: 18px; cursor: pointer; padding: 2px 6px; transition: all 0.3s; border-radius: 8px; }
+  .dice-btn:hover { background: rgba(240,192,64,0.15); transform: scale(1.15); }
+  .dice-btn.active { background: rgba(240,192,64,0.25); animation: dice-wiggle 0.5s ease; }
+  @keyframes dice-wiggle { 0%,100%{transform:rotate(0)} 25%{transform:rotate(-15deg)} 75%{transform:rotate(15deg)} }
+
+  /* --- Concept D: Swipeable pill --- */
+  .swipe-pill-track { position: absolute; top: 168px; left: 50%; transform: translateX(-50%); z-index: 10; width: 260px; }
+  .swipe-pill { background: rgba(20,20,20,0.85); backdrop-filter: blur(12px); border-radius: 22px; padding: 0; display: flex; overflow: hidden; border: 1px solid #333; position: relative; }
+  .swipe-indicator { position: absolute; top: 2px; bottom: 2px; width: 50%; border-radius: 20px; transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1); pointer-events: none; }
+  .swipe-indicator.left { left: 2px; background: rgba(42,107,63,0.5); }
+  .swipe-indicator.right { left: calc(50% - 2px); background: rgba(240,192,64,0.3); }
+  .swipe-option { flex: 1; padding: 10px 0; text-align: center; font-size: 13px; cursor: pointer; transition: color 0.2s; position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  .swipe-option.active { color: #fff; }
+  .swipe-option:not(.active) { color: #777; }
+  .swipe-hint { position: absolute; top: 204px; left: 50%; transform: translateX(-50%); font-size: 10px; color: #555; z-index: 10; }
+
+  /* Teleport overlay */
+  .teleport-overlay { position: absolute; inset: 0; z-index: 40; background: #0d1117; opacity: 0; pointer-events: none; transition: opacity 0.6s ease; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .teleport-overlay.active { opacity: 1; pointer-events: auto; }
+  .teleport-destination { font-size: 28px; font-weight: 700; opacity: 0; transform: translateY(20px); transition: all 0.5s ease 0.3s; }
+  .teleport-overlay.active .teleport-destination { opacity: 1; transform: translateY(0); }
+  .teleport-subtitle { font-size: 14px; color: #888; margin-top: 8px; opacity: 0; transition: opacity 0.5s ease 0.5s; }
+  .teleport-overlay.active .teleport-subtitle { opacity: 1; }
+  .teleport-distance { font-size: 11px; color: #555; margin-top: 4px; opacity: 0; transition: opacity 0.5s ease 0.6s; }
+  .teleport-overlay.active .teleport-distance { opacity: 1; }
+
+  /* Callout */
+  .callout { position: absolute; z-index: 20; padding: 6px 10px; background: rgba(240,192,64,0.9); border-radius: 8px; font-size: 10px; color: #000; font-weight: 600; white-space: nowrap; pointer-events: none; }
+  .callout::after { content: ''; position: absolute; width: 0; height: 0; border: 5px solid transparent; }
+  .callout.arrow-down::after { bottom: -10px; left: 50%; transform: translateX(-50%); border-top-color: rgba(240,192,64,0.9); }
+  .callout.arrow-up::after { top: -10px; left: 50%; transform: translateX(-50%); border-bottom-color: rgba(240,192,64,0.9); }
+
+  .pros-cons { margin-top: 12px; font-size: 12px; line-height: 1.6; }
+  .pros-cons .pro { color: #3fb950; }
+  .pros-cons .con { color: #f47067; }
+  .pros-cons .neutral { color: #d29922; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <button class="nav-btn active" onclick="showScene('a')">A. Dual Pill</button>
+  <button class="nav-btn" onclick="showScene('b')">B. Morphing Pill</button>
+  <button class="nav-btn" onclick="showScene('c')">C. Search Bar Dice</button>
+  <button class="nav-btn" onclick="showScene('d')">D. Toggle Pill</button>
+</nav>
+
+<!-- ==================== CONCEPT A: DUAL PILL ==================== -->
+<div class="scene active" id="scene-a">
+  <div class="scene-header">
+    <h2>A. Dual Pill — Side by Side</h2>
+    <p>"Search this area" and "Surprise Me" live in one pill, side by side. Two clear options. User always sees both. Tapping Surprise Me triggers teleport + escalation.</p>
+    <div class="pros-cons">
+      <span class="pro">+ Both always visible, zero discovery needed</span><br>
+      <span class="pro">+ Clear mental model: HERE vs SOMEWHERE</span><br>
+      <span class="con">- Wider pill, takes more horizontal space</span><br>
+      <span class="neutral">~ Surprise Me visible even when not relevant (first-time users might not understand it yet)</span>
+    </div>
+  </div>
+  <div class="scene-grid">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+
+        <div class="area-header">
+          <div class="area-strip">
+            <div class="area-name">
+              <span class="flag">🇦🇪</span>
+              <span class="name" id="a-area-name">Dubai</span>
+              <span class="meta" id="a-area-meta">· First visit · ☁ 76°F · 9:18 PM</span>
+            </div>
+            <div><span class="safety-dot"></span></div>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <div class="search-pill">
+            <div class="search-left">
+              <span class="search-icon">📍</span>
+              <span class="search-text" id="a-search-text">Dubai</span>
+            </div>
+            <span class="pin-counter" id="a-counter">5</span>
+            <button class="search-close">✕</button>
+          </div>
+        </div>
+
+        <div class="open-nearby"><span>3 open nearby</span> <span class="cb-green">●3</span></div>
+
+        <!-- DUAL PILL -->
+        <div class="dual-pill">
+          <div class="pill-option active-search" id="a-search-opt" onclick="aSearch()">
+            <span>↻</span>
+            <span>Search here</span>
+          </div>
+          <div class="pill-option" id="a-surprise-opt" onclick="aSurprise()">
+            <span>🎲</span>
+            <span>Surprise me</span>
+          </div>
+        </div>
+
+        <div class="callout arrow-down" style="top: 200px; left: 50%; transform: translateX(-50%);">
+          Two actions, one pill — HERE vs SOMEWHERE
+        </div>
+
+        <!-- Pins -->
+        <div class="map-pin" style="top: 290px; left: 60px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+        <div class="map-pin" style="top: 340px; left: 170px;"><div class="pin-marker luxury"><span class="icon">✨</span></div></div>
+        <div class="map-pin" style="top: 270px; left: 250px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin" style="top: 380px; left: 110px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+        <div class="map-pin" style="top: 360px; left: 280px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+
+        <div class="fab-stack">
+          <button class="fab-btn profile">👤</button>
+          <div class="fab-label">Profile</div>
+          <button class="fab-btn visited">📍</button>
+          <div class="fab-label">Visited</div>
+        </div>
+        <div class="vibe-stack"><div class="vibe-fab">Luxury</div><div class="vibe-fab">Modern</div><div class="vibe-fab">Desert</div></div>
+
+        <div class="teleport-overlay" id="a-teleport">
+          <div class="teleport-destination" id="a-dest">🇴🇲 Muscat</div>
+          <div class="teleport-subtitle">Oman</div>
+          <div class="teleport-distance">450 km east of Dubai</div>
+        </div>
+
+        <div class="bottom-card">
+          <div class="card-image"><div class="fallback food">🍽</div><div class="photo-count">1/4</div></div>
+          <div class="card-body">
+            <div class="card-title">Al Fanar Restaurant</div>
+            <div class="card-subtitle">Traditional Emirati · Food</div>
+            <div class="card-vibes"><span class="vibe-tag food">Food</span><span class="vibe-tag culture">Culture</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.6</span><span class="open">● Open</span><span>· $$</span></div>
+            <div class="card-action-row">
+              <span class="card-action-link">🏷 Visit</span>
+              <span class="card-action-link">🧭 Get There</span>
+              <span class="card-action-link">Details →</span>
+            </div>
+          </div>
+        </div>
+        <div class="carousel-dots">
+          <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="bottom-bar">
+          <div class="bottom-input">Hidden gems nearby?</div>
+          <div class="bottom-bar-btn">⏸</div>
+          <div class="bottom-bar-btn companion-btn">✦</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CONCEPT B: MORPHING PILL ==================== -->
+<div class="scene" id="scene-b">
+  <div class="scene-header">
+    <h2>B. Morphing Pill — Single Pill, Two States</h2>
+    <p>One pill that starts as "Search this area." Long-press or swipe up transforms it into "Surprise Me" with a gold color shift. The pill IS the discovery trigger — its mode determines WHERE.</p>
+    <div class="pros-cons">
+      <span class="pro">+ Clean, minimal — one element</span><br>
+      <span class="pro">+ Surprise Me feels like a hidden power move</span><br>
+      <span class="con">- Long-press is not discoverable</span><br>
+      <span class="neutral">~ Could add a subtle dice icon hint that invites the long-press</span>
+    </div>
+  </div>
+  <div class="scene-grid">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+
+        <div class="area-header">
+          <div class="area-strip">
+            <div class="area-name">
+              <span class="flag">🇦🇪</span>
+              <span class="name">Dubai</span>
+              <span class="meta">· First visit · ☁ 76°F · 9:18 PM</span>
+            </div>
+            <div><span class="safety-dot"></span></div>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <div class="search-pill">
+            <div class="search-left"><span class="search-icon">📍</span><span class="search-text">Dubai</span></div>
+            <span class="pin-counter">5</span>
+            <button class="search-close">✕</button>
+          </div>
+        </div>
+
+        <div class="open-nearby"><span>3 open nearby</span> <span class="cb-green">●3</span></div>
+
+        <!-- MORPHING PILL -->
+        <div class="morph-pill" id="b-pill" onclick="bToggle()">
+          <span class="pill-icon" id="b-icon">↻</span>
+          <span class="pill-text" id="b-text">Search this area</span>
+          <span style="font-size:10px;color:#666;margin-left:4px;" id="b-hint">hold for 🎲</span>
+        </div>
+
+        <div class="callout arrow-down" style="top: 200px; left: 50%; transform: translateX(-50%);" id="b-callout">
+          Tap = search here · Long-press = surprise me
+        </div>
+
+        <div class="map-pin" style="top: 290px; left: 60px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+        <div class="map-pin" style="top: 340px; left: 170px;"><div class="pin-marker luxury"><span class="icon">✨</span></div></div>
+        <div class="map-pin" style="top: 270px; left: 250px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin" style="top: 380px; left: 110px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+        <div class="map-pin" style="top: 360px; left: 280px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+
+        <div class="fab-stack">
+          <button class="fab-btn profile">👤</button><div class="fab-label">Profile</div>
+          <button class="fab-btn visited">📍</button><div class="fab-label">Visited</div>
+        </div>
+        <div class="vibe-stack"><div class="vibe-fab">Luxury</div><div class="vibe-fab">Modern</div><div class="vibe-fab">Desert</div></div>
+
+        <div class="bottom-card">
+          <div class="card-image"><div class="fallback food">🍽</div><div class="photo-count">1/4</div></div>
+          <div class="card-body">
+            <div class="card-title">Al Fanar Restaurant</div>
+            <div class="card-subtitle">Traditional Emirati · Food</div>
+            <div class="card-vibes"><span class="vibe-tag food">Food</span><span class="vibe-tag culture">Culture</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.6</span><span class="open">● Open</span></div>
+            <div class="card-action-row">
+              <span class="card-action-link">🏷 Visit</span><span class="card-action-link">🧭 Get There</span><span class="card-action-link">Details →</span>
+            </div>
+          </div>
+        </div>
+        <div class="carousel-dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        <div class="bottom-bar">
+          <div class="bottom-input">Hidden gems nearby?</div>
+          <div class="bottom-bar-btn">⏸</div>
+          <div class="bottom-bar-btn companion-btn">✦</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CONCEPT C: SEARCH BAR DICE ==================== -->
+<div class="scene" id="scene-c">
+  <div class="scene-header">
+    <h2>C. Dice in Search Bar — Surprise Me Lives in the Search</h2>
+    <p>The search bar gets a dice icon next to the counter. "Search this area" pill stays as-is below. The dice is the Surprise Me trigger — it's IN the search bar because discovery IS search. Compact, no extra UI.</p>
+    <div class="pros-cons">
+      <span class="pro">+ No new UI elements — fits into existing search bar</span><br>
+      <span class="pro">+ Dice icon is universally understood as "random"</span><br>
+      <span class="pro">+ Search this area pill stays untouched</span><br>
+      <span class="con">- Small tap target in the search bar</span><br>
+      <span class="neutral">~ Dice could animate/wiggle periodically to draw attention</span>
+    </div>
+  </div>
+  <div class="scene-grid">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+
+        <div class="area-header">
+          <div class="area-strip">
+            <div class="area-name">
+              <span class="flag">🇦🇪</span>
+              <span class="name">Dubai</span>
+              <span class="meta">· First visit · ☁ 76°F · 9:18 PM</span>
+            </div>
+            <div><span class="safety-dot"></span></div>
+          </div>
+        </div>
+
+        <!-- SEARCH BAR WITH DICE -->
+        <div class="search-bar">
+          <div class="search-pill-c">
+            <div class="search-left"><span class="search-icon">📍</span><span class="search-text">Dubai</span></div>
+            <div class="search-mid">
+              <span class="pin-counter">5</span>
+              <span class="search-divider"></span>
+              <button class="dice-btn" id="c-dice" onclick="cDice()">🎲</button>
+            </div>
+            <button class="search-close">✕</button>
+          </div>
+        </div>
+
+        <div class="open-nearby"><span>3 open nearby</span> <span class="cb-green">●3</span></div>
+
+        <!-- Search this area stays separate -->
+        <div style="position:absolute;top:168px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(20,20,20,0.85);backdrop-filter:blur(12px);border-radius:20px;padding:8px 18px;font-size:13px;color:#fff;cursor:pointer;display:flex;align-items:center;gap:6px;border:1px solid #333;">
+          <span>↻</span><span>Search this area</span>
+        </div>
+
+        <div class="callout arrow-down" style="top: 80px; right: 70px;">
+          🎲 in search bar = Surprise Me
+        </div>
+
+        <div class="map-pin" style="top: 290px; left: 60px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+        <div class="map-pin" style="top: 340px; left: 170px;"><div class="pin-marker luxury"><span class="icon">✨</span></div></div>
+        <div class="map-pin" style="top: 270px; left: 250px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin" style="top: 380px; left: 110px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+        <div class="map-pin" style="top: 360px; left: 280px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+
+        <div class="fab-stack">
+          <button class="fab-btn profile">👤</button><div class="fab-label">Profile</div>
+          <button class="fab-btn visited">📍</button><div class="fab-label">Visited</div>
+        </div>
+        <div class="vibe-stack"><div class="vibe-fab">Luxury</div><div class="vibe-fab">Modern</div><div class="vibe-fab">Desert</div></div>
+
+        <div class="teleport-overlay" id="c-teleport">
+          <div class="teleport-destination">🇬🇷 Santorini</div>
+          <div class="teleport-subtitle">Greece</div>
+          <div class="teleport-distance">3,200 km northwest</div>
+        </div>
+
+        <div class="bottom-card">
+          <div class="card-image"><div class="fallback food">🍽</div><div class="photo-count">1/4</div></div>
+          <div class="card-body">
+            <div class="card-title">Al Fanar Restaurant</div>
+            <div class="card-subtitle">Traditional Emirati · Food</div>
+            <div class="card-vibes"><span class="vibe-tag food">Food</span><span class="vibe-tag culture">Culture</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.6</span><span class="open">● Open</span></div>
+            <div class="card-action-row">
+              <span class="card-action-link">🏷 Visit</span><span class="card-action-link">🧭 Get There</span><span class="card-action-link">Details →</span>
+            </div>
+          </div>
+        </div>
+        <div class="carousel-dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        <div class="bottom-bar">
+          <div class="bottom-input">Hidden gems nearby?</div>
+          <div class="bottom-bar-btn">⏸</div>
+          <div class="bottom-bar-btn companion-btn">✦</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== CONCEPT D: TOGGLE PILL ==================== -->
+<div class="scene" id="scene-d">
+  <div class="scene-header">
+    <h2>D. Toggle Pill — Segmented Control</h2>
+    <p>One pill, two segments: "Search here" and "Surprise me." Toggle between them like iOS segmented control. Selected mode determines what happens when you tap. Sliding highlight shows active mode.</p>
+    <div class="pros-cons">
+      <span class="pro">+ Both options equally weighted — no hidden features</span><br>
+      <span class="pro">+ Familiar iOS pattern (segmented control)</span><br>
+      <span class="pro">+ Visual state is always clear</span><br>
+      <span class="con">- Takes horizontal space</span><br>
+      <span class="neutral">~ Could default to "Search here" and only show toggle after first area is explored</span>
+    </div>
+  </div>
+  <div class="scene-grid">
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="map-bg"><div class="map-grid"></div></div>
+
+        <div class="area-header">
+          <div class="area-strip">
+            <div class="area-name">
+              <span class="flag">🇦🇪</span>
+              <span class="name">Dubai</span>
+              <span class="meta">· First visit · ☁ 76°F · 9:18 PM</span>
+            </div>
+            <div><span class="safety-dot"></span></div>
+          </div>
+        </div>
+
+        <div class="search-bar">
+          <div class="search-pill">
+            <div class="search-left"><span class="search-icon">📍</span><span class="search-text">Dubai</span></div>
+            <span class="pin-counter">5</span>
+            <button class="search-close">✕</button>
+          </div>
+        </div>
+
+        <div class="open-nearby"><span>3 open nearby</span> <span class="cb-green">●3</span></div>
+
+        <!-- TOGGLE PILL -->
+        <div class="swipe-pill-track">
+          <div class="swipe-pill">
+            <div class="swipe-indicator left" id="d-indicator"></div>
+            <div class="swipe-option active" id="d-opt-search" onclick="dToggle('search')">
+              <span>↻</span> Search here
+            </div>
+            <div class="swipe-option" id="d-opt-surprise" onclick="dToggle('surprise')">
+              <span>🎲</span> Surprise me
+            </div>
+          </div>
+        </div>
+
+        <div class="callout arrow-down" style="top: 200px; left: 50%; transform: translateX(-50%);">
+          Toggle: search HERE or go SOMEWHERE
+        </div>
+
+        <div class="map-pin" style="top: 290px; left: 60px;"><div class="pin-marker food"><span class="icon">🍽</span></div></div>
+        <div class="map-pin" style="top: 340px; left: 170px;"><div class="pin-marker luxury"><span class="icon">✨</span></div></div>
+        <div class="map-pin" style="top: 270px; left: 250px;"><div class="pin-marker historic"><span class="icon">🏛</span></div></div>
+        <div class="map-pin" style="top: 380px; left: 110px;"><div class="pin-marker culture"><span class="icon">🎭</span></div></div>
+        <div class="map-pin" style="top: 360px; left: 280px;"><div class="pin-marker nature"><span class="icon">🌿</span></div></div>
+
+        <div class="fab-stack">
+          <button class="fab-btn profile">👤</button><div class="fab-label">Profile</div>
+          <button class="fab-btn visited">📍</button><div class="fab-label">Visited</div>
+        </div>
+        <div class="vibe-stack"><div class="vibe-fab">Luxury</div><div class="vibe-fab">Modern</div><div class="vibe-fab">Desert</div></div>
+
+        <div class="teleport-overlay" id="d-teleport">
+          <div class="teleport-destination">🇴🇲 Muscat</div>
+          <div class="teleport-subtitle">Oman</div>
+          <div class="teleport-distance">450 km east</div>
+        </div>
+
+        <div class="bottom-card">
+          <div class="card-image"><div class="fallback food">🍽</div><div class="photo-count">1/4</div></div>
+          <div class="card-body">
+            <div class="card-title">Al Fanar Restaurant</div>
+            <div class="card-subtitle">Traditional Emirati · Food</div>
+            <div class="card-vibes"><span class="vibe-tag food">Food</span><span class="vibe-tag culture">Culture</span></div>
+            <div class="card-meta"><span class="rating">⭐ 4.6</span><span class="open">● Open</span></div>
+            <div class="card-action-row">
+              <span class="card-action-link">🏷 Visit</span><span class="card-action-link">🧭 Get There</span><span class="card-action-link">Details →</span>
+            </div>
+          </div>
+        </div>
+        <div class="carousel-dots"><div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+        <div class="bottom-bar">
+          <div class="bottom-input">Hidden gems nearby?</div>
+          <div class="bottom-bar-btn">⏸</div>
+          <div class="bottom-bar-btn companion-btn">✦</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function showScene(id) {
+    document.querySelectorAll('.scene').forEach(s => s.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('scene-' + id).classList.add('active');
+    event.target.classList.add('active');
+  }
+
+  // --- Concept A: Dual pill ---
+  function aSearch() {
+    document.getElementById('a-search-opt').classList.add('active-search');
+    document.getElementById('a-surprise-opt').classList.remove('active-surprise');
+  }
+  function aSurprise() {
+    document.getElementById('a-surprise-opt').classList.add('active-surprise');
+    document.getElementById('a-search-opt').classList.remove('active-search');
+    const overlay = document.getElementById('a-teleport');
+    overlay.classList.add('active');
+    setTimeout(() => overlay.classList.remove('active'), 2500);
+  }
+
+  // --- Concept B: Morphing pill ---
+  let bMode = 'search';
+  function bToggle() {
+    const pill = document.getElementById('b-pill');
+    const icon = document.getElementById('b-icon');
+    const text = document.getElementById('b-text');
+    const hint = document.getElementById('b-hint');
+    if (bMode === 'search') {
+      bMode = 'surprise';
+      pill.classList.add('surprise-mode');
+      icon.textContent = '🎲';
+      text.textContent = 'Surprise me';
+      hint.textContent = 'tap for ↻';
+    } else {
+      bMode = 'search';
+      pill.classList.remove('surprise-mode');
+      icon.textContent = '↻';
+      text.textContent = 'Search this area';
+      hint.textContent = 'hold for 🎲';
+    }
+  }
+
+  // --- Concept C: Search bar dice ---
+  function cDice() {
+    const dice = document.getElementById('c-dice');
+    dice.classList.add('active');
+    setTimeout(() => dice.classList.remove('active'), 500);
+    const overlay = document.getElementById('c-teleport');
+    setTimeout(() => {
+      overlay.classList.add('active');
+      setTimeout(() => overlay.classList.remove('active'), 2500);
+    }, 600);
+  }
+
+  // --- Concept D: Toggle pill ---
+  function dToggle(mode) {
+    const indicator = document.getElementById('d-indicator');
+    const optSearch = document.getElementById('d-opt-search');
+    const optSurprise = document.getElementById('d-opt-surprise');
+    if (mode === 'search') {
+      indicator.className = 'swipe-indicator left';
+      optSearch.classList.add('active');
+      optSurprise.classList.remove('active');
+    } else {
+      indicator.className = 'swipe-indicator right';
+      optSurprise.classList.add('active');
+      optSearch.classList.remove('active');
+      const overlay = document.getElementById('d-teleport');
+      setTimeout(() => {
+        overlay.classList.add('active');
+        setTimeout(() => overlay.classList.remove('active'), 2500);
+      }, 300);
+    }
+  }
+</script>
+
+</body>
+</html>

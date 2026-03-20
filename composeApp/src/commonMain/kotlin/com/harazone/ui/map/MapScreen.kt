@@ -24,11 +24,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Icon
@@ -303,7 +301,7 @@ private fun ReadyContent(
                 visitedPois = state.visitedPois,
                 visitedFilter = state.visitedFilter,
                 onPinTapped = { index -> viewModel.onPinTapped(index) },
-                selectedPinIndex = state.selectedPinIndex,
+                selectedPinIndex = state.autoSlideshowIndex ?: state.selectedPinIndex,
             )
         }
 
@@ -381,12 +379,7 @@ private fun ReadyContent(
             recentPlaces = state.recentPlaces,
             onRecentSelected = { viewModel.onRecentSelected(it) },
             onClearRecents = { viewModel.onClearRecents() },
-            showBatchNav = state.poiBatches.size > 1 && !state.isSearchingArea,
-            batchIndex = if (state.showAllMode) state.poiBatches.size else state.activeBatchIndex,
-            batchTotal = MapViewModel.MAX_BATCH_SLOTS,
-            onPrevBatch = { viewModel.onPrevBatch() },
-            onNextBatch = { viewModel.onNextBatch() },
-            onSearchDeeper = { viewModel.onSearchDeeper() },
+            poiCount = state.pois.size,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .padding(top = statusBarPadding + 56.dp)
@@ -409,19 +402,16 @@ private fun ReadyContent(
             )
         }
 
-        // "Search this area" floating pill
+        // Search / Surprise Me toggle pill
         if (state.showSearchAreaPill && !state.isSearchingArea && !state.showListView && state.selectedPoi == null && !showProfile) {
-            FilledTonalButton(
-                onClick = { viewModel.onSearchThisArea() },
+            SearchSurpriseTogglePill(
+                onSearchHere = viewModel::onSearchThisArea,
+                onSurpriseMe = viewModel::onSurpriseMe,
+                surpriseMeEnabled = state.showSurpriseMe,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .padding(top = statusBarPadding + 56.dp + 48.dp + 32.dp),
-                shape = RoundedCornerShape(20.dp),
-            ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(stringResource(Res.string.search_this_area))
-            }
+            )
         }
 
         // Bottom carousel — snap-scroll POI cards
@@ -877,6 +867,50 @@ private fun ReadyContent(
     }
 }
 
+
+@Composable
+private fun SearchSurpriseTogglePill(
+    onSearchHere: () -> Unit,
+    onSurpriseMe: () -> Unit,
+    surpriseMeEnabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(MapFloatingUiDark.copy(alpha = 0.92f))
+            .padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Search here — single tap executes
+        Surface(
+            onClick = onSearchHere,
+            shape = RoundedCornerShape(17.dp),
+            color = Color.White.copy(alpha = 0.15f),
+        ) {
+            Text(
+                text = "↻ Search here",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        // Surprise Me — single tap executes
+        Surface(
+            onClick = onSurpriseMe,
+            shape = RoundedCornerShape(17.dp),
+            color = Color.Transparent,
+        ) {
+            Text(
+                text = "\uD83C\uDFB2 ${stringResource(Res.string.vibe_surprise_me)}",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            )
+        }
+    }
+}
 
 @Composable
 private fun SavesNearbyPill(count: Int, modifier: Modifier = Modifier) {

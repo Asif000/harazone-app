@@ -93,7 +93,7 @@ internal class GeminiAreaIntelligenceProvider(
         // Stage 1 — fast pin call (returns vibes + POIs)
         launch {
             try {
-                val prompt = promptBuilder.buildPinOnlyPrompt(areaName, isNewUser = context.isNewUser, languageTag = context.preferredLanguage)
+                val prompt = promptBuilder.buildPinOnlyPrompt(areaName, isNewUser = context.isNewUser, languageTag = context.preferredLanguage, tasteProfile = context.tasteProfile)
                 val requestBody = buildRequestBody(prompt)
                 val fullText = StringBuilder()
                 var hasEmitted = false
@@ -154,7 +154,7 @@ internal class GeminiAreaIntelligenceProvider(
                 val stage1Names = stage1Result.names
                 val stage1Vibes = stage1Result.vibes
                 val prompt = if (stage1Names.isNotEmpty() && stage1Vibes.isNotEmpty()) {
-                    promptBuilder.buildDynamicVibeEnrichmentPrompt(areaName, stage1Vibes.map { it.label }, stage1Names, languageTag = context.preferredLanguage)
+                    promptBuilder.buildDynamicVibeEnrichmentPrompt(areaName, stage1Vibes.map { it.label }, stage1Names, languageTag = context.preferredLanguage, tasteProfile = context.tasteProfile)
                 } else if (stage1Names.isNotEmpty()) {
                     promptBuilder.buildEnrichmentPrompt(areaName, stage1Names, context)
                 } else {
@@ -225,9 +225,14 @@ internal class GeminiAreaIntelligenceProvider(
         }
 
         // Stage 3 — background batch pipeline (silent, 2 batches of 3 POIs each)
+        // Skip for taste-driven queries (Surprise here!) — 3 curated POIs are the result
         launch {
             try {
                 val stage1Result = stage1Deferred.await()
+                // Check AFTER await so BackgroundFetchComplete fires after VibesReady
+                if (context.hasTasteProfile) {
+                    return@launch
+                }
                 val stage1Names = stage1Result.names
                 val stage1VibeLabels = stage1Result.vibeLabels
                 if (stage1Names.isEmpty() || stage1VibeLabels.isEmpty()) return@launch
@@ -484,7 +489,9 @@ internal class GeminiAreaIntelligenceProvider(
             }
         }
         val (_, pois) = responseParser.parseStage1Response(fullText.toString())
-        return pois
+        if (pois.isNotEmpty()) return pois
+        // Fallback: try parsing as background batch format (pois-only object)
+        return responseParser.parseBackgroundBatchPois(fullText.toString())
     }
 
     private suspend fun streamAndParseEnrichment(prompt: String): Pair<List<com.harazone.domain.model.DynamicVibeContent>, List<POI>> {

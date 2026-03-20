@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dots Cap Options</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #0a0a0a; font-family: -apple-system, sans-serif; color: #fff; padding: 32px 16px; }
+  h1 { font-size: 14px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 32px; }
+  .section { margin-bottom: 48px; }
+  .label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 16px; }
+  .phone { width: 320px; background: #1a1a1a; border-radius: 24px; padding: 20px 16px; margin-bottom: 16px; }
+  .subtitle { font-size: 10px; color: #555; margin-top: 8px; }
+
+  /* Search bar mockup */
+  .search-bar {
+    background: rgba(255,255,255,0.1);
+    border-radius: 24px;
+    padding: 10px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .search-bar .area { font-size: 13px; color: #fff; flex: 1; }
+  .search-bar .count { font-size: 12px; color: rgba(255,255,255,0.6); }
+  .search-bar .divider { color: rgba(255,255,255,0.3); font-size: 12px; }
+
+  /* Card */
+  .card {
+    background: rgba(255,255,255,0.08);
+    border-radius: 16px;
+    height: 120px;
+    margin-bottom: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .card .name { font-size: 14px; font-weight: 600; }
+  .card .vibe { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+  /* Dots row */
+  .dots-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-top: 10px;
+  }
+  .dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.35);
+  }
+  .dot.active {
+    width: 8px; height: 8px;
+    background: #fff;
+  }
+  .dot-plus {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    margin-left: 2px;
+    font-weight: 600;
+  }
+  .dot-count {
+    font-size: 10px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 600;
+    background: rgba(255,255,255,0.1);
+    border-radius: 8px;
+    padding: 1px 6px;
+  }
+
+  /* Variants row */
+  .variants { display: flex; gap: 12px; flex-wrap: wrap; }
+  .variant { flex: 0 0 auto; }
+  .variant-title { font-size: 10px; color: #666; margin-bottom: 6px; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Carousel Dots — Cap Options (12 POIs example)</h1>
+
+<!-- Option A: 9 dots + "+" label -->
+<div class="section">
+  <div class="label">Option A — 9 dots + "3+" overflow label</div>
+  <div class="phone">
+    <div class="search-bar">
+      <span>📍</span>
+      <span class="area">Dubai</span>
+      <span class="divider">·</span>
+      <span class="count">12 places</span>
+    </div>
+    <div class="card">
+      <div class="name">🏛 Dubai Mall</div>
+      <div class="vibe">Shopping · Iconic</div>
+    </div>
+    <div class="dots-row">
+      <div class="dot active"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <span class="dot-plus">+3</span>
+    </div>
+  </div>
+  <div class="subtitle">9 dots always visible · "+N" badge for overflow · user knows there's more</div>
+</div>
+
+<!-- Option B: Counter only, no dots above cap -->
+<div class="section">
+  <div class="label">Option B — Counter replaces dots above 9</div>
+  <div class="phone">
+    <div class="search-bar">
+      <span>📍</span>
+      <span class="area">Dubai</span>
+      <span class="divider">·</span>
+      <span class="count">12 places</span>
+    </div>
+    <div class="card">
+      <div class="name">🏛 Dubai Mall</div>
+      <div class="vibe">Shopping · Iconic</div>
+    </div>
+    <div class="dots-row">
+      <span class="dot-count">1 / 12</span>
+    </div>
+  </div>
+  <div class="subtitle">No dots · just "1/12" position label · clean but loses tactile feel</div>
+</div>
+
+<!-- Option C: Dots always, but shrink + fade at edges -->
+<div class="section">
+  <div class="label">Option C — All dots, shrink + fade at edges (scrollable feel)</div>
+  <div class="phone">
+    <div class="search-bar">
+      <span>📍</span>
+      <span class="area">Dubai</span>
+      <span class="divider">·</span>
+      <span class="count">12 places</span>
+    </div>
+    <div class="card">
+      <div class="name">🏛 Dubai Mall</div>
+      <div class="vibe">Shopping · Iconic</div>
+    </div>
+    <div class="dots-row">
+      <!-- active -->
+      <div class="dot active"></div>
+      <!-- near -->
+      <div class="dot" style="opacity:0.9; width:7px;height:7px;"></div>
+      <div class="dot" style="opacity:0.7; width:6px;height:6px;"></div>
+      <div class="dot" style="opacity:0.5; width:5px;height:5px;"></div>
+      <div class="dot" style="opacity:0.35; width:4px;height:4px;"></div>
+      <div class="dot" style="opacity:0.25; width:4px;height:4px;"></div>
+      <div class="dot" style="opacity:0.2; width:3px;height:3px;"></div>
+      <div class="dot" style="opacity:0.15; width:3px;height:3px;"></div>
+      <div class="dot" style="opacity:0.1; width:3px;height:3px;"></div>
+      <div class="dot" style="opacity:0.08; width:3px;height:3px;"></div>
+      <div class="dot" style="opacity:0.06; width:3px;height:3px;"></div>
+      <div class="dot" style="opacity:0.04; width:3px;height:3px;"></div>
+    </div>
+  </div>
+  <div class="subtitle">All dots visible · far dots fade + shrink · shows depth without clutter</div>
+</div>
+
+<!-- Option D: 9 dots max, dots just cap silently -->
+<div class="section">
+  <div class="label">Option D — 9 dots max, no overflow label (counter in search bar is enough)</div>
+  <div class="phone">
+    <div class="search-bar">
+      <span>📍</span>
+      <span class="area">Dubai</span>
+      <span class="divider">·</span>
+      <span class="count">12 places</span>
+    </div>
+    <div class="card">
+      <div class="name">🏛 Dubai Mall</div>
+      <div class="vibe">Shopping · Iconic</div>
+    </div>
+    <div class="dots-row">
+      <div class="dot active"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <div class="dot"></div>
+      <!-- silent cap — no overflow label, search bar has "12 places" -->
+    </div>
+  </div>
+  <div class="subtitle">9 dots = visual rhythm only · counter in search bar tells exact count · cleanest</div>
+</div>
+
+</body>
+</html>

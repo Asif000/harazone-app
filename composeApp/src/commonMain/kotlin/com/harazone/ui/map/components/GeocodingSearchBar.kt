@@ -17,8 +17,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
@@ -56,6 +54,7 @@ import androidx.compose.ui.unit.dp
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.RecentPlace
 import com.harazone.ui.theme.MapFloatingUiDark
+import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
 
@@ -75,12 +74,7 @@ fun GeocodingSearchBar(
     recentPlaces: List<RecentPlace> = emptyList(),
     onRecentSelected: (RecentPlace) -> Unit = {},
     onClearRecents: () -> Unit = {},
-    showBatchNav: Boolean = false,
-    batchIndex: Int = 0,
-    batchTotal: Int = 0,
-    onPrevBatch: () -> Unit = {},
-    onNextBatch: () -> Unit = {},
-    onSearchDeeper: () -> Unit = {},
+    poiCount: Int = 0,
     modifier: Modifier = Modifier,
 ) {
     val spinning = isSearchingArea
@@ -105,11 +99,7 @@ fun GeocodingSearchBar(
             selected -> SelectedState(
                 selectedPlace = selectedPlace ?: "",
                 onClear = onClear,
-                showBatchNav = showBatchNav,
-                batchIndex = batchIndex,
-                batchTotal = batchTotal,
-                onPrevBatch = onPrevBatch,
-                onNextBatch = onNextBatch,
+                poiCount = poiCount,
             )
             active -> ActiveState(
                 query = query,
@@ -143,12 +133,7 @@ fun GeocodingSearchBar(
             )
             else -> IdleState(
                 onTap = { isFieldFocused = true },
-                showBatchNav = showBatchNav,
-                batchIndex = batchIndex,
-                batchTotal = batchTotal,
-                onPrevBatch = onPrevBatch,
-                onNextBatch = onNextBatch,
-                onSearchDeeper = onSearchDeeper,
+                poiCount = poiCount,
             )
         }
     }
@@ -157,12 +142,7 @@ fun GeocodingSearchBar(
 @Composable
 private fun IdleState(
     onTap: () -> Unit,
-    showBatchNav: Boolean = false,
-    batchIndex: Int = 0,
-    batchTotal: Int = 0,
-    onPrevBatch: () -> Unit = {},
-    onNextBatch: () -> Unit = {},
-    onSearchDeeper: () -> Unit = {},
+    poiCount: Int = 0,
 ) {
     Surface(
         shape = RoundedCornerShape(50),
@@ -189,14 +169,7 @@ private fun IdleState(
                 color = Color.White.copy(alpha = 0.5f),
                 modifier = Modifier.weight(1f),
             )
-            if (showBatchNav) {
-                InlineBatchNav(
-                    batchIndex = batchIndex,
-                    batchTotal = batchTotal,
-                    onPrevBatch = onPrevBatch,
-                    onNextBatch = onNextBatch,
-                )
-            }
+            PoiCountChip(poiCount)
         }
     }
 }
@@ -436,11 +409,7 @@ private fun RecentPlaceRow(
 private fun SelectedState(
     selectedPlace: String,
     onClear: () -> Unit,
-    showBatchNav: Boolean = false,
-    batchIndex: Int = 0,
-    batchTotal: Int = 0,
-    onPrevBatch: () -> Unit = {},
-    onNextBatch: () -> Unit = {},
+    poiCount: Int = 0,
 ) {
     Surface(
         shape = RoundedCornerShape(50),
@@ -469,15 +438,7 @@ private fun SelectedState(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            if (showBatchNav) {
-                Spacer(Modifier.width(4.dp))
-                InlineBatchNav(
-                    batchIndex = batchIndex,
-                    batchTotal = batchTotal,
-                    onPrevBatch = onPrevBatch,
-                    onNextBatch = onNextBatch,
-                )
-            }
+            PoiCountChip(poiCount)
             Spacer(Modifier.width(8.dp))
             Icon(
                 imageVector = Icons.Default.Close,
@@ -492,46 +453,13 @@ private fun SelectedState(
 }
 
 @Composable
-private fun InlineBatchNav(
-    batchIndex: Int,
-    batchTotal: Int,
-    onPrevBatch: () -> Unit,
-    onNextBatch: () -> Unit,
-) {
-    val isFirstSlot = batchIndex == 0
-    val isLastSlot = batchIndex == batchTotal - 1
-    val label = if (isLastSlot) stringResource(Res.string.batch_all) else "${batchIndex + 1}/$batchTotal"
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .background(Color.White.copy(alpha = 0.04f), RoundedCornerShape(8.dp))
-            .padding(horizontal = 2.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Default.ChevronLeft,
-            contentDescription = "Previous batch",
-            tint = if (isFirstSlot) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.8f),
-            modifier = Modifier
-                .size(24.dp)
-                .clickable(enabled = !isFirstSlot) { onPrevBatch() },
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = Color.White.copy(alpha = 0.9f),
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 3.dp),
-        )
-        Icon(
-            imageVector = Icons.Default.ChevronRight,
-            contentDescription = "Next batch",
-            tint = if (isLastSlot) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.8f),
-            modifier = Modifier
-                .size(24.dp)
-                .clickable(enabled = !isLastSlot) { onNextBatch() },
-        )
-    }
+private fun PoiCountChip(poiCount: Int) {
+    if (poiCount <= 0) return
+    Text(
+        text = pluralStringResource(Res.plurals.search_n_places, poiCount, poiCount),
+        style = MaterialTheme.typography.labelSmall,
+        color = Color.White.copy(alpha = 0.6f),
+    )
 }
 
 @Composable
@@ -554,7 +482,7 @@ private fun SpinningState(showCancel: Boolean, onCancelLoad: () -> Unit) {
             )
             Spacer(Modifier.width(8.dp))
             Text(
-                text = stringResource(Res.string.search_refreshing),
+                text = stringResource(Res.string.search_discovering),
                 style = MaterialTheme.typography.labelMedium,
                 color = Color.White.copy(alpha = 0.7f),
                 modifier = Modifier.weight(1f),

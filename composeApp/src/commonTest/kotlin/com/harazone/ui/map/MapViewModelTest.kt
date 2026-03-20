@@ -2815,6 +2815,128 @@ class MapViewModelTest {
         assertEquals(true, updated.isCompanionPulsing)
     }
 
+    // --- Streaming Discovery UX Tests ---
+
+    @Test
+    fun onCarouselSwiped_resetsZoomToDefault() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        // Simulate slideshow zoom
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        // Swipe to card 1
+        viewModel.onCarouselSwiped(1)
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(MapViewModel.DEFAULT_ZOOM_LEVEL, after.cameraZoomLevel)
+        assertEquals(1, after.selectedPinIndex)
+    }
+
+    @Test
+    fun startAutoSlideshow_startsEvenWhenSelectedPinIndexSet() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        // Set selectedPinIndex (simulate previous carousel swipe)
+        viewModel.onCarouselSwiped(1)
+        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(before.selectedPinIndex)
+
+        // Trigger idle → should still start slideshow
+        viewModel.onIdleDetected()
+        testScheduler.advanceTimeBy(500)
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(after.autoSlideshowIndex)
+    }
+
+    @Test
+    fun onSurpriseMe_worksWithNoSaves() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        viewModel.onSurpriseMe()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(after.isSearchingArea)
+    }
+
+    @Test
+    fun showSurpriseMe_trueWhenSavesHaveVibes() = runTest(testDispatcher) {
+        val savedRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+            savedPoiRepository = savedRepo,
+        )
+        savedRepo.save(
+            SavedPoi(
+                id = "s2", name = "Vibed Place", type = "food", vibe = "Nightlife",
+                whySpecial = "test", lat = 1.0, lng = 2.0, areaName = "Manhattan, New York", savedAt = 1000L,
+            )
+        )
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(state.showSurpriseMe)
+    }
+
+    @Test
+    fun animatePoiCounter_incrementsToTargetCount() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(
+                    BucketUpdate.VibesReady(batchVibes, batch0Pois),
+                    BucketUpdate.PortraitComplete(batch0Pois),
+                    BucketUpdate.BackgroundFetchComplete,
+                )
+            ),
+        )
+        // After VibesReady, counter animation starts. Advance enough time (3 pois * 150ms).
+        testScheduler.advanceTimeBy(500)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(batch0Pois.size, state.poiStreamingCount)
+    }
+
 }
 
 private class SuspendingFakeAreaRepository : AreaRepository {
