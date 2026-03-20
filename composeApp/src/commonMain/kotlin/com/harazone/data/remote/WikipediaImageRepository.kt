@@ -16,6 +16,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
 
+const val MAX_GALLERY_IMAGES = 5
+
 class WikipediaImageRepository(private val httpClient: HttpClient) {
 
     companion object {
@@ -69,13 +71,42 @@ class WikipediaImageRepository(private val httpClient: HttpClient) {
         }
     }
 
-    private suspend fun searchCommonsImage(query: String): String? {
+    /**
+     * Multi-image lookup: Wikipedia thumbnail + Wikimedia Commons gallery images.
+     * Returns up to [MAX_GALLERY_IMAGES] distinct URLs. Never throws — returns emptyList() on failure.
+     */
+    suspend fun getImageUrls(wikiSlug: String?, poiName: String): List<String> {
+        return try {
+            val urls = mutableListOf<String>()
+            // Wikipedia thumbnail via slug
+            if (wikiSlug != null) {
+                fetchThumbnail(wikiSlug)?.let { urls.add(it) }
+            }
+            // Wikipedia thumbnail via name (fallback when slug missed)
+            if (urls.isEmpty()) {
+                fetchThumbnail(poiName)?.let { urls.add(it) }
+            }
+            // Commons multi-image search
+            if (urls.size < MAX_GALLERY_IMAGES) {
+                val commonsUrls = searchCommonsImages(poiName, MAX_GALLERY_IMAGES)
+                urls.addAll(commonsUrls)
+            }
+            urls.distinct().take(MAX_GALLERY_IMAGES)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.d { "WikipediaImageRepository: getImageUrls failed for '$poiName': ${e.message}" }
+            emptyList()
+        }
+    }
+
+    private suspend fun searchCommonsImages(query: String, limit: Int): List<String> {
         return try {
             val encoded = query.encodeURLQueryComponent()
             val response = httpClient.get(
                 "https://commons.wikimedia.org/w/api.php?action=query" +
                     "&generator=search&gsrnamespace=6&gsrsearch=$encoded" +
-                    "&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=800" +
+                    "&gsrlimit=$limit&prop=imageinfo&iiprop=url&iiurlwidth=800" +
                     "&format=json"
             ) {
                 header(HttpHeaders.UserAgent, USER_AGENT)
@@ -84,20 +115,26 @@ class WikipediaImageRepository(private val httpClient: HttpClient) {
                     socketTimeoutMillis = 5_000
                 }
             }
-            if (!response.status.isSuccess()) return null
+            if (!response.status.isSuccess()) return emptyList()
             val body = json.decodeFromString<JsonObject>(response.bodyAsText())
-            val pages = body["query"]?.jsonObject?.get("pages")?.jsonObject ?: return null
-            val firstPage = pages.values.firstOrNull()?.jsonObject ?: return null
-            val imageInfo = firstPage["imageinfo"]
-                ?.let { json.decodeFromString<List<CommonsImageInfo>>(it.toString()) }
-                ?.firstOrNull()
-            imageInfo?.thumburl?.takeIf { it.isNotBlank() }
+            val pages = body["query"]?.jsonObject?.get("pages")?.jsonObject ?: return emptyList()
+            pages.values.mapNotNull { pageElement ->
+                val page = pageElement.jsonObject
+                val imageInfo = page["imageinfo"]
+                    ?.let { json.decodeFromString<List<CommonsImageInfo>>(it.toString()) }
+                    ?.firstOrNull()
+                imageInfo?.thumburl?.takeIf { it.isNotBlank() }
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            AppLogger.d { "WikipediaImageRepository: Commons search failed for '$query': ${e.message}" }
-            null
+            AppLogger.d { "WikipediaImageRepository: Commons multi-search failed for '$query': ${e.message}" }
+            emptyList()
         }
+    }
+
+    private suspend fun searchCommonsImage(query: String): String? {
+        return searchCommonsImages(query, 1).firstOrNull()
     }
 
     @Serializable

@@ -19,6 +19,7 @@ data class POI(
     val vibeInsights: Map<String, String> = emptyMap(),
     val wikiSlug: String? = null,
     val imageUrl: String? = null,
+    val imageUrls: List<String> = emptyList(),
     val userNote: String? = null,
     val priceRange: String? = null,
 ) {

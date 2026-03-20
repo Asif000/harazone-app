@@ -2,6 +2,8 @@ package com.harazone.ui.map.components
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
@@ -101,6 +104,9 @@ internal fun AiDetailPage(
     onPoiCardClick: (ChatPoiCard) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    var showGallery by remember(poi.savedId) { mutableStateOf(false) }
+    val vibeColor = (Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) } ?: Vibe.DEFAULT).toColor()
+
     val listState = rememberLazyListState()
 
     // Auto-scroll only after user has manually scrolled down to chat area
@@ -146,6 +152,7 @@ internal fun AiDetailPage(
                 item(key = "header") {
                     PoiDetailHeader(
                         poi = poi,
+                        vibeColor = vibeColor,
                         isVisited = isVisited,
                         visitState = visitState,
                         onVisit = onVisit,
@@ -153,6 +160,7 @@ internal fun AiDetailPage(
                         onDirectionsClick = onDirectionsClick,
                         onShowOnMap = onShowOnMap,
                         onDismiss = onDismiss,
+                        onImageClick = { showGallery = true },
                     )
                 }
 
@@ -269,6 +277,16 @@ internal fun AiDetailPage(
                 placeholder = DETAIL_PAGE_CHAT_HINT,
             )
         }
+
+        // Fullscreen image gallery overlay — last child for Z-order
+        if (showGallery && poi.imageUrls.isNotEmpty()) {
+            FullscreenImageGallery(
+                images = poi.imageUrls,
+                poiName = poi.name,
+                vibeColor = vibeColor,
+                onDismiss = { showGallery = false },
+            )
+        }
     }
 }
 
@@ -368,6 +386,7 @@ private fun PoiContextBlock(
 @Composable
 private fun PoiDetailHeader(
     poi: POI,
+    vibeColor: Color,
     isVisited: Boolean,
     visitState: VisitState?,
     onVisit: () -> Unit,
@@ -375,16 +394,22 @@ private fun PoiDetailHeader(
     onDirectionsClick: (Double, Double, String) -> Unit,
     onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
+    onImageClick: () -> Unit = {},
 ) {
-    val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) }
-    val vibeColor = (poiVibe ?: Vibe.DEFAULT).toColor()
 
     Column {
         // Hero image
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(160.dp),
+                .height(160.dp)
+                .then(
+                    if (poi.imageUrls.isNotEmpty()) Modifier.clickable(
+                        indication = null,
+                        interactionSource = remember { MutableInteractionSource() },
+                    ) { onImageClick() }
+                    else Modifier
+                ),
         ) {
             // Gradient fallback
             Box(
@@ -412,6 +437,23 @@ private fun PoiDetailHeader(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
+            // Image count badge — hide for single image
+            if (poi.imageUrls.size > 1) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(8.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                ) {
+                    Text(
+                        text = "1/${poi.imageUrls.size} photos",
+                        color = Color.White,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                }
+            }
+
             // Close button
             IconButton(
                 onClick = onDismiss,

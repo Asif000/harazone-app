@@ -2,6 +2,7 @@ package com.harazone.ui.map
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.harazone.data.remote.MAX_GALLERY_IMAGES
 import com.harazone.data.remote.MapTilerGeocodingProvider
 import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.domain.model.AreaContext
@@ -30,9 +31,12 @@ import com.harazone.util.AppLogger
 import com.harazone.util.haversineDistanceMeters
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -128,6 +132,10 @@ class MapViewModel(
     private var lastFetchLng: Double = 0.0
     private var lastFetchMs: Long = 0L
 
+    // Gallery image prefetch
+    private val prefetchJobs = HashMap<String, Job>()
+    private val imagePrefetchSemaphore = Semaphore(MAX_GALLERY_IMAGES)
+
     init {
         loadLocation()
         viewModelScope.launch {
@@ -211,17 +219,19 @@ class MapViewModel(
 
     fun selectPoiWithImageResolve(poi: POI) {
         selectPoi(poi)
+        prefetchGalleryImages(poi)
         if (poi.imageUrl != null) return
         viewModelScope.launch {
             try {
                 val url = wikipediaImageRepository.getImageUrl(poi.wikiSlug, poi.name)
                 if (url != null) {
                     val current = _uiState.value as? MapUiState.Ready ?: return@launch
-                    if (current.selectedPoi?.name == poi.name &&
-                        current.selectedPoi?.latitude == poi.latitude &&
-                        current.selectedPoi?.longitude == poi.longitude
+                    val sel = current.selectedPoi
+                    if (sel != null && sel.name == poi.name &&
+                        sel.latitude == poi.latitude &&
+                        sel.longitude == poi.longitude
                     ) {
-                        _uiState.value = current.copy(selectedPoi = poi.copy(imageUrl = url))
+                        _uiState.value = current.copy(selectedPoi = sel.copy(imageUrl = url))
                     }
                 }
             } catch (e: CancellationException) { throw e }
@@ -1686,6 +1696,42 @@ class MapViewModel(
         }
     }
 
+    private fun prefetchGalleryImages(poi: POI) {
+        if (poi.imageUrls.isNotEmpty()) return
+        if (prefetchJobs.containsKey(poi.savedId)) return
+        prefetchJobs[poi.savedId] = viewModelScope.launch {
+            try {
+                val urls = imagePrefetchSemaphore.withPermit {
+                    wikipediaImageRepository.getImageUrls(poi.wikiSlug, poi.name)
+                }
+                if (urls.isNotEmpty()) updatePoiImages(poi.savedId, urls)
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) { /* silently ignore — prefetch is best-effort */ }
+            finally {
+                prefetchJobs.remove(poi.savedId)
+            }
+        }
+    }
+
+    private fun updatePoiImages(savedId: String, urls: List<String>) {
+        _uiState.update { state ->
+            val ready = state as? MapUiState.Ready ?: return@update state
+            fun POI.withImages(): POI {
+                // Ensure imageUrl (used by POI card + hero) is first in the gallery list
+                val heroUrl = imageUrl ?: urls.first()
+                val galleryUrls = (listOf(heroUrl) + urls).distinct().take(MAX_GALLERY_IMAGES)
+                return copy(imageUrls = galleryUrls, imageUrl = heroUrl)
+            }
+            ready.copy(
+                pois = ready.pois.map { p -> if (p.savedId == savedId) p.withImages() else p },
+                allDiscoveredPois = ready.allDiscoveredPois.map { p -> if (p.savedId == savedId) p.withImages() else p },
+                selectedPoi = ready.selectedPoi?.let { sel ->
+                    if (sel.savedId == savedId) sel.withImages() else sel
+                },
+            )
+        }
+    }
+
     private fun mergePois(stage1: List<POI>, enrichments: List<POI>): List<POI> {
         val enrichMap = enrichments.associateBy { it.name.trim().lowercase() }
         val merged = stage1.map { pin ->
@@ -1703,7 +1749,10 @@ class MapViewModel(
         }
         val stage1Keys = stage1.map { it.name.trim().lowercase() }.toSet()
         val newPois = enrichments.filter { it.name.trim().lowercase() !in stage1Keys }
-        return merged + newPois
+        val result = merged + newPois
+        // Prefetch gallery images for enriched POIs (fire-and-forget)
+        result.forEach { prefetchGalleryImages(it) }
+        return result
     }
 
     private fun haversineKm(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double =
