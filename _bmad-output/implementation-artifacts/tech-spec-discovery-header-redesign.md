@@ -141,10 +141,10 @@ Single 14px line. Rotates every 4s on a smooth crossfade. Priority order when mu
 |----------|-----------|--------|-------|
 | 1 | Safety CAUTION, RECONSIDER, or DO_NOT_TRAVEL | `⚠️ Reconsider travel · Check advisory` | Amber |
 | 2 | Remote/teleported area | `From Dubai · 8,300 mi` | Teal |
-| 3 | Companion nudge available | `✨ Try Surprise — 3 spots match your taste` | Purple |
-| 4 | Featured POI nearby | `🎡 Ain Dubai 1.2 km · sunset at 6:15 PM` | Teal |
-| 5 | Default (always present) | `🌤 82°F · 3:42 PM · First visit` | White/muted |
-| 6 | Active vibe filter (when collapsed) | `🎭 3/5 Arts · History` | Purple |
+| 3 | Active vibe filter (when collapsed) | `🎭 3/5 Arts · History` | Purple |
+| 4 | Companion nudge available | `✨ Try Surprise — 3 spots match your taste` | Purple |
+| 5 | Featured POI nearby | `🎡 Ain Dubai 1.2 km · sunset at 6:15 PM` | Teal |
+| 6 | Default (always present) | `🌤 82°F · 3:42 PM · First visit` | White/muted |
 
 Rules:
 - Safety warning (priority 1) does NOT rotate — it stays fixed until area changes. This is the **primary accessible signal** for safety state (color dot is secondary). (H3)
@@ -186,7 +186,18 @@ During POI discovery (after tapping Discover, or initial load):
 
 Tapping collapsed bar (outside 🎲 and count pill) expands the header into a full panel. Slides down with a smooth spring animation. Scrim covers the map only (not the bottom bar). Tap scrim → collapses.
 
-**Gesture conflict (iOS):** The scrim composable must consume all touch events (`Modifier.pointerInput(Unit) { detectTapGestures { } }`) so MapLibre's underlying pan/zoom gesture recognizers do not fire while the panel is open. Without this, on iOS, MapLibre may intercept touches through the scrim. The expanded panel's own horizontal chip scroll and vertical content scroll are unaffected — they sit above the scrim in z-order.
+**Gesture conflict (iOS):** The scrim composable must consume ALL pointer events (tap, drag, pinch) so MapLibre's underlying gesture recognizers do not fire while the panel is open. `detectTapGestures` alone is insufficient — it only handles taps, allowing drag/pinch to leak through to MapLibre on iOS. Use `awaitPointerEventScope` with `PointerEventPass.Initial` consuming every `PointerEvent`:
+```kotlin
+Modifier.pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            event.changes.forEach { it.consume() }
+        }
+    }
+}
+```
+The expanded panel's own horizontal chip scroll and vertical content scroll are unaffected — they sit above the scrim in z-order.
 
 **Keyboard behavior:** On expand, the search input auto-focuses and the software keyboard opens. Use `Modifier.imePadding()` on the expanded panel so the bottom bar stays visible above the keyboard. The POI carousel is pushed off-screen (acceptable — the keyboard is for search). The map tiles remain visible above the keyboard.
 - **Android only:** call `WindowCompat.setDecorFitsSystemWindows(window, false)` in `MainActivity` (likely already set). Do not add this call in common code.
@@ -220,8 +231,8 @@ Tapping collapsed bar (outside 🎲 and count pill) expands the header into a fu
 
 5. **Action buttons** (horizontal row)
    - `✨ Surprise` (primary, purple) — same as 🎲 but labeled
-   - `🔄 Refresh` — re-runs discovery for current area
-   - `🔖 Save Area` — saves the area itself (not a POI)
+   - `🔄 Refresh` — re-runs discovery for current area (`onSearchThisArea()`)
+   - `🔖 Save Area` — hidden until area-save feature is implemented (future spec)
 
 6. **Recent explorations** (bottom of panel)
    - Up to 3 cards: past teleportations
@@ -584,7 +595,7 @@ Orb bar: 💬 pip + "Ain Dubai closes in 2 hrs!"
 - [ ] AC40: Nudge queue respects max depth 3; priority: safety → time-sensitive → taste; excess nudges dropped
 - [ ] AC41: Intel strip tap opens companion chat pre-loaded with the tapped fact text as entry context
 - [ ] AC42: "Refresh" button in expanded panel re-runs `onSearchThisArea()` and shows spinner
-- [ ] AC43: "Save Area" button saves the current area (same as existing area-save flow if implemented; no-op stub if not)
+- [ ] AC43: "Save Area" button is hidden if area-save feature is not yet implemented; renders only when the feature exists
 - [ ] AC44: Meta line posts `LiveRegion.POLITE` on rotation; `LiveRegion.ASSERTIVE` for safety warnings
 - [ ] AC45: Repeated 🎲 taps with zero-match filter keep showing orb message each time (not silent no-op)
 - [ ] AC46: Ghost pin visual converts from dashed outline to filled heart pin after "Discover this one too" tap
@@ -600,8 +611,8 @@ Orb bar: 💬 pip + "Ain Dubai closes in 2 hrs!"
 Each commit must update or create tests for replaced components:
 
 - **Commit A:** `AmbientTickerTest.kt` → `RotatingMetaTickerTest.kt` (test `buildMetaLines()` priority sorting, safety override, rotation pause). `TopContextBar`, `GeocodingSearchBar`, `VibeRail`, `SearchSurpriseTogglePill` had no tests — no migration needed, but new unit tests for `MetaLine` priority logic and `CountPill` debounce are required.
-- **Commit B:** `CompanionOrb` had no tests. New tests for orb state mapping and mutual exclusion logic.
-- **Commit C:** New tests for ghost pin generation (same vibe, nearest by distance) and saved lens toggle state.
+- **Commit B:** `CompanionOrb`, `CompanionCard`, `AISearchBar`, `MapListToggle`, `SavesNearbyPill` had no dedicated test files. New unit tests required: orb state mapping (7 states → correct icon/text/glow), mutual exclusion logic (hamburger dismisses peek and vice versa), nudge queue priority ordering + max depth 3. Verify `CompanionNudgeEngineTest.kt` still passes (engine is unchanged, but call sites move).
+- **Commit C:** New unit tests required: ghost pin generation logic (same vibe filter, nearest by distance, max 2-3 pins), ghost pin → heart pin conversion on save, saved lens toggle state (pan detection disabled, Discover button suppressed). Test saved list sort order (most recent area first, alpha tiebreaker).
 
 ---
 
@@ -627,10 +638,10 @@ Each commit must update or create tests for replaced components:
 sealed class MetaLine(val priority: Int) {
     data class SafetyWarning(val text: String) : MetaLine(1)       // Amber, fixed (no rotation)
     data class RemoteContext(val fromCity: String, val distance: String) : MetaLine(2) // Teal
-    data class CompanionNudge(val text: String) : MetaLine(3)      // Purple
-    data class PoiHighlight(val text: String) : MetaLine(4)        // Teal
-    data class Default(val text: String) : MetaLine(5)             // White/muted
-    data class VibeFilter(val count: Int, val total: Int, val names: String) : MetaLine(6)
+    data class VibeFilter(val count: Int, val total: Int, val names: String) : MetaLine(3) // Purple
+    data class CompanionNudge(val text: String) : MetaLine(4)      // Purple
+    data class PoiHighlight(val text: String) : MetaLine(5)        // Teal
+    data class Default(val text: String) : MetaLine(6)             // White/muted
     data object GpsAcquiring : MetaLine(99)                        // Static, no rotation
     data object LocationDenied : MetaLine(99)                      // Static
     data class Discovering(val areaName: String) : MetaLine(99)    // Pauses rotation
