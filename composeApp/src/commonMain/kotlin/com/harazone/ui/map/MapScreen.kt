@@ -247,8 +247,46 @@ private fun ReadyContent(
         }.onGloballyPositioned { coords ->
         screenHeightPx = coords.size.height.toFloat()
     }) {
-        // Base: map or list
-        if (state.showListView) {
+        // Base: map or list (saved lens swaps to SavedPlacesScreen)
+        if (state.showListView && state.savedLensActive) {
+            SavedPlacesScreen(
+                userLat = state.gpsLatitude.takeIf { state.showMyLocation },
+                userLng = state.gpsLongitude.takeIf { state.showMyLocation },
+                onDismiss = { viewModel.toggleListView() },
+                onAskAi = { poi ->
+                    viewModel.toggleListView()
+                    if (poi != null) {
+                        chatViewModel.openChat(
+                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
+                            entryPoint = ChatEntryPoint.SavedCard(poi.name),
+                        )
+                    } else {
+                        chatViewModel.openChat(
+                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
+                            entryPoint = ChatEntryPoint.SavesSheet,
+                        )
+                    }
+                },
+                onDirections = { lat, lng, name -> onNavigateToMaps(lat, lng, name) },
+                onShare = { /* TODO: platform share intent */ },
+                onPoiSelected = { saved ->
+                    viewModel.toggleListView()
+                    viewModel.selectPoi(
+                        POI(
+                            name = saved.name,
+                            type = saved.type,
+                            description = saved.description ?: saved.whySpecial,
+                            insight = saved.whySpecial,
+                            confidence = Confidence.HIGH,
+                            latitude = saved.lat,
+                            longitude = saved.lng,
+                            imageUrl = saved.imageUrl,
+                            rating = saved.rating,
+                        )
+                    )
+                },
+            )
+        } else if (state.showListView) {
             POIListView(
                 pois = state.pois,
                 dynamicVibes = state.dynamicVibes,
@@ -466,7 +504,7 @@ private fun ReadyContent(
 
         // Saved Lens banner (below Safety Banner)
         SavedLensBanner(
-            totalSavedCount = state.visitedPois.size,
+            totalSavedCount = state.visitedPoiCount,
             onExit = viewModel::onExitSavedLens,
             visible = state.savedLensActive,
             modifier = Modifier

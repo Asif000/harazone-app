@@ -397,10 +397,10 @@ private fun NormalRow(
 
         Spacer(Modifier.width(6.dp))
 
-        // Count pill OR Discover button
+        // Count pill OR Discover button (♥ chip is always visible separately)
         when {
             savedLensActive -> {
-                // Pill hidden in saved lens mode
+                // Pill hidden in saved lens mode — ♥ chip below handles toggle
             }
             showDiscoverButton -> {
                 Box(
@@ -426,6 +426,17 @@ private fun NormalRow(
                     onSavedTap = onSavedLensTap,
                 )
             }
+        }
+
+        // ♥ chip — always visible (independent of Discover button)
+        if (!isGpsAcquiring && !isGeocodePending && !isLocationDenied &&
+            (showDiscoverButton || savedLensActive)) {
+            CountPill(
+                discoveredCount = discoveredCount,
+                savedCount = savedCount,
+                onSavedTap = onSavedLensTap,
+                showDiscoveredCount = false,
+            )
         }
 
         // 🎲 Surprise button
