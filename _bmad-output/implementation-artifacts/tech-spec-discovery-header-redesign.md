@@ -197,7 +197,7 @@ Modifier.pointerInput(Unit) {
     }
 }
 ```
-The expanded panel's own horizontal chip scroll and vertical content scroll are unaffected — they sit above the scrim in z-order.
+The expanded panel's own horizontal chip scroll and vertical content scroll are unaffected — they sit above the scrim in z-order. **Implementation constraint:** Apply the consuming `pointerInput` to the scrim layer only (a sibling composable behind the panel content in the composition tree), NOT to any composable that wraps the panel content — otherwise panel scrolling will be blocked.
 
 **Keyboard behavior:** On expand, the search input auto-focuses and the software keyboard opens. Use `Modifier.imePadding()` on the expanded panel so the bottom bar stays visible above the keyboard. The POI carousel is pushed off-screen (acceptable — the keyboard is for search). The map tiles remain visible above the keyboard.
 - **Android only:** call `WindowCompat.setDecorFitsSystemWindows(window, false)` in `MainActivity` (likely already set). Do not add this call in common code.
