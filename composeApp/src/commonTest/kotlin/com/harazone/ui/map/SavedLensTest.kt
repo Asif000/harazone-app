@@ -321,8 +321,7 @@ class SavedLensTest {
 
     @Test
     fun savedPlacesSortedByMostRecentAreaThenAlpha() {
-        // Test the sort order specified by AC34:
-        // most recently saved-to area first, alpha tiebreaker on area name
+        // Test the sort order specified by AC34 via production buildCapsules
         val saves = listOf(
             SavedPoi(id = "1", name = "Cafe A", type = "cafe", areaName = "Dubai Marina",
                 lat = 25.0, lng = 55.0, whySpecial = "", savedAt = 1000L),
@@ -334,16 +333,13 @@ class SavedLensTest {
                 lat = 25.3, lng = 55.3, whySpecial = "", savedAt = 500L),
         )
 
-        // Group by area, sort groups by most recent save in area (desc), alpha tiebreaker
-        val grouped = saves.groupBy { it.areaName }
-        val sortedAreas = grouped.entries.sortedWith(
-            compareByDescending<Map.Entry<String, List<SavedPoi>>> { entry ->
-                entry.value.maxOf { it.savedAt }
-            }.thenBy { it.key }
-        ).map { it.key }
-
+        val capsules = com.harazone.ui.saved.SavedPlacesViewModel.buildCapsules(
+            saves, userLat = null, userLng = null, sortByRecent = true,
+        )
+        // First capsule is "All", then areas sorted by most recent save
+        val areaLabels = capsules.drop(1).map { it.label }
         // Dubai Marina has most recent save (3000L), then Al Quoz (2000L), then Bur Dubai (500L)
-        assertEquals(listOf("Dubai Marina", "Al Quoz", "Bur Dubai"), sortedAreas)
+        assertEquals(listOf("Dubai Marina", "Al Quoz", "Bur Dubai"), areaLabels)
     }
 
     // --- Ghost pin chain suppression ---

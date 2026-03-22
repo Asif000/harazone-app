@@ -22,6 +22,8 @@ class SavedPlacesViewModel(
     private var allSaves: List<SavedPoi> = emptyList()
     private var userLat: Double? = null
     private var userLng: Double? = null
+    var sortByRecent: Boolean = false
+        private set
     private var saveNoteJob: Job? = null
     private var currentEditingNoteText: String = ""
 
@@ -31,6 +33,13 @@ class SavedPlacesViewModel(
                 allSaves = pois
                 recompute()
             }
+        }
+    }
+
+    fun setSortByRecent(enabled: Boolean) {
+        if (sortByRecent != enabled) {
+            sortByRecent = enabled
+            recompute()
         }
     }
 
@@ -158,7 +167,7 @@ class SavedPlacesViewModel(
         _uiState.update { state ->
             val pending = state.pendingUnsaveIds
             val visibleSaves = allSaves.filter { it.id !in pending }
-            val capsules = buildCapsules(visibleSaves, userLat, userLng)
+            val capsules = buildCapsules(visibleSaves, userLat, userLng, sortByRecent)
             val story = buildDiscoveryStory(visibleSaves)
             val filtered = visibleSaves.filter { poi ->
                 matchesCapsule(poi, state.activeCapsule) &&
@@ -189,12 +198,22 @@ class SavedPlacesViewModel(
             saves: List<SavedPoi>,
             userLat: Double?,
             userLng: Double?,
+            sortByRecent: Boolean = false,
         ): List<DistanceCapsule> {
             if (saves.isEmpty()) return emptyList()
 
             val grouped = saves.groupBy { it.areaName }
 
-            val areaCapsules = if (userLat != null && userLng != null) {
+            val areaCapsules = if (sortByRecent) {
+                // AC34: most recently saved-to area first, alpha tiebreaker
+                grouped.map { (area, pois) ->
+                    Triple(area, pois.size, Double.MAX_VALUE)
+                }.sortedWith(
+                    compareByDescending<Triple<String, Int, Double>> {
+                        grouped[it.first]!!.maxOf { p -> p.savedAt }
+                    }.thenBy { it.first }
+                )
+            } else if (userLat != null && userLng != null) {
                 grouped.map { (area, pois) ->
                     val minDist = pois.minOf { haversineKm(userLat, userLng, it.lat, it.lng) }
                     Triple(area, pois.size, minDist)

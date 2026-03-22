@@ -252,6 +252,7 @@ private fun ReadyContent(
             SavedPlacesScreen(
                 userLat = state.gpsLatitude.takeIf { state.showMyLocation },
                 userLng = state.gpsLongitude.takeIf { state.showMyLocation },
+                sortByRecent = true,
                 onDismiss = { viewModel.toggleListView() },
                 onAskAi = { poi ->
                     viewModel.toggleListView()

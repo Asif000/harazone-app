@@ -82,6 +82,7 @@ fun SavedPlacesScreen(
     onDirections: (Double, Double, String) -> Unit,
     onShare: (String) -> Unit,
     onPoiSelected: (SavedPoi) -> Unit = {},
+    sortByRecent: Boolean = false,
     viewModel: SavedPlacesViewModel = koinViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -91,6 +92,10 @@ fun SavedPlacesScreen(
     val undoLabel = stringResource(Res.string.saved_undo)
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    LaunchedEffect(sortByRecent) {
+        viewModel.setSortByRecent(sortByRecent)
+    }
 
     LaunchedEffect(userLat, userLng) {
         viewModel.onLocationUpdated(userLat, userLng)
