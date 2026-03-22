@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FINAL — Complete Discovery Header Redesign</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 16px 60px;
+  }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 28px; text-align: center; }
+  .phase {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: rgba(102,126,234,0.5); font-weight: 600;
+    margin: 28px 0 14px; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    width: 320px; text-align: center;
+  }
+  .step { width: 320px; margin-bottom: 32px; }
+  .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sn { width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .st { font-size: 14px; font-weight: 700; }
+  .sd { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 12px; }
+  .sd .k { color: #4ECDC4; font-weight: 600; }
+  .sd .p { color: #a5b4fc; font-weight: 600; }
+  .sd .r { color: #FF6B6B; font-weight: 600; }
+
+  .phone { width: 320px; height: 693px; border-radius: 36px; border: 3px solid rgba(255,255,255,0.08); background: #0a0a0f; overflow: hidden; box-shadow: 0 12px 40px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+  .ps { height: 48px; flex-shrink: 0; padding: 14px 22px 0; display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); position: relative; }
+  .pi { width: 100px; height: 28px; background: #000; border-radius: 14px; position: absolute; top: 8px; left: 50%; transform: translateX(-50%); }
+
+  /* Header */
+  .dh { flex-shrink: 0; margin: 2px 8px 0; border-radius: 14px; background: rgba(20,20,28,0.93); border: 1px solid rgba(255,255,255,0.06); overflow: hidden; }
+  .dr { display: flex; align-items: center; padding: 8px 8px 8px 12px; gap: 6px; }
+  .di { flex: 1; min-width: 0; }
+  .dn { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+  .sd2 { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #4ade80; }
+  .mw { height: 14px; overflow: hidden; margin-top: 1px; }
+  .mt { display: flex; flex-direction: column; animation: rm 15s ease-in-out infinite; }
+  .ml { height: 14px; font-size: 10px; color: rgba(255,255,255,0.4); white-space: nowrap; display: flex; align-items: center; }
+  .ml .s { margin: 0 3px; opacity: 0.3; }
+  .ml .h { color: #4ECDC4; font-weight: 500; }
+  .ml .n { color: rgba(167,139,250,0.7); }
+  @keyframes rm { 0%,20%{transform:translateY(0)} 26%,46%{transform:translateY(-14px)} 52%,72%{transform:translateY(-28px)} 78%,98%{transform:translateY(-42px)} 100%{transform:translateY(0)} }
+  .ms { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; white-space: nowrap; }
+  .ms .s { margin: 0 3px; opacity: 0.3; }
+  .ms .rm { color: #4ECDC4; font-weight: 500; }
+  .cp { display: flex; align-items: center; gap: 3px; padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,0.05); flex-shrink: 0; }
+  .ci2 { font-size: 9px; color: rgba(78,205,196,0.5); }
+  .cn { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.5); }
+  .cs { font-size: 9px; color: rgba(255,107,107,0.5); }
+  .cp.sa { background: rgba(255,107,107,0.08); border: 1px solid rgba(255,107,107,0.12); }
+  .cp.sa .cs { color: #FF6B6B; }
+  .db { padding: 5px 12px; border-radius: 9px; background: linear-gradient(135deg, #4ECDC4, #2ab0a6); font-size: 10px; font-weight: 600; color: #fff; border: none; flex-shrink: 0; box-shadow: 0 1px 6px rgba(78,205,196,0.2); }
+  /* Larger surprise button (38px) */
+  .sb { width: 38px; height: 38px; border-radius: 12px; background: linear-gradient(135deg, #667eea, #764ba2); border: none; color: #fff; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 10px rgba(102,126,234,0.25); position: relative; overflow: hidden; }
+  .sb .sh { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent); transform: translateX(-100%); animation: shim 3s infinite; }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .cv { font-size: 8px; color: rgba(255,255,255,0.15); flex-shrink: 0; }
+  .cv.up { transform: rotate(180deg); }
+
+  /* Expanded sections */
+  .sr2 { display: flex; align-items: center; padding: 4px 12px; gap: 6px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+  .sr2i { font-size: 12px; color: rgba(255,255,255,0.2); }
+  .sr2t { flex: 1; font-size: 13px; color: rgba(255,255,255,0.2); padding: 7px 0; }
+  .sr2t.ty { color: #fff; font-weight: 500; }
+  .sr2x { width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.3); font-size: 9px; display: flex; align-items: center; justify-content: center; }
+  .cg { display: flex; gap: 12px; padding: 7px 12px 4px; flex-wrap: wrap; }
+  .cgi { font-size: 10px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 3px; }
+  .cgi .v { color: rgba(255,255,255,0.7); font-weight: 500; }
+  .vc { display: flex; gap: 5px; padding: 4px 12px 8px; flex-wrap: wrap; }
+  .vch { padding: 4px 10px; border-radius: 8px; font-size: 10px; font-weight: 500; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.45); display: flex; align-items: center; gap: 4px; }
+  .il { margin: 0 12px 6px; padding: 5px 8px; background: rgba(255,255,255,0.02); border-radius: 7px; font-size: 10px; color: rgba(255,255,255,0.3); line-height: 1.4; }
+  .il .h { color: #4ECDC4; font-weight: 500; }
+  .dv { height: 1px; background: rgba(255,255,255,0.04); margin: 0 12px; }
+  .ac { display: flex; gap: 5px; padding: 7px 12px 9px; }
+  .ab { flex: 1; padding: 7px 0; border-radius: 9px; border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.02); color: rgba(255,255,255,0.5); font-size: 10.5px; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 3px; }
+  .ab.pr { background: linear-gradient(135deg, #667eea, #764ba2); border-color: transparent; color: #fff; }
+  .rc { padding: 4px 12px 6px; }
+  .rl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.15); margin-bottom: 3px; }
+  .ri { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+  .rf { width: 22px; height: 22px; border-radius: 5px; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .rn { flex: 1; }
+  .rnm { font-size: 11px; font-weight: 500; }
+  .rdt { font-size: 8.5px; color: rgba(255,255,255,0.22); }
+  .rdist { font-size: 8.5px; color: rgba(255,255,255,0.18); flex-shrink: 0; }
+
+  /* Search results */
+  .srs { padding: 0 12px; }
+  .srl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.15); padding: 5px 0 2px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .srl .srl2 { flex: 1; height: 1px; background: rgba(255,255,255,0.04); }
+  .sri { display: flex; align-items: center; gap: 7px; padding: 5px 0; }
+  .sric { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .sric.pc2 { background: rgba(78,205,196,0.1); }
+  .sric.ac3 { background: rgba(102,126,234,0.1); }
+  .sric.vc2 { background: rgba(255,107,107,0.1); }
+  .sinf { flex: 1; min-width: 0; }
+  .snm { font-size: 11.5px; font-weight: 500; }
+  .snm .m { color: #fff; font-weight: 600; }
+  .snm .r { color: rgba(255,255,255,0.4); }
+  .sdt { font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 1px; }
+  .sbg { padding: 2px 5px; border-radius: 4px; font-size: 8px; font-weight: 600; flex-shrink: 0; }
+  .sbg.pb { background: rgba(78,205,196,0.12); color: #4ECDC4; }
+  .sbg.ab2 { background: rgba(102,126,234,0.12); color: #8b9cf7; }
+  .sbg.vb { background: rgba(255,107,107,0.12); color: #FF6B6B; }
+  .sri.hl2 { background: rgba(78,205,196,0.05); border-radius: 7px; padding: 5px 6px; margin: 0 -6px; }
+
+  /* Spinner */
+  .spr { display: flex; align-items: center; padding: 8px 12px; gap: 8px; }
+  .spd { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.06); border-top-color: #667eea; border-radius: 50%; animation: sp 0.7s linear infinite; flex-shrink: 0; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .spt { flex: 1; font-size: 12px; color: rgba(255,255,255,0.5); }
+  .spt em { color: #fff; font-style: normal; font-weight: 600; }
+  .spx { padding: 3px 8px; border-radius: 5px; background: rgba(255,255,255,0.06); border: none; color: rgba(255,255,255,0.3); font-size: 9px; }
+
+  /* Map */
+  .pm { flex: 1; min-height: 0; position: relative; background: radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%), radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%), #0d1117; }
+  .pm.w { background: radial-gradient(ellipse at 20% 40%, rgba(20,50,60,0.4) 0%, transparent 35%), radial-gradient(ellipse at 50% 50%, rgba(25,40,35,0.3) 0%, transparent 40%), radial-gradient(ellipse at 80% 45%, rgba(40,30,50,0.3) 0%, transparent 35%), #0d1117; }
+  .pn { position: absolute; width: 22px; height: 22px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); box-shadow: 0 1px 5px rgba(0,0,0,0.35); z-index: 2; }
+  .pn.dm { opacity: 0.15; }
+  .sp2 { position: absolute; z-index: 3; display: flex; flex-direction: column; align-items: center; }
+  .sp2i { width: 26px; height: 26px; border-radius: 50%; background: rgba(255,107,107,0.9); display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff; box-shadow: 0 2px 8px rgba(255,107,107,0.3); }
+  .sp2l { margin-top: 2px; padding: 1px 5px; border-radius: 3px; background: rgba(20,20,28,0.9); font-size: 7px; font-weight: 600; color: rgba(255,255,255,0.6); }
+  .clp { position: absolute; z-index: 4; display: flex; flex-direction: column; align-items: center; }
+  .clc { width: 36px; height: 36px; border-radius: 50%; background: rgba(255,107,107,0.15); border: 2px solid rgba(255,107,107,0.4); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #FF6B6B; }
+  .cll { margin-top: 2px; padding: 1px 5px; border-radius: 3px; background: rgba(20,20,28,0.9); font-size: 7px; font-weight: 600; color: rgba(255,255,255,0.5); }
+  .svb { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); padding: 4px 12px; border-radius: 8px; background: rgba(255,107,107,0.1); border: 1px solid rgba(255,107,107,0.15); font-size: 9px; color: #FF6B6B; font-weight: 500; z-index: 5; display: flex; align-items: center; gap: 5px; }
+  .svb .sx { width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 8px; color: rgba(255,255,255,0.3); }
+  .mb { position: absolute; z-index: 5; width: 36px; height: 36px; border-radius: 10px; background: rgba(20,20,28,0.9); border: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); font-size: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
+  .mb.hm { border-color: rgba(78,205,196,0.2); color: #4ECDC4; }
+  .fl { position: absolute; inset: 0; z-index: 10; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
+  .flt { font-size: 18px; font-weight: 700; text-shadow: 0 3px 16px rgba(102,126,234,0.4); }
+
+  /* Toast */
+  .tst { flex-shrink: 0; margin: 0 8px; background: rgba(20,20,28,0.95); border: 1px solid rgba(78,205,196,0.12); border-radius: 10px; padding: 8px 10px; }
+  .tsth { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; margin-bottom: 5px; }
+  .tsth .ht { color: #FF6B6B; }
+  .tstc { display: flex; gap: 4px; }
+  .tc { flex: 1; background: rgba(255,255,255,0.03); border-radius: 6px; padding: 5px 6px; }
+  .tcn { font-size: 9.5px; font-weight: 500; }
+  .tcv { font-size: 8px; color: rgba(255,255,255,0.28); }
+  .tcd { font-size: 8px; color: #4ECDC4; margin-top: 2px; }
+  /* Dashed sim pins */
+  .dsm { position: absolute; width: 16px; height: 16px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); z-index: 4; border: 2px dashed rgba(78,205,196,0.6); background: rgba(78,205,196,0.1); }
+
+  /* Cards */
+  .pc { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px; }
+  .pcd { flex: 1; background: rgba(20,20,28,0.9); border: 1px solid rgba(255,255,255,0.05); border-radius: 10px; padding: 8px 9px; }
+  .pcd.sc { border-color: rgba(255,107,107,0.08); }
+  .pcn { font-size: 11px; font-weight: 600; }
+  .pcv { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .pci { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+  .pca { font-size: 8px; color: rgba(102,126,234,0.5); margin-top: 2px; }
+
+  /* Bottom bar */
+  .bb { flex-shrink: 0; padding: 6px 8px 20px; display: flex; gap: 6px; align-items: center; }
+  .bm { width: 38px; height: 38px; border-radius: 10px; background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 15px; color: rgba(255,255,255,0.35); flex-shrink: 0; }
+  .bt { width: 38px; height: 38px; border-radius: 10px; background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 15px; color: rgba(255,255,255,0.35); flex-shrink: 0; }
+  .bt.la { background: rgba(78,205,196,0.08); border-color: rgba(78,205,196,0.15); color: #4ECDC4; }
+  .ob { flex: 1; background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05); border-radius: 14px; display: flex; align-items: center; gap: 7px; padding: 9px 12px; position: relative; overflow: hidden; }
+  .ob.nu { border-color: rgba(102,126,234,0.2); }
+  .ob.su { border-color: rgba(167,139,250,0.15); }
+  .ob.sv { border-color: rgba(255,107,107,0.12); }
+  .ob.tl { border-color: rgba(78,205,196,0.12); }
+  .oo { width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(135deg, #667eea, #764ba2); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+  .oo.pu { animation: ob2 2s ease-in-out infinite; }
+  @keyframes ob2 { 0%,100%{transform:scale(1)} 50%{transform:scale(1.12)} }
+  .ot { flex: 1; font-size: 11px; color: rgba(255,255,255,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .om { width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; font-size: 9px; color: rgba(255,255,255,0.2); flex-shrink: 0; }
+
+  /* List view */
+  .lv { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px; }
+  .lv::-webkit-scrollbar { display: none; }
+  .lc { background: rgba(20,20,28,0.9); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 10px; margin-bottom: 6px; display: flex; gap: 10px; align-items: center; }
+  .lc.slc { border-color: rgba(255,107,107,0.06); }
+  .lci { width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; font-size: 20px; }
+  .lcf { flex: 1; min-width: 0; }
+  .lcn { font-size: 12px; font-weight: 600; }
+  .lcv { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .lcm { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 2px; display: flex; gap: 6px; }
+  .lca { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+  .lcb { width: 28px; height: 28px; border-radius: 7px; background: rgba(255,255,255,0.04); border: none; color: rgba(255,255,255,0.35); font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .lcb.sv2 { color: #FF6B6B; }
+  .ls { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; padding: 4px 4px 6px; font-weight: 600; }
+  .ls.ds { color: rgba(78,205,196,0.3); }
+  .ls.ss { color: rgba(255,107,107,0.3); }
+
+  /* Peek card */
+  .pk { padding: 8px 12px 2px; font-size: 10.5px; color: rgba(255,255,255,0.55); line-height: 1.5; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .pk .ph { color: #4ECDC4; font-weight: 500; }
+  .pk .pa { display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 5px; background: rgba(78,205,196,0.08); color: #4ECDC4; font-size: 9px; font-weight: 500; margin-top: 4px; }
+
+  /* Menu items */
+  .fmi { display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 8px; background: rgba(20,20,28,0.95); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.4); white-space: nowrap; margin-bottom: 4px; }
+  .fmic { width: 28px; height: 28px; border-radius: 8px; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .fmt { font-size: 12px; color: rgba(255,255,255,0.6); font-weight: 500; }
+  .fscr { position: absolute; inset: 0; z-index: 5; background: rgba(0,0,0,0.3); }
+</style>
+</head>
+<body>
+
+<h1>FINAL — Complete Redesign</h1>
+<div class="sub">Every state in one storyboard. 22 decisions, 6 killed components, 0 added. Scroll down.</div>
+
+<!-- 1: MAP DEFAULT -->
+<div class="phase">Default — Map View</div>
+<div class="step">
+  <div class="step-head"><div class="sn">1</div><div class="st">App launch</div></div>
+  <div class="sd">Discovery Header (rotating meta, <span class="k">📍5 ♥2</span>, <span class="p">🎲 38px</span>) + map + carousel + bottom bar (<span class="k">☰</span> <span class="k">▤</span> <span class="p">🌟 orb</span>). ◎ floats on map.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Dubai Marina <div class="sd2"></div></div><div class="mw"><div class="mt"><div class="ml">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div><div class="ml"><span class="h">🎡 Ain Dubai</span> 1.2 km <span class="s">·</span> sunset 6:15 PM</div><div class="ml"><span class="n">✨ 3 spots match your taste</span></div><div class="ml"><span class="h">🍽 Nobu</span> 300m <span class="s">·</span> omakase tonight</div></div></div></div><div class="cp"><span class="ci2">📍</span><span class="cn">5</span><span class="cs">♥2</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="pm"><div class="pn" style="top:20%;left:18%;background:#FF6B6B"></div><div class="pn" style="top:40%;left:48%;background:#4ECDC4"></div><div class="pn" style="top:15%;left:68%;background:#FFE66D"></div><div class="pn" style="top:50%;left:34%;background:#A78BFA"></div><div class="pn" style="top:30%;left:80%;background:#F97316"></div><div class="mb" style="bottom:10px;right:10px">◎</div></div>
+    <div class="pc"><div class="pcd"><div class="pcn">Dubai Mall</div><div class="pcv">Shopping · Luxury</div><div class="pci">⭐ 4.8 · Open</div></div><div class="pcd"><div class="pcn">Marina Walk</div><div class="pcv">Scenic · Nightlife</div><div class="pci">⭐ 4.6 · Open</div></div></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob"><div class="oo">🌟</div><div class="ot">Ask about Dubai Marina...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 2: PAN → DISCOVER -->
+<div class="phase">Pan Map → Discover</div>
+<div class="step">
+  <div class="step-head"><div class="sn">2</div><div class="st">Discover replaces count</div></div>
+  <div class="sd">Teal <span class="k">Discover</span> button appears. Two choices: Discover or <span class="p">🎲</span>.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Jumeirah Beach <div class="sd2"></div></div><div class="ms">🌤 84°F <span class="s">·</span> 3:45 PM <span class="s">·</span> New area</div></div><button class="db">Discover</button><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="pm"><div class="mb" style="bottom:10px;right:10px">◎</div></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob"><div class="oo">🌟</div><div class="ot">Want to know about this area?</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 3: SURPRISE -->
+<div class="phase">Surprise</div>
+<div class="step">
+  <div class="step-head"><div class="sn">3</div><div class="st">🎲 → flash + spinner</div></div>
+  <div class="sd">Orb glows <span class="p">purple</span>, bounces.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="spr"><div class="spd"></div><div class="spt">Discovering <em>Dubai Marina</em>...</div><button class="spx">Cancel</button></div></div>
+    <div class="pm"><div class="fl"><div class="flt">✨ Finding something special...</div></div></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob su"><div class="oo pu">✨</div><div class="ot" style="color:rgba(167,139,250,0.7)">Here's why I picked these...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 4: EXPANDED HEADER -->
+<div class="phase">Expanded Header</div>
+<div class="step">
+  <div class="step-head"><div class="sn">4</div><div class="st">Search + vibes + actions + recents</div></div>
+  <div class="sd">Everything in one panel.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dr"><div class="di"><div class="dn">Dubai Marina <div class="sd2"></div></div><div class="ms">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div></div><div class="cp"><span class="ci2">📍</span><span class="cn">5</span><span class="cs">♥2</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv up">▼</div></div>
+      <div class="sr2"><span class="sr2i">🔍</span><span class="sr2t">Search places, areas, or vibes...</span><button class="sr2x">✕</button></div>
+      <div class="cg"><div class="cgi">🌤 <span class="v">82°F</span></div><div class="cgi">🕐 <span class="v">3:42 PM</span></div><div class="cgi">📍 <span class="v">First visit</span></div></div>
+      <div class="vc"><div class="vch">🏞 Scenic</div><div class="vch">💎 Luxury</div><div class="vch">🏛 Cultural</div><div class="vch">🌃 Nightlife</div><div class="vch">🍽 Food</div></div>
+      <div class="il"><span class="h">Dubai Mall</span> 1.2 km · luxury shopping · <span class="h">sunset</span> at 6:15 PM</div>
+      <div class="dv"></div>
+      <div class="ac"><button class="ab pr">🎲 Surprise</button><button class="ab">↻ Refresh</button><button class="ab">♡ Save Area</button></div>
+      <div class="dv"></div>
+      <div class="rc"><div class="rl">Recent explorations</div><div class="ri"><div class="rf">🇧🇿</div><div class="rn"><div class="rnm">Belize City</div><div class="rdt">8 saved · 3 days ago</div></div><div class="rdist">7,200 mi</div></div><div class="ri"><div class="rf">🇯🇵</div><div class="rn"><div class="rnm">Kyoto</div><div class="rdt">12 saved · 1 week ago</div></div><div class="rdist">4,800 mi</div></div></div>
+    </div>
+    <div class="pm"></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob"><div class="oo">🌟</div><div class="ot">Ask about Dubai Marina...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 5: SMART SEARCH -->
+<div class="phase">Smart Search</div>
+<div class="step">
+  <div class="step-head"><div class="sn">5</div><div class="st">Type "sushi" → HERE vs ELSEWHERE</div></div>
+  <div class="sd">Local POIs + vibe filter + remote areas. One input, grouped.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dr"><div class="di"><div class="dn">Dubai Marina <div class="sd2"></div></div><div class="ms">🌤 82°F <span class="s">·</span> 3:42 PM</div></div><div class="cp"><span class="ci2">📍</span><span class="cn">5</span><span class="cs">♥2</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv up">▼</div></div>
+      <div class="sr2"><span class="sr2i">🔍</span><span class="sr2t ty">sushi</span><button class="sr2x">✕</button></div>
+      <div class="srs">
+        <div class="srl"><span>HERE · Dubai Marina</span><div class="srl2"></div></div>
+        <div class="sri hl2"><div class="sric pc2">🍣</div><div class="sinf"><div class="snm"><span class="m">Sushi</span><span class="r"> Art Marina</span></div><div class="sdt">Japanese · ⭐ 4.6 · 300m</div></div><span class="sbg pb">Here</span></div>
+        <div class="sri"><div class="sric vc2">✨</div><div class="sinf"><div class="snm"><span class="m">Sushi</span><span class="r"> spots in Dubai Marina</span></div><div class="sdt">AI-curated · 4 places match</div></div><span class="sbg vb">Vibe</span></div>
+        <div class="srl"><span>ELSEWHERE</span><div class="srl2"></div></div>
+        <div class="sri"><div class="sric ac3">📍</div><div class="sinf"><div class="snm"><span class="m">Sushi</span><span class="r"> Street, Tsukiji, Tokyo</span></div><div class="sdt">Discover 20+ places · 4,800 mi</div></div><span class="sbg ab2">Area</span></div>
+      </div>
+    </div>
+    <div class="pm"></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob"><div class="oo">🌟</div><div class="ot">Ask about Dubai Marina...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 6: TELEPORTED -->
+<div class="phase">Teleported</div>
+<div class="step">
+  <div class="step-head"><div class="sn">6</div><div class="st">Remote — LA from Dubai</div></div>
+  <div class="sd"><span class="k">From Dubai · 8,300 mi</span>. Orb: teal. ◎ → <span class="k">⌂</span>.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Griffith Park Area <div class="sd2"></div></div><div class="ms">☀️ 74°F <span class="s">·</span> 4:42 AM <span class="s">·</span> <span class="rm">From Dubai · 8,300 mi</span></div></div><div class="cp"><span class="ci2">📍</span><span class="cn">12</span><span class="cs">♥1</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="pm"><div class="pn" style="top:22%;left:28%;background:#4ECDC4"></div><div class="pn" style="top:42%;left:55%;background:#FFE66D"></div><div class="pn" style="top:28%;left:72%;background:#A78BFA"></div><div class="pn" style="top:50%;left:40%;background:#FF6B6B"></div><div class="mb hm" style="bottom:10px;right:10px">⌂</div></div>
+    <div class="pc"><div class="pcd"><div class="pcn">Griffith Observatory</div><div class="pcv">Scenic · Landmark</div><div class="pci">⭐ 4.9 · Free</div></div><div class="pcd"><div class="pcn">Hollywood Sign</div><div class="pcv">Scenic · Hiking</div><div class="pci">⭐ 4.7</div></div></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob tl"><div class="oo pu">🌟</div><div class="ot" style="color:rgba(78,205,196,0.6)">Tell me about Griffith Park...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 7: SAVE + LOOP -->
+<div class="phase">Save → Discovery Loop</div>
+<div class="step">
+  <div class="step-head"><div class="sn">7</div><div class="st">Save → toast + similar pins</div></div>
+  <div class="sd">Toast + dashed pins. Orb: <span class="r">warm red</span>.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Griffith Park Area <div class="sd2"></div></div><div class="ms">☀️ 74°F <span class="s">·</span> 4:42 AM <span class="s">·</span> <span class="rm">From Dubai · 8,300 mi</span></div></div><div class="cp"><span class="ci2">📍</span><span class="cn">12</span><span class="cs">♥2</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="pm"><div class="pn" style="top:22%;left:28%;background:#4ECDC4"></div><div class="pn" style="top:42%;left:55%;background:#FFE66D"></div><div class="dsm" style="top:30%;left:42%"></div><div class="dsm" style="top:45%;left:68%"></div><div class="mb hm" style="bottom:10px;right:10px">⌂</div></div>
+    <div class="tst"><div class="tsth"><span class="ht">♥</span> Saved! Griffith Observatory</div><div class="tstc"><div class="tc"><div class="tcn">Hollywood Sign</div><div class="tcv">Scenic · Hiking</div><div class="tcd">2.1 mi</div></div><div class="tc"><div class="tcn">Fern Dell Trail</div><div class="tcv">Nature · Quiet</div><div class="tcd">0.8 mi</div></div></div></div>
+    <div class="pc"><div class="pcd"><div class="pcn">Griffith Observatory</div><div class="pcv">Scenic · Landmark</div><div class="pci">⭐ 4.9</div></div><div class="pcd"><div class="pcn">Hollywood Sign</div><div class="pcv">Scenic · Hiking</div><div class="pci">⭐ 4.7</div></div></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob sv"><div class="oo pu">♥</div><div class="ot" style="color:rgba(255,107,107,0.65)">Why you'd love this place...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 8: LIST VIEW -->
+<div class="phase">List View</div>
+<div class="step">
+  <div class="step-head"><div class="sn">8</div><div class="st">▤ → discovered list</div></div>
+  <div class="sd">Toggle to 🗺 (teal). Tap → back to map.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Dubai Marina <div class="sd2"></div></div><div class="ms">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> 5 places</div></div><div class="cp"><span class="ci2">📍</span><span class="cn">5</span><span class="cs">♥2</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="lv">
+      <div class="ls ds">Discovered · sorted by distance</div>
+      <div class="lc"><div class="lci">🏬</div><div class="lcf"><div class="lcn">Dubai Mall</div><div class="lcv">Shopping · Luxury</div><div class="lcm"><span>⭐ 4.8</span><span>Open</span><span>1.2 km</span></div></div><div class="lca"><button class="lcb sv2">♥</button><button class="lcb">→</button></div></div>
+      <div class="lc"><div class="lci">🌅</div><div class="lcf"><div class="lcn">Marina Walk</div><div class="lcv">Scenic · Nightlife</div><div class="lcm"><span>⭐ 4.6</span><span>Open</span><span>200m</span></div></div><div class="lca"><button class="lcb sv2">♥</button><button class="lcb">→</button></div></div>
+      <div class="lc"><div class="lci">🎡</div><div class="lcf"><div class="lcn">Ain Dubai</div><div class="lcv">Scenic · Views</div><div class="lcm"><span>⭐ 4.5</span><span>Closes 8 PM</span><span>1.2 km</span></div></div><div class="lca"><button class="lcb">♡</button><button class="lcb">→</button></div></div>
+    </div>
+    <div class="bb"><div class="bm">☰</div><div class="bt la">🗺</div><div class="ob"><div class="oo">🌟</div><div class="ot">Ask about Dubai Marina...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 9: SAVED MAP -->
+<div class="phase">Saved Lens — Map</div>
+<div class="step">
+  <div class="step-head"><div class="sn">9</div><div class="st">♥2 → saved world map</div></div>
+  <div class="sd">Heart clusters. Whole context switches. Same bottom bar.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Your Saved Places</div><div class="ms">18 places <span class="s">·</span> 5 areas <span class="s">·</span> 4 vibes</div></div><div class="cp sa"><span class="cs">♥ 18</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="pm w"><div class="svb">♥ Viewing 18 saved places <div class="sx">✕</div></div><div class="clp" style="top:35%;left:72%"><div class="clc">8</div><div class="cll">Dubai</div></div><div class="clp" style="top:42%;left:22%"><div class="clc">3</div><div class="cll">Belize</div></div><div class="sp2" style="top:32%;left:12%"><div class="sp2i">♥</div><div class="sp2l">Griffith</div></div><div class="clp" style="top:30%;left:85%"><div class="clc">5</div><div class="cll">Kyoto</div></div><div class="sp2" style="top:55%;left:18%"><div class="sp2i">♥</div><div class="sp2l">Lima</div></div><div class="mb" style="bottom:10px;right:10px">◎</div></div>
+    <div class="pc"><div class="pcd sc"><div class="pcn">Dubai Mall</div><div class="pcv">Shopping · Luxury</div><div class="pca">📍 Dubai</div></div><div class="pcd sc"><div class="pcn">Griffith Observatory</div><div class="pcv">Scenic · Landmark</div><div class="pca">📍 Los Angeles</div></div></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob"><div class="oo">🌟</div><div class="ot">Ask about your saved places...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 10: SAVED LIST -->
+<div class="step">
+  <div class="step-head"><div class="sn">10</div><div class="st">▤ → saved list by area</div></div>
+  <div class="sd">Grouped by area. ♥18 exits saved lens.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Your Saved Places</div><div class="ms">18 places <span class="s">·</span> 5 areas <span class="s">·</span> 4 vibes</div></div><div class="cp sa"><span class="cs">♥ 18</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="lv">
+      <div class="ls ss">Dubai Marina · 8 saves</div>
+      <div class="lc slc"><div class="lci">🏬</div><div class="lcf"><div class="lcn">Dubai Mall</div><div class="lcv">Shopping · Luxury · ⭐ 4.8</div><div class="lcm"><span>saved today</span></div></div><div class="lca"><button class="lcb sv2">♥</button><button class="lcb">→</button></div></div>
+      <div class="ls ss">Griffith Park · 1 save</div>
+      <div class="lc slc"><div class="lci">🏛</div><div class="lcf"><div class="lcn">Griffith Observatory</div><div class="lcv">Scenic · Landmark · ⭐ 4.9</div><div class="lcm"><span>saved yesterday</span></div></div><div class="lca"><button class="lcb sv2">♥</button><button class="lcb">→</button></div></div>
+      <div class="ls ss">Kyoto, Japan · 5 saves</div>
+      <div class="lc slc"><div class="lci">🏯</div><div class="lcf"><div class="lcn">Kinkaku-ji Temple</div><div class="lcv">Cultural · Historic · ⭐ 4.9</div><div class="lcm"><span>saved 1 week ago</span></div></div><div class="lca"><button class="lcb sv2">♥</button><button class="lcb">→</button></div></div>
+    </div>
+    <div class="bb"><div class="bm">☰</div><div class="bt la">🗺</div><div class="ob"><div class="oo">🌟</div><div class="ot">Ask about your saved places...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+<!-- 11: NUDGE PEEK -->
+<div class="phase">Orb Nudge + Peek</div>
+<div class="step">
+  <div class="step-head"><div class="sn">11</div><div class="st">Orb nudge → tap → peek card</div></div>
+  <div class="sd">Orb pulses. Tap → peek expands above bar with full text + action.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Dubai Marina <div class="sd2"></div></div><div class="ms">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div></div><div class="cp"><span class="ci2">📍</span><span class="cn">5</span><span class="cs">♥2</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="pm"><div class="pn" style="top:20%;left:18%;background:#FF6B6B"></div><div class="pn" style="top:40%;left:48%;background:#4ECDC4"></div><div class="pn" style="top:15%;left:68%;background:#FFE66D"></div><div class="pn" style="top:50%;left:34%;background:#A78BFA"></div><div class="mb" style="bottom:10px;right:10px">◎</div></div>
+    <div class="pc"><div class="pcd"><div class="pcn">Dubai Mall</div><div class="pcv">Shopping · Luxury</div><div class="pci">⭐ 4.8</div></div><div class="pcd"><div class="pcn">Marina Walk</div><div class="pcv">Scenic · Nightlife</div><div class="pci">⭐ 4.6</div></div></div>
+    <div class="bb"><div class="bm">☰</div><div class="bt">▤</div><div class="ob nu">
+      <div class="pk"><span class="ph">Ain Dubai</span> closes at 8 PM — only 2 hours! Golden hour starts at 6:15 PM from the top.<br><span class="pa">🎡 Show on map</span></div>
+      <div style="display:flex;align-items:center;gap:7px;padding:9px 12px"><div class="oo pu">💬</div><div class="ot" style="color:rgba(255,255,255,0.5)">Swipe up for full chat...</div><div class="om">🎤</div></div>
+    </div></div>
+  </div>
+</div>
+
+<!-- 12: HAMBURGER MENU -->
+<div class="phase">Hamburger Menu</div>
+<div class="step">
+  <div class="step-head"><div class="sn">12</div><div class="st">☰ → menu from bottom bar</div></div>
+  <div class="sd">Profile, AI Personality, Settings, Feedback. Rises from ☰.</div>
+  <div class="phone">
+    <div class="ps"><span>9:41</span><div class="pi"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dr"><div class="di"><div class="dn">Dubai Marina <div class="sd2"></div></div><div class="ms">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div></div><div class="cp"><span class="ci2">📍</span><span class="cn">5</span><span class="cs">♥2</span></div><button class="sb"><span class="sh"></span>🎲</button><div class="cv">▼</div></div></div>
+    <div class="pm"><div class="fscr"></div><div class="pn" style="top:20%;left:18%;background:#FF6B6B;opacity:0.3"></div><div class="pn" style="top:40%;left:48%;background:#4ECDC4;opacity:0.3"></div><div class="pn" style="top:15%;left:68%;background:#FFE66D;opacity:0.3"></div></div>
+    <div class="pc" style="opacity:0.3"><div class="pcd"><div class="pcn">Dubai Mall</div><div class="pcv">Shopping · Luxury</div></div><div class="pcd"><div class="pcn">Marina Walk</div><div class="pcv">Scenic · Nightlife</div></div></div>
+    <div style="flex-shrink:0;padding:0 8px;position:relative"><div style="position:absolute;bottom:52px;left:0;z-index:10;display:flex;flex-direction:column;gap:4px"><div class="fmi"><div class="fmic">👤</div><div class="fmt">Profile</div></div><div class="fmi"><div class="fmic">🤖</div><div class="fmt">AI Personality</div></div><div class="fmi"><div class="fmic">⚙</div><div class="fmt">Settings</div></div><div class="fmi"><div class="fmic">📧</div><div class="fmt">Send Feedback</div></div></div></div>
+    <div class="bb"><div class="bm" style="background:rgba(78,205,196,0.1);border-color:rgba(78,205,196,0.15);color:#4ECDC4">✕</div><div class="bt">▤</div><div class="ob"><div class="oo">🌟</div><div class="ot">Ask about Dubai Marina...</div><div class="om">🎤</div></div></div>
+  </div>
+</div>
+
+</body>
+</html>

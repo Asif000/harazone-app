@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phone Test</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px;
+  }
+  .label { font-size: 14px; margin-bottom: 12px; color: rgba(255,255,255,0.5); }
+
+  .phone {
+    width: 320px;
+    height: 693px;          /* FIXED iPhone 15 ratio */
+    border-radius: 36px;
+    border: 3px solid rgba(255,255,255,0.1);
+    background: #0a0a0f;
+    overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .status {
+    height: 48px; flex-shrink: 0;
+    padding: 14px 22px 0;
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6);
+    position: relative;
+  }
+  .island {
+    width: 100px; height: 28px; background: #000; border-radius: 14px;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  }
+
+  .header {
+    flex-shrink: 0;
+    margin: 2px 8px 0;
+    border-radius: 14px;
+    background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center;
+    padding: 8px 8px 8px 12px; gap: 6px;
+  }
+  .h-info { flex: 1; min-width: 0; }
+  .h-name { font-size: 13px; font-weight: 600; }
+  .h-meta { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+  .h-chip {
+    padding: 2px 7px; border-radius: 7px;
+    background: rgba(255,255,255,0.06); font-size: 9.5px;
+    color: rgba(255,255,255,0.4);
+  }
+  .h-surp {
+    width: 34px; height: 34px; border-radius: 11px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 8px rgba(102,126,234,0.2);
+  }
+  .h-chev { font-size: 8px; color: rgba(255,255,255,0.15); }
+
+  .map {
+    flex: 1;               /* FILL remaining space */
+    min-height: 0;         /* Allow shrinking if needed */
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%),
+      #0d1117;
+    position: relative;
+  }
+  .pin {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+  }
+
+  .cards {
+    flex-shrink: 0;
+    display: flex; gap: 6px; padding: 6px 8px;
+  }
+  .card {
+    flex: 1; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 8px 9px;
+  }
+  .c-name { font-size: 11px; font-weight: 600; }
+  .c-vibe { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .c-info { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  .nav {
+    flex-shrink: 0;
+    display: flex; gap: 6px; padding: 6px 8px 20px;
+  }
+  .ai-bar {
+    flex: 1; background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 10px;
+    padding: 9px 10px; display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: rgba(255,255,255,0.25);
+  }
+  .orb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+  }
+  .nav-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="label">Single phone test — should be tall rectangle, not square</div>
+
+<div class="phone">
+  <div class="status">
+    <span>9:41</span>
+    <div class="island"></div>
+    <span>📶 🔋</span>
+  </div>
+
+  <div class="header">
+    <div class="h-info">
+      <div class="h-name">Dubai Marina</div>
+      <div class="h-meta">🌤 82°F · 3:42 PM · First visit</div>
+    </div>
+    <div class="h-chip">5 places</div>
+    <button class="h-surp">🎲</button>
+    <div class="h-chev">▼</div>
+  </div>
+
+  <div class="map">
+    <div class="pin" style="top:25%;left:18%;background:#FF6B6B"></div>
+    <div class="pin" style="top:45%;left:48%;background:#4ECDC4"></div>
+    <div class="pin" style="top:20%;left:68%;background:#FFE66D"></div>
+    <div class="pin" style="top:55%;left:34%;background:#A78BFA"></div>
+    <div class="pin" style="top:35%;left:80%;background:#F97316"></div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="c-name">Dubai Mall</div>
+      <div class="c-vibe">Shopping · Luxury</div>
+      <div class="c-info">⭐ 4.8 · Open</div>
+    </div>
+    <div class="card">
+      <div class="c-name">Marina Walk</div>
+      <div class="c-vibe">Scenic · Nightlife</div>
+      <div class="c-info">⭐ 4.6 · Open</div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <div class="ai-bar">
+      <div class="orb"></div>
+      Ask about Dubai Marina...
+    </div>
+    <div class="nav-btn">◎</div>
+    <div class="nav-btn">☰</div>
+  </div>
+</div>
+
+</body>
+</html>

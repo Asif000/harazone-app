@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Local vs Remote Search</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 16px 60px;
+  }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 24px; }
+  .phase {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: rgba(102,126,234,0.5); font-weight: 600;
+    margin: 24px 0 14px; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    width: 320px; text-align: center;
+  }
+  .step { width: 320px; margin-bottom: 32px; }
+  .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .st { font-size: 14px; font-weight: 700; }
+  .sd { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 12px; }
+  .sd .k { color: #4ECDC4; font-weight: 600; }
+  .sd .p { color: #a5b4fc; font-weight: 600; }
+
+  /* Phone */
+  .phone {
+    width: 320px; height: 693px;
+    border-radius: 36px; border: 3px solid rgba(255,255,255,0.08);
+    background: #0a0a0f; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column;
+  }
+  .p-status {
+    height: 48px; flex-shrink: 0; padding: 14px 22px 0;
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6);
+    position: relative;
+  }
+  .p-island {
+    width: 100px; height: 28px; background: #000; border-radius: 14px;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  }
+
+  /* Header */
+  .dh {
+    flex-shrink: 0; margin: 2px 8px 0;
+    border-radius: 14px; background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
+  }
+  .dh-row {
+    display: flex; align-items: center;
+    padding: 8px 8px 8px 12px; gap: 6px;
+  }
+  .dh-info { flex: 1; min-width: 0; }
+  .dh-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dh-meta { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+  .dh-meta .sep { margin: 0 3px; opacity: 0.3; }
+  .dh-chip { padding: 2px 7px; border-radius: 7px; background: rgba(255,255,255,0.06); font-size: 9.5px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+  .dh-surp {
+    width: 34px; height: 34px; border-radius: 11px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 1px 8px rgba(102,126,234,0.2);
+    position: relative; overflow: hidden;
+  }
+  .dh-surp .shm {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%); animation: shim 3s infinite;
+  }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .dh-chev { font-size: 8px; color: rgba(255,255,255,0.15); flex-shrink: 0; transform: rotate(180deg); }
+
+  /* Search */
+  .dh-srch {
+    display: flex; align-items: center; padding: 4px 12px; gap: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dh-srch-i { font-size: 12px; color: rgba(255,255,255,0.2); }
+  .dh-srch-t { flex: 1; font-size: 13px; padding: 7px 0; }
+  .dh-srch-t.placeholder { color: rgba(255,255,255,0.2); }
+  .dh-srch-t.typed { color: #fff; font-weight: 500; }
+  .dh-srch-x {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); border: none;
+    color: rgba(255,255,255,0.3); font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Search results */
+  .sr-sec { padding: 0 12px; }
+  .sr-label {
+    font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: rgba(255,255,255,0.15); padding: 6px 0 3px; font-weight: 600;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .sr-label .sr-line { flex: 1; height: 1px; background: rgba(255,255,255,0.04); }
+
+  .sr-item {
+    display: flex; align-items: center; gap: 7px; padding: 6px 0;
+  }
+  .sr-ico {
+    width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+  }
+  .sr-ico.here { background: rgba(78,205,196,0.1); }
+  .sr-ico.vibe { background: rgba(255,107,107,0.1); }
+  .sr-ico.area { background: rgba(102,126,234,0.1); }
+  .sr-ico.poi { background: rgba(78,205,196,0.1); }
+  .sr-ico.saved { background: rgba(255,230,109,0.1); }
+  .sr-inf { flex: 1; min-width: 0; }
+  .sr-nm { font-size: 11.5px; font-weight: 500; }
+  .sr-nm .m { color: #fff; font-weight: 600; }
+  .sr-nm .r { color: rgba(255,255,255,0.4); }
+  .sr-dt { font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 1px; }
+  .sr-badge {
+    padding: 2px 6px; border-radius: 4px; font-size: 8px; font-weight: 600; flex-shrink: 0;
+  }
+  .sr-badge.here-b { background: rgba(78,205,196,0.12); color: #4ECDC4; }
+  .sr-badge.vibe-b { background: rgba(255,107,107,0.12); color: #FF6B6B; }
+  .sr-badge.area-b { background: rgba(102,126,234,0.12); color: #8b9cf7; }
+  .sr-badge.poi-b { background: rgba(78,205,196,0.12); color: #4ECDC4; }
+  .sr-badge.saved-b { background: rgba(255,230,109,0.12); color: #FFE66D; }
+
+  .sr-item.hl {
+    background: rgba(78,205,196,0.05); border-radius: 7px;
+    padding: 6px 6px; margin: 0 -6px;
+  }
+
+  /* Distance pill */
+  .sr-dist {
+    font-size: 8px; color: rgba(255,255,255,0.2); flex-shrink: 0;
+  }
+
+  /* "Here" section header with location context */
+  .here-header {
+    display: flex; align-items: center; gap: 5px;
+    padding: 6px 12px 2px;
+    font-size: 9px; color: rgba(78,205,196,0.5); font-weight: 500;
+  }
+  .here-dot { width: 4px; height: 4px; border-radius: 50%; background: #4ECDC4; }
+
+  /* Map */
+  .p-map {
+    flex: 1; min-height: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%),
+      #0d1117;
+    position: relative;
+  }
+  .pin {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+  }
+  .pin.dim { opacity: 0.15; }
+  .pin.pulse {
+    animation: pin-pulse 1.5s ease-in-out infinite;
+  }
+  @keyframes pin-pulse {
+    0%, 100% { box-shadow: 0 1px 5px rgba(0,0,0,0.35); }
+    50% { box-shadow: 0 1px 5px rgba(0,0,0,0.35), 0 0 12px rgba(78,205,196,0.4); }
+  }
+
+  /* Filter badge on map */
+  .filter-badge {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    padding: 3px 10px; border-radius: 6px;
+    background: rgba(20,20,28,0.9); border: 1px solid rgba(78,205,196,0.15);
+    font-size: 9px; color: #4ECDC4; font-weight: 500;
+    display: flex; align-items: center; gap: 4px; z-index: 2;
+  }
+  .filter-badge .fb-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ECDC4; }
+
+  /* Cards */
+  .p-cards { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px; }
+  .p-card {
+    flex: 1; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 8px 9px;
+  }
+  .p-card.match { border-color: rgba(78,205,196,0.15); }
+  .pc-n { font-size: 11px; font-weight: 600; }
+  .pc-v { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .pc-i { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  /* Nav */
+  .p-nav { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px 20px; }
+  .p-ai {
+    flex: 1; background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 10px;
+    padding: 9px 10px; display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: rgba(255,255,255,0.25);
+  }
+  .p-orb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2); flex-shrink: 0;
+  }
+  .p-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+</style>
+</head>
+<body>
+
+<h1>Local vs Remote Search</h1>
+<div class="sub">One input — results split into HERE (current area) vs ELSEWHERE. Scroll down.</div>
+
+<!-- ===== 1: Type "sushi" — local results first ===== -->
+<div class="phase">Local Search — "sushi" in Dubai Marina</div>
+<div class="step">
+  <div class="step-head"><div class="sn">1</div><div class="st">Type "sushi"</div></div>
+  <div class="sd">Results split into <span class="k">HERE</span> (Dubai Marina — current area) and <span class="k">ELSEWHERE</span>. Local POIs show distance in meters. Vibe match shows AI-curated count. Remote areas show distance in miles.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+      <div class="dh-srch">
+        <span class="dh-srch-i">🔍</span>
+        <span class="dh-srch-t typed">sushi</span>
+        <button class="dh-srch-x">✕</button>
+      </div>
+      <div class="sr-sec">
+        <!-- HERE section -->
+        <div class="sr-label"><span>HERE · Dubai Marina</span><div class="sr-line"></div></div>
+
+        <div class="sr-item hl">
+          <div class="sr-ico here">🍣</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Sushi</span><span class="r"> Art Marina</span></div>
+            <div class="sr-dt">Japanese · ⭐ 4.6 · Open now</div>
+          </div>
+          <div class="sr-dist">300m</div>
+          <span class="sr-badge here-b">Here</span>
+        </div>
+
+        <div class="sr-item">
+          <div class="sr-ico here">🍱</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="r">Nobu Dubai — </span><span class="m">Sushi</span><span class="r"> Bar</span></div>
+            <div class="sr-dt">Japanese · ⭐ 4.8 · Open now</div>
+          </div>
+          <div class="sr-dist">800m</div>
+          <span class="sr-badge here-b">Here</span>
+        </div>
+
+        <div class="sr-item">
+          <div class="sr-ico vibe">✨</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Sushi</span><span class="r"> spots in Dubai Marina</span></div>
+            <div class="sr-dt">AI-curated · 4 places match</div>
+          </div>
+          <span class="sr-badge vibe-b">Vibe</span>
+        </div>
+
+        <!-- ELSEWHERE section -->
+        <div class="sr-label"><span>ELSEWHERE</span><div class="sr-line"></div></div>
+
+        <div class="sr-item">
+          <div class="sr-ico area">📍</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Sushi</span><span class="r"> Street, Tsukiji, Tokyo</span></div>
+            <div class="sr-dt">Discover 20+ places · Food, Cultural</div>
+          </div>
+          <div class="sr-dist">4,800 mi</div>
+          <span class="sr-badge area-b">Area</span>
+        </div>
+
+        <div class="sr-item">
+          <div class="sr-ico poi">🍣</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Sushi</span><span class="r"> Saito, Tokyo</span></div>
+            <div class="sr-dt">3-Michelin-star · ⭐ 4.9</div>
+          </div>
+          <div class="sr-dist">4,800 mi</div>
+          <span class="sr-badge poi-b">POI</span>
+        </div>
+      </div>
+    </div>
+    <div class="p-map"></div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>Ask about Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 2: Tap local POI result ===== -->
+<div class="phase">Tap Local POI — Highlights on Map</div>
+<div class="step">
+  <div class="step-head"><div class="sn">2</div><div class="st">Tap "Sushi Art Marina"</div></div>
+  <div class="sd">Header collapses. The selected POI's pin <span class="k">pulses on the map</span>. Carousel scrolls to that card. No teleportation needed — you're already here. Orb: <span class="p">"Sushi Art has omakase specials..."</span></div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev" style="transform:none">▼</div>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="pin dim" style="top:25%;left:18%;background:#FF6B6B"></div>
+      <div class="pin pulse" style="top:38%;left:42%;background:#4ECDC4"></div>
+      <div class="pin dim" style="top:20%;left:68%;background:#FFE66D"></div>
+      <div class="pin dim" style="top:55%;left:34%;background:#A78BFA"></div>
+      <div class="pin dim" style="top:35%;left:80%;background:#F97316"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card match">
+        <div class="pc-n">Sushi Art Marina</div>
+        <div class="pc-v">Japanese · Food</div>
+        <div class="pc-i">⭐ 4.6 · Open · 300m</div>
+      </div>
+      <div class="p-card">
+        <div class="pc-n">Nobu Dubai</div>
+        <div class="pc-v">Japanese · Luxury</div>
+        <div class="pc-i">⭐ 4.8 · Open · 800m</div>
+      </div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai" style="border-color:rgba(78,205,196,0.12)"><div class="p-orb"></div><span style="color:rgba(78,205,196,0.6)">Sushi Art has omakase specials...</span></div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 3: Tap Vibe result ===== -->
+<div class="phase">Tap Vibe Result — Instant Filter</div>
+<div class="step">
+  <div class="step-head"><div class="sn">3</div><div class="st">Tap "Sushi spots in Dubai Marina"</div></div>
+  <div class="sd">Tapping a <span class="k">Vibe result = instant filter</span>. Same as tapping a vibe chip. Map filters to sushi spots only. Count updates. No new search — just a filter on current POIs. Search and vibe chips are the same system.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> <span style="color:#4ECDC4;font-weight:500">🍣 Sushi</span></div>
+        </div>
+        <div class="dh-chip" style="background:rgba(78,205,196,0.08);color:#4ECDC4;border:1px solid rgba(78,205,196,0.12)">4 of 5</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev" style="transform:none">▼</div>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="filter-badge"><div class="fb-dot"></div>Sushi · 4 places</div>
+      <div class="pin" style="top:25%;left:18%;background:#FF6B6B;opacity:0.15"></div>
+      <div class="pin" style="top:38%;left:42%;background:#4ECDC4"></div>
+      <div class="pin" style="top:20%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:55%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:35%;left:80%;background:#F97316;opacity:0.15"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card match"><div class="pc-n">Sushi Art Marina</div><div class="pc-v">Japanese · Food</div><div class="pc-i">⭐ 4.6 · 300m</div></div>
+      <div class="p-card match"><div class="pc-n">Nobu Dubai</div><div class="pc-v">Japanese · Luxury</div><div class="pc-i">⭐ 4.8 · 800m</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>4 sushi spots in Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 4: Type "scenic" — vibe search ===== -->
+<div class="phase">Vibe Search = Same as Chip Tap</div>
+<div class="step">
+  <div class="step-head"><div class="sn">4</div><div class="st">Type "scenic" = tap Scenic chip</div></div>
+  <div class="sd">Typing a vibe name shows the <span class="k">same filter result</span> as tapping the chip. Search and chips are unified — one system, two entry points. User discovers this naturally.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+      <div class="dh-srch">
+        <span class="dh-srch-i">🔍</span>
+        <span class="dh-srch-t typed">scenic</span>
+        <button class="dh-srch-x">✕</button>
+      </div>
+      <div class="sr-sec">
+        <div class="sr-label"><span>HERE · Dubai Marina</span><div class="sr-line"></div></div>
+
+        <div class="sr-item hl">
+          <div class="sr-ico vibe">🏞</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Scenic</span><span class="r"> places in Dubai Marina</span></div>
+            <div class="sr-dt">Filter to 3 scenic places · Tap to apply</div>
+          </div>
+          <span class="sr-badge vibe-b">Filter</span>
+        </div>
+
+        <div class="sr-item">
+          <div class="sr-ico here">🌅</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="r">Marina Walk — </span><span class="m">Scenic</span><span class="r"> Promenade</span></div>
+            <div class="sr-dt">Scenic · Nightlife · ⭐ 4.6</div>
+          </div>
+          <div class="sr-dist">200m</div>
+          <span class="sr-badge here-b">Here</span>
+        </div>
+
+        <div class="sr-item">
+          <div class="sr-ico here">🎡</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="r">Ain Dubai — </span><span class="m">Scenic</span><span class="r"> Views</span></div>
+            <div class="sr-dt">Scenic · Landmark · ⭐ 4.5</div>
+          </div>
+          <div class="sr-dist">1.2km</div>
+          <span class="sr-badge here-b">Here</span>
+        </div>
+
+        <div class="sr-label"><span>ELSEWHERE</span><div class="sr-line"></div></div>
+
+        <div class="sr-item">
+          <div class="sr-ico area">📍</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Scenic</span><span class="r"> Route, Big Sur, CA</span></div>
+            <div class="sr-dt">Discover 15+ places · Nature, Drives</div>
+          </div>
+          <div class="sr-dist">8,400 mi</div>
+          <span class="sr-badge area-b">Area</span>
+        </div>
+
+        <div class="sr-item">
+          <div class="sr-ico area">📍</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Scenic</span><span class="r"> Rim, Grand Canyon</span></div>
+            <div class="sr-dt">Discover 8+ places · Nature, Hiking</div>
+          </div>
+          <div class="sr-dist">8,100 mi</div>
+          <span class="sr-badge area-b">Area</span>
+        </div>
+      </div>
+    </div>
+    <div class="p-map"></div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>Ask about Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 5: Saved place in search ===== -->
+<div class="phase">Your Saves Appear Too</div>
+<div class="step">
+  <div class="step-head"><div class="sn">5</div><div class="st">Type "griffith" — saved place shows</div></div>
+  <div class="sd">Previously saved places appear in <span class="k">YOUR SAVES</span> section with a yellow badge. The discovery loop feeds back — everything you saved is searchable from anywhere.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+      <div class="dh-srch">
+        <span class="dh-srch-i">🔍</span>
+        <span class="dh-srch-t typed">griffith</span>
+        <button class="dh-srch-x">✕</button>
+      </div>
+      <div class="sr-sec">
+        <div class="sr-label"><span>YOUR SAVES</span><div class="sr-line"></div></div>
+
+        <div class="sr-item hl">
+          <div class="sr-ico saved">⭐</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Griffith</span><span class="r"> Observatory</span></div>
+            <div class="sr-dt">Saved 1 day ago · Scenic, Landmark</div>
+          </div>
+          <span class="sr-badge saved-b">Saved</span>
+        </div>
+
+        <div class="sr-label"><span>PLACES</span><div class="sr-line"></div></div>
+
+        <div class="sr-item">
+          <div class="sr-ico poi">🏛</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Griffith</span><span class="r"> Observatory</span></div>
+            <div class="sr-dt">Los Angeles, CA · 8,300 mi</div>
+          </div>
+          <span class="sr-badge poi-b">POI</span>
+        </div>
+
+        <div class="sr-item">
+          <div class="sr-ico poi">🌳</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Griffith</span><span class="r"> Park</span></div>
+            <div class="sr-dt">Los Angeles, CA · 8,300 mi</div>
+          </div>
+          <span class="sr-badge poi-b">POI</span>
+        </div>
+
+        <div class="sr-label"><span>AREAS</span><div class="sr-line"></div></div>
+
+        <div class="sr-item">
+          <div class="sr-ico area">📍</div>
+          <div class="sr-inf">
+            <div class="sr-nm"><span class="m">Griffith</span><span class="r"> Park Area, LA</span></div>
+            <div class="sr-dt">Discover 12+ places · Scenic, Nature</div>
+          </div>
+          <div class="sr-dist">8,300 mi</div>
+          <span class="sr-badge area-b">Area</span>
+        </div>
+      </div>
+    </div>
+    <div class="p-map"></div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>Ask about Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

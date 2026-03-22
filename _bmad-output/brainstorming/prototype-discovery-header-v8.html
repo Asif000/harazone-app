@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discovery Header v8 — Full Anatomy + Journey</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 30px 16px 60px;
+  }
+  h1 { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 30px; }
+
+  .phase {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: rgba(102,126,234,0.5); font-weight: 600;
+    margin: 30px 0 16px; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    width: 320px; text-align: center;
+  }
+
+  .step { width: 320px; margin-bottom: 36px; }
+  .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .st { font-size: 14px; font-weight: 700; }
+  .sd { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 12px; }
+  .sd .k { color: #4ECDC4; font-weight: 600; }
+  .sd .p { color: #a5b4fc; font-weight: 600; }
+
+  /* PHONE */
+  .phone {
+    width: 320px; height: 693px;
+    border-radius: 36px; border: 3px solid rgba(255,255,255,0.08);
+    background: #0a0a0f; position: relative; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .phone.short { height: 400px; }
+  .phone.mid { height: 540px; }
+
+  .island {
+    width: 100px; height: 28px; background: #000; border-radius: 16px;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 50;
+  }
+  .sbar {
+    position: relative; z-index: 40; height: 48px; padding: 12px 22px 0;
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.7);
+  }
+  .mapbg {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%),
+      #0d1117;
+    z-index: 0;
+  }
+  .mapbg::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 50px, rgba(255,255,255,0.012) 50px, rgba(255,255,255,0.012) 51px),
+      repeating-linear-gradient(90deg, transparent, transparent 50px, rgba(255,255,255,0.012) 50px, rgba(255,255,255,0.012) 51px);
+  }
+
+  /* Pins */
+  .pn {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    z-index: 3; box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+  }
+  .sm {
+    position: absolute; width: 16px; height: 16px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    z-index: 4; border: 2px dashed rgba(78,205,196,0.6);
+    background: rgba(78,205,196,0.1);
+  }
+
+  /* DISCOVERY HEADER */
+  .dh {
+    position: relative; z-index: 10; margin: 0 8px;
+    border-radius: 14px; background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
+  }
+  .dr {
+    display: flex; align-items: center;
+    padding: 8px 8px 8px 12px; gap: 6px;
+  }
+  .di { flex: 1; min-width: 0; }
+  .dn {
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .dm { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+  .dm .s { margin: 0 3px; opacity: 0.3; }
+  .dm .rt { color: #4ECDC4; font-weight: 500; }
+  .ch {
+    padding: 2px 7px; border-radius: 7px;
+    background: rgba(255,255,255,0.06); font-size: 9.5px;
+    color: rgba(255,255,255,0.4); flex-shrink: 0;
+  }
+  .db {
+    padding: 5px 12px; border-radius: 9px;
+    background: linear-gradient(135deg, #4ECDC4, #2ab0a6);
+    font-size: 10px; font-weight: 600; color: #fff;
+    border: none; flex-shrink: 0;
+    box-shadow: 0 1px 6px rgba(78,205,196,0.2);
+  }
+  .sb {
+    width: 34px; height: 34px; border-radius: 11px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 1px 8px rgba(102,126,234,0.2);
+    position: relative; overflow: hidden;
+  }
+  .sb .sh {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%); animation: shim 3s infinite;
+  }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .cv { font-size: 8px; color: rgba(255,255,255,0.15); flex-shrink: 0; }
+  .cv.up { transform: rotate(180deg); }
+
+  /* Spinner */
+  .spr { display: flex; align-items: center; padding: 8px 12px; gap: 8px; }
+  .spd {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.06);
+    border-top-color: #667eea; border-radius: 50%;
+    animation: sp 0.7s linear infinite; flex-shrink: 0;
+  }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .spt { flex: 1; font-size: 12px; color: rgba(255,255,255,0.5); }
+  .spt em { color: #fff; font-style: normal; font-weight: 600; }
+  .spx {
+    padding: 3px 8px; border-radius: 5px;
+    background: rgba(255,255,255,0.06); border: none;
+    color: rgba(255,255,255,0.3); font-size: 9px;
+  }
+
+  /* Search row */
+  .srr {
+    display: flex; align-items: center; padding: 4px 12px; gap: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .sri { font-size: 12px; color: rgba(255,255,255,0.2); }
+  .srt { flex: 1; font-size: 13px; color: rgba(255,255,255,0.2); padding: 7px 0; }
+  .srt.ty { color: #fff; font-weight: 500; }
+  .srx {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); border: none;
+    color: rgba(255,255,255,0.3); font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Context */
+  .cg { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; padding: 7px 12px; }
+  .ci { font-size: 10px; color: rgba(255,255,255,0.4); display: flex; align-items: center; gap: 3px; }
+  .ci .v { color: rgba(255,255,255,0.7); font-weight: 500; }
+  .il {
+    margin: 2px 12px 6px; padding: 5px 8px;
+    background: rgba(255,255,255,0.02); border-radius: 7px;
+    font-size: 10px; color: rgba(255,255,255,0.3); line-height: 1.4;
+  }
+  .il .hl { color: #4ECDC4; font-weight: 500; }
+  .dv { height: 1px; background: rgba(255,255,255,0.04); margin: 0 12px; }
+
+  /* Actions */
+  .acs { display: flex; gap: 5px; padding: 7px 12px 9px; }
+  .ac {
+    flex: 1; padding: 7px 0; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.02);
+    color: rgba(255,255,255,0.5); font-size: 10.5px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+  }
+  .ac.pr {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent; color: #fff;
+  }
+
+  /* Search results */
+  .srs { padding: 0 12px; }
+  .srl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.15); padding: 5px 0 2px; font-weight: 600; }
+  .sri2 { display: flex; align-items: center; gap: 7px; padding: 5px 0; }
+  .sric { width: 28px; height: 28px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .sric.pc { background: rgba(78,205,196,0.1); }
+  .sric.ac2 { background: rgba(102,126,234,0.1); }
+  .sric.vc { background: rgba(255,107,107,0.1); }
+  .sinf { flex: 1; min-width: 0; }
+  .snm { font-size: 11.5px; font-weight: 500; }
+  .snm .m { color: #fff; font-weight: 600; }
+  .snm .r { color: rgba(255,255,255,0.4); }
+  .sdt { font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 1px; }
+  .sbg { padding: 2px 5px; border-radius: 4px; font-size: 8px; font-weight: 600; flex-shrink: 0; }
+  .sbg.pb { background: rgba(78,205,196,0.12); color: #4ECDC4; }
+  .sbg.ab { background: rgba(102,126,234,0.12); color: #8b9cf7; }
+  .sbg.vb { background: rgba(255,107,107,0.12); color: #FF6B6B; }
+  .sri2.hlr { background: rgba(102,126,234,0.06); border-radius: 7px; padding: 5px 6px; margin: 0 -6px; }
+
+  /* Recents */
+  .rcs { padding: 4px 12px 6px; }
+  .rcl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.15); margin-bottom: 3px; }
+  .rci { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+  .rcf { width: 22px; height: 22px; border-radius: 5px; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .rcn { flex: 1; }
+  .rcnm { font-size: 11px; font-weight: 500; }
+  .rcd { font-size: 8.5px; color: rgba(255,255,255,0.22); }
+  .rcdi { font-size: 8.5px; color: rgba(255,255,255,0.18); flex-shrink: 0; }
+
+  /* Bottom elements */
+  .pcards {
+    position: absolute; bottom: 80px; left: 8px; right: 8px;
+    display: flex; gap: 6px; z-index: 5;
+  }
+  .pcard {
+    flex: 1; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 8px 9px;
+  }
+  .pcn { font-size: 11px; font-weight: 600; }
+  .pcv { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .pci { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  .bn {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 8px 8px 24px; display: flex; gap: 6px; z-index: 5;
+  }
+  .bai {
+    flex: 1; background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 10px;
+    padding: 9px 10px; display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: rgba(255,255,255,0.25);
+  }
+  .bai.nudge { border-color: rgba(102,126,234,0.2); }
+  .borb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    flex-shrink: 0;
+  }
+  .borb.pulse { animation: porb 2s ease-in-out infinite; }
+  @keyframes porb { 0%,100%{box-shadow:0 0 4px rgba(102,126,234,0.2)} 50%{box-shadow:0 0 12px rgba(102,126,234,0.5)} }
+  .bbt {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  /* Home button variant (remote) */
+  .bbt.home {
+    border-color: rgba(78,205,196,0.2);
+    color: #4ECDC4;
+    position: relative;
+  }
+  .bbt.home::after {
+    content: '';
+    position: absolute; inset: -2px;
+    border-radius: 10px;
+    border: 1px solid rgba(78,205,196,0.15);
+    animation: hpulse 2s ease-in-out infinite;
+  }
+  @keyframes hpulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
+
+  /* Flash */
+  .fov {
+    position: absolute; inset: 0; z-index: 20;
+    background: rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .fot { font-size: 18px; font-weight: 700; text-shadow: 0 3px 16px rgba(102,126,234,0.4); }
+
+  /* Toast */
+  .tst {
+    position: absolute; bottom: 148px; left: 10px; right: 10px;
+    background: rgba(20,20,28,0.95);
+    border: 1px solid rgba(78,205,196,0.12);
+    border-radius: 10px; padding: 8px 10px; z-index: 10;
+  }
+  .tsth { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; margin-bottom: 5px; }
+  .tsth .ht { color: #FF6B6B; }
+  .tstc { display: flex; gap: 4px; }
+  .tc { flex: 1; background: rgba(255,255,255,0.03); border-radius: 6px; padding: 5px 6px; }
+  .tcn { font-size: 9.5px; font-weight: 500; }
+  .tcv { font-size: 8px; color: rgba(255,255,255,0.28); }
+  .tcd { font-size: 8px; color: #4ECDC4; margin-top: 2px; }
+
+  /* Callout labels */
+  .cl {
+    position: absolute; z-index: 15;
+    padding: 2px 6px; border-radius: 4px;
+    font-size: 8px; font-weight: 600; white-space: nowrap;
+  }
+  .cl.su { background: rgba(102,126,234,0.2); color: #c4b5fd; }
+  .cl.di2 { background: rgba(78,205,196,0.2); color: #6ee7d8; }
+  .cl.wh { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.45); }
+
+  /* ===== ANATOMY LABELS ===== */
+  .anatomy-label {
+    position: absolute; z-index: 15;
+    display: flex; align-items: center; gap: 4px;
+    font-size: 9px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .anatomy-label .al-line {
+    width: 20px; height: 1px; flex-shrink: 0;
+  }
+  .anatomy-label .al-tag {
+    padding: 3px 8px; border-radius: 5px;
+    letter-spacing: 0.3px;
+  }
+
+  /* Layer 1: FIND */
+  .al-find .al-line { background: #667eea; }
+  .al-find .al-tag { background: rgba(102,126,234,0.2); color: #a5b4fc; }
+
+  /* Layer 2: SEE */
+  .al-see .al-line { background: rgba(255,255,255,0.15); }
+  .al-see .al-tag { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5); }
+
+  /* Layer 3: BROWSE */
+  .al-browse .al-line { background: #4ECDC4; }
+  .al-browse .al-tag { background: rgba(78,205,196,0.15); color: #4ECDC4; }
+
+  /* Layer 4: UNDERSTAND */
+  .al-understand .al-line { background: #764ba2; }
+  .al-understand .al-tag { background: rgba(118,75,162,0.2); color: #c084fc; }
+
+  /* Zone highlight bands */
+  .zone {
+    position: absolute; left: 0; right: 0;
+    z-index: 1; pointer-events: none;
+  }
+  .zone.z-find { top: 48px; height: 52px; background: rgba(102,126,234,0.04); border-top: 1px solid rgba(102,126,234,0.08); border-bottom: 1px solid rgba(102,126,234,0.08); }
+  .zone.z-see { top: 100px; bottom: 150px; }
+  .zone.z-browse { bottom: 80px; height: 70px; background: rgba(78,205,196,0.03); border-top: 1px solid rgba(78,205,196,0.06); border-bottom: 1px solid rgba(78,205,196,0.06); }
+  .zone.z-understand { bottom: 0; height: 56px; background: rgba(118,75,162,0.03); border-top: 1px solid rgba(118,75,162,0.06); }
+</style>
+</head>
+<body>
+
+<h1>Discovery Header v8 — Full Anatomy</h1>
+<div class="sub">Step 0 = anatomy. Steps 1–9 = journey. Scroll down.</div>
+
+<!-- ===== STEP 0: ANATOMY ===== -->
+<div class="phase">Anatomy — 4 Layers, 4 Jobs</div>
+<div class="step">
+  <div class="step-head"><div class="sn">0</div><div class="st">Screen anatomy</div></div>
+  <div class="sd">
+    Four layers, four clear jobs. No overlap.<br>
+    <span class="p">FIND</span> = Discovery Header (search, surprise, context)<br>
+    <span class="k">SEE</span> = Map + pins (spatial context)<br>
+    <span class="k">BROWSE</span> = POI carousel (swipe through places)<br>
+    <span class="p">UNDERSTAND</span> = AI companion (why these places) + navigate (home, list)
+  </div>
+  <div class="phone">
+    <div class="mapbg"></div>
+    <div class="island"></div>
+    <!-- Zone highlights -->
+    <div class="zone z-find"></div>
+    <div class="zone z-browse"></div>
+    <div class="zone z-understand"></div>
+    <!-- Pins -->
+    <div class="pn" style="top:42%;left:18%;background:#FF6B6B"></div>
+    <div class="pn" style="top:55%;left:48%;background:#4ECDC4"></div>
+    <div class="pn" style="top:38%;left:68%;background:#FFE66D"></div>
+    <div class="pn" style="top:60%;left:34%;background:#A78BFA"></div>
+    <div class="pn" style="top:48%;left:80%;background:#F97316"></div>
+    <!-- Anatomy labels (right side) -->
+    <div class="anatomy-label al-find" style="top:62px; right:6px;">
+      <div class="al-line"></div>
+      <div class="al-tag">FIND — search, surprise, context</div>
+    </div>
+    <div class="anatomy-label al-see" style="top:46%; right:6px;">
+      <div class="al-line"></div>
+      <div class="al-tag">SEE — map + pins</div>
+    </div>
+    <div class="anatomy-label al-browse" style="bottom:108px; right:6px;">
+      <div class="al-line"></div>
+      <div class="al-tag">BROWSE — POI carousel</div>
+    </div>
+    <div class="anatomy-label al-understand" style="bottom:32px; right:6px;">
+      <div class="al-line"></div>
+      <div class="al-tag">UNDERSTAND — AI + navigate</div>
+    </div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh">
+        <div class="dr">
+          <div class="di"><div class="dn">Dubai Marina</div><div class="dm">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div></div>
+          <div class="ch">5 places</div>
+          <button class="sb"><span class="sh"></span>🎲</button>
+          <div class="cv">▼</div>
+        </div>
+      </div>
+    </div>
+    <div class="pcards">
+      <div class="pcard"><div class="pcn">Dubai Mall</div><div class="pcv">Shopping · Luxury</div><div class="pci">⭐ 4.8 · Open</div></div>
+      <div class="pcard"><div class="pcn">Marina Walk</div><div class="pcv">Scenic · Nightlife</div><div class="pci">⭐ 4.6 · Open</div></div>
+    </div>
+    <div class="bn">
+      <div class="bai"><div class="borb pulse"></div>Ask about Dubai Marina...</div>
+      <div class="bbt">◎</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 0b: ORB STATES ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">0</div><div class="st">Orb adapts to context</div></div>
+  <div class="sd">
+    The AI companion bar <span class="p">reacts to what just happened</span>. It's the WHY layer — the header is the WHERE layer. They don't compete.
+  </div>
+  <!-- Sub-states shown as mini bars -->
+  <div style="width:320px;display:flex;flex-direction:column;gap:8px;">
+    <div style="border-radius:12px;background:rgba(20,20,28,0.9);border:1px solid rgba(255,255,255,0.06);padding:10px 12px;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">When: idle at home</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="borb" style="width:20px;height:20px"></div>
+        <span style="font-size:11px;color:rgba(255,255,255,0.35)">Ask about Dubai Marina...</span>
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">◎</div>
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">☰</div>
+        </div>
+      </div>
+    </div>
+    <div style="border-radius:12px;background:rgba(20,20,28,0.9);border:1px solid rgba(102,126,234,0.12);padding:10px 12px;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">When: surprise delivered</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="borb pulse" style="width:20px;height:20px"></div>
+        <span style="font-size:11px;color:rgba(167,139,250,0.7)">Here's why I picked these for you...</span>
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">◎</div>
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">☰</div>
+        </div>
+      </div>
+    </div>
+    <div style="border-radius:12px;background:rgba(20,20,28,0.9);border:1px solid rgba(78,205,196,0.12);padding:10px 12px;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">When: teleported to LA</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="borb pulse" style="width:20px;height:20px"></div>
+        <span style="font-size:11px;color:rgba(78,205,196,0.7)">Tell me about Griffith Park...</span>
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <div class="bbt home" style="width:26px;height:26px;font-size:10px">⌂</div>
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">☰</div>
+        </div>
+      </div>
+    </div>
+    <div style="border-radius:12px;background:rgba(20,20,28,0.9);border:1px solid rgba(255,107,107,0.12);padding:10px 12px;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">When: just saved a POI</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="borb pulse" style="width:20px;height:20px"></div>
+        <span style="font-size:11px;color:rgba(255,107,107,0.7)">Why you'd love Griffith Observatory...</span>
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">◎</div>
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">☰</div>
+        </div>
+      </div>
+    </div>
+    <div style="border-radius:12px;background:rgba(20,20,28,0.9);border:1px solid rgba(255,255,255,0.06);padding:10px 12px;">
+      <div style="font-size:9px;color:rgba(255,255,255,0.2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">When: POIs streaming in</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div class="borb pulse" style="width:20px;height:20px"></div>
+        <span style="font-size:11px;color:rgba(255,255,255,0.4)">Want to know about these places?</span>
+        <div style="margin-left:auto;display:flex;gap:4px">
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">◎</div>
+          <div class="bbt" style="width:26px;height:26px;font-size:10px">☰</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 0c: LOCATION BUTTON ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">0</div><div class="st">Location button adapts</div></div>
+  <div class="sd">
+    <span class="k">◎ at home</span> = center on GPS (normal).<br>
+    <span class="k">⌂ when remote</span> = "Return to Dubai" with pulsing teal ring. One tap = fly back home, header updates.
+  </div>
+  <div style="width:320px;display:flex;gap:12px;justify-content:center;align-items:center;">
+    <div style="text-align:center;">
+      <div class="bbt" style="width:48px;height:48px;font-size:20px;margin:0 auto 6px">◎</div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.3)">Local</div>
+      <div style="font-size:9px;color:rgba(255,255,255,0.2)">Center on GPS</div>
+    </div>
+    <div style="font-size:16px;color:rgba(255,255,255,0.1)">→</div>
+    <div style="text-align:center;">
+      <div class="bbt home" style="width:48px;height:48px;font-size:20px;margin:0 auto 6px">⌂</div>
+      <div style="font-size:10px;color:#4ECDC4">Remote</div>
+      <div style="font-size:9px;color:rgba(78,205,196,0.5)">Return to Dubai</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 1 ===== -->
+<div class="phase">Phase 1 — App Launch</div>
+<div class="step">
+  <div class="step-head"><div class="sn">1</div><div class="st">App opens at your location</div></div>
+  <div class="sd"><span class="k">Discovery Header</span> + map + carousel + AI bar. All four layers visible. Orb says "Ask about Dubai Marina..."</div>
+  <div class="phone">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="pn" style="top:42%;left:18%;background:#FF6B6B"></div>
+    <div class="pn" style="top:55%;left:48%;background:#4ECDC4"></div>
+    <div class="pn" style="top:38%;left:68%;background:#FFE66D"></div>
+    <div class="pn" style="top:60%;left:34%;background:#A78BFA"></div>
+    <div class="pn" style="top:48%;left:80%;background:#F97316"></div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh"><div class="dr">
+        <div class="di"><div class="dn">Dubai Marina</div><div class="dm">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div></div>
+        <div class="ch">5 places</div>
+        <button class="sb"><span class="sh"></span>🎲</button>
+        <div class="cv">▼</div>
+      </div></div>
+    </div>
+    <div class="pcards">
+      <div class="pcard"><div class="pcn">Dubai Mall</div><div class="pcv">Shopping · Luxury</div><div class="pci">⭐ 4.8 · Open</div></div>
+      <div class="pcard"><div class="pcn">Marina Walk</div><div class="pcv">Scenic · Nightlife</div><div class="pci">⭐ 4.6 · Open</div></div>
+    </div>
+    <div class="bn">
+      <div class="bai"><div class="borb"></div>Ask about Dubai Marina...</div>
+      <div class="bbt">◎</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 2 ===== -->
+<div class="phase">Phase 2 — Local Exploration</div>
+<div class="step">
+  <div class="step-head"><div class="sn">2</div><div class="st">Tap 🎲 Surprise</div></div>
+  <div class="sd">Flash + spinner. Orb shifts: <span class="p">"Here's why I picked these for you..."</span></div>
+  <div class="phone short">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="fov"><div class="fot">✨ Finding something special...</div></div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:25;padding:0 8px">
+      <div class="dh"><div class="spr">
+        <div class="spd"></div>
+        <div class="spt">Discovering <em>Dubai Marina</em>...</div>
+        <button class="spx">Cancel</button>
+      </div></div>
+    </div>
+    <div class="bn">
+      <div class="bai nudge"><div class="borb pulse"></div><span style="color:rgba(167,139,250,0.7)">Here's why I picked these...</span></div>
+      <div class="bbt">◎</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 3 ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">3</div><div class="st">Pan map → Discover button</div></div>
+  <div class="sd">Header transforms: <span class="k">teal Discover</span> replaces count. Orb: "Want to know about these places?"</div>
+  <div class="phone short">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="cl di2" style="top:52px;right:82px">NEW →</div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh"><div class="dr">
+        <div class="di"><div class="dn">Jumeirah Beach</div><div class="dm">🌤 84°F <span class="s">·</span> 3:45 PM <span class="s">·</span> New area</div></div>
+        <button class="db">Discover</button>
+        <button class="sb"><span class="sh"></span>🎲</button>
+        <div class="cv">▼</div>
+      </div></div>
+    </div>
+    <div class="bn">
+      <div class="bai"><div class="borb"></div>Want to know about these places?</div>
+      <div class="bbt">◎</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 4 ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">4</div><div class="st">Discover → POIs load</div></div>
+  <div class="sd">Count chip returns. Carousel fills. Orb ready.</div>
+  <div class="phone mid">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="pn" style="top:42%;left:22%;background:#FF6B6B"></div>
+    <div class="pn" style="top:55%;left:52%;background:#4ECDC4"></div>
+    <div class="pn" style="top:38%;left:72%;background:#A78BFA"></div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh"><div class="dr">
+        <div class="di"><div class="dn">Jumeirah Beach</div><div class="dm">🌤 84°F <span class="s">·</span> 3:45 PM <span class="s">·</span> New area</div></div>
+        <div class="ch">7 places</div>
+        <button class="sb"><span class="sh"></span>🎲</button>
+        <div class="cv">▼</div>
+      </div></div>
+    </div>
+    <div class="pcards">
+      <div class="pcard"><div class="pcn">Jumeirah Mosque</div><div class="pcv">Cultural · Historic</div><div class="pci">⭐ 4.7</div></div>
+      <div class="pcard"><div class="pcn">Kite Beach</div><div class="pcv">Beach · Active</div><div class="pci">⭐ 4.5</div></div>
+    </div>
+    <div class="bn">
+      <div class="bai"><div class="borb"></div>Ask about Jumeirah Beach...</div>
+      <div class="bbt">◎</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 5 ===== -->
+<div class="phase">Phase 3 — Search & Teleport</div>
+<div class="step">
+  <div class="step-head"><div class="sn">5</div><div class="st">Tap header → expand</div></div>
+  <div class="sd">Full panel: search, context, actions, recents.</div>
+  <div class="phone">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh">
+        <div class="dr">
+          <div class="di"><div class="dn">Dubai Marina</div><div class="dm">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div></div>
+          <div class="ch">5 places</div>
+          <button class="sb"><span class="sh"></span>🎲</button>
+          <div class="cv up">▼</div>
+        </div>
+        <div class="srr"><span class="sri">🔍</span><span class="srt">Search places, areas, or vibes...</span><button class="srx">✕</button></div>
+        <div class="cg">
+          <div class="ci">🌤 <span class="v">82°F</span> Partly cloudy</div>
+          <div class="ci">🕐 <span class="v">3:42 PM</span> Local</div>
+          <div class="ci">📍 <span class="v">First visit</span></div>
+          <div class="ci">✨ <span class="v">Scenic, Luxury</span></div>
+        </div>
+        <div class="il"><span class="hl">Dubai Mall</span> 1.2 km · luxury shopping · <span class="hl">sunset views</span> from marina walk</div>
+        <div class="dv"></div>
+        <div class="acs">
+          <button class="ac pr">🎲 Surprise</button>
+          <button class="ac">↻ Refresh</button>
+          <button class="ac">♡ Save Area</button>
+        </div>
+        <div class="dv"></div>
+        <div class="rcs">
+          <div class="rcl">Recent explorations</div>
+          <div class="rci"><div class="rcf">🇧🇿</div><div class="rcn"><div class="rcnm">Belize City</div><div class="rcd">8 saved · 3 days ago</div></div><div class="rcdi">7,200 mi</div></div>
+          <div class="rci"><div class="rcf">🇯🇵</div><div class="rcn"><div class="rcnm">Kyoto, Japan</div><div class="rcd">12 saved · 1 week ago</div></div><div class="rcdi">4,800 mi</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="bn">
+      <div class="bai"><div class="borb"></div>Ask about Dubai Marina...</div>
+      <div class="bbt">◎</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 6 ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">6</div><div class="st">Type "griffith" → results</div></div>
+  <div class="sd"><span class="k">POI</span> (teal) · <span class="k">Area</span> (blue) · <span class="k">Vibe</span> (red). Context hides.</div>
+  <div class="phone">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh">
+        <div class="dr">
+          <div class="di"><div class="dn">Dubai Marina</div><div class="dm">🌤 82°F <span class="s">·</span> 3:42 PM <span class="s">·</span> First visit</div></div>
+          <div class="ch">5 places</div>
+          <button class="sb"><span class="sh"></span>🎲</button>
+          <div class="cv up">▼</div>
+        </div>
+        <div class="srr"><span class="sri">🔍</span><span class="srt ty">griffith</span><button class="srx">✕</button></div>
+        <div class="srs">
+          <div class="srl">PLACES</div>
+          <div class="sri2"><div class="sric pc">🏛</div><div class="sinf"><div class="snm"><span class="m">Griffith</span><span class="r"> Observatory</span></div><div class="sdt">Los Angeles, CA · 8,300 mi</div></div><span class="sbg pb">POI</span></div>
+          <div class="sri2"><div class="sric pc">🌳</div><div class="sinf"><div class="snm"><span class="m">Griffith</span><span class="r"> Park</span></div><div class="sdt">Los Angeles, CA · 8,300 mi</div></div><span class="sbg pb">POI</span></div>
+          <div class="srl">AREAS</div>
+          <div class="sri2 hlr"><div class="sric ac2">📍</div><div class="sinf"><div class="snm"><span class="m">Griffith</span><span class="r"> Park Area, LA</span></div><div class="sdt">Discover 12+ places · Scenic, Nature</div></div><span class="sbg ab">Area</span></div>
+          <div class="srl">VIBES</div>
+          <div class="sri2"><div class="sric vc">✨</div><div class="sinf"><div class="snm"><span class="r">Scenic viewpoints near </span><span class="m">Griffith</span></div><div class="sdt">AI-curated · 6 match your taste</div></div><span class="sbg vb">Vibe</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="bn">
+      <div class="bai"><div class="borb"></div>Ask about Dubai Marina...</div>
+      <div class="bbt">◎</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 7 ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">7</div><div class="st">Teleport to LA</div></div>
+  <div class="sd">Header: <span class="k">Griffith Park Area</span> + <span class="k">From Dubai · 8,300 mi</span>. Orb updates. Location button becomes <span class="k">⌂ Return home</span> with teal pulse.</div>
+  <div class="phone">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="pn" style="top:40%;left:28%;background:#4ECDC4"></div>
+    <div class="pn" style="top:52%;left:55%;background:#FFE66D"></div>
+    <div class="pn" style="top:44%;left:72%;background:#A78BFA"></div>
+    <div class="pn" style="top:58%;left:40%;background:#FF6B6B"></div>
+    <div class="cl wh" style="bottom:34px;right:50px">← Return home</div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh"><div class="dr">
+        <div class="di"><div class="dn">Griffith Park Area</div><div class="dm">☀️ 74°F <span class="s">·</span> 4:42 AM <span class="s">·</span> <span class="rt">From Dubai · 8,300 mi</span></div></div>
+        <div class="ch">12 places</div>
+        <button class="sb"><span class="sh"></span>🎲</button>
+        <div class="cv">▼</div>
+      </div></div>
+    </div>
+    <div class="pcards">
+      <div class="pcard"><div class="pcn">Griffith Observatory</div><div class="pcv">Scenic · Landmark</div><div class="pci">⭐ 4.9 · Free</div></div>
+      <div class="pcard"><div class="pcn">Hollywood Sign Trail</div><div class="pcv">Scenic · Hiking</div><div class="pci">⭐ 4.7</div></div>
+    </div>
+    <div class="bn">
+      <div class="bai nudge"><div class="borb pulse"></div><span style="color:rgba(78,205,196,0.7)">Tell me about Griffith Park...</span></div>
+      <div class="bbt home">⌂</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 8 ===== -->
+<div class="phase">Phase 4 — Save & Discovery Loop</div>
+<div class="step">
+  <div class="step-head"><div class="sn">8</div><div class="st">Save → similar + orb reacts</div></div>
+  <div class="sd">Toast + dashed pins. Orb shifts: <span class="p">"Why you'd love Griffith Observatory..."</span></div>
+  <div class="phone">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="pn" style="top:40%;left:28%;background:#4ECDC4"></div>
+    <div class="pn" style="top:52%;left:55%;background:#FFE66D"></div>
+    <div class="pn" style="top:44%;left:72%;background:#A78BFA"></div>
+    <div class="sm" style="top:46%;left:42%"></div>
+    <div class="sm" style="top:54%;left:65%"></div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh"><div class="dr">
+        <div class="di"><div class="dn">Griffith Park Area</div><div class="dm">☀️ 74°F <span class="s">·</span> 4:42 AM <span class="s">·</span> <span class="rt">From Dubai · 8,300 mi</span></div></div>
+        <div class="ch">12 places</div>
+        <button class="sb"><span class="sh"></span>🎲</button>
+        <div class="cv">▼</div>
+      </div></div>
+    </div>
+    <div class="tst">
+      <div class="tsth"><span class="ht">♥</span> Saved! Griffith Observatory</div>
+      <div class="tstc">
+        <div class="tc"><div class="tcn">Hollywood Sign</div><div class="tcv">Scenic · Hiking</div><div class="tcd">2.1 mi</div></div>
+        <div class="tc"><div class="tcn">Fern Dell Trail</div><div class="tcv">Nature · Quiet</div><div class="tcd">0.8 mi</div></div>
+      </div>
+    </div>
+    <div class="pcards">
+      <div class="pcard"><div class="pcn">Griffith Observatory</div><div class="pcv">Scenic · Landmark</div><div class="pci">⭐ 4.9 · Free</div></div>
+      <div class="pcard"><div class="pcn">Hollywood Sign Trail</div><div class="pcv">Scenic · Hiking</div><div class="pci">⭐ 4.7</div></div>
+    </div>
+    <div class="bn">
+      <div class="bai" style="border-color:rgba(255,107,107,0.15)"><div class="borb pulse"></div><span style="color:rgba(255,107,107,0.65)">Why you'd love this place...</span></div>
+      <div class="bbt home">⌂</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 9 ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">9</div><div class="st">Surprise → taste-aware loop</div></div>
+  <div class="sd">Each save makes it smarter. <span class="k">See → Explore → Discover → Save → See more → Explore deeper...</span></div>
+  <div class="phone short">
+    <div class="mapbg"></div><div class="island"></div>
+    <div class="sbar"><span>9:41</span><span>📶 🔋</span></div>
+    <div style="position:relative;z-index:10;padding:0 8px">
+      <div class="dh"><div class="spr">
+        <div class="spd"></div>
+        <div class="spt">Discovering <em>Griffith Park Area</em>...</div>
+        <button class="spx">Cancel</button>
+      </div></div>
+    </div>
+    <div class="bn">
+      <div class="bai nudge"><div class="borb pulse"></div><span style="color:rgba(167,139,250,0.7)">Here's why I picked these...</span></div>
+      <div class="bbt home">⌂</div><div class="bbt">☰</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

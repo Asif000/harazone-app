@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discovery Header v4 — Full User Journey</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    background: #111122;
+    color: #fff;
+    display: flex;
+    gap: 30px;
+    padding: 20px;
+    min-height: 100vh;
+    align-items: flex-start;
+  }
+
+  /* LEFT: Journey steps */
+  .journey {
+    width: 280px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 20px;
+  }
+  .journey h2 {
+    font-size: 16px; font-weight: 700; margin-bottom: 4px;
+  }
+  .journey .sub {
+    font-size: 11px; color: rgba(255,255,255,0.35); margin-bottom: 16px;
+  }
+
+  .step-btn {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.5);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    margin-bottom: 6px;
+  }
+  .step-btn:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.8); }
+  .step-btn.active {
+    background: rgba(102,126,234,0.12);
+    border-color: rgba(102,126,234,0.3);
+    color: #fff;
+  }
+  .step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+    margin-top: 1px;
+  }
+  .step-btn.active .step-num {
+    background: rgba(102,126,234,0.4);
+  }
+  .step-info { flex: 1; }
+  .step-title { font-weight: 600; font-size: 12.5px; margin-bottom: 2px; }
+  .step-desc { font-size: 10.5px; color: rgba(255,255,255,0.35); line-height: 1.4; }
+  .step-btn.active .step-desc { color: rgba(255,255,255,0.5); }
+
+  .step-divider {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 1px;
+    color: rgba(255,255,255,0.15); margin: 10px 0 6px; padding-left: 4px;
+  }
+
+  /* RIGHT: Phone + annotation */
+  .right { display: flex; flex-direction: column; align-items: center; }
+
+  .annotation {
+    max-width: 390px; margin-bottom: 12px;
+    padding: 10px 14px; border-radius: 10px;
+    background: rgba(102,126,234,0.08);
+    border: 1px solid rgba(102,126,234,0.15);
+    font-size: 12px; color: rgba(255,255,255,0.6);
+    line-height: 1.5; min-height: 50px;
+    transition: opacity 0.3s;
+  }
+  .annotation strong { color: rgba(255,255,255,0.85); }
+  .annotation .key { color: #4ECDC4; font-weight: 500; }
+
+  /* Phone */
+  .phone {
+    width: 390px; height: 844px; border-radius: 40px;
+    border: 3px solid rgba(255,255,255,0.1); background: #0a0a0f;
+    position: relative; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5); flex-shrink: 0;
+  }
+  .status-bar {
+    height: 54px; padding: 14px 28px 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    font-size: 12px; font-weight: 600; position: relative; z-index: 200;
+  }
+  .dynamic-island {
+    width: 120px; height: 34px; background: #000; border-radius: 20px;
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 300;
+  }
+  .map-layer {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 35% 55%, rgba(30,60,40,0.4) 0%, transparent 50%),
+      radial-gradient(ellipse at 65% 35%, rgba(30,40,70,0.4) 0%, transparent 50%),
+      linear-gradient(180deg, #0d1117, #161b22 50%, #0d1117);
+    z-index: 0;
+  }
+  .map-layer::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(255,255,255,0.015) 60px, rgba(255,255,255,0.015) 61px),
+      repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.015) 60px, rgba(255,255,255,0.015) 61px);
+  }
+
+  /* Pins */
+  .pin {
+    position: absolute; width: 28px; height: 28px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    z-index: 5; box-shadow: 0 2px 8px rgba(0,0,0,0.4); transition: all 0.5s;
+  }
+  .pin.p1 { top: 42%; left: 22%; background: #FF6B6B; }
+  .pin.p2 { top: 54%; left: 50%; background: #4ECDC4; }
+  .pin.p3 { top: 36%; left: 68%; background: #FFE66D; }
+  .pin.p4 { top: 60%; left: 36%; background: #A78BFA; }
+  .pin.p5 { top: 48%; left: 78%; background: #F97316; }
+  .pin.hide { opacity: 0; transform: rotate(-45deg) scale(0); }
+
+  .sim-pin {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg) scale(0);
+    z-index: 6; border: 2px dashed rgba(78,205,196,0.7);
+    background: rgba(78,205,196,0.15);
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .sim-pin.show { transform: rotate(-45deg) scale(1); }
+  .sim-pin.sp1 { top: 51%; left: 56%; transition-delay: 0.15s; }
+  .sim-pin.sp2 { top: 44%; left: 44%; transition-delay: 0.35s; }
+
+  /* ===== DISCOVERY HEADER ===== */
+  .dh {
+    position: absolute; top: 56px; left: 10px; right: 10px;
+    z-index: 100; border-radius: 18px;
+    background: rgba(20,20,28,0.92); backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+  }
+  .dh.x { border-radius: 22px; background: rgba(20,20,28,0.97); }
+
+  /* -- Collapsed -- */
+  .dh-c {
+    display: flex; align-items: center;
+    padding: 9px 10px 9px 14px; gap: 8px;
+    min-height: 52px; cursor: pointer;
+  }
+  .dh.sp .dh-c { display: none; }
+
+  .dh-place { flex: 1; min-width: 0; }
+  .dh-name {
+    font-size: 14.5px; font-weight: 600; letter-spacing: -0.2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color 0.3s;
+  }
+  .dh-meta {
+    font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color 0.3s;
+  }
+  .dh-meta .sep { margin: 0 4px; opacity: 0.35; }
+  .dh-meta .remote-tag { color: #4ECDC4; font-weight: 500; }
+
+  /* Count chip */
+  .dh-chip {
+    padding: 3px 8px; border-radius: 9px;
+    background: rgba(255,255,255,0.07); font-size: 10.5px;
+    font-weight: 500; color: rgba(255,255,255,0.5);
+    flex-shrink: 0; white-space: nowrap;
+    transition: all 0.3s;
+  }
+
+  /* Discover button (replaces count when panned) */
+  .dh-discover {
+    padding: 6px 14px; border-radius: 10px;
+    background: linear-gradient(135deg, #4ECDC4, #2ab0a6);
+    font-size: 11.5px; font-weight: 600; color: #fff;
+    border: none; cursor: pointer; flex-shrink: 0;
+    white-space: nowrap; font-family: inherit;
+    box-shadow: 0 2px 8px rgba(78,205,196,0.3);
+    transition: transform 0.15s;
+    display: none;
+    animation: pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .dh-discover:active { transform: scale(0.95); }
+  .dh-discover.show { display: block; }
+  @keyframes pop-in { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  /* Surprise */
+  .dh-surprise {
+    width: 38px; height: 38px; border-radius: 13px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 18px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; position: relative; overflow: hidden;
+    box-shadow: 0 2px 10px rgba(102,126,234,0.3);
+    transition: transform 0.15s;
+  }
+  .dh-surprise:active { transform: scale(0.92); }
+  .dh-surprise .shim {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    transform: translateX(-100%); animation: shim 3s infinite;
+  }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+
+  .dh-chevron {
+    font-size: 9px; color: rgba(255,255,255,0.2); flex-shrink: 0;
+    transition: transform 0.3s; margin-left: -2px;
+  }
+  .dh.x .dh-chevron { transform: rotate(180deg); }
+
+  /* -- Spinning -- */
+  .dh-sp {
+    display: none; align-items: center; padding: 9px 14px; gap: 10px; min-height: 52px;
+  }
+  .dh.sp .dh-sp { display: flex; }
+  .spin-r {
+    width: 22px; height: 22px; border: 2.5px solid rgba(255,255,255,0.08);
+    border-top-color: #667eea; border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin-l { flex: 1; font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.65); }
+  .spin-l em { color: #fff; font-style: normal; font-weight: 600; }
+  .spin-x {
+    padding: 5px 12px; border-radius: 7px; background: rgba(255,255,255,0.07);
+    border: none; color: rgba(255,255,255,0.45); font-size: 11.5px; font-family: inherit; cursor: pointer;
+  }
+
+  /* -- Expanded -- */
+  .dh-exp {
+    max-height: 0; opacity: 0; overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease 0.05s;
+  }
+  .dh.x .dh-exp { max-height: 700px; opacity: 1; }
+  .dh-div { height: 1px; background: rgba(255,255,255,0.05); margin: 0 14px; }
+
+  /* Search */
+  .dh-srch { display: flex; align-items: center; padding: 2px 14px; gap: 8px; }
+  .dh-si { color: rgba(255,255,255,0.3); font-size: 14px; }
+  .dh-inp {
+    flex: 1; background: none; border: none; color: #fff;
+    font-size: 15px; font-family: inherit; padding: 10px 0; outline: none;
+  }
+  .dh-inp::placeholder { color: rgba(255,255,255,0.25); }
+  .dh-x {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: rgba(255,255,255,0.08); border: none;
+    color: rgba(255,255,255,0.45); font-size: 12px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Search results */
+  .sr { max-height: 0; opacity: 0; overflow: hidden; transition: max-height 0.3s, opacity 0.2s; }
+  .sr.show { max-height: 400px; opacity: 1; }
+  .sr-label {
+    font-size: 9px; text-transform: uppercase; letter-spacing: 0.8px;
+    color: rgba(255,255,255,0.2); padding: 8px 14px 4px; font-weight: 600;
+  }
+  .sr-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; cursor: pointer; transition: background 0.15s;
+  }
+  .sr-item:hover { background: rgba(255,255,255,0.04); }
+  .sr-ico {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; flex-shrink: 0;
+  }
+  .sr-ico.area { background: rgba(102,126,234,0.12); }
+  .sr-ico.poi { background: rgba(78,205,196,0.12); }
+  .sr-ico.vibe { background: rgba(255,107,107,0.12); }
+  .sr-inf { flex: 1; min-width: 0; }
+  .sr-nm { font-size: 13px; font-weight: 500; }
+  .sr-nm .m { color: #fff; font-weight: 600; }
+  .sr-nm .r { color: rgba(255,255,255,0.5); }
+  .sr-dt { font-size: 10.5px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+  .sr-b {
+    padding: 2px 7px; border-radius: 5px; font-size: 9.5px; font-weight: 500; flex-shrink: 0;
+  }
+  .sr-b.ab { background: rgba(102,126,234,0.15); color: #8b9cf7; }
+  .sr-b.pb { background: rgba(78,205,196,0.15); color: #4ECDC4; }
+  .sr-b.vb { background: rgba(255,107,107,0.15); color: #FF6B6B; }
+
+  /* Remote badge */
+  .dh-rem {
+    display: none; align-items: center; gap: 5px;
+    margin: 6px 14px 2px; padding: 4px 10px;
+    background: rgba(78,205,196,0.07); border: 1px solid rgba(78,205,196,0.12);
+    border-radius: 7px; font-size: 10.5px; color: #4ECDC4; font-weight: 500;
+  }
+  .dh-rem.show { display: inline-flex; }
+  .dh-rem-dot {
+    width: 5px; height: 5px; background: #4ECDC4; border-radius: 50%;
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Context body */
+  .dh-body { transition: max-height 0.3s, opacity 0.2s; overflow: hidden; }
+  .dh-body.hide { max-height: 0 !important; opacity: 0; }
+  .dh-ctx { padding: 10px 14px; }
+  .dh-cg { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 12px; }
+  .dh-ci { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: rgba(255,255,255,0.45); }
+  .dh-ci .v { color: rgba(255,255,255,0.75); font-weight: 500; }
+  .dh-intel {
+    margin-top: 8px; padding: 7px 10px; background: rgba(255,255,255,0.03);
+    border-radius: 9px; font-size: 11.5px; color: rgba(255,255,255,0.38); line-height: 1.45;
+  }
+  .dh-intel .hl { color: #4ECDC4; font-weight: 500; }
+
+  /* Actions */
+  .dh-acts { display: flex; padding: 10px 14px 12px; gap: 7px; }
+  .dh-act {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 9px 0; border-radius: 11px;
+    border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.65); font-size: 12.5px; font-weight: 500;
+    font-family: inherit; cursor: pointer;
+  }
+  .dh-act.pri {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent; color: #fff;
+  }
+
+  /* Recents */
+  .dh-recs {
+    padding: 6px 14px 10px; max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height 0.3s, opacity 0.2s;
+  }
+  .dh-recs.show { max-height: 200px; opacity: 1; }
+  .dh-rl { font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.2); margin-bottom: 6px; }
+  .dh-ri { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; }
+  .dh-ri:hover { opacity: 0.8; }
+  .dh-rf {
+    width: 28px; height: 28px; border-radius: 7px; background: rgba(255,255,255,0.05);
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .dh-rin { flex: 1; }
+  .dh-rn { font-size: 12.5px; font-weight: 500; }
+  .dh-rd { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+  .dh-rdist { font-size: 10px; color: rgba(255,255,255,0.25); flex-shrink: 0; }
+
+  /* ===== Bottom ===== */
+  .pdots {
+    position: absolute; bottom: 172px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 4px; z-index: 20;
+  }
+  .pd { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.2); }
+  .pd.on { background: #fff; width: 14px; border-radius: 3px; }
+
+  .carousel {
+    position: absolute; bottom: 94px; left: 0; right: 0;
+    padding: 0 10px; display: flex; gap: 8px; overflow-x: auto; z-index: 15;
+  }
+  .carousel::-webkit-scrollbar { display: none; }
+  .pc {
+    min-width: 220px; flex-shrink: 0;
+    background: rgba(20,20,28,0.92); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; padding: 10px 12px;
+  }
+  .pc-n { font-size: 13px; font-weight: 600; }
+  .pc-v { font-size: 10.5px; color: #4ECDC4; margin-top: 2px; }
+  .pc-i { font-size: 10.5px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+
+  .bnav {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 10px 10px 28px; display: flex; gap: 8px; align-items: center; z-index: 15;
+  }
+  .bai {
+    flex: 1; background: rgba(20,20,28,0.9); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.07); border-radius: 14px;
+    padding: 11px 14px; display: flex; align-items: center; gap: 7px;
+    font-size: 12px; color: rgba(255,255,255,0.3);
+  }
+  .borb {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    animation: porb 3s ease-in-out infinite;
+  }
+  @keyframes porb { 0%,100%{box-shadow:0 0 6px rgba(102,126,234,0.25)} 50%{box-shadow:0 0 14px rgba(102,126,234,0.5)} }
+  .bico {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: rgba(20,20,28,0.9); border: 1px solid rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.5); font-size: 16px;
+    display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+
+  /* Toast */
+  .toast {
+    position: absolute; bottom: 200px; left: 12px; right: 12px;
+    background: rgba(20,20,28,0.95); backdrop-filter: blur(20px);
+    border: 1px solid rgba(78,205,196,0.15); border-radius: 14px;
+    padding: 11px 12px; z-index: 120;
+    transform: translateY(16px); opacity: 0;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); pointer-events: none;
+  }
+  .toast.vis { transform: translateY(0); opacity: 1; }
+  .toast-h { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; }
+  .toast-h .heart { color: #FF6B6B; }
+  .toast-h .tt { font-size: 13px; font-weight: 600; }
+  .toast-cards { display: flex; gap: 6px; }
+  .tc {
+    min-width: 100px; background: rgba(255,255,255,0.04);
+    border-radius: 8px; padding: 8px;
+  }
+  .tc-n { font-size: 11px; font-weight: 500; }
+  .tc-v { font-size: 9.5px; color: rgba(255,255,255,0.35); margin-top: 1px; }
+  .tc-d { font-size: 9.5px; color: #4ECDC4; margin-top: 3px; }
+
+  /* Flash */
+  .flash {
+    position: absolute; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0); pointer-events: none; transition: background 0.3s;
+  }
+  .flash.on { background: rgba(0,0,0,0.35); }
+  .flash-t {
+    font-size: 22px; font-weight: 700; opacity: 0; transform: scale(0.85);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-shadow: 0 4px 20px rgba(102,126,234,0.4);
+  }
+  .flash.on .flash-t { opacity: 1; transform: scale(1); }
+
+  /* Callout arrows pointing to phone */
+  .callout {
+    position: absolute; z-index: 150;
+    padding: 5px 10px; border-radius: 7px;
+    font-size: 10px; font-weight: 600;
+    pointer-events: none; white-space: nowrap;
+    opacity: 0; transition: opacity 0.4s;
+  }
+  .callout.vis { opacity: 1; }
+  .callout.c-surprise {
+    top: 72px; right: 18px;
+    background: rgba(102,126,234,0.2); color: #a5b4fc;
+  }
+  .callout.c-discover {
+    top: 72px; right: 72px;
+    background: rgba(78,205,196,0.2); color: #4ECDC4;
+  }
+  .callout.c-context {
+    top: 72px; left: 18px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
+  }
+  .callout.c-name {
+    top: 60px; left: 18px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6);
+  }
+</style>
+</head>
+<body>
+
+<!-- LEFT: Journey steps -->
+<div class="journey">
+  <h2>User Journey</h2>
+  <p class="sub">Click each step to see the UI state</p>
+
+  <div class="step-divider">App Launch</div>
+  <button class="step-btn active" onclick="goStep(1)">
+    <div class="step-num">1</div>
+    <div class="step-info">
+      <div class="step-title">App opens at GPS</div>
+      <div class="step-desc">Map loads. Header shows area name + weather + time. Surprise button visible.</div>
+    </div>
+  </button>
+
+  <div class="step-divider">Local exploration</div>
+  <button class="step-btn" onclick="goStep(2)">
+    <div class="step-num">2</div>
+    <div class="step-info">
+      <div class="step-title">Tap Surprise 🎲</div>
+      <div class="step-desc">One tap. Flash → spinner → taste-matched POIs appear on map.</div>
+    </div>
+  </button>
+  <button class="step-btn" onclick="goStep(3)">
+    <div class="step-num">3</div>
+    <div class="step-info">
+      <div class="step-title">Pan map to new area</div>
+      <div class="step-desc">Header transforms: new area name + teal "Discover" button replaces count chip.</div>
+    </div>
+  </button>
+  <button class="step-btn" onclick="goStep(4)">
+    <div class="step-num">4</div>
+    <div class="step-info">
+      <div class="step-title">Tap Discover</div>
+      <div class="step-desc">Spinner → POIs load for new area. Header returns to settled state with count.</div>
+    </div>
+  </button>
+
+  <div class="step-divider">Search & Teleport</div>
+  <button class="step-btn" onclick="goStep(5)">
+    <div class="step-num">5</div>
+    <div class="step-info">
+      <div class="step-title">Tap header to expand</div>
+      <div class="step-desc">Full panel: search input, context grid, actions, recent explorations.</div>
+    </div>
+  </button>
+  <button class="step-btn" onclick="goStep(6)">
+    <div class="step-num">6</div>
+    <div class="step-info">
+      <div class="step-title">Type "griffith"</div>
+      <div class="step-desc">Smart results: POIs, Areas, Vibes. Grouped with color badges. Context hides.</div>
+    </div>
+  </button>
+  <button class="step-btn" onclick="goStep(7)">
+    <div class="step-num">7</div>
+    <div class="step-info">
+      <div class="step-title">Tap "Griffith Park Area"</div>
+      <div class="step-desc">Teleport! Map flies to LA. Header shows area + "From Dubai" badge. Discovering...</div>
+    </div>
+  </button>
+
+  <div class="step-divider">Save & Loop</div>
+  <button class="step-btn" onclick="goStep(8)">
+    <div class="step-num">8</div>
+    <div class="step-info">
+      <div class="step-title">Save a POI</div>
+      <div class="step-desc">Toast: "Saved! 2 similar nearby" + dashed pins appear on map. Discovery loop closes.</div>
+    </div>
+  </button>
+  <button class="step-btn" onclick="goStep(9)">
+    <div class="step-num">9</div>
+    <div class="step-info">
+      <div class="step-title">Surprise again 🎲</div>
+      <div class="step-desc">Now taste-aware from save. New POIs filtered by preference. Loop restarts.</div>
+    </div>
+  </button>
+</div>
+
+<!-- RIGHT: Phone -->
+<div class="right">
+  <div class="annotation" id="anno">
+    <strong>Step 1 — App opens.</strong> The Discovery Header is the ONLY element at the top. It shows: <span class="key">area name</span> (Dubai Marina), <span class="key">weather + time + visit</span> (collapsed meta), <span class="key">POI count</span> (5 places), and the <span class="key">Surprise button</span> (always visible, one-tap). The chevron hints it's expandable.
+  </div>
+
+  <div class="phone">
+    <div class="map-layer"></div>
+    <div class="pin p1" id="pin1"></div>
+    <div class="pin p2" id="pin2"></div>
+    <div class="pin p3" id="pin3"></div>
+    <div class="pin p4" id="pin4"></div>
+    <div class="pin p5" id="pin5"></div>
+    <div class="sim-pin sp1" id="sp1"></div>
+    <div class="sim-pin sp2" id="sp2"></div>
+
+    <div class="status-bar">
+      <span>9:41</span>
+      <div class="dynamic-island"></div>
+      <span style="font-size:11px">📶 📡 🔋</span>
+    </div>
+
+    <!-- Callout labels -->
+    <div class="callout c-surprise" id="cSurprise">← Surprise (always here)</div>
+    <div class="callout c-discover" id="cDiscover">Discover →</div>
+    <div class="callout c-context" id="cContext">Context →</div>
+    <div class="callout c-name" id="cName">Area name →</div>
+
+    <!-- DISCOVERY HEADER -->
+    <div class="dh" id="dh">
+      <div class="dh-c" id="dhC">
+        <div class="dh-place">
+          <div class="dh-name" id="dhName">Dubai Marina</div>
+          <div class="dh-meta" id="dhMeta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip" id="dhChip">5 places</div>
+        <button class="dh-discover" id="dhDiscover">Discover</button>
+        <button class="dh-surprise"><span class="shim"></span>🎲</button>
+        <div class="dh-chevron">▼</div>
+      </div>
+
+      <div class="dh-sp" id="dhSp">
+        <div class="spin-r"></div>
+        <div class="spin-l">Discovering <em id="spinW">Dubai Marina</em>...</div>
+        <button class="spin-x">Cancel</button>
+      </div>
+
+      <div class="dh-exp">
+        <div class="dh-srch">
+          <span class="dh-si">🔍</span>
+          <input class="dh-inp" id="inp" type="text" placeholder="Search places, areas, or vibes..." readonly>
+          <button class="dh-x">✕</button>
+        </div>
+        <div class="dh-div"></div>
+
+        <!-- Search results -->
+        <div class="sr" id="sr">
+          <div class="sr-label">PLACES</div>
+          <div class="sr-item">
+            <div class="sr-ico poi">🏛</div>
+            <div class="sr-inf"><div class="sr-nm"><span class="m">Griffith</span><span class="r"> Observatory</span></div><div class="sr-dt">Los Angeles, CA · 8,300 mi</div></div>
+            <span class="sr-b pb">POI</span>
+          </div>
+          <div class="sr-item">
+            <div class="sr-ico poi">🌳</div>
+            <div class="sr-inf"><div class="sr-nm"><span class="m">Griffith</span><span class="r"> Park</span></div><div class="sr-dt">Los Angeles, CA · 8,300 mi</div></div>
+            <span class="sr-b pb">POI</span>
+          </div>
+          <div class="sr-label">AREAS</div>
+          <div class="sr-item" style="background:rgba(102,126,234,0.06); border-radius:8px; margin:0 8px;">
+            <div class="sr-ico area">📍</div>
+            <div class="sr-inf"><div class="sr-nm"><span class="m">Griffith</span><span class="r"> Park Area, LA</span></div><div class="sr-dt">Discover 12+ places · Scenic, Nature</div></div>
+            <span class="sr-b ab">Area</span>
+          </div>
+          <div class="sr-label">VIBES</div>
+          <div class="sr-item">
+            <div class="sr-ico vibe">✨</div>
+            <div class="sr-inf"><div class="sr-nm"><span class="r">Scenic viewpoints near </span><span class="m">Griffith</span></div><div class="sr-dt">AI-curated · 6 matching your taste</div></div>
+            <span class="sr-b vb">Vibe</span>
+          </div>
+        </div>
+
+        <!-- Body (context + actions) -->
+        <div class="dh-body" id="dhBody">
+          <div class="dh-rem" id="dhRem"><span class="dh-rem-dot"></span>Exploring from Dubai · 7,200 mi</div>
+          <div class="dh-ctx">
+            <div class="dh-cg">
+              <div class="dh-ci"><span>🌤</span> <span class="v" id="cxT">82°F</span> Partly cloudy</div>
+              <div class="dh-ci"><span>🕐</span> <span class="v" id="cxTm">3:42 PM</span> Local time</div>
+              <div class="dh-ci"><span>📍</span> <span class="v" id="cxV">First visit</span></div>
+              <div class="dh-ci"><span>✨</span> <span class="v" id="cxVb">Scenic, Luxury</span></div>
+            </div>
+            <div class="dh-intel" id="dhIntel">
+              <span class="hl">Dubai Mall</span> 1.2 km · luxury shopping & world's largest aquarium · <span class="hl">sunset views</span> from marina walk
+            </div>
+          </div>
+          <div class="dh-div"></div>
+          <div class="dh-acts">
+            <button class="dh-act pri"><span>🎲</span> Surprise</button>
+            <button class="dh-act"><span>↻</span> Refresh</button>
+            <button class="dh-act"><span>♡</span> Save Area</button>
+          </div>
+        </div>
+
+        <div class="dh-div"></div>
+        <div class="dh-recs" id="dhRecs">
+          <div class="dh-rl">Recent explorations</div>
+          <div class="dh-ri">
+            <div class="dh-rf">🇧🇿</div>
+            <div class="dh-rin"><div class="dh-rn">Belize City</div><div class="dh-rd">8 saved · 3 days ago</div></div>
+            <div class="dh-rdist">7,200 mi</div>
+          </div>
+          <div class="dh-ri">
+            <div class="dh-rf">🇯🇵</div>
+            <div class="dh-rin"><div class="dh-rn">Kyoto, Japan</div><div class="dh-rd">12 saved · 1 week ago</div></div>
+            <div class="dh-rdist">4,800 mi</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast">
+      <div class="toast-h"><span class="heart">♥</span> <span class="tt">Saved! Griffith Observatory</span></div>
+      <div class="toast-cards">
+        <div class="tc"><div class="tc-n">Hollywood Sign</div><div class="tc-v">Scenic · Hiking</div><div class="tc-d">2.1 mi</div></div>
+        <div class="tc"><div class="tc-n">Fern Dell Trail</div><div class="tc-v">Nature · Quiet</div><div class="tc-d">0.8 mi</div></div>
+      </div>
+    </div>
+
+    <!-- Flash -->
+    <div class="flash" id="flash"><div class="flash-t">✨ Finding something special...</div></div>
+
+    <!-- Bottom -->
+    <div class="pdots"><div class="pd on"></div><div class="pd"></div><div class="pd"></div><div class="pd"></div><div class="pd"></div></div>
+    <div class="carousel">
+      <div class="pc"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8 · Open</div></div>
+      <div class="pc"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6 · Open</div></div>
+      <div class="pc"><div class="pc-n">Ain Dubai</div><div class="pc-v">Landmark · Views</div><div class="pc-i">⭐ 4.5 · Open</div></div>
+    </div>
+    <div class="bnav">
+      <div class="bai"><div class="borb"></div>Ask about this area...</div>
+      <div class="bico">◎</div>
+      <div class="bico">☰</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const dh = $('dh'), dhC = $('dhC'), dhName = $('dhName'), dhMeta = $('dhMeta');
+const dhChip = $('dhChip'), dhDiscover = $('dhDiscover'), dhBody = $('dhBody');
+const dhRem = $('dhRem'), dhRecs = $('dhRecs'), sr = $('sr'), inp = $('inp');
+const spinW = $('spinW'), toast = $('toast'), flash = $('flash'), anno = $('anno');
+
+let currentStep = 1;
+
+function goStep(n) {
+  currentStep = n;
+  // Update step buttons
+  document.querySelectorAll('.step-btn').forEach((b, i) => b.classList.toggle('active', i === n - 1));
+
+  // Reset all states
+  dh.classList.remove('x', 'sp');
+  dh.style.display = '';
+  dhDiscover.classList.remove('show');
+  dhChip.style.display = '';
+  sr.classList.remove('show');
+  dhBody.classList.remove('hide');
+  dhRecs.classList.remove('show');
+  dhRem.classList.remove('show');
+  toast.classList.remove('vis');
+  flash.classList.remove('on');
+  inp.value = '';
+  document.querySelectorAll('.sim-pin').forEach(p => p.classList.remove('show'));
+  document.querySelectorAll('.pin').forEach(p => p.classList.remove('hide'));
+  document.querySelectorAll('.callout').forEach(c => c.classList.remove('vis'));
+
+  switch(n) {
+    case 1: step1(); break;
+    case 2: step2(); break;
+    case 3: step3(); break;
+    case 4: step4(); break;
+    case 5: step5(); break;
+    case 6: step6(); break;
+    case 7: step7(); break;
+    case 8: step8(); break;
+    case 9: step9(); break;
+  }
+}
+
+function setLocal() {
+  dhName.textContent = 'Dubai Marina';
+  dhMeta.innerHTML = '🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit';
+  dhChip.textContent = '5 places';
+  $('cxT').textContent = '82°F'; $('cxTm').textContent = '3:42 PM';
+  $('cxV').textContent = 'First visit'; $('cxVb').textContent = 'Scenic, Luxury';
+  $('dhIntel').innerHTML = '<span class="hl">Dubai Mall</span> 1.2 km · luxury shopping & world\'s largest aquarium';
+}
+
+function setRemoteLA() {
+  dhName.textContent = 'Griffith Park Area';
+  dhMeta.innerHTML = '☀️ 74°F <span class="sep">·</span> 4:42 AM <span class="sep">·</span> <span class="remote-tag">From Dubai · 8,300 mi</span>';
+  dhChip.textContent = '12 places';
+  dhRem.classList.add('show');
+  $('cxT').textContent = '74°F'; $('cxTm').textContent = '4:42 AM';
+  $('cxV').textContent = 'New area'; $('cxVb').textContent = 'Scenic, Nature';
+  $('dhIntel').innerHTML = '<span class="hl">Griffith Observatory</span> 0.5 mi · free admission, sunset city views · <span class="hl">Hollywood Sign</span> visible from trails';
+}
+
+function step1() {
+  setLocal();
+  $('cSurprise').classList.add('vis');
+  $('cContext').classList.add('vis');
+  anno.innerHTML = '<strong>Step 1 — App opens at GPS location.</strong> The Discovery Header is the ONLY top element. Shows: <span class="key">area name</span>, <span class="key">weather · time · visit</span>, <span class="key">POI count chip</span>, and the <span class="key">🎲 Surprise button</span> (always visible, always one-tap). Chevron hints it expands.';
+}
+
+function step2() {
+  setLocal();
+  flash.classList.add('on');
+  dh.classList.add('sp');
+  spinW.textContent = 'Dubai Marina';
+  anno.innerHTML = '<strong>Step 2 — Surprise tapped.</strong> Flash overlay + spinner. Header shows "Discovering Dubai Marina..." with cancel. Taste-filtered POIs incoming. No need to expand, search, or navigate — one tap from collapsed state.';
+  setTimeout(() => {
+    flash.classList.remove('on');
+    dh.classList.remove('sp');
+    dhChip.textContent = '3 places';
+  }, 2000);
+}
+
+function step3() {
+  setLocal();
+  // Panned to new area
+  dhName.textContent = 'Jumeirah Beach';
+  dhMeta.innerHTML = '🌤 84°F <span class="sep">·</span> 3:45 PM <span class="sep">·</span> New area';
+  dhChip.style.display = 'none';
+  dhDiscover.classList.add('show');
+  $('cDiscover').classList.add('vis');
+  $('cSurprise').classList.add('vis');
+  anno.innerHTML = '<strong>Step 3 — User panned map.</strong> Header transforms in-place: area name updates to <span class="key">Jumeirah Beach</span>. The count chip is replaced by a teal <span class="key">Discover</span> button. This IS the "Search this area" — no separate floating pill needed. Surprise button stays for taste-filtered discovery. Two clear choices: <span class="key">Discover</span> (show me what\'s here) or <span class="key">🎲</span> (surprise me based on my taste).';
+}
+
+function step4() {
+  dhName.textContent = 'Jumeirah Beach';
+  dhMeta.innerHTML = '🌤 84°F <span class="sep">·</span> 3:45 PM <span class="sep">·</span> New area';
+  dh.classList.add('sp');
+  spinW.textContent = 'Jumeirah Beach';
+  anno.innerHTML = '<strong>Step 4 — Discover tapped.</strong> Spinner replaces collapsed row. POIs loading for Jumeirah Beach...';
+  setTimeout(() => {
+    dh.classList.remove('sp');
+    dhChip.textContent = '7 places';
+    dhChip.style.display = '';
+    dhDiscover.classList.remove('show');
+    anno.innerHTML = '<strong>Step 4 — Discovered!</strong> 7 places loaded. Header settles: count chip returns ("7 places"), Discover button gone. Ready for exploration. Surprise button still available for taste-filtered variant.';
+  }, 1800);
+}
+
+function step5() {
+  setLocal();
+  dh.classList.add('x');
+  dhRecs.classList.add('show');
+  anno.innerHTML = '<strong>Step 5 — Header expanded.</strong> Tap anywhere on collapsed bar to expand. Full panel shows: <span class="key">search input</span> (type to find POIs, areas, or vibes anywhere in the world), <span class="key">context grid</span> (weather, time, visit, vibes), <span class="key">intel strip</span> (AI facts about the area), <span class="key">3 action buttons</span> (Surprise, Refresh, Save Area), and <span class="key">recent explorations</span> with saved counts.';
+}
+
+function step6() {
+  setLocal();
+  dh.classList.add('x');
+  inp.value = 'griffith';
+  sr.classList.add('show');
+  dhBody.classList.add('hide');
+  dhRecs.classList.remove('show');
+  anno.innerHTML = '<strong>Step 6 — Smart search.</strong> User types "griffith" — results appear grouped by type:<br>• <span class="key">PLACES</span> (teal) — Griffith Observatory, Griffith Park (specific POIs)<br>• <span class="key">AREAS</span> (blue) — Griffith Park Area (teleport + discover 12+ places)<br>• <span class="key">VIBES</span> (red) — "Scenic viewpoints near Griffith" (AI-curated)<br>Context and actions hide to make room. One input handles ALL search types.';
+}
+
+function step7() {
+  setRemoteLA();
+  dh.classList.add('sp');
+  spinW.textContent = 'Griffith Park Area';
+  anno.innerHTML = '<strong>Step 7 — Teleporting to LA.</strong> User tapped "Griffith Park Area" → map flies to Los Angeles. Header shows spinner. When resolved...';
+  setTimeout(() => {
+    dh.classList.remove('sp');
+    anno.innerHTML = '<strong>Step 7 — Arrived.</strong> Now exploring <span class="key">Griffith Park Area</span>. Collapsed meta shows: ☀️ 74°F · 4:42 AM (LA time) · <span class="key" style="color:#4ECDC4">From Dubai · 8,300 mi</span>. User always knows they\'re exploring remotely. 12 places found. Surprise works here too — taste-filtered for this area.';
+  }, 1800);
+}
+
+function step8() {
+  setRemoteLA();
+  dhRem.classList.add('show');
+  toast.classList.add('vis');
+  setTimeout(() => {
+    document.querySelectorAll('.sim-pin').forEach(p => p.classList.add('show'));
+  }, 300);
+  anno.innerHTML = '<strong>Step 8 — Save triggers the loop.</strong> User saved Griffith Observatory → toast shows <span class="key">2 similar places nearby</span> (Hollywood Sign, Fern Dell Trail). Dashed-outline pins pulse onto the map. The system learned: this user likes <span class="key">Scenic + Landmark</span> places. Next Surprise will be smarter.';
+}
+
+function step9() {
+  setRemoteLA();
+  dhRem.classList.add('show');
+  flash.classList.add('on');
+  dh.classList.add('sp');
+  spinW.textContent = 'Griffith Park Area';
+  anno.innerHTML = '<strong>Step 9 — Loop restarts.</strong> Surprise tapped again — now taste-aware from the save. Flash + spinner. New POIs will weight toward Scenic + Landmark vibes. The discovery loop: <span class="key">See → Explore → Discover → Save → See more like it → Explore deeper...</span>';
+  setTimeout(() => {
+    flash.classList.remove('on');
+    dh.classList.remove('sp');
+    dhChip.textContent = '3 places';
+  }, 2000);
+}
+
+// Init
+goStep(1);
+</script>
+
+</body>
+</html>

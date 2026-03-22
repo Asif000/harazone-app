@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vibe Filters in Discovery Header</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 16px 60px;
+  }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 24px; }
+
+  .phase {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: rgba(102,126,234,0.5); font-weight: 600;
+    margin: 24px 0 14px; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    width: 320px; text-align: center;
+  }
+  .step { width: 320px; margin-bottom: 32px; }
+  .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .st { font-size: 14px; font-weight: 700; }
+  .sd { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 12px; }
+  .sd .k { color: #4ECDC4; font-weight: 600; }
+  .sd .p { color: #a5b4fc; font-weight: 600; }
+
+  /* Phone */
+  .phone {
+    width: 320px; height: 693px;
+    border-radius: 36px; border: 3px solid rgba(255,255,255,0.08);
+    background: #0a0a0f; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column;
+  }
+
+  .p-status {
+    height: 48px; flex-shrink: 0; padding: 14px 22px 0;
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6);
+    position: relative;
+  }
+  .p-island {
+    width: 100px; height: 28px; background: #000; border-radius: 14px;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  }
+
+  /* Discovery Header */
+  .dh {
+    flex-shrink: 0; margin: 2px 8px 0;
+    border-radius: 14px; background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
+  }
+  .dh-row {
+    display: flex; align-items: center;
+    padding: 8px 8px 8px 12px; gap: 6px;
+  }
+  .dh-info { flex: 1; min-width: 0; }
+  .dh-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dh-meta { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+  .dh-meta .sep { margin: 0 3px; opacity: 0.3; }
+  .dh-chip { padding: 2px 7px; border-radius: 7px; background: rgba(255,255,255,0.06); font-size: 9.5px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+  .dh-surp {
+    width: 34px; height: 34px; border-radius: 11px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 1px 8px rgba(102,126,234,0.2);
+    position: relative; overflow: hidden;
+  }
+  .dh-surp .shm {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%); animation: shim 3s infinite;
+  }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .dh-chev { font-size: 8px; color: rgba(255,255,255,0.15); flex-shrink: 0; }
+  .dh-chev.up { transform: rotate(180deg); }
+
+  /* Search row */
+  .dh-srch {
+    display: flex; align-items: center; padding: 4px 12px; gap: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dh-srch-i { font-size: 12px; color: rgba(255,255,255,0.2); }
+  .dh-srch-t { flex: 1; font-size: 13px; color: rgba(255,255,255,0.2); padding: 7px 0; }
+  .dh-srch-x {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); border: none;
+    color: rgba(255,255,255,0.3); font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Context grid */
+  .dh-ctx { padding: 7px 12px 4px; }
+  .dh-ctx-row {
+    display: flex; gap: 12px; margin-bottom: 4px;
+  }
+  .dh-ctx-item {
+    font-size: 10px; color: rgba(255,255,255,0.4);
+    display: flex; align-items: center; gap: 3px;
+  }
+  .dh-ctx-item .v { color: rgba(255,255,255,0.7); font-weight: 500; }
+
+  /* === VIBE FILTER CHIPS === */
+  .dh-vibes {
+    display: flex; gap: 5px; padding: 4px 12px 8px;
+    flex-wrap: wrap;
+  }
+  .vibe-chip {
+    padding: 4px 10px; border-radius: 8px;
+    font-size: 10px; font-weight: 500;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.45);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .vibe-chip .vibe-icon { font-size: 11px; }
+  .vibe-chip.active {
+    background: rgba(78,205,196,0.12);
+    border-color: rgba(78,205,196,0.25);
+    color: #4ECDC4;
+  }
+  .vibe-chip.active2 {
+    background: rgba(167,139,250,0.12);
+    border-color: rgba(167,139,250,0.25);
+    color: #A78BFA;
+  }
+  .vibe-chip.active3 {
+    background: rgba(255,230,109,0.12);
+    border-color: rgba(255,230,109,0.25);
+    color: #FFE66D;
+  }
+  .vibe-chip .vibe-x {
+    font-size: 8px; opacity: 0.6; margin-left: 2px;
+  }
+
+  /* Intel */
+  .dh-intel {
+    margin: 0 12px 6px; padding: 5px 8px;
+    background: rgba(255,255,255,0.02); border-radius: 7px;
+    font-size: 10px; color: rgba(255,255,255,0.3); line-height: 1.4;
+  }
+  .dh-intel .hl { color: #4ECDC4; font-weight: 500; }
+
+  .dh-div { height: 1px; background: rgba(255,255,255,0.04); margin: 0 12px; }
+
+  /* Actions */
+  .dh-acts { display: flex; gap: 5px; padding: 7px 12px 9px; }
+  .dh-act {
+    flex: 1; padding: 7px 0; border-radius: 9px;
+    border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.02);
+    color: rgba(255,255,255,0.5); font-size: 10.5px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+  }
+  .dh-act.pri {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent; color: #fff;
+  }
+  /* Surprise inherits filter color */
+  .dh-act.pri.filtered {
+    background: linear-gradient(135deg, #4ECDC4, #2ab0a6);
+  }
+
+  /* Recents */
+  .dh-recs { padding: 4px 12px 6px; }
+  .dh-rl { font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px; color: rgba(255,255,255,0.15); margin-bottom: 3px; }
+  .dh-ri { display: flex; align-items: center; gap: 6px; padding: 4px 0; }
+  .dh-rf { width: 22px; height: 22px; border-radius: 5px; background: rgba(255,255,255,0.04); display: flex; align-items: center; justify-content: center; font-size: 11px; }
+  .dh-rn { flex: 1; }
+  .dh-rnm { font-size: 11px; font-weight: 500; }
+  .dh-rdt { font-size: 8.5px; color: rgba(255,255,255,0.22); }
+  .dh-rdist { font-size: 8.5px; color: rgba(255,255,255,0.18); flex-shrink: 0; }
+
+  /* Spinner */
+  .dh-spin { display: flex; align-items: center; padding: 8px 12px; gap: 8px; }
+  .spin-dot {
+    width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.06);
+    border-top-color: #4ECDC4; border-radius: 50%;
+    animation: sp 0.7s linear infinite; flex-shrink: 0;
+  }
+  @keyframes sp { to { transform: rotate(360deg); } }
+  .spin-txt { flex: 1; font-size: 12px; color: rgba(255,255,255,0.5); }
+  .spin-txt em { color: #fff; font-style: normal; font-weight: 600; }
+  .spin-filter {
+    padding: 2px 6px; border-radius: 5px;
+    background: rgba(78,205,196,0.1); border: 1px solid rgba(78,205,196,0.15);
+    font-size: 8px; color: #4ECDC4; font-weight: 500;
+  }
+  .spin-x {
+    padding: 3px 8px; border-radius: 5px;
+    background: rgba(255,255,255,0.06); border: none;
+    color: rgba(255,255,255,0.3); font-size: 9px;
+  }
+
+  /* Map */
+  .p-map {
+    flex: 1; min-height: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%),
+      #0d1117;
+    position: relative;
+  }
+  .pin {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+    transition: opacity 0.3s;
+  }
+  .pin.dim { opacity: 0.2; }
+
+  /* Active filter indicator on map */
+  .filter-badge {
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+    padding: 3px 10px; border-radius: 6px;
+    background: rgba(20,20,28,0.9); border: 1px solid rgba(78,205,196,0.15);
+    font-size: 9px; color: #4ECDC4; font-weight: 500;
+    display: flex; align-items: center; gap: 4px;
+    z-index: 2;
+  }
+  .filter-badge .fb-dot {
+    width: 5px; height: 5px; border-radius: 50%; background: #4ECDC4;
+  }
+
+  /* Cards */
+  .p-cards { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px; }
+  .p-card {
+    flex: 1; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 8px 9px;
+  }
+  .pc-n { font-size: 11px; font-weight: 600; }
+  .pc-v { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .pc-i { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+  /* Filtered card highlight */
+  .p-card.match { border-color: rgba(78,205,196,0.15); }
+
+  /* Nav */
+  .p-nav { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px 20px; }
+  .p-ai {
+    flex: 1; background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 10px;
+    padding: 9px 10px; display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: rgba(255,255,255,0.25);
+  }
+  .p-orb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2); flex-shrink: 0;
+  }
+  .p-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Flash */
+  .p-flash {
+    position: absolute; inset: 0; z-index: 2;
+    background: rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .p-flash-t { font-size: 16px; font-weight: 700; text-shadow: 0 3px 16px rgba(78,205,196,0.4); }
+</style>
+</head>
+<body>
+
+<h1>Vibe Filters in Discovery Header</h1>
+<div class="sub">Where vibes live in the new unified design. Scroll down.</div>
+
+<!-- ===== A: COLLAPSED — vibe hint in meta ===== -->
+<div class="phase">Collapsed State — Vibe Hint</div>
+<div class="step">
+  <div class="step-head"><div class="sn">A</div><div class="st">Vibe shown in meta line</div></div>
+  <div class="sd">Dominant vibe appears in collapsed meta: <span class="k">✨ Scenic</span>. Passive — just context. No separate vibe rail floating on the map.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> ✨ Scenic</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="pin" style="top:25%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:45%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:20%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:55%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:35%;left:80%;background:#F97316"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>Ask about Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== B: EXPANDED — vibe chips (no filter) ===== -->
+<div class="phase">Expanded — Vibe Chips (Unfiltered)</div>
+<div class="step">
+  <div class="step-head"><div class="sn">B</div><div class="st">Tappable vibe filter chips</div></div>
+  <div class="sd">Vibes appear as <span class="k">tappable chips</span> between context and intel. Unselected = outline. These are the area's available vibes. Tap any to filter.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev up">▼</div>
+      </div>
+      <div class="dh-srch"><span class="dh-srch-i">🔍</span><span class="dh-srch-t">Search places, areas, or vibes...</span><button class="dh-srch-x">✕</button></div>
+      <div class="dh-ctx">
+        <div class="dh-ctx-row">
+          <div class="dh-ctx-item">🌤 <span class="v">82°F</span> Cloudy</div>
+          <div class="dh-ctx-item">🕐 <span class="v">3:42 PM</span></div>
+          <div class="dh-ctx-item">📍 <span class="v">First visit</span></div>
+        </div>
+      </div>
+      <div class="dh-vibes">
+        <div class="vibe-chip"><span class="vibe-icon">🏞</span> Scenic</div>
+        <div class="vibe-chip"><span class="vibe-icon">💎</span> Luxury</div>
+        <div class="vibe-chip"><span class="vibe-icon">🏛</span> Cultural</div>
+        <div class="vibe-chip"><span class="vibe-icon">🌃</span> Nightlife</div>
+        <div class="vibe-chip"><span class="vibe-icon">🍽</span> Food</div>
+      </div>
+      <div class="dh-intel"><span class="hl">Dubai Mall</span> 1.2 km · luxury shopping · <span class="hl">sunset views</span> at 6:15 PM</div>
+      <div class="dh-div"></div>
+      <div class="dh-acts">
+        <button class="dh-act pri">🎲 Surprise</button>
+        <button class="dh-act">↻ Refresh</button>
+        <button class="dh-act">♡ Save Area</button>
+      </div>
+      <div class="dh-div"></div>
+      <div class="dh-recs">
+        <div class="dh-rl">Recent explorations</div>
+        <div class="dh-ri"><div class="dh-rf">🇧🇿</div><div class="dh-rn"><div class="dh-rnm">Belize City</div><div class="dh-rdt">8 saved · 3 days ago</div></div><div class="dh-rdist">7,200 mi</div></div>
+      </div>
+    </div>
+    <div class="p-map"></div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>Ask about Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== C: EXPANDED — Scenic selected ===== -->
+<div class="phase">Filter Active — "Scenic" Selected</div>
+<div class="step">
+  <div class="step-head"><div class="sn">C</div><div class="st">Scenic filter active</div></div>
+  <div class="sd">Tapped <span class="k">Scenic</span> — chip turns teal with ✕. Other chips stay available. Surprise button text changes to <span class="k">"🎲 Scenic Surprise"</span> — filter flows into Surprise automatically.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> ✨ Scenic</div>
+        </div>
+        <div class="dh-chip">3 of 5</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev up">▼</div>
+      </div>
+      <div class="dh-srch"><span class="dh-srch-i">🔍</span><span class="dh-srch-t">Search places, areas, or vibes...</span><button class="dh-srch-x">✕</button></div>
+      <div class="dh-ctx">
+        <div class="dh-ctx-row">
+          <div class="dh-ctx-item">🌤 <span class="v">82°F</span> Cloudy</div>
+          <div class="dh-ctx-item">🕐 <span class="v">3:42 PM</span></div>
+          <div class="dh-ctx-item">📍 <span class="v">First visit</span></div>
+        </div>
+      </div>
+      <div class="dh-vibes">
+        <div class="vibe-chip active"><span class="vibe-icon">🏞</span> Scenic <span class="vibe-x">✕</span></div>
+        <div class="vibe-chip"><span class="vibe-icon">💎</span> Luxury</div>
+        <div class="vibe-chip"><span class="vibe-icon">🏛</span> Cultural</div>
+        <div class="vibe-chip"><span class="vibe-icon">🌃</span> Nightlife</div>
+        <div class="vibe-chip"><span class="vibe-icon">🍽</span> Food</div>
+      </div>
+      <div class="dh-intel"><span class="hl">Filtering: 3 scenic places</span> · Marina Walk, Ain Dubai, Palm View Point</div>
+      <div class="dh-div"></div>
+      <div class="dh-acts">
+        <button class="dh-act pri filtered">🏞 Scenic Surprise</button>
+        <button class="dh-act">↻ Refresh</button>
+        <button class="dh-act">♡ Save Area</button>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="filter-badge"><div class="fb-dot"></div>Scenic · 3 places</div>
+      <div class="pin" style="top:25%;left:18%;background:#FF6B6B;opacity:0.15"></div>
+      <div class="pin" style="top:45%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:20%;left:68%;background:#FFE66D;opacity:0.15"></div>
+      <div class="pin" style="top:55%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:35%;left:80%;background:#F97316"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card match"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+      <div class="p-card match"><div class="pc-n">Ain Dubai</div><div class="pc-v">Scenic · Views</div><div class="pc-i">⭐ 4.5</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>3 scenic spots in Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== D: MULTI FILTER ===== -->
+<div class="phase">Multi-Filter — "Scenic + Cultural"</div>
+<div class="step">
+  <div class="step-head"><div class="sn">D</div><div class="st">Multiple vibes selected</div></div>
+  <div class="sd">Tap multiple vibes — each gets its own color. Count chip updates: <span class="k">4 of 5</span>. Surprise respects both filters. Pins that don't match any selected vibe go dim.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> ✨ Scenic + Cultural</div>
+        </div>
+        <div class="dh-chip">4 of 5</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev up">▼</div>
+      </div>
+      <div class="dh-srch"><span class="dh-srch-i">🔍</span><span class="dh-srch-t">Search places, areas, or vibes...</span><button class="dh-srch-x">✕</button></div>
+      <div class="dh-ctx">
+        <div class="dh-ctx-row">
+          <div class="dh-ctx-item">🌤 <span class="v">82°F</span> Cloudy</div>
+          <div class="dh-ctx-item">🕐 <span class="v">3:42 PM</span></div>
+          <div class="dh-ctx-item">📍 <span class="v">First visit</span></div>
+        </div>
+      </div>
+      <div class="dh-vibes">
+        <div class="vibe-chip active"><span class="vibe-icon">🏞</span> Scenic <span class="vibe-x">✕</span></div>
+        <div class="vibe-chip"><span class="vibe-icon">💎</span> Luxury</div>
+        <div class="vibe-chip active2"><span class="vibe-icon">🏛</span> Cultural <span class="vibe-x">✕</span></div>
+        <div class="vibe-chip"><span class="vibe-icon">🌃</span> Nightlife</div>
+        <div class="vibe-chip"><span class="vibe-icon">🍽</span> Food</div>
+      </div>
+      <div class="dh-intel"><span class="hl">4 places match</span> · Scenic or Cultural in Dubai Marina</div>
+      <div class="dh-div"></div>
+      <div class="dh-acts">
+        <button class="dh-act pri filtered">🎲 Filtered Surprise</button>
+        <button class="dh-act">↻ Refresh</button>
+        <button class="dh-act">♡ Save Area</button>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="filter-badge"><div class="fb-dot"></div>Scenic + Cultural · 4 places</div>
+      <div class="pin" style="top:25%;left:18%;background:#FF6B6B;opacity:0.15"></div>
+      <div class="pin" style="top:45%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:20%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:55%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:35%;left:80%;background:#F97316"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card match"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+      <div class="p-card match"><div class="pc-n">Heritage Village</div><div class="pc-v">Cultural · Historic</div><div class="pc-i">⭐ 4.4</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>4 scenic & cultural spots here...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== E: FILTERED SURPRISE ===== -->
+<div class="phase">Filtered Surprise</div>
+<div class="step">
+  <div class="step-head"><div class="sn">E</div><div class="st">Surprise respects vibe filter</div></div>
+  <div class="sd">Tapped 🎲 with Scenic active. Spinner shows <span class="k">filter badge</span>. Results will be scenic-only. Filter state carries through the entire discovery loop.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-spin">
+        <div class="spin-dot"></div>
+        <div class="spin-txt">Discovering <em>scenic</em> places...</div>
+        <div class="spin-filter">🏞 Scenic</div>
+        <button class="spin-x">Cancel</button>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="p-flash"><div class="p-flash-t">🏞 Finding scenic surprises...</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai" style="border-color:rgba(78,205,196,0.12)"><div class="p-orb"></div><span style="color:rgba(78,205,196,0.6)">Scenic places coming up...</span></div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== F: COLLAPSED WITH ACTIVE FILTER ===== -->
+<div class="phase">Collapsed with Active Filter</div>
+<div class="step">
+  <div class="step-head"><div class="sn">F</div><div class="st">Filter persists when collapsed</div></div>
+  <div class="sd">User collapses header. Meta shows active filter: <span class="k">✨ Scenic</span>. Count shows <span class="k">3 of 5</span>. Map shows filter badge. Non-matching pins stay dim. Filter clears on next Discover or manually in expanded view.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> <span style="color:#4ECDC4;font-weight:500">🏞 Scenic</span></div>
+        </div>
+        <div class="dh-chip" style="background:rgba(78,205,196,0.08);color:#4ECDC4;border:1px solid rgba(78,205,196,0.12)">3 of 5</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="filter-badge"><div class="fb-dot"></div>Scenic · 3 places</div>
+      <div class="pin" style="top:25%;left:18%;background:#FF6B6B;opacity:0.15"></div>
+      <div class="pin" style="top:45%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:20%;left:68%;background:#FFE66D;opacity:0.15"></div>
+      <div class="pin" style="top:55%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:35%;left:80%;background:#F97316"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card match"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+      <div class="p-card match"><div class="pc-n">Ain Dubai</div><div class="pc-v">Scenic · Views</div><div class="pc-i">⭐ 4.5</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>3 scenic spots in Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

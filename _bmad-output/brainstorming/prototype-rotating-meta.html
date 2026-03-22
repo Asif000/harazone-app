@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rotating Meta Line</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 16px 60px;
+  }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 24px; }
+  .phase {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: rgba(102,126,234,0.5); font-weight: 600;
+    margin: 24px 0 14px; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    width: 320px; text-align: center;
+  }
+  .step { width: 320px; margin-bottom: 32px; }
+  .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .st { font-size: 14px; font-weight: 700; }
+  .sd { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 12px; }
+  .sd .k { color: #4ECDC4; font-weight: 600; }
+  .sd .p { color: #a5b4fc; font-weight: 600; }
+
+  /* Phone */
+  .phone {
+    width: 320px; height: 693px;
+    border-radius: 36px; border: 3px solid rgba(255,255,255,0.08);
+    background: #0a0a0f; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column;
+  }
+  .p-status {
+    height: 48px; flex-shrink: 0; padding: 14px 22px 0;
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6);
+    position: relative;
+  }
+  .p-island {
+    width: 100px; height: 28px; background: #000; border-radius: 14px;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  }
+
+  /* Header */
+  .dh {
+    flex-shrink: 0; margin: 2px 8px 0;
+    border-radius: 14px; background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
+  }
+  .dh-row {
+    display: flex; align-items: center;
+    padding: 8px 8px 8px 12px; gap: 6px;
+  }
+  .dh-info { flex: 1; min-width: 0; }
+  .dh-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* === ROTATING META === */
+  .dh-meta-wrap {
+    height: 14px;
+    overflow: hidden;
+    margin-top: 1px;
+    position: relative;
+  }
+  .dh-meta-track {
+    display: flex;
+    flex-direction: column;
+    animation: rotate-meta 15s ease-in-out infinite;
+  }
+  .dh-meta-line {
+    height: 14px;
+    font-size: 10px;
+    color: rgba(255,255,255,0.4);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .dh-meta-line .sep { margin: 0 3px; opacity: 0.3; }
+  .dh-meta-line .hl { color: #4ECDC4; font-weight: 500; }
+  .dh-meta-line .nudge { color: rgba(167,139,250,0.7); }
+  .dh-meta-line .warn { color: rgba(255,170,100,0.7); }
+
+  /* Rotate: show each line for 4s, transition 1s */
+  @keyframes rotate-meta {
+    0%, 20%    { transform: translateY(0); }
+    26%, 46%   { transform: translateY(-14px); }
+    52%, 72%   { transform: translateY(-28px); }
+    78%, 98%   { transform: translateY(-42px); }
+    100%       { transform: translateY(0); }
+  }
+
+  /* Non-rotating version for static screens */
+  .dh-meta-static {
+    font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .dh-meta-static .sep { margin: 0 3px; opacity: 0.3; }
+
+  .dh-chip { padding: 2px 7px; border-radius: 7px; background: rgba(255,255,255,0.06); font-size: 9.5px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+  .dh-surp {
+    width: 34px; height: 34px; border-radius: 11px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 1px 8px rgba(102,126,234,0.2);
+    position: relative; overflow: hidden;
+  }
+  .dh-surp .shm {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%); animation: shim 3s infinite;
+  }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .dh-chev { font-size: 8px; color: rgba(255,255,255,0.15); flex-shrink: 0; }
+
+  /* Map */
+  .p-map {
+    flex: 1; min-height: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%),
+      #0d1117;
+    position: relative;
+  }
+  .pin {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+  }
+
+  /* Cards */
+  .p-cards { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px; }
+  .p-card {
+    flex: 1; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 8px 9px;
+  }
+  .pc-n { font-size: 11px; font-weight: 600; }
+  .pc-v { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .pc-i { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  /* Nav */
+  .p-nav { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px 20px; }
+  .p-ai {
+    flex: 1; background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 10px;
+    padding: 9px 10px; display: flex; align-items: center; gap: 5px;
+    font-size: 10px; color: rgba(255,255,255,0.25);
+  }
+  .p-orb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2); flex-shrink: 0;
+  }
+  .p-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Indicator dots showing which meta line is active */
+  .meta-dots {
+    display: flex; gap: 3px; padding: 3px 12px 0;
+  }
+  .meta-dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+  }
+  .meta-dot.on { background: rgba(255,255,255,0.4); }
+
+  /* Frozen frame labels */
+  .frame-label {
+    position: absolute; z-index: 5;
+    padding: 2px 6px; border-radius: 4px;
+    font-size: 8px; font-weight: 600; white-space: nowrap;
+    background: rgba(102,126,234,0.2); color: #c4b5fd;
+  }
+</style>
+</head>
+<body>
+
+<h1>Rotating Meta Line</h1>
+<div class="sub">The collapsed meta line cycles through context + ticker content. Watch it animate.</div>
+
+<!-- ===== LIVE: Animated rotation ===== -->
+<div class="phase">Live — Watch It Rotate</div>
+<div class="step">
+  <div class="step-head"><div class="sn">1</div><div class="st">Meta line rotates every 4s</div></div>
+  <div class="sd">Same 14px line height. Cycles through: <span class="k">weather/time</span> → <span class="k">POI highlight</span> → <span class="k">companion nudge</span> → <span class="k">area fact</span>. No extra vertical space. Watch the phone below.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta-wrap">
+            <div class="dh-meta-track">
+              <div class="dh-meta-line">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+              <div class="dh-meta-line"><span class="hl">🎡 Ain Dubai</span> 1.2 km <span class="sep">·</span> sunset views at 6:15 PM</div>
+              <div class="dh-meta-line"><span class="nudge">✨ Try "Surprise" — 3 spots match your taste</span></div>
+              <div class="dh-meta-line"><span class="hl">🍽 Nobu</span> 300m <span class="sep">·</span> omakase specials tonight</div>
+            </div>
+          </div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="pin" style="top:25%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:45%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:20%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:55%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:35%;left:80%;background:#F97316"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8 · Open</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6 · Open</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div>Ask about Dubai Marina...</div>
+      <div class="p-btn">◎</div><div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FROZEN FRAMES: Each line shown static ===== -->
+<div class="phase">Frozen Frames — What Each Line Shows</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">A</div><div class="st">Default: weather + time + visit</div></div>
+  <div class="sd">First in rotation. The baseline context. Always starts here on area load.</div>
+  <div class="phone" style="height:140px;border-radius:20px">
+    <div class="dh" style="margin:8px">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta-static">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">B</div><div class="st">POI highlight + distance</div></div>
+  <div class="sd">Rotates in after 4s. Highlights a nearby POI with distance and hook. <span class="k">Teal text</span> for POI name.</div>
+  <div class="phone" style="height:140px;border-radius:20px">
+    <div class="dh" style="margin:8px">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta-static"><span style="color:#4ECDC4;font-weight:500">🎡 Ain Dubai</span> 1.2 km <span class="sep">·</span> sunset views at 6:15 PM</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">C</div><div class="st">Companion nudge</div></div>
+  <div class="sd">Proactive AI nudge. <span class="p">Purple text</span>. Encourages Surprise or exploration. Only shows when taste profile has data.</div>
+  <div class="phone" style="height:140px;border-radius:20px">
+    <div class="dh" style="margin:8px">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta-static"><span style="color:rgba(167,139,250,0.7)">✨ Try "Surprise" — 3 spots match your taste</span></div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">D</div><div class="st">Another POI + hook</div></div>
+  <div class="sd">Cycles through different POIs. Each gets a turn. <span class="k">Teal name + distance + enticing detail.</span></div>
+  <div class="phone" style="height:140px;border-radius:20px">
+    <div class="dh" style="margin:8px">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta-static"><span style="color:#4ECDC4;font-weight:500">🍽 Nobu</span> 300m <span class="sep">·</span> omakase specials tonight</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== REMOTE: Different ticker content ===== -->
+<div class="phase">Remote Area — Ticker Adapts</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">E</div><div class="st">Teleported to LA — ticker shows local intel</div></div>
+  <div class="sd">Same rotation, different content. Shows <span class="k">LA weather/time</span>, <span class="k">local POI highlights</span>, and <span class="k">remote context</span> (distance from home). Content always matches WHERE you're exploring.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Griffith Park Area</div>
+          <div class="dh-meta-wrap">
+            <div class="dh-meta-track" style="animation-delay:-0.5s">
+              <div class="dh-meta-line">☀️ 74°F <span class="sep">·</span> 4:42 AM <span class="sep">·</span> <span style="color:#4ECDC4;font-weight:500">From Dubai · 8,300 mi</span></div>
+              <div class="dh-meta-line"><span class="hl">🏛 Griffith Observatory</span> 0.5 mi <span class="sep">·</span> free admission</div>
+              <div class="dh-meta-line"><span class="nudge">🌅 Best sunset views from east terrace at 7:45 PM</span></div>
+              <div class="dh-meta-line"><span class="hl">🥾 Hollywood Sign Trail</span> 2.1 mi <span class="sep">·</span> moderate hike</div>
+            </div>
+          </div>
+        </div>
+        <div class="dh-chip">12 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="p-map">
+      <div class="pin" style="top:22%;left:28%;background:#4ECDC4"></div>
+      <div class="pin" style="top:42%;left:55%;background:#FFE66D"></div>
+      <div class="pin" style="top:28%;left:72%;background:#A78BFA"></div>
+      <div class="pin" style="top:50%;left:40%;background:#FF6B6B"></div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Griffith Observatory</div><div class="pc-v">Scenic · Landmark</div><div class="pc-i">⭐ 4.9 · Free</div></div>
+      <div class="p-card"><div class="pc-n">Hollywood Sign</div><div class="pc-v">Scenic · Hiking</div><div class="pc-i">⭐ 4.7</div></div>
+    </div>
+    <div class="p-nav">
+      <div class="p-ai"><div class="p-orb"></div><span style="color:rgba(78,205,196,0.6)">Tell me about Griffith Park...</span></div>
+      <div class="p-btn" style="border-color:rgba(78,205,196,0.2);color:#4ECDC4">⌂</div>
+      <div class="p-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SAFETY: Warning ticker ===== -->
+<div class="phase">Safety Warning in Rotation</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">F</div><div class="st">Caution area — warning rotates in</div></div>
+  <div class="sd">In areas with safety advisories, an <span class="k" style="color:rgba(255,170,100,0.9)">amber warning</span> rotates into the meta line. Doesn't take permanent space — cycles naturally with other content.</div>
+  <div class="phone" style="height:140px;border-radius:20px">
+    <div class="dh" style="margin:8px">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Caracas, Venezuela</div>
+          <div class="dh-meta-static"><span style="color:rgba(255,170,100,0.8)">⚠️ Reconsider travel · Check advisory before visiting</span></div>
+        </div>
+        <div class="dh-chip">6 places</div>
+        <button class="dh-surp"><span class="shm"></span>🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

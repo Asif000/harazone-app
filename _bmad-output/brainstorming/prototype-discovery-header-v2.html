@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discovery Header v2 — Unified Search/Context/Surprise</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    background: #1a1a2e;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: rgba(255,255,255,0.9);
+  }
+  .subtitle {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 16px;
+  }
+
+  /* ===== DEMO CONTROLS (outside phone) ===== */
+  .controls {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 20px;
+    max-width: 390px;
+  }
+  .ctrl-btn {
+    padding: 7px 14px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    color: rgba(255,255,255,0.6);
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .ctrl-btn.active {
+    background: rgba(102,126,234,0.25);
+    border-color: rgba(102,126,234,0.5);
+    color: #fff;
+  }
+  .ctrl-label {
+    width: 100%;
+    font-size: 10px;
+    color: rgba(255,255,255,0.25);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-align: center;
+    margin: 4px 0 2px;
+  }
+
+  /* State description */
+  .state-desc {
+    max-width: 390px;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(255,255,255,0.35);
+    margin-top: 12px;
+    line-height: 1.5;
+    min-height: 36px;
+  }
+  .state-desc strong { color: rgba(255,255,255,0.6); }
+
+  /* ===== PHONE FRAME ===== */
+  .phone {
+    width: 390px;
+    height: 844px;
+    border-radius: 40px;
+    border: 3px solid rgba(255,255,255,0.1);
+    background: #0a0a0f;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    flex-shrink: 0;
+  }
+
+  /* Status bar */
+  .status-bar {
+    height: 54px;
+    padding: 14px 28px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    font-size: 12px;
+    font-weight: 600;
+    position: relative;
+    z-index: 200;
+  }
+  .status-bar .time { }
+  .status-bar .icons { display: flex; gap: 4px; font-size: 11px; }
+
+  /* Dynamic island */
+  .dynamic-island {
+    width: 120px;
+    height: 34px;
+    background: #000;
+    border-radius: 20px;
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 300;
+  }
+
+  /* Map background */
+  .map-layer {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 35% 55%, rgba(30,60,40,0.4) 0%, transparent 50%),
+      radial-gradient(ellipse at 65% 35%, rgba(30,40,70,0.4) 0%, transparent 50%),
+      linear-gradient(180deg, #0d1117, #161b22 50%, #0d1117);
+    z-index: 0;
+  }
+  .map-layer::after {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 60px, rgba(255,255,255,0.015) 60px, rgba(255,255,255,0.015) 61px),
+      repeating-linear-gradient(90deg, transparent, transparent 60px, rgba(255,255,255,0.015) 60px, rgba(255,255,255,0.015) 61px);
+  }
+
+  /* Map pins */
+  .pin {
+    position: absolute;
+    width: 28px; height: 28px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    z-index: 5;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    transition: opacity 0.5s;
+  }
+  .pin.p1 { top: 42%; left: 22%; background: #FF6B6B; }
+  .pin.p2 { top: 54%; left: 50%; background: #4ECDC4; }
+  .pin.p3 { top: 36%; left: 68%; background: #FFE66D; }
+  .pin.p4 { top: 60%; left: 36%; background: #A78BFA; }
+  .pin.p5 { top: 48%; left: 78%; background: #F97316; }
+
+  /* Similar pins (dashed, appear on save) */
+  .sim-pin {
+    position: absolute;
+    width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg) scale(0);
+    z-index: 6;
+    border: 2px dashed rgba(78, 205, 196, 0.7);
+    background: rgba(78, 205, 196, 0.15);
+    transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .sim-pin.show { transform: rotate(-45deg) scale(1); }
+  .sim-pin.sp1 { top: 51%; left: 56%; transition-delay: 0.15s; }
+  .sim-pin.sp2 { top: 44%; left: 44%; transition-delay: 0.35s; }
+  .sim-pin.sp3 { top: 57%; left: 64%; transition-delay: 0.55s; }
+
+  /* ===== DISCOVERY HEADER ===== */
+  .dh {
+    position: absolute;
+    top: 56px;
+    left: 10px; right: 10px;
+    z-index: 100;
+    border-radius: 18px;
+    background: rgba(20, 20, 28, 0.92);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow: hidden;
+  }
+  .dh.is-expanded {
+    border-radius: 22px;
+    background: rgba(20, 20, 28, 0.97);
+  }
+
+  /* -- Collapsed row -- */
+  .dh-collapsed {
+    display: flex;
+    align-items: center;
+    padding: 9px 10px 9px 14px;
+    gap: 8px;
+    min-height: 52px;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+  .dh.is-spinning .dh-collapsed { display: none; }
+
+  .dh-place { flex: 1; min-width: 0; }
+  .dh-name {
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dh-meta {
+    font-size: 11px;
+    color: rgba(255,255,255,0.45);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .dh-meta .sep { margin: 0 4px; opacity: 0.35; }
+  .dh-meta .remote-tag {
+    color: #4ECDC4;
+    font-weight: 500;
+  }
+
+  .dh-count {
+    padding: 3px 8px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.07);
+    font-size: 10.5px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.5);
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .dh-surprise {
+    width: 38px; height: 38px;
+    border-radius: 13px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+    position: relative;
+    overflow: hidden;
+  }
+  .dh-surprise:active { transform: scale(0.92); }
+  .dh-surprise .shim {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+    transform: translateX(-100%);
+    animation: shim 3s infinite;
+  }
+  @keyframes shim {
+    0% { transform: translateX(-100%); }
+    25% { transform: translateX(100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .dh-chevron {
+    font-size: 9px;
+    color: rgba(255,255,255,0.2);
+    flex-shrink: 0;
+    transition: transform 0.3s;
+    margin-left: -2px;
+  }
+  .dh.is-expanded .dh-chevron { transform: rotate(180deg); }
+
+  /* -- Spinning row -- */
+  .dh-spinning {
+    display: none;
+    align-items: center;
+    padding: 9px 14px;
+    gap: 10px;
+    min-height: 52px;
+  }
+  .dh.is-spinning .dh-spinning { display: flex; }
+  .spin-ring {
+    width: 22px; height: 22px;
+    border: 2.5px solid rgba(255,255,255,0.08);
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin-label {
+    flex: 1;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.65);
+  }
+  .spin-label em { color: #fff; font-style: normal; font-weight: 600; }
+  .spin-cancel {
+    padding: 5px 12px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.07);
+    border: none;
+    color: rgba(255,255,255,0.45);
+    font-size: 11.5px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  /* -- Expanded panel -- */
+  .dh-expanded {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease 0.05s;
+  }
+  .dh.is-expanded .dh-expanded {
+    max-height: 600px;
+    opacity: 1;
+  }
+
+  .dh-divider {
+    height: 1px;
+    background: rgba(255,255,255,0.05);
+    margin: 0 14px;
+  }
+
+  /* Search row */
+  .dh-search {
+    display: flex;
+    align-items: center;
+    padding: 2px 14px;
+    gap: 8px;
+  }
+  .dh-search-icon { color: rgba(255,255,255,0.3); font-size: 14px; flex-shrink: 0; }
+  .dh-search-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 15px;
+    font-family: inherit;
+    padding: 10px 0;
+    outline: none;
+  }
+  .dh-search-input::placeholder { color: rgba(255,255,255,0.25); }
+  .dh-close {
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.08);
+    border: none;
+    color: rgba(255,255,255,0.45);
+    font-size: 12px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Remote badge (in expanded) */
+  .dh-remote {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    margin: 6px 14px 2px;
+    padding: 4px 10px;
+    background: rgba(78, 205, 196, 0.07);
+    border: 1px solid rgba(78, 205, 196, 0.12);
+    border-radius: 7px;
+    font-size: 10.5px;
+    color: #4ECDC4;
+    font-weight: 500;
+  }
+  .dh-remote.show { display: inline-flex; }
+  .dh-remote-dot {
+    width: 5px; height: 5px;
+    background: #4ECDC4;
+    border-radius: 50%;
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+  /* Context section */
+  .dh-context {
+    padding: 10px 14px;
+  }
+  .dh-ctx-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px 12px;
+  }
+  .dh-ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.45);
+  }
+  .dh-ctx-item .ci-icon { font-size: 13px; }
+  .dh-ctx-item .ci-val { color: rgba(255,255,255,0.75); font-weight: 500; }
+
+  .dh-intel {
+    margin-top: 8px;
+    padding: 7px 10px;
+    background: rgba(255,255,255,0.03);
+    border-radius: 9px;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.38);
+    line-height: 1.45;
+  }
+  .dh-intel .hl { color: #4ECDC4; font-weight: 500; }
+
+  /* Action buttons */
+  .dh-actions {
+    display: flex;
+    padding: 10px 14px 12px;
+    gap: 7px;
+  }
+  .dh-act {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 9px 0;
+    border-radius: 11px;
+    border: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.03);
+    color: rgba(255,255,255,0.65);
+    font-size: 12.5px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .dh-act:active { transform: scale(0.97); }
+  .dh-act.primary {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 2px 10px rgba(102,126,234,0.25);
+  }
+  .dh-act .ai { font-size: 14px; }
+
+  /* Recents */
+  .dh-recents {
+    padding: 6px 14px 10px;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.3s, opacity 0.2s;
+  }
+  .dh-recents.show {
+    max-height: 200px;
+    opacity: 1;
+  }
+  .dh-rec-label {
+    font-size: 9.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: rgba(255,255,255,0.2);
+    margin-bottom: 6px;
+  }
+  .dh-rec-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    cursor: pointer;
+  }
+  .dh-rec-item:hover { opacity: 0.8; }
+  .dh-rec-flag {
+    width: 28px; height: 28px;
+    border-radius: 7px;
+    background: rgba(255,255,255,0.05);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .dh-rec-info { flex: 1; min-width: 0; }
+  .dh-rec-name { font-size: 12.5px; font-weight: 500; }
+  .dh-rec-detail { font-size: 10px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+  .dh-rec-dist { font-size: 10px; color: rgba(255,255,255,0.25); flex-shrink: 0; }
+
+  /* ===== BOTTOM AREA ===== */
+
+  /* POI dots */
+  .poi-dots {
+    position: absolute;
+    bottom: 172px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    z-index: 20;
+  }
+  .pdot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.2);
+    transition: all 0.3s;
+  }
+  .pdot.on { background: #fff; width: 14px; border-radius: 3px; }
+
+  /* POI carousel */
+  .poi-carousel {
+    position: absolute;
+    bottom: 94px;
+    left: 0; right: 0;
+    padding: 0 10px;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    z-index: 15;
+    scroll-snap-type: x mandatory;
+  }
+  .poi-carousel::-webkit-scrollbar { display: none; }
+  .poi-c {
+    min-width: 220px;
+    flex-shrink: 0;
+    background: rgba(20,20,28,0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 10px 12px;
+    scroll-snap-align: center;
+  }
+  .poi-c-name { font-size: 13px; font-weight: 600; }
+  .poi-c-vibe { font-size: 10.5px; color: #4ECDC4; margin-top: 2px; }
+  .poi-c-info { font-size: 10.5px; color: rgba(255,255,255,0.35); margin-top: 2px; }
+  .poi-c-btns { display: flex; gap: 6px; margin-top: 7px; }
+  .poi-c-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    border: none;
+    color: rgba(255,255,255,0.5);
+    font-size: 10.5px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .poi-c-btn.saved { color: #FF6B6B; }
+
+  /* Bottom nav */
+  .bot-nav {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    padding: 10px 10px 28px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    z-index: 15;
+  }
+  .bot-ai {
+    flex: 1;
+    background: rgba(20,20,28,0.9);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    padding: 11px 14px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: rgba(255,255,255,0.3);
+  }
+  .bot-orb {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    flex-shrink: 0;
+    animation: porb 3s ease-in-out infinite;
+  }
+  @keyframes porb {
+    0%,100% { box-shadow: 0 0 6px rgba(102,126,234,0.25); }
+    50% { box-shadow: 0 0 14px rgba(102,126,234,0.5); }
+  }
+  .bot-icon {
+    width: 40px; height: 40px;
+    border-radius: 12px;
+    background: rgba(20,20,28,0.9);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.07);
+    color: rgba(255,255,255,0.5);
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* ===== SAVE TOAST ===== */
+  .save-toast {
+    position: absolute;
+    bottom: 200px;
+    left: 12px; right: 12px;
+    background: rgba(20,20,28,0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(78, 205, 196, 0.15);
+    border-radius: 14px;
+    padding: 11px 12px;
+    z-index: 120;
+    transform: translateY(16px);
+    opacity: 0;
+    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+  }
+  .save-toast.vis {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .st-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 7px;
+  }
+  .st-heart { color: #FF6B6B; font-size: 14px; }
+  .st-title { font-size: 13px; font-weight: 600; }
+  .st-cards {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+  }
+  .st-cards::-webkit-scrollbar { display: none; }
+  .st-card {
+    min-width: 100px;
+    flex-shrink: 0;
+    background: rgba(255,255,255,0.04);
+    border-radius: 8px;
+    padding: 8px;
+  }
+  .st-card-name { font-size: 11px; font-weight: 500; }
+  .st-card-vibe { font-size: 9.5px; color: rgba(255,255,255,0.35); margin-top: 1px; }
+  .st-card-dist { font-size: 9.5px; color: #4ECDC4; margin-top: 3px; }
+
+  /* ===== SURPRISE FLASH ===== */
+  .surprise-flash {
+    position: absolute; inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0,0,0,0);
+    pointer-events: none;
+    transition: background 0.3s;
+  }
+  .surprise-flash.on { background: rgba(0,0,0,0.35); }
+  .surprise-flash-text {
+    font-size: 22px;
+    font-weight: 700;
+    opacity: 0;
+    transform: scale(0.85);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    text-shadow: 0 4px 20px rgba(102, 126, 234, 0.4);
+  }
+  .surprise-flash.on .surprise-flash-text {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* ===== FIRST-TIME HINT ===== */
+  .hint-bubble {
+    position: absolute;
+    top: 114px;
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    background: rgba(102,126,234,0.85);
+    padding: 5px 12px;
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 500;
+    z-index: 110;
+    opacity: 0;
+    transition: all 0.3s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  .hint-bubble.vis {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  .hint-bubble::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid rgba(102,126,234,0.85);
+  }
+</style>
+</head>
+<body>
+
+<h1>Discovery Header — Unified Top Nav</h1>
+<p class="subtitle">Replaces TopContextBar + GeocodingSearchBar + AmbientTicker + SearchSurprisePill</p>
+
+<!-- DEMO CONTROLS -->
+<div class="controls">
+  <div class="ctrl-label">Location states</div>
+  <button class="ctrl-btn active" id="btnLocal" onclick="setScene('local')">📍 Local (Dubai)</button>
+  <button class="ctrl-btn" id="btnRemote" onclick="setScene('remote')">✈️ Remote (Belize)</button>
+  <div class="ctrl-label">Interactions</div>
+  <button class="ctrl-btn" id="btnExpand" onclick="toggleExpand()">⬇ Expand / Collapse</button>
+  <button class="ctrl-btn" id="btnSurprise" onclick="doSurprise()">🎲 Surprise!</button>
+  <button class="ctrl-btn" id="btnSave" onclick="doSave()">♡ Save POI</button>
+  <button class="ctrl-btn" id="btnSpin" onclick="doSpin()">⟳ Discovering...</button>
+</div>
+
+<!-- PHONE -->
+<div class="phone">
+  <div class="map-layer"></div>
+  <div class="pin p1"></div>
+  <div class="pin p2"></div>
+  <div class="pin p3"></div>
+  <div class="pin p4"></div>
+  <div class="pin p5"></div>
+  <div class="sim-pin sp1"></div>
+  <div class="sim-pin sp2"></div>
+  <div class="sim-pin sp3"></div>
+
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="dynamic-island"></div>
+    <span class="icons">📶 📡 🔋</span>
+  </div>
+
+  <!-- Hint -->
+  <div class="hint-bubble" id="hint">Tap to search, explore & discover</div>
+
+  <!-- DISCOVERY HEADER -->
+  <div class="dh" id="dh">
+
+    <!-- Collapsed -->
+    <div class="dh-collapsed" id="dhCollapsed" onclick="toggleExpand()">
+      <div class="dh-place">
+        <div class="dh-name" id="dhName">Dubai Marina</div>
+        <div class="dh-meta" id="dhMeta">
+          🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit
+        </div>
+      </div>
+      <div class="dh-count" id="dhCount">5 places</div>
+      <button class="dh-surprise" onclick="event.stopPropagation(); doSurprise();" title="Surprise me here!">
+        <span class="shim"></span>
+        🎲
+      </button>
+      <div class="dh-chevron" id="dhChevron">▼</div>
+    </div>
+
+    <!-- Spinning -->
+    <div class="dh-spinning" id="dhSpinning">
+      <div class="spin-ring"></div>
+      <div class="spin-label">Discovering <em id="spinWhere">Dubai Marina</em>...</div>
+      <button class="spin-cancel" onclick="cancelSpin()">Cancel</button>
+    </div>
+
+    <!-- Expanded panel -->
+    <div class="dh-expanded">
+      <!-- Search -->
+      <div class="dh-search">
+        <span class="dh-search-icon">🔍</span>
+        <input class="dh-search-input" id="searchInput" type="text" placeholder="Search any place..." onfocus="showRecents(true)" onblur="setTimeout(()=>showRecents(false),200)">
+        <button class="dh-close" onclick="event.stopPropagation(); toggleExpand();">✕</button>
+      </div>
+
+      <div class="dh-divider"></div>
+
+      <!-- Remote badge -->
+      <div class="dh-remote" id="dhRemote">
+        <span class="dh-remote-dot"></span>
+        Exploring from Dubai · 7,200 mi away
+      </div>
+
+      <!-- Context -->
+      <div class="dh-context">
+        <div class="dh-ctx-grid">
+          <div class="dh-ctx-item">
+            <span class="ci-icon">🌤</span>
+            <span class="ci-val" id="cxTemp">82°F</span>
+            Partly cloudy
+          </div>
+          <div class="dh-ctx-item">
+            <span class="ci-icon">🕐</span>
+            <span class="ci-val" id="cxTime">3:42 PM</span>
+            Local time
+          </div>
+          <div class="dh-ctx-item">
+            <span class="ci-icon">📍</span>
+            <span class="ci-val" id="cxVisit">First visit</span>
+          </div>
+          <div class="dh-ctx-item">
+            <span class="ci-icon">✨</span>
+            <span class="ci-val" id="cxVibes">Scenic, Luxury</span>
+          </div>
+        </div>
+        <div class="dh-intel" id="dhIntel">
+          <span class="hl">Dubai Mall</span> 1.2 km · luxury shopping & world's largest aquarium · <span class="hl">sunset views</span> from marina walk at 6:15 PM
+        </div>
+      </div>
+
+      <div class="dh-divider"></div>
+
+      <!-- Actions -->
+      <div class="dh-actions">
+        <button class="dh-act primary" onclick="event.stopPropagation(); doSurprise();">
+          <span class="ai">🎲</span> Surprise
+        </button>
+        <button class="dh-act" onclick="event.stopPropagation(); doSpin();">
+          <span class="ai">↻</span> Refresh
+        </button>
+        <button class="dh-act" onclick="event.stopPropagation(); doSave();">
+          <span class="ai">♡</span> Save Area
+        </button>
+      </div>
+
+      <div class="dh-divider"></div>
+
+      <!-- Recents -->
+      <div class="dh-recents" id="dhRecents">
+        <div class="dh-rec-label">Recent explorations</div>
+        <div class="dh-rec-item" onclick="setScene('remote')">
+          <div class="dh-rec-flag">🇧🇿</div>
+          <div class="dh-rec-info">
+            <div class="dh-rec-name">Belize City</div>
+            <div class="dh-rec-detail">8 saved · 3 days ago</div>
+          </div>
+          <div class="dh-rec-dist">7,200 mi</div>
+        </div>
+        <div class="dh-rec-item">
+          <div class="dh-rec-flag">🇯🇵</div>
+          <div class="dh-rec-info">
+            <div class="dh-rec-name">Kyoto, Japan</div>
+            <div class="dh-rec-detail">12 saved · 1 week ago</div>
+          </div>
+          <div class="dh-rec-dist">4,800 mi</div>
+        </div>
+        <div class="dh-rec-item">
+          <div class="dh-rec-flag">🇵🇪</div>
+          <div class="dh-rec-info">
+            <div class="dh-rec-name">Lima, Peru</div>
+            <div class="dh-rec-detail">5 saved · 2 weeks ago</div>
+          </div>
+          <div class="dh-rec-dist">8,100 mi</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save toast -->
+  <div class="save-toast" id="saveToast">
+    <div class="st-head">
+      <span class="st-heart">♥</span>
+      <span class="st-title">Saved! Dubai Aquarium</span>
+    </div>
+    <div class="st-cards">
+      <div class="st-card">
+        <div class="st-card-name">Lost Chambers</div>
+        <div class="st-card-vibe">Scenic · Unique</div>
+        <div class="st-card-dist">0.8 km</div>
+      </div>
+      <div class="st-card">
+        <div class="st-card-name">Atlantis Waterpark</div>
+        <div class="st-card-vibe">Family · Adventure</div>
+        <div class="st-card-dist">2.1 km</div>
+      </div>
+      <div class="st-card">
+        <div class="st-card-name">Blue Waters</div>
+        <div class="st-card-vibe">Scenic · Luxury</div>
+        <div class="st-card-dist">3.4 km</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Surprise flash -->
+  <div class="surprise-flash" id="surpriseFlash">
+    <div class="surprise-flash-text">✨ Finding something special...</div>
+  </div>
+
+  <!-- Bottom: dots + carousel + nav -->
+  <div class="poi-dots">
+    <div class="pdot on"></div>
+    <div class="pdot"></div>
+    <div class="pdot"></div>
+    <div class="pdot"></div>
+    <div class="pdot"></div>
+  </div>
+
+  <div class="poi-carousel">
+    <div class="poi-c">
+      <div class="poi-c-name">Dubai Mall</div>
+      <div class="poi-c-vibe">Shopping · Luxury</div>
+      <div class="poi-c-info">⭐ 4.8 · Open now</div>
+      <div class="poi-c-btns">
+        <button class="poi-c-btn" onclick="doSave()">♡ Save</button>
+        <button class="poi-c-btn">📍 Details</button>
+      </div>
+    </div>
+    <div class="poi-c">
+      <div class="poi-c-name">Marina Walk</div>
+      <div class="poi-c-vibe">Scenic · Nightlife</div>
+      <div class="poi-c-info">⭐ 4.6 · Open now</div>
+      <div class="poi-c-btns">
+        <button class="poi-c-btn saved">♥ Saved</button>
+        <button class="poi-c-btn">📍 Details</button>
+      </div>
+    </div>
+    <div class="poi-c">
+      <div class="poi-c-name">Ain Dubai</div>
+      <div class="poi-c-vibe">Landmark · Views</div>
+      <div class="poi-c-info">⭐ 4.5 · Open now</div>
+      <div class="poi-c-btns">
+        <button class="poi-c-btn" onclick="doSave()">♡ Save</button>
+        <button class="poi-c-btn">📍 Details</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="bot-nav">
+    <div class="bot-ai">
+      <div class="bot-orb"></div>
+      <span>Ask about this area...</span>
+    </div>
+    <div class="bot-icon">◎</div>
+    <div class="bot-icon">☰</div>
+  </div>
+</div>
+
+<p class="state-desc" id="stateDesc">
+  <strong>Local view:</strong> Collapsed header shows place + weather + time. Surprise button always one-tap. Tap bar to expand.
+</p>
+
+<script>
+const dh = document.getElementById('dh');
+const dhCollapsed = document.getElementById('dhCollapsed');
+const dhSpinning = document.getElementById('dhSpinning');
+const dhName = document.getElementById('dhName');
+const dhMeta = document.getElementById('dhMeta');
+const dhCount = document.getElementById('dhCount');
+const dhRemote = document.getElementById('dhRemote');
+const spinWhere = document.getElementById('spinWhere');
+const saveToast = document.getElementById('saveToast');
+const surpriseFlash = document.getElementById('surpriseFlash');
+const hint = document.getElementById('hint');
+const stateDesc = document.getElementById('stateDesc');
+const simPins = document.querySelectorAll('.sim-pin');
+
+let expanded = false;
+let spinning = false;
+
+// Show hint on load
+setTimeout(() => hint.classList.add('vis'), 600);
+setTimeout(() => hint.classList.remove('vis'), 3500);
+
+function setScene(scene) {
+  // Clear spinning
+  spinning = false;
+  dh.classList.remove('is-spinning');
+
+  // Clear expand
+  if (expanded) toggleExpand();
+
+  // Update control buttons
+  document.getElementById('btnLocal').classList.toggle('active', scene === 'local');
+  document.getElementById('btnRemote').classList.toggle('active', scene === 'remote');
+
+  if (scene === 'local') {
+    dhName.textContent = 'Dubai Marina';
+    dhMeta.innerHTML = '🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit';
+    dhCount.textContent = '5 places';
+    dhRemote.classList.remove('show');
+    document.getElementById('cxTemp').textContent = '82°F';
+    document.getElementById('cxTime').textContent = '3:42 PM';
+    document.getElementById('cxVisit').textContent = 'First visit';
+    document.getElementById('cxVibes').textContent = 'Scenic, Luxury';
+    document.getElementById('dhIntel').innerHTML = '<span class="hl">Dubai Mall</span> 1.2 km · luxury shopping & world\'s largest aquarium · <span class="hl">sunset views</span> from marina walk at 6:15 PM';
+    stateDesc.innerHTML = '<strong>Local view:</strong> Collapsed header shows place + weather + time. Surprise button always one-tap. Tap bar to expand.';
+  } else {
+    dhName.textContent = 'Belize City';
+    dhMeta.innerHTML = '🌧 88°F <span class="sep">·</span> 11:42 AM <span class="sep">·</span> <span class="remote-tag">From Dubai · 7,200 mi</span>';
+    dhCount.textContent = '8 places';
+    dhRemote.classList.add('show');
+    document.getElementById('cxTemp').textContent = '88°F';
+    document.getElementById('cxTime').textContent = '11:42 AM';
+    document.getElementById('cxVisit').textContent = 'New area';
+    document.getElementById('cxVibes').textContent = 'Adventure, Cultural';
+    document.getElementById('dhIntel').innerHTML = '<span class="hl">Caracol Maya Site</span> 3.5 km · ancient Mayan pyramids · <span class="hl">Great Barrier Reef</span> snorkeling 20 min offshore';
+    stateDesc.innerHTML = '<strong>Remote exploring:</strong> Teal "From Dubai · 7,200 mi" badge in both collapsed meta and expanded panel. User always knows they\'re exploring remotely.';
+  }
+}
+
+function toggleExpand() {
+  if (spinning) return;
+  expanded = !expanded;
+  dh.classList.toggle('is-expanded', expanded);
+  hint.classList.remove('vis');
+  if (expanded) {
+    setTimeout(() => document.getElementById('searchInput').focus(), 350);
+    stateDesc.innerHTML = '<strong>Expanded:</strong> Search input (teleport anywhere), context grid (weather/time/vibes), intel strip, 3 action buttons, recent explorations. All in one panel.';
+  }
+}
+
+function showRecents(show) {
+  document.getElementById('dhRecents').classList.toggle('show', show);
+}
+
+function doSpin() {
+  if (expanded) toggleExpand();
+  spinning = true;
+  dh.classList.add('is-spinning');
+  spinWhere.textContent = dhName.textContent;
+  stateDesc.innerHTML = '<strong>Discovering:</strong> Spinner replaces collapsed content. Cancel available. Auto-resolves in 2.5s.';
+  setTimeout(() => {
+    if (spinning) cancelSpin();
+  }, 2500);
+}
+
+function cancelSpin() {
+  spinning = false;
+  dh.classList.remove('is-spinning');
+  stateDesc.innerHTML = '<strong>Back to idle.</strong> Discovery cancelled or completed.';
+}
+
+function doSurprise() {
+  if (expanded) toggleExpand();
+  surpriseFlash.classList.add('on');
+  dh.classList.add('is-spinning');
+  spinning = true;
+  spinWhere.textContent = dhName.textContent;
+  stateDesc.innerHTML = '<strong>Surprise!</strong> Flash overlay + spinner. Taste-filtered POIs incoming...';
+
+  setTimeout(() => surpriseFlash.classList.remove('on'), 1200);
+  setTimeout(() => {
+    spinning = false;
+    dh.classList.remove('is-spinning');
+    dhCount.textContent = '3 places';
+    stateDesc.innerHTML = '<strong>Surprise delivered!</strong> 3 taste-matched POIs loaded. Header returns to collapsed with updated count.';
+  }, 2000);
+}
+
+function doSave() {
+  saveToast.classList.add('vis');
+  stateDesc.innerHTML = '<strong>Saved!</strong> Toast shows 3 similar places nearby. Dashed pins pulse onto the map. Fades after 4s.';
+  setTimeout(() => simPins.forEach(p => p.classList.add('show')), 300);
+  setTimeout(() => saveToast.classList.remove('vis'), 4000);
+  setTimeout(() => simPins.forEach(p => p.classList.remove('show')), 10000);
+}
+</script>
+
+</body>
+</html>

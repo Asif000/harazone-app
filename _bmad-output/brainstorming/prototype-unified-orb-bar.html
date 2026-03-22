@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Unified Orb Bar</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 16px 60px;
+  }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 24px; }
+  .phase {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: rgba(102,126,234,0.5); font-weight: 600;
+    margin: 24px 0 14px; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    width: 320px; text-align: center;
+  }
+  .step { width: 320px; margin-bottom: 32px; }
+  .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .st { font-size: 14px; font-weight: 700; }
+  .sd { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 12px; }
+  .sd .k { color: #4ECDC4; font-weight: 600; }
+  .sd .p { color: #a5b4fc; font-weight: 600; }
+
+  /* Phone */
+  .phone {
+    width: 320px; height: 693px;
+    border-radius: 36px; border: 3px solid rgba(255,255,255,0.08);
+    background: #0a0a0f; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column;
+  }
+  .p-status {
+    height: 48px; flex-shrink: 0; padding: 14px 22px 0;
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6);
+    position: relative;
+  }
+  .p-island {
+    width: 100px; height: 28px; background: #000; border-radius: 14px;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  }
+
+  /* Header */
+  .dh {
+    flex-shrink: 0; margin: 2px 8px 0;
+    border-radius: 14px; background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
+  }
+  .dh-row {
+    display: flex; align-items: center;
+    padding: 8px 8px 8px 12px; gap: 6px;
+  }
+  .dh-info { flex: 1; min-width: 0; }
+  .dh-name {
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .safety-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #4ade80; }
+  .dh-meta { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; white-space: nowrap; }
+  .dh-meta .sep { margin: 0 3px; opacity: 0.3; }
+  .dh-meta .hl { color: #4ECDC4; font-weight: 500; }
+  .dh-chip { padding: 2px 7px; border-radius: 7px; background: rgba(255,255,255,0.06); font-size: 9.5px; color: rgba(255,255,255,0.4); flex-shrink: 0; }
+  .dh-surp {
+    width: 34px; height: 34px; border-radius: 11px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 1px 8px rgba(102,126,234,0.2);
+    position: relative; overflow: hidden;
+  }
+  .dh-surp .shm {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%); animation: shim 3s infinite;
+  }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .dh-chev { font-size: 8px; color: rgba(255,255,255,0.15); flex-shrink: 0; }
+
+  /* Map */
+  .p-map {
+    flex: 1; min-height: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%),
+      #0d1117;
+    position: relative;
+  }
+  .pin {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+  }
+
+  /* Floating buttons on map */
+  .map-btn {
+    position: absolute; z-index: 5;
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(20,20,28,0.9); border: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.4); font-size: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  /* Cards */
+  .p-cards { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px; }
+  .p-card {
+    flex: 1; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 8px 9px;
+  }
+  .pc-n { font-size: 11px; font-weight: 600; }
+  .pc-v { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .pc-i { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  /* === UNIFIED ORB BAR === */
+  .orb-bar-wrap {
+    flex-shrink: 0; padding: 6px 8px 20px;
+    display: flex; gap: 6px; align-items: flex-end;
+  }
+
+  .orb-bar {
+    flex: 1;
+    background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 14px;
+    padding: 0;
+    cursor: pointer;
+    transition: all 0.3s;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* Idle state */
+  .orb-bar .ob-main {
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 12px;
+  }
+  .ob-orb {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; flex-shrink: 0;
+    transition: all 0.3s;
+    position: relative;
+  }
+  .ob-orb .orb-face { font-size: 14px; }
+  .ob-text {
+    flex: 1; font-size: 11px; color: rgba(255,255,255,0.3);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: color 0.3s;
+  }
+  .ob-mic {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: rgba(255,255,255,0.2); flex-shrink: 0;
+  }
+
+  /* Nudge state — bar glows and pulses */
+  .orb-bar.nudge {
+    border-color: rgba(102,126,234,0.2);
+    box-shadow: 0 0 16px rgba(102,126,234,0.08);
+  }
+  .orb-bar.nudge .ob-orb {
+    animation: orb-bounce 2s ease-in-out infinite;
+    box-shadow: 0 0 12px rgba(102,126,234,0.35);
+  }
+  @keyframes orb-bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+  }
+  .orb-bar.nudge .ob-text { color: rgba(255,255,255,0.6); }
+
+  /* Nudge pip */
+  .ob-pip {
+    position: absolute; top: -2px; right: -2px;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #FF6B6B; border: 2px solid rgba(20,20,28,0.85);
+    display: none;
+  }
+  .orb-bar.nudge .ob-pip { display: block; }
+
+  /* Glow trail behind orb on nudge */
+  .ob-glow {
+    position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+    width: 36px; height: 36px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(102,126,234,0.15) 0%, transparent 70%);
+    opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .orb-bar.nudge .ob-glow { opacity: 1; animation: glow-pulse 2s ease-in-out infinite; }
+  @keyframes glow-pulse {
+    0%, 100% { opacity: 0.5; transform: translateY(-50%) scale(1); }
+    50% { opacity: 1; transform: translateY(-50%) scale(1.3); }
+  }
+
+  /* Surprise state — teal glow */
+  .orb-bar.surprise {
+    border-color: rgba(167,139,250,0.2);
+    box-shadow: 0 0 16px rgba(167,139,250,0.08);
+  }
+  .orb-bar.surprise .ob-orb {
+    animation: orb-bounce 2s ease-in-out infinite;
+    box-shadow: 0 0 12px rgba(167,139,250,0.35);
+  }
+  .orb-bar.surprise .ob-text { color: rgba(167,139,250,0.75); }
+  .orb-bar.surprise .ob-glow {
+    opacity: 1; animation: glow-pulse 2s ease-in-out infinite;
+    background: radial-gradient(circle, rgba(167,139,250,0.15) 0%, transparent 70%);
+  }
+
+  /* Save state — warm glow */
+  .orb-bar.saved {
+    border-color: rgba(255,107,107,0.15);
+    box-shadow: 0 0 12px rgba(255,107,107,0.06);
+  }
+  .orb-bar.saved .ob-orb {
+    animation: orb-bounce 2.5s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(255,107,107,0.25);
+  }
+  .orb-bar.saved .ob-text { color: rgba(255,107,107,0.7); }
+  .orb-bar.saved .ob-glow {
+    opacity: 1;
+    background: radial-gradient(circle, rgba(255,107,107,0.12) 0%, transparent 70%);
+  }
+
+  /* Teleport state — teal */
+  .orb-bar.teleport {
+    border-color: rgba(78,205,196,0.15);
+    box-shadow: 0 0 12px rgba(78,205,196,0.06);
+  }
+  .orb-bar.teleport .ob-orb {
+    animation: orb-bounce 2s ease-in-out infinite;
+    box-shadow: 0 0 10px rgba(78,205,196,0.25);
+  }
+  .orb-bar.teleport .ob-text { color: rgba(78,205,196,0.7); }
+
+  /* Expanded nudge — peek card above bar */
+  .ob-peek {
+    padding: 8px 12px 2px;
+    font-size: 10.5px; color: rgba(255,255,255,0.55);
+    line-height: 1.5;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    display: none;
+  }
+  .ob-peek.show { display: block; }
+  .ob-peek .peek-hl { color: #4ECDC4; font-weight: 500; }
+  .ob-peek .peek-action {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 2px 7px; border-radius: 5px;
+    background: rgba(78,205,196,0.08);
+    color: #4ECDC4; font-size: 9px; font-weight: 500;
+    margin-top: 4px; margin-bottom: 2px;
+  }
+
+  /* Shimmer streak across bar on nudge arrival */
+  .ob-streak {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(102,126,234,0.06), transparent);
+    transform: translateX(-100%);
+    pointer-events: none;
+  }
+  .orb-bar.nudge .ob-streak { animation: streak 3s ease-in-out infinite; }
+  @keyframes streak {
+    0% { transform: translateX(-100%); }
+    40% { transform: translateX(100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  /* Nav buttons */
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #4ECDC4, #2ab0a6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff;
+    flex-shrink: 0; cursor: pointer;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+  .nav-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 13px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<h1>Unified Orb Bar</h1>
+<div class="sub">Floating orb merged into bottom bar. One AI surface, two modes. Scroll down.</div>
+
+<!-- ===== 1: IDLE ===== -->
+<div class="phase">Idle — Waiting for You</div>
+<div class="step">
+  <div class="step-head"><div class="sn">1</div><div class="st">Idle state</div></div>
+  <div class="sd">Bar shows the <span class="p">orb</span> (larger, 28px, with face), placeholder text, and mic button. Subtle, unobtrusive. No floating orb on map — cleaner map surface. Location button floats on map (bottom-right).</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info"><div class="dh-name">Dubai Marina <div class="safety-dot"></div></div><div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div></div>
+      <div class="dh-chip">5 places</div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:20%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:40%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:15%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:50%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:30%;left:80%;background:#F97316"></div>
+      <div class="map-btn" style="bottom:10px;right:10px">◎</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar">
+        <div class="ob-glow"></div>
+        <div class="ob-streak"></div>
+        <div class="ob-main">
+          <div class="ob-orb"><span class="orb-face">🌟</span><div class="ob-pip"></div></div>
+          <div class="ob-text">Ask about Dubai Marina...</div>
+          <div class="ob-mic">🎤</div>
+        </div>
+      </div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 2: NUDGE ARRIVES ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">2</div><div class="st">Nudge arrives — bar glows</div></div>
+  <div class="sd">Orb <span class="p">bounces and pulses</span> with glow halo. Red pip appears. Text changes to the nudge. <span class="k">Shimmer streak</span> sweeps across the bar to catch attention. Border glows purple. Hard to miss even at the bottom.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info"><div class="dh-name">Dubai Marina <div class="safety-dot"></div></div><div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div></div>
+      <div class="dh-chip">5 places</div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:20%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:40%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:15%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:50%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:30%;left:80%;background:#F97316"></div>
+      <div class="map-btn" style="bottom:10px;right:10px">◎</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar nudge">
+        <div class="ob-glow"></div>
+        <div class="ob-streak"></div>
+        <div class="ob-main">
+          <div class="ob-orb"><span class="orb-face">💬</span><div class="ob-pip"></div></div>
+          <div class="ob-text">Ain Dubai closes in 2 hrs — catch sunset!</div>
+          <div class="ob-mic">🎤</div>
+        </div>
+      </div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 3: TAP NUDGE — peek card ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">3</div><div class="st">Tap nudge — peek card expands</div></div>
+  <div class="sd">Tap the bar → a <span class="k">peek card</span> expands upward from the bar with the full nudge text + action button. Still compact — not full chat. Tap again or action → dismisses. Swipe up → full chat.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info"><div class="dh-name">Dubai Marina <div class="safety-dot"></div></div><div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div></div>
+      <div class="dh-chip">5 places</div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:20%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:40%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:15%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:50%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:30%;left:80%;background:#F97316"></div>
+      <div class="map-btn" style="bottom:10px;right:10px">◎</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar nudge">
+        <div class="ob-glow"></div>
+        <div class="ob-peek show">
+          <span class="peek-hl">Ain Dubai</span> closes at 8 PM — that's only 2 hours! The sunset from the observation wheel is incredible. Golden hour starts at 6:15 PM today.
+          <br><span class="peek-action">🎡 Show Ain Dubai on map</span>
+        </div>
+        <div class="ob-main">
+          <div class="ob-orb"><span class="orb-face">💬</span><div class="ob-pip"></div></div>
+          <div class="ob-text">Swipe up for full chat...</div>
+          <div class="ob-mic">🎤</div>
+        </div>
+      </div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 4: SURPRISE STATE ===== -->
+<div class="phase">Contextual States</div>
+<div class="step">
+  <div class="step-head"><div class="sn">4</div><div class="st">Surprise delivered</div></div>
+  <div class="sd">After Surprise, orb glows <span class="p">purple</span>. Face changes to ✨. Text explains why it picked these. Tapping opens a peek with taste reasoning.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info"><div class="dh-name">Dubai Marina <div class="safety-dot"></div></div><div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> ✨ Scenic</div></div>
+      <div class="dh-chip">3 places</div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:25%;left:28%;background:#4ECDC4"></div>
+      <div class="pin" style="top:45%;left:55%;background:#A78BFA"></div>
+      <div class="pin" style="top:30%;left:75%;background:#F97316"></div>
+      <div class="map-btn" style="bottom:10px;right:10px">◎</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+      <div class="p-card"><div class="pc-n">Palm View Point</div><div class="pc-v">Scenic · Views</div><div class="pc-i">⭐ 4.4</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar surprise">
+        <div class="ob-glow"></div>
+        <div class="ob-streak"></div>
+        <div class="ob-main">
+          <div class="ob-orb"><span class="orb-face">✨</span></div>
+          <div class="ob-text">Here's why I picked these for you...</div>
+          <div class="ob-mic">🎤</div>
+        </div>
+      </div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 5: SAVE STATE ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">5</div><div class="st">Just saved a POI</div></div>
+  <div class="sd">Orb glows <span class="k" style="color:#FF6B6B">warm red</span>. Face: ♥. Tells you WHY you'd love this place. Reinforces the save decision.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info"><div class="dh-name">Dubai Marina <div class="safety-dot"></div></div><div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div></div>
+      <div class="dh-chip">5 places</div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:20%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:40%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:15%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:50%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:30%;left:80%;background:#F97316"></div>
+      <div class="map-btn" style="bottom:10px;right:10px">◎</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar saved">
+        <div class="ob-glow"></div>
+        <div class="ob-main">
+          <div class="ob-orb"><span class="orb-face">♥</span></div>
+          <div class="ob-text">Why you'd love Marina Walk...</div>
+          <div class="ob-mic">🎤</div>
+        </div>
+      </div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 6: TELEPORT STATE ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">6</div><div class="st">Teleported to remote area</div></div>
+  <div class="sd">Orb glows <span class="k">teal</span>. Offers to tell you about the new area. Location button on map changes to <span class="k">⌂</span> (return home) with teal ring.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info"><div class="dh-name">Griffith Park Area <div class="safety-dot"></div></div><div class="dh-meta">☀️ 74°F <span class="sep">·</span> 4:42 AM <span class="sep">·</span> <span class="hl">From Dubai · 8,300 mi</span></div></div>
+      <div class="dh-chip">12 places</div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:22%;left:28%;background:#4ECDC4"></div>
+      <div class="pin" style="top:42%;left:55%;background:#FFE66D"></div>
+      <div class="pin" style="top:28%;left:72%;background:#A78BFA"></div>
+      <div class="pin" style="top:50%;left:40%;background:#FF6B6B"></div>
+      <div class="map-btn" style="bottom:10px;right:10px;border-color:rgba(78,205,196,0.2);color:#4ECDC4">⌂</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Griffith Observatory</div><div class="pc-v">Scenic · Landmark</div><div class="pc-i">⭐ 4.9 · Free</div></div>
+      <div class="p-card"><div class="pc-n">Hollywood Sign</div><div class="pc-v">Scenic · Hiking</div><div class="pc-i">⭐ 4.7</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar teleport">
+        <div class="ob-glow"></div>
+        <div class="ob-main">
+          <div class="ob-orb"><span class="orb-face">🌟</span></div>
+          <div class="ob-text">Tell me about Griffith Park...</div>
+          <div class="ob-mic">🎤</div>
+        </div>
+      </div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 7: FINAL ANATOMY ===== -->
+<div class="phase">Final Screen Anatomy</div>
+<div class="step">
+  <div class="step-head"><div class="sn">7</div><div class="st">Everything together</div></div>
+  <div class="sd">
+    <span class="p">FIND</span> — Discovery Header (top)<br>
+    <span class="k">SEE</span> — Map + pins + ◎ location (floating)<br>
+    <span class="k">BROWSE</span> — POI carousel<br>
+    <span class="p">UNDERSTAND</span> — Unified orb bar + avatar + list toggle<br><br>
+    No floating orb. No separate ticker. No vibe rail. No search pill. <span class="k">5 elements killed, 0 added.</span>
+  </div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info"><div class="dh-name">Dubai Marina <div class="safety-dot"></div></div><div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div></div>
+      <div class="dh-chip">5 places</div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:20%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:40%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:15%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:50%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:30%;left:80%;background:#F97316"></div>
+      <div class="map-btn" style="bottom:10px;right:10px">◎</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar">
+        <div class="ob-glow"></div>
+        <div class="ob-streak"></div>
+        <div class="ob-main">
+          <div class="ob-orb"><span class="orb-face">🌟</span><div class="ob-pip"></div></div>
+          <div class="ob-text">Ask about Dubai Marina...</div>
+          <div class="ob-mic">🎤</div>
+        </div>
+      </div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

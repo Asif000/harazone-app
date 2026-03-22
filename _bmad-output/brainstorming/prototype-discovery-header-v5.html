@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discovery Header — User Journey Storyboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif;
+    background: #111118;
+    color: #fff;
+    padding: 40px 20px 80px;
+  }
+
+  .page-title {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .page-sub {
+    text-align: center;
+    font-size: 13px;
+    color: rgba(255,255,255,0.35);
+    margin-bottom: 50px;
+  }
+
+  /* ===== STEP SECTION ===== */
+  .step-section {
+    max-width: 440px;
+    margin: 0 auto 60px;
+  }
+  .step-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  .step-number {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; flex-shrink: 0;
+  }
+  .step-title {
+    font-size: 18px; font-weight: 700;
+  }
+  .step-desc {
+    font-size: 13px;
+    color: rgba(255,255,255,0.5);
+    line-height: 1.6;
+    margin-bottom: 16px;
+    padding-left: 44px;
+  }
+  .step-desc .key { color: #4ECDC4; font-weight: 600; }
+  .step-desc .purple { color: #a5b4fc; font-weight: 600; }
+
+  .divider-line {
+    max-width: 440px;
+    margin: 0 auto 60px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+  }
+
+  .phase-label {
+    max-width: 440px;
+    margin: 0 auto 30px;
+    text-align: center;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: rgba(102,126,234,0.6);
+    font-weight: 600;
+  }
+
+  /* ===== PHONE FRAME ===== */
+  .phone {
+    width: 340px; height: 200px;
+    margin: 0 auto;
+    border-radius: 20px;
+    background: #0a0a0f;
+    border: 2px solid rgba(255,255,255,0.08);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+  }
+  /* Taller variant for expanded states */
+  .phone.tall { height: 420px; }
+  .phone.med { height: 280px; }
+
+  .phone-map {
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse at 35% 55%, rgba(30,60,40,0.3) 0%, transparent 50%),
+      radial-gradient(ellipse at 65% 35%, rgba(30,40,70,0.3) 0%, transparent 50%),
+      #0d1117;
+    z-index: 0;
+  }
+  .phone-map::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,0.012) 40px, rgba(255,255,255,0.012) 41px),
+      repeating-linear-gradient(90deg, transparent, transparent 40px, rgba(255,255,255,0.012) 40px, rgba(255,255,255,0.012) 41px);
+  }
+
+  /* Status bar (minimal) */
+  .ph-status {
+    position: relative; z-index: 10;
+    height: 28px;
+    padding: 8px 16px 0;
+    display: flex; justify-content: space-between;
+    font-size: 10px; font-weight: 600;
+    color: rgba(255,255,255,0.6);
+  }
+
+  /* Pins */
+  .ph-pin {
+    position: absolute;
+    width: 18px; height: 18px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    z-index: 2;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+
+  /* Sim pins */
+  .ph-sim {
+    position: absolute;
+    width: 14px; height: 14px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    z-index: 3;
+    border: 1.5px dashed rgba(78,205,196,0.7);
+    background: rgba(78,205,196,0.12);
+  }
+
+  /* ===== DISCOVERY HEADER (inside phone) ===== */
+  .dh {
+    position: relative; z-index: 10;
+    margin: 2px 8px 0;
+    border-radius: 14px;
+    background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+
+  /* Collapsed row */
+  .dh-row {
+    display: flex; align-items: center;
+    padding: 7px 8px 7px 11px;
+    gap: 6px;
+  }
+  .dh-info { flex: 1; min-width: 0; }
+  .dh-name {
+    font-size: 12px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .dh-meta {
+    font-size: 9px; color: rgba(255,255,255,0.4); margin-top: 1px;
+    white-space: nowrap;
+  }
+  .dh-meta .sep { margin: 0 3px; opacity: 0.3; }
+  .dh-meta .rem { color: #4ECDC4; font-weight: 500; }
+
+  .dh-chip {
+    padding: 2px 6px; border-radius: 7px;
+    background: rgba(255,255,255,0.06); font-size: 9px;
+    color: rgba(255,255,255,0.45); flex-shrink: 0; white-space: nowrap;
+  }
+  .dh-disc-btn {
+    padding: 4px 10px; border-radius: 8px;
+    background: linear-gradient(135deg, #4ECDC4, #2ab0a6);
+    font-size: 9.5px; font-weight: 600; color: #fff;
+    border: none; flex-shrink: 0; white-space: nowrap;
+    box-shadow: 0 1px 6px rgba(78,205,196,0.25);
+  }
+  .dh-surp {
+    width: 30px; height: 30px; border-radius: 10px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: 0 1px 8px rgba(102,126,234,0.25);
+  }
+  .dh-chev { font-size: 7px; color: rgba(255,255,255,0.18); flex-shrink: 0; }
+
+  /* Spinning row */
+  .dh-spin-row {
+    display: flex; align-items: center;
+    padding: 7px 11px; gap: 8px;
+  }
+  .spin-dot {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.06);
+    border-top-color: #667eea; border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spin-txt { font-size: 11px; color: rgba(255,255,255,0.55); flex: 1; }
+  .spin-txt em { color: #fff; font-style: normal; font-weight: 600; }
+  .spin-can {
+    padding: 3px 8px; border-radius: 5px;
+    background: rgba(255,255,255,0.06); border: none;
+    color: rgba(255,255,255,0.35); font-size: 9px;
+  }
+
+  /* Search input row */
+  .dh-search-row {
+    display: flex; align-items: center;
+    padding: 4px 11px; gap: 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .dh-search-ico { font-size: 11px; color: rgba(255,255,255,0.25); }
+  .dh-search-text {
+    flex: 1; font-size: 12px; color: rgba(255,255,255,0.25); padding: 6px 0;
+  }
+  .dh-search-text.typed { color: #fff; font-weight: 500; }
+  .dh-search-x {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255,255,255,0.06); border: none;
+    color: rgba(255,255,255,0.35); font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Remote badge */
+  .dh-remote-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    margin: 4px 11px 2px; padding: 3px 8px;
+    background: rgba(78,205,196,0.06); border: 1px solid rgba(78,205,196,0.1);
+    border-radius: 5px; font-size: 9px; color: #4ECDC4; font-weight: 500;
+  }
+  .rb-dot {
+    width: 4px; height: 4px; background: #4ECDC4; border-radius: 50%;
+  }
+
+  /* Context grid */
+  .dh-ctx-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 4px 8px; padding: 7px 11px;
+  }
+  .dh-ctx-item {
+    font-size: 9.5px; color: rgba(255,255,255,0.4);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .dh-ctx-item .val { color: rgba(255,255,255,0.7); font-weight: 500; }
+
+  /* Intel strip */
+  .dh-intel-strip {
+    margin: 2px 11px 6px; padding: 5px 8px;
+    background: rgba(255,255,255,0.02); border-radius: 7px;
+    font-size: 9.5px; color: rgba(255,255,255,0.3); line-height: 1.4;
+  }
+  .dh-intel-strip .hl { color: #4ECDC4; font-weight: 500; }
+
+  /* Action buttons */
+  .dh-actions-row {
+    display: flex; gap: 5px; padding: 6px 11px 8px;
+  }
+  .dh-act-btn {
+    flex: 1; padding: 6px 0; border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.02);
+    color: rgba(255,255,255,0.5); font-size: 10px; font-weight: 500;
+    display: flex; align-items: center; justify-content: center; gap: 3px;
+  }
+  .dh-act-btn.pri {
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border-color: transparent; color: #fff;
+  }
+
+  /* Search results */
+  .dh-sr-section { padding: 0 11px; }
+  .dh-sr-label {
+    font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: rgba(255,255,255,0.15); padding: 6px 0 3px; font-weight: 600;
+  }
+  .dh-sr-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 5px 0;
+  }
+  .dh-sr-ico {
+    width: 26px; height: 26px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center; font-size: 12px;
+  }
+  .dh-sr-ico.poi-bg { background: rgba(78,205,196,0.1); }
+  .dh-sr-ico.area-bg { background: rgba(102,126,234,0.1); }
+  .dh-sr-ico.vibe-bg { background: rgba(255,107,107,0.1); }
+  .dh-sr-info { flex: 1; min-width: 0; }
+  .dh-sr-name { font-size: 11px; font-weight: 500; }
+  .dh-sr-name .m { color: #fff; font-weight: 600; }
+  .dh-sr-name .r { color: rgba(255,255,255,0.45); }
+  .dh-sr-det { font-size: 9px; color: rgba(255,255,255,0.25); margin-top: 1px; }
+  .dh-sr-badge {
+    padding: 1px 5px; border-radius: 4px; font-size: 8px; font-weight: 600; flex-shrink: 0;
+  }
+  .dh-sr-badge.poi-b { background: rgba(78,205,196,0.12); color: #4ECDC4; }
+  .dh-sr-badge.area-b { background: rgba(102,126,234,0.12); color: #8b9cf7; }
+  .dh-sr-badge.vibe-b { background: rgba(255,107,107,0.12); color: #FF6B6B; }
+
+  /* Area result highlighted */
+  .dh-sr-item.highlighted {
+    background: rgba(102,126,234,0.06);
+    border-radius: 7px;
+    padding: 5px 6px;
+    margin: 0 -6px;
+  }
+
+  /* Recents */
+  .dh-recs-section { padding: 4px 11px 6px; }
+  .dh-recs-label {
+    font-size: 8px; text-transform: uppercase; letter-spacing: 0.6px;
+    color: rgba(255,255,255,0.15); margin-bottom: 4px;
+  }
+  .dh-rec-item {
+    display: flex; align-items: center; gap: 6px; padding: 4px 0;
+  }
+  .dh-rec-flag {
+    width: 22px; height: 22px; border-radius: 5px;
+    background: rgba(255,255,255,0.04);
+    display: flex; align-items: center; justify-content: center; font-size: 11px;
+  }
+  .dh-rec-info { flex: 1; }
+  .dh-rec-name { font-size: 10.5px; font-weight: 500; }
+  .dh-rec-det { font-size: 8.5px; color: rgba(255,255,255,0.25); }
+  .dh-rec-dist { font-size: 8.5px; color: rgba(255,255,255,0.2); }
+
+  /* Divider inside panel */
+  .dh-div { height: 1px; background: rgba(255,255,255,0.04); margin: 0 11px; }
+
+  /* ===== BOTTOM ELEMENTS (inside phone) ===== */
+  .ph-carousel {
+    position: absolute; bottom: 38px; left: 0; right: 0;
+    padding: 0 8px;
+    display: flex; gap: 6px; z-index: 5;
+  }
+  .ph-card {
+    min-width: 150px;
+    background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 7px 9px;
+  }
+  .ph-card-n { font-size: 10.5px; font-weight: 600; }
+  .ph-card-v { font-size: 8.5px; color: #4ECDC4; margin-top: 1px; }
+  .ph-card-i { font-size: 8.5px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  .ph-bottom {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 6px 8px 12px; display: flex; gap: 6px; z-index: 5;
+  }
+  .ph-ai {
+    flex: 1; background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 10px;
+    padding: 7px 10px; display: flex; align-items: center; gap: 5px;
+    font-size: 9.5px; color: rgba(255,255,255,0.25);
+  }
+  .ph-orb {
+    width: 16px; height: 16px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+  }
+  .ph-btn {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* Toast */
+  .ph-toast {
+    position: absolute; bottom: 80px; left: 8px; right: 8px;
+    background: rgba(20,20,28,0.95);
+    border: 1px solid rgba(78,205,196,0.12);
+    border-radius: 10px; padding: 8px; z-index: 10;
+  }
+  .ph-toast-h {
+    display: flex; align-items: center; gap: 5px; margin-bottom: 5px;
+    font-size: 10.5px; font-weight: 600;
+  }
+  .ph-toast-h .heart { color: #FF6B6B; }
+  .ph-toast-cards { display: flex; gap: 4px; }
+  .ph-toast-c {
+    flex: 1; background: rgba(255,255,255,0.03);
+    border-radius: 6px; padding: 5px 6px;
+  }
+  .ph-toast-cn { font-size: 9px; font-weight: 500; }
+  .ph-toast-cv { font-size: 8px; color: rgba(255,255,255,0.3); }
+  .ph-toast-cd { font-size: 8px; color: #4ECDC4; margin-top: 2px; }
+
+  /* Flash overlay */
+  .ph-flash {
+    position: absolute; inset: 0; z-index: 20;
+    background: rgba(0,0,0,0.3);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ph-flash-t {
+    font-size: 16px; font-weight: 700;
+    text-shadow: 0 3px 16px rgba(102,126,234,0.4);
+  }
+
+  /* Callout labels ON the phone */
+  .ph-callout {
+    position: absolute; z-index: 15;
+    padding: 2px 6px; border-radius: 4px;
+    font-size: 8px; font-weight: 600;
+    white-space: nowrap;
+  }
+  .ph-callout.surp {
+    top: 32px; right: 48px;
+    background: rgba(102,126,234,0.25); color: #c4b5fd;
+  }
+  .ph-callout.disc {
+    top: 32px; right: 80px;
+    background: rgba(78,205,196,0.25); color: #6ee7d8;
+  }
+  .ph-callout.ctx {
+    top: 51px; left: 14px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5);
+  }
+  .ph-callout.name-c {
+    top: 30px; left: 14px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.5);
+  }
+
+  /* Arrow connector */
+  .arrow-down {
+    text-align: center;
+    color: rgba(255,255,255,0.1);
+    font-size: 20px;
+    margin: 20px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-title">Discovery Header — User Journey</div>
+<div class="page-sub">Scroll down to walk through each state. One unified top bar replaces 4 separate elements.</div>
+
+<!-- ==================== PHASE 1: APP LAUNCH ==================== -->
+<div class="phase-label">Phase 1 — App Launch</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">1</div>
+    <div class="step-title">App opens at your location</div>
+  </div>
+  <div class="step-desc">
+    Map loads. The <span class="key">Discovery Header</span> is the ONLY element at the top. It shows:<br>
+    <span class="key">Area name</span> + <span class="key">weather · time · visit</span> + <span class="key">POI count</span> + <span class="purple">🎲 Surprise button</span> (always visible, always one-tap).
+  </div>
+  <div class="phone">
+    <div class="phone-map"></div>
+    <div class="ph-pin" style="top:45%;left:25%;background:#FF6B6B"></div>
+    <div class="ph-pin" style="top:55%;left:55%;background:#4ECDC4"></div>
+    <div class="ph-pin" style="top:38%;left:72%;background:#FFE66D"></div>
+    <div class="ph-pin" style="top:62%;left:38%;background:#A78BFA"></div>
+    <div class="ph-pin" style="top:48%;left:82%;background:#F97316"></div>
+    <div class="ph-callout surp">Surprise — always here ↓</div>
+    <div class="ph-callout name-c">Area + context ↓</div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp">🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="ph-carousel">
+      <div class="ph-card"><div class="ph-card-n">Dubai Mall</div><div class="ph-card-v">Shopping · Luxury</div><div class="ph-card-i">⭐ 4.8</div></div>
+      <div class="ph-card"><div class="ph-card-n">Marina Walk</div><div class="ph-card-v">Scenic · Nightlife</div><div class="ph-card-i">⭐ 4.6</div></div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+
+<!-- ==================== PHASE 2: LOCAL EXPLORATION ==================== -->
+<div class="phase-label">Phase 2 — Local Exploration</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">2</div>
+    <div class="step-title">Tap 🎲 Surprise</div>
+  </div>
+  <div class="step-desc">
+    One tap from collapsed state. Flash overlay + spinner. <span class="key">Taste-filtered POIs</span> loading based on saved preferences. No expansion or navigation needed.
+  </div>
+  <div class="phone">
+    <div class="phone-map"></div>
+    <div class="ph-flash"><div class="ph-flash-t">✨ Finding something special...</div></div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-spin-row">
+        <div class="spin-dot"></div>
+        <div class="spin-txt">Discovering <em>Dubai Marina</em>...</div>
+        <button class="spin-can">Cancel</button>
+      </div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">3</div>
+    <div class="step-title">Pan map to a new area</div>
+  </div>
+  <div class="step-desc">
+    User drags the map. After 500ms idle, the header <span class="key">transforms in-place</span>: area name updates to the new location, and the count chip is <span class="key">replaced by a teal "Discover" button</span>. No separate floating pill. Two clear choices: <span class="key">Discover</span> (show me what's here) or <span class="purple">🎲</span> (surprise me based on my taste).
+  </div>
+  <div class="phone">
+    <div class="phone-map"></div>
+    <div class="ph-callout disc">← NEW: Discover button</div>
+    <div class="ph-callout surp">Still here ↓</div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Jumeirah Beach</div>
+          <div class="dh-meta">🌤 84°F <span class="sep">·</span> 3:45 PM <span class="sep">·</span> New area</div>
+        </div>
+        <button class="dh-disc-btn">Discover</button>
+        <button class="dh-surp">🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">4</div>
+    <div class="step-title">Tap "Discover" → POIs load</div>
+  </div>
+  <div class="step-desc">
+    Spinner while fetching. When done: Discover button disappears, <span class="key">count chip returns</span> with "7 places". Header settles. Pins appear on map. Carousel fills with POI cards.
+  </div>
+  <div class="phone">
+    <div class="phone-map"></div>
+    <div class="ph-pin" style="top:40%;left:20%;background:#FF6B6B"></div>
+    <div class="ph-pin" style="top:52%;left:48%;background:#4ECDC4"></div>
+    <div class="ph-pin" style="top:35%;left:65%;background:#FFE66D"></div>
+    <div class="ph-pin" style="top:58%;left:33%;background:#A78BFA"></div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Jumeirah Beach</div>
+          <div class="dh-meta">🌤 84°F <span class="sep">·</span> 3:45 PM <span class="sep">·</span> New area</div>
+        </div>
+        <div class="dh-chip">7 places</div>
+        <button class="dh-surp">🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="ph-carousel">
+      <div class="ph-card"><div class="ph-card-n">Jumeirah Mosque</div><div class="ph-card-v">Cultural · Historic</div><div class="ph-card-i">⭐ 4.7</div></div>
+      <div class="ph-card"><div class="ph-card-n">Kite Beach</div><div class="ph-card-v">Beach · Active</div><div class="ph-card-i">⭐ 4.5</div></div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+<div class="divider-line"></div>
+
+<!-- ==================== PHASE 3: SEARCH & TELEPORT ==================== -->
+<div class="phase-label">Phase 3 — Search & Teleport</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">5</div>
+    <div class="step-title">Tap header → expands</div>
+  </div>
+  <div class="step-desc">
+    Tap anywhere on the collapsed bar. Full panel opens with: <span class="key">search input</span> (find POIs, areas, or vibes worldwide), <span class="key">context grid</span> (weather, time, visit, vibes), <span class="key">intel strip</span> (AI facts), <span class="key">3 action buttons</span>, and <span class="key">recent explorations</span>.
+  </div>
+  <div class="phone tall">
+    <div class="phone-map"></div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp">🎲</button>
+        <div class="dh-chev" style="transform:rotate(180deg)">▼</div>
+      </div>
+      <!-- Search input -->
+      <div class="dh-search-row">
+        <span class="dh-search-ico">🔍</span>
+        <span class="dh-search-text">Search places, areas, or vibes...</span>
+        <button class="dh-search-x">✕</button>
+      </div>
+      <div class="dh-div"></div>
+      <!-- Context -->
+      <div class="dh-ctx-grid">
+        <div class="dh-ctx-item">🌤 <span class="val">82°F</span> Partly cloudy</div>
+        <div class="dh-ctx-item">🕐 <span class="val">3:42 PM</span> Local</div>
+        <div class="dh-ctx-item">📍 <span class="val">First visit</span></div>
+        <div class="dh-ctx-item">✨ <span class="val">Scenic, Luxury</span></div>
+      </div>
+      <div class="dh-intel-strip">
+        <span class="hl">Dubai Mall</span> 1.2 km · luxury shopping · <span class="hl">sunset views</span> from marina walk at 6:15 PM
+      </div>
+      <div class="dh-div"></div>
+      <!-- Actions -->
+      <div class="dh-actions-row">
+        <button class="dh-act-btn pri">🎲 Surprise</button>
+        <button class="dh-act-btn">↻ Refresh</button>
+        <button class="dh-act-btn">♡ Save Area</button>
+      </div>
+      <div class="dh-div"></div>
+      <!-- Recents -->
+      <div class="dh-recs-section">
+        <div class="dh-recs-label">Recent explorations</div>
+        <div class="dh-rec-item">
+          <div class="dh-rec-flag">🇧🇿</div>
+          <div class="dh-rec-info"><div class="dh-rec-name">Belize City</div><div class="dh-rec-det">8 saved · 3 days ago</div></div>
+          <div class="dh-rec-dist">7,200 mi</div>
+        </div>
+        <div class="dh-rec-item">
+          <div class="dh-rec-flag">🇯🇵</div>
+          <div class="dh-rec-info"><div class="dh-rec-name">Kyoto, Japan</div><div class="dh-rec-det">12 saved · 1 week ago</div></div>
+          <div class="dh-rec-dist">4,800 mi</div>
+        </div>
+      </div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">6</div>
+    <div class="step-title">Type "griffith" → smart results</div>
+  </div>
+  <div class="step-desc">
+    One input handles all search types. Results grouped with <span class="key">color-coded badges</span>:<br>
+    <span class="key">POI</span> (teal) — specific places like Griffith Observatory<br>
+    <span class="key">Area</span> (blue) — teleport + discover 12+ places<br>
+    <span class="key">Vibe</span> (red) — AI-curated "scenic viewpoints near Griffith"<br>
+    Context and actions hide to make room for results.
+  </div>
+  <div class="phone tall" style="height:380px">
+    <div class="phone-map"></div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Dubai Marina</div>
+          <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+        </div>
+        <div class="dh-chip">5 places</div>
+        <button class="dh-surp">🎲</button>
+        <div class="dh-chev" style="transform:rotate(180deg)">▼</div>
+      </div>
+      <div class="dh-search-row">
+        <span class="dh-search-ico">🔍</span>
+        <span class="dh-search-text typed">griffith</span>
+        <button class="dh-search-x">✕</button>
+      </div>
+      <div class="dh-div"></div>
+      <div class="dh-sr-section">
+        <div class="dh-sr-label">PLACES</div>
+        <div class="dh-sr-item">
+          <div class="dh-sr-ico poi-bg">🏛</div>
+          <div class="dh-sr-info"><div class="dh-sr-name"><span class="m">Griffith</span><span class="r"> Observatory</span></div><div class="dh-sr-det">Los Angeles, CA · 8,300 mi</div></div>
+          <span class="dh-sr-badge poi-b">POI</span>
+        </div>
+        <div class="dh-sr-item">
+          <div class="dh-sr-ico poi-bg">🌳</div>
+          <div class="dh-sr-info"><div class="dh-sr-name"><span class="m">Griffith</span><span class="r"> Park</span></div><div class="dh-sr-det">Los Angeles, CA · 8,300 mi</div></div>
+          <span class="dh-sr-badge poi-b">POI</span>
+        </div>
+        <div class="dh-sr-label">AREAS</div>
+        <div class="dh-sr-item highlighted">
+          <div class="dh-sr-ico area-bg">📍</div>
+          <div class="dh-sr-info"><div class="dh-sr-name"><span class="m">Griffith</span><span class="r"> Park Area, LA</span></div><div class="dh-sr-det">Discover 12+ places · Scenic, Nature</div></div>
+          <span class="dh-sr-badge area-b">Area</span>
+        </div>
+        <div class="dh-sr-label">VIBES</div>
+        <div class="dh-sr-item">
+          <div class="dh-sr-ico vibe-bg">✨</div>
+          <div class="dh-sr-info"><div class="dh-sr-name"><span class="r">Scenic viewpoints near </span><span class="m">Griffith</span></div><div class="dh-sr-det">AI-curated · 6 match your taste</div></div>
+          <span class="dh-sr-badge vibe-b">Vibe</span>
+        </div>
+      </div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">7</div>
+    <div class="step-title">Tap area result → teleport to LA</div>
+  </div>
+  <div class="step-desc">
+    Map flies to Los Angeles. Header collapses and updates: <span class="key">Griffith Park Area</span> + LA weather/time. The <span class="key">teal "From Dubai · 8,300 mi"</span> badge in the meta line ensures user always knows they're exploring remotely.
+  </div>
+  <div class="phone">
+    <div class="phone-map"></div>
+    <div class="ph-pin" style="top:38%;left:30%;background:#4ECDC4"></div>
+    <div class="ph-pin" style="top:50%;left:55%;background:#FFE66D"></div>
+    <div class="ph-pin" style="top:42%;left:75%;background:#A78BFA"></div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Griffith Park Area</div>
+          <div class="dh-meta">☀️ 74°F <span class="sep">·</span> 4:42 AM <span class="sep">·</span> <span class="rem">From Dubai · 8,300 mi</span></div>
+        </div>
+        <div class="dh-chip">12 places</div>
+        <button class="dh-surp">🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="ph-carousel">
+      <div class="ph-card"><div class="ph-card-n">Griffith Observatory</div><div class="ph-card-v">Scenic · Landmark</div><div class="ph-card-i">⭐ 4.9 · Free</div></div>
+      <div class="ph-card"><div class="ph-card-n">Hollywood Sign Trail</div><div class="ph-card-v">Scenic · Hiking</div><div class="ph-card-i">⭐ 4.7</div></div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+<div class="divider-line"></div>
+
+<!-- ==================== PHASE 4: SAVE & LOOP ==================== -->
+<div class="phase-label">Phase 4 — Save & Discovery Loop</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">8</div>
+    <div class="step-title">Save a POI → similar places appear</div>
+  </div>
+  <div class="step-desc">
+    User saves Griffith Observatory. Toast shows <span class="key">"Saved! 2 similar nearby"</span>. Dashed-outline pins pulse onto the map. The system learned: user likes <span class="key">Scenic + Landmark</span>. <span class="purple">Next Surprise will be smarter.</span>
+  </div>
+  <div class="phone med">
+    <div class="phone-map"></div>
+    <div class="ph-pin" style="top:38%;left:30%;background:#4ECDC4"></div>
+    <div class="ph-pin" style="top:50%;left:55%;background:#FFE66D"></div>
+    <div class="ph-pin" style="top:42%;left:75%;background:#A78BFA"></div>
+    <div class="ph-sim" style="top:44%;left:45%"></div>
+    <div class="ph-sim" style="top:52%;left:68%"></div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-row">
+        <div class="dh-info">
+          <div class="dh-name">Griffith Park Area</div>
+          <div class="dh-meta">☀️ 74°F <span class="sep">·</span> 4:42 AM <span class="sep">·</span> <span class="rem">From Dubai · 8,300 mi</span></div>
+        </div>
+        <div class="dh-chip">12 places</div>
+        <button class="dh-surp">🎲</button>
+        <div class="dh-chev">▼</div>
+      </div>
+    </div>
+    <div class="ph-toast">
+      <div class="ph-toast-h"><span class="heart">♥</span> Saved! Griffith Observatory</div>
+      <div class="ph-toast-cards">
+        <div class="ph-toast-c"><div class="ph-toast-cn">Hollywood Sign</div><div class="ph-toast-cv">Scenic · Hiking</div><div class="ph-toast-cd">2.1 mi</div></div>
+        <div class="ph-toast-c"><div class="ph-toast-cn">Fern Dell Trail</div><div class="ph-toast-cv">Nature · Quiet</div><div class="ph-toast-cd">0.8 mi</div></div>
+      </div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down">↓</div>
+
+<div class="step-section">
+  <div class="step-header">
+    <div class="step-number">9</div>
+    <div class="step-title">Surprise again → taste-aware results</div>
+  </div>
+  <div class="step-desc">
+    The loop restarts. Surprise now factors in the save — weights toward <span class="key">Scenic + Landmark</span>. Each save makes Surprise smarter. The cycle: <span class="key">See → Explore → Discover → Save → See more like it → Explore deeper...</span>
+  </div>
+  <div class="phone">
+    <div class="phone-map"></div>
+    <div class="ph-status"><span>9:41</span><span>📶 🔋</span></div>
+    <div class="dh">
+      <div class="dh-spin-row">
+        <div class="spin-dot"></div>
+        <div class="spin-txt">Discovering <em>Griffith Park Area</em>...</div>
+        <button class="spin-can">Cancel</button>
+      </div>
+    </div>
+    <div class="ph-bottom">
+      <div class="ph-ai"><div class="ph-orb"></div>Ask about this area...</div>
+      <div class="ph-btn">◎</div>
+      <div class="ph-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<div class="arrow-down" style="font-size:14px; color:rgba(255,255,255,0.06);">— end of journey —</div>
+
+</body>
+</html>

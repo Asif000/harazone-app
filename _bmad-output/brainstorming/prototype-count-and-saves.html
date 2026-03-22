@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Count Refinement + Saved Places</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, system-ui, sans-serif;
+    background: #111118; color: #fff;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 16px 60px;
+  }
+  h1 { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+  .sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-bottom: 24px; }
+  .phase {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 2px;
+    color: rgba(102,126,234,0.5); font-weight: 600;
+    margin: 24px 0 14px; padding: 8px 0;
+    border-top: 1px solid rgba(255,255,255,0.04);
+    width: 320px; text-align: center;
+  }
+  .step { width: 320px; margin-bottom: 32px; }
+  .step-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .sn {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; flex-shrink: 0;
+  }
+  .st { font-size: 14px; font-weight: 700; }
+  .sd { font-size: 11px; color: rgba(255,255,255,0.4); line-height: 1.6; margin-bottom: 12px; }
+  .sd .k { color: #4ECDC4; font-weight: 600; }
+  .sd .p { color: #a5b4fc; font-weight: 600; }
+
+  /* Phone */
+  .phone {
+    width: 320px; height: 693px;
+    border-radius: 36px; border: 3px solid rgba(255,255,255,0.08);
+    background: #0a0a0f; overflow: hidden;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+    display: flex; flex-direction: column;
+  }
+  .p-status {
+    height: 48px; flex-shrink: 0; padding: 14px 22px 0;
+    display: flex; justify-content: space-between;
+    font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6);
+    position: relative;
+  }
+  .p-island {
+    width: 100px; height: 28px; background: #000; border-radius: 14px;
+    position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+  }
+
+  /* Header */
+  .dh {
+    flex-shrink: 0; margin: 2px 8px 0;
+    border-radius: 14px; background: rgba(20,20,28,0.93);
+    border: 1px solid rgba(255,255,255,0.06); overflow: hidden;
+  }
+  .dh-row {
+    display: flex; align-items: center;
+    padding: 8px 8px 8px 12px; gap: 6px;
+  }
+  .dh-info { flex: 1; min-width: 0; }
+  .dh-name {
+    font-size: 13px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; align-items: center; gap: 4px;
+  }
+  .safety-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #4ade80; }
+  .dh-meta { font-size: 10px; color: rgba(255,255,255,0.4); margin-top: 1px; white-space: nowrap; }
+  .dh-meta .sep { margin: 0 3px; opacity: 0.3; }
+  .dh-meta .hl { color: #4ECDC4; font-weight: 500; }
+  .dh-surp {
+    width: 34px; height: 34px; border-radius: 11px;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    border: none; color: #fff; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; box-shadow: 0 1px 8px rgba(102,126,234,0.2);
+    position: relative; overflow: hidden;
+  }
+  .dh-surp .shm {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%); animation: shim 3s infinite;
+  }
+  @keyframes shim { 0%{transform:translateX(-100%)} 25%{transform:translateX(100%)} 100%{transform:translateX(100%)} }
+  .dh-chev { font-size: 8px; color: rgba(255,255,255,0.15); flex-shrink: 0; }
+
+  /* === COUNT BADGE OPTIONS === */
+
+  /* Option A: circle badge */
+  .count-circle {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.5);
+    flex-shrink: 0;
+    position: relative;
+  }
+  /* Ring progress (SVG) */
+  .count-ring {
+    position: absolute; inset: -2px;
+  }
+  .count-ring circle {
+    fill: none; stroke-width: 2;
+  }
+  .count-ring .bg { stroke: rgba(255,255,255,0.04); }
+  .count-ring .fg { stroke: rgba(78,205,196,0.4); stroke-linecap: round; transform: rotate(-90deg); transform-origin: center; }
+
+  /* Option B: minimal dot count */
+  .count-dots {
+    display: flex; gap: 3px; align-items: center; flex-shrink: 0;
+    padding: 4px 6px;
+  }
+  .count-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(78,205,196,0.5);
+  }
+  .count-dot.dim { background: rgba(255,255,255,0.08); }
+  .count-num {
+    font-size: 9px; color: rgba(255,255,255,0.35); margin-left: 2px;
+  }
+
+  /* Option C: pill with icon (RECOMMENDED) */
+  .count-pill {
+    display: flex; align-items: center; gap: 3px;
+    padding: 3px 8px; border-radius: 8px;
+    background: rgba(255,255,255,0.05);
+    flex-shrink: 0;
+  }
+  .count-pill .cp-icon { font-size: 9px; color: rgba(78,205,196,0.5); }
+  .count-pill .cp-num { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.5); }
+  .count-pill .cp-saved { font-size: 9px; color: rgba(255,107,107,0.5); }
+
+  /* Streaming animation */
+  .count-pill.streaming { animation: count-pop 0.6s ease-out; }
+  @keyframes count-pop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.15); background: rgba(78,205,196,0.1); }
+    100% { transform: scale(1); }
+  }
+
+  /* Filter active count */
+  .count-pill.filtered {
+    background: rgba(78,205,196,0.08);
+    border: 1px solid rgba(78,205,196,0.12);
+  }
+  .count-pill.filtered .cp-num { color: #4ECDC4; }
+
+  /* Map */
+  .p-map {
+    flex: 1; min-height: 0;
+    background:
+      radial-gradient(ellipse at 30% 50%, rgba(30,60,40,0.35) 0%, transparent 45%),
+      radial-gradient(ellipse at 70% 40%, rgba(30,40,70,0.35) 0%, transparent 45%),
+      #0d1117;
+    position: relative;
+  }
+  .pin {
+    position: absolute; width: 22px; height: 22px;
+    border-radius: 50% 50% 50% 0; transform: rotate(-45deg);
+    box-shadow: 0 1px 5px rgba(0,0,0,0.35);
+  }
+  .map-btn {
+    position: absolute; z-index: 5;
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(20,20,28,0.9); border: 1px solid rgba(255,255,255,0.06);
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,0.4); font-size: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+
+  /* Cards */
+  .p-cards { flex-shrink: 0; display: flex; gap: 6px; padding: 6px 8px; }
+  .p-card {
+    flex: 1; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 10px; padding: 8px 9px;
+  }
+  .pc-n { font-size: 11px; font-weight: 600; }
+  .pc-v { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .pc-i { font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 1px; }
+
+  /* Orb bar */
+  .orb-bar-wrap { flex-shrink: 0; padding: 6px 8px 20px; display: flex; gap: 6px; align-items: flex-end; }
+  .orb-bar {
+    flex: 1; background: rgba(20,20,28,0.85);
+    border: 1px solid rgba(255,255,255,0.05); border-radius: 14px;
+    display: flex; align-items: center; gap: 7px; padding: 9px 12px;
+  }
+  .ob-orb {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .ob-text { flex: 1; font-size: 11px; color: rgba(255,255,255,0.3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ob-mic {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(255,255,255,0.04);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 9px; color: rgba(255,255,255,0.2); flex-shrink: 0;
+  }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: linear-gradient(135deg, #4ECDC4, #2ab0a6);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+  .nav-btn {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: rgba(20,20,28,0.85); border: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4); font-size: 13px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .nav-btn.active { background: rgba(78,205,196,0.1); border-color: rgba(78,205,196,0.2); color: #4ECDC4; }
+
+  /* === LIST VIEW WITH TABS === */
+  .list-tabs {
+    display: flex; gap: 0; flex-shrink: 0; margin: 4px 8px 0;
+    border-radius: 10px; overflow: hidden;
+    background: rgba(255,255,255,0.03);
+  }
+  .list-tab {
+    flex: 1; padding: 8px 0; text-align: center;
+    font-size: 11px; font-weight: 500; color: rgba(255,255,255,0.3);
+    cursor: pointer; position: relative;
+  }
+  .list-tab.active {
+    color: #fff;
+  }
+  .list-tab.active::after {
+    content: ''; position: absolute; bottom: 0; left: 20%; right: 20%;
+    height: 2px; border-radius: 1px;
+  }
+  .list-tab.disc.active::after { background: #4ECDC4; }
+  .list-tab.saved-tab.active::after { background: #FF6B6B; }
+  .list-tab .tab-count {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 16px; height: 16px; border-radius: 50%;
+    font-size: 9px; font-weight: 600; margin-left: 3px;
+  }
+  .list-tab.disc .tab-count { background: rgba(78,205,196,0.12); color: #4ECDC4; }
+  .list-tab.saved-tab .tab-count { background: rgba(255,107,107,0.12); color: #FF6B6B; }
+
+  .list-view {
+    flex: 1; min-height: 0; overflow-y: auto; padding: 6px 8px;
+  }
+  .list-view::-webkit-scrollbar { display: none; }
+  .list-card {
+    background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px; padding: 10px; margin-bottom: 6px;
+    display: flex; gap: 10px; align-items: center;
+  }
+  .list-card-img {
+    width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0;
+    background: rgba(255,255,255,0.04);
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .list-card-info { flex: 1; min-width: 0; }
+  .list-card-name { font-size: 12px; font-weight: 600; }
+  .list-card-vibe { font-size: 9px; color: #4ECDC4; margin-top: 2px; }
+  .list-card-meta {
+    font-size: 9px; color: rgba(255,255,255,0.3); margin-top: 2px;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .list-card-area {
+    font-size: 8px; color: rgba(102,126,234,0.6); margin-top: 2px;
+    display: flex; align-items: center; gap: 3px;
+  }
+  .list-card-actions { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+  .list-card-btn {
+    width: 28px; height: 28px; border-radius: 7px;
+    background: rgba(255,255,255,0.04); border: none;
+    color: rgba(255,255,255,0.35); font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .list-card-btn.saved { color: #FF6B6B; }
+
+  /* Saved card — slightly different styling */
+  .list-card.saved-card { border-color: rgba(255,107,107,0.06); }
+  .list-card.saved-card .list-card-vibe { color: rgba(255,255,255,0.35); }
+
+  /* Compare bar (mini) */
+  .compare-strip {
+    flex-shrink: 0; margin: 0 8px; padding: 6px 0;
+    display: flex; gap: 6px;
+  }
+  .compare-strip .cmp {
+    border-radius: 12px; background: rgba(20,20,28,0.9);
+    border: 1px solid rgba(255,255,255,0.05); padding: 8px 10px;
+    flex: 1;
+  }
+  .compare-strip .cmp-label {
+    font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: rgba(255,255,255,0.15); margin-bottom: 6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Count Refinement + Saved Places</h1>
+<div class="sub">Scroll down for count options and saved places access.</div>
+
+<!-- ===== COUNT OPTIONS ===== -->
+<div class="phase">Count Badge — 3 Options</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">A</div><div class="st">Option A: Circle with ring</div></div>
+  <div class="sd">Number in a circle with a subtle progress ring that fills as POIs stream in. Clean but might be too small to read.</div>
+  <div class="compare-strip">
+    <div class="cmp">
+      <div class="cmp-label">Normal</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="count-circle">
+          5
+          <svg class="count-ring" viewBox="0 0 28 28"><circle class="bg" cx="14" cy="14" r="12"/><circle class="fg" cx="14" cy="14" r="12" stroke-dasharray="75" stroke-dashoffset="0"/></svg>
+        </div>
+        <span style="font-size:9px;color:rgba(255,255,255,0.2)">Full ring = all loaded</span>
+      </div>
+    </div>
+    <div class="cmp">
+      <div class="cmp-label">Streaming</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="count-circle">
+          3
+          <svg class="count-ring" viewBox="0 0 28 28"><circle class="bg" cx="14" cy="14" r="12"/><circle class="fg" cx="14" cy="14" r="12" stroke-dasharray="75" stroke-dashoffset="30"/></svg>
+        </div>
+        <span style="font-size:9px;color:rgba(255,255,255,0.2)">Partial = still loading</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">B</div><div class="st">Option B: Dot cluster</div></div>
+  <div class="sd">Each dot = one POI. Teal dots = loaded, dim = pending. Organic and visual but gets messy past 6-7.</div>
+  <div class="compare-strip">
+    <div class="cmp">
+      <div class="cmp-label">5 loaded</div>
+      <div class="count-dots">
+        <div class="count-dot"></div><div class="count-dot"></div><div class="count-dot"></div><div class="count-dot"></div><div class="count-dot"></div>
+      </div>
+    </div>
+    <div class="cmp">
+      <div class="cmp-label">3 of 5 streaming</div>
+      <div class="count-dots">
+        <div class="count-dot"></div><div class="count-dot"></div><div class="count-dot"></div><div class="count-dot dim"></div><div class="count-dot dim"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="step">
+  <div class="step-head"><div class="sn">C</div><div class="st">Option C: Minimal pin+number (recommended)</div></div>
+  <div class="sd">Tiny 📍 icon + number. <span class="k">Pops/scales briefly</span> when a new POI arrives. Shows saved count too when saves exist: <span class="k">📍5 ♥2</span>. Clean, readable, informative.</div>
+  <div class="compare-strip">
+    <div class="cmp">
+      <div class="cmp-label">Normal</div>
+      <div class="count-pill"><span class="cp-icon">📍</span><span class="cp-num">5</span></div>
+    </div>
+    <div class="cmp">
+      <div class="cmp-label">With saves</div>
+      <div class="count-pill"><span class="cp-icon">📍</span><span class="cp-num">5</span><span class="cp-saved">♥2</span></div>
+    </div>
+  </div>
+  <div class="compare-strip" style="margin-top:-2px">
+    <div class="cmp">
+      <div class="cmp-label">Streaming (pops)</div>
+      <div class="count-pill streaming"><span class="cp-icon">📍</span><span class="cp-num">3</span></div>
+    </div>
+    <div class="cmp">
+      <div class="cmp-label">Filtered</div>
+      <div class="count-pill filtered"><span class="cp-icon">🏞</span><span class="cp-num">3/5</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FULL PHONE WITH RECOMMENDED COUNT ===== -->
+<div class="phase">Recommended — In Context</div>
+<div class="step">
+  <div class="step-head"><div class="sn">1</div><div class="st">Count pill with saved indicator</div></div>
+  <div class="sd">Pill shows <span class="k">📍5</span> discovered + <span class="k">♥2</span> saved in this area. Compact, tells you both things at once. The ♥ number links to saves — tapping it could filter to saved-only.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info">
+        <div class="dh-name">Dubai Marina <div class="safety-dot"></div></div>
+        <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> First visit</div>
+      </div>
+      <div class="count-pill"><span class="cp-icon">📍</span><span class="cp-num">5</span><span class="cp-saved">♥2</span></div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="p-map">
+      <div class="pin" style="top:20%;left:18%;background:#FF6B6B"></div>
+      <div class="pin" style="top:40%;left:48%;background:#4ECDC4"></div>
+      <div class="pin" style="top:15%;left:68%;background:#FFE66D"></div>
+      <div class="pin" style="top:50%;left:34%;background:#A78BFA"></div>
+      <div class="pin" style="top:30%;left:80%;background:#F97316"></div>
+      <div class="map-btn" style="bottom:10px;right:10px">◎</div>
+    </div>
+    <div class="p-cards">
+      <div class="p-card"><div class="pc-n">Dubai Mall</div><div class="pc-v">Shopping · Luxury</div><div class="pc-i">⭐ 4.8</div></div>
+      <div class="p-card"><div class="pc-n">Marina Walk</div><div class="pc-v">Scenic · Nightlife</div><div class="pc-i">⭐ 4.6</div></div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar"><div class="ob-orb">🌟</div><div class="ob-text">Ask about Dubai Marina...</div><div class="ob-mic">🎤</div></div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LIST VIEW: DISCOVERED TAB ===== -->
+<div class="phase">Saved Places — List View Tabs</div>
+<div class="step">
+  <div class="step-head"><div class="sn">2</div><div class="st">List view — Discovered tab</div></div>
+  <div class="sd">Tap ☰ → list with two tabs: <span class="k">Discovered</span> (current area's POIs) and <span class="k">Saved</span> (all saves across all areas). Tab counts as tiny badges.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info">
+        <div class="dh-name">Dubai Marina <div class="safety-dot"></div></div>
+        <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> 5 places</div>
+      </div>
+      <div class="count-pill"><span class="cp-icon">📍</span><span class="cp-num">5</span><span class="cp-saved">♥2</span></div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="list-tabs">
+      <div class="list-tab disc active">Discovered <span class="tab-count">5</span></div>
+      <div class="list-tab saved-tab">Saved <span class="tab-count">18</span></div>
+    </div>
+    <div class="list-view">
+      <div class="list-card">
+        <div class="list-card-img">🏬</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Dubai Mall</div>
+          <div class="list-card-vibe">Shopping · Luxury</div>
+          <div class="list-card-meta"><span>⭐ 4.8</span><span>Open now</span><span>1.2 km</span></div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn saved">♥</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+      <div class="list-card">
+        <div class="list-card-img">🌅</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Marina Walk</div>
+          <div class="list-card-vibe">Scenic · Nightlife</div>
+          <div class="list-card-meta"><span>⭐ 4.6</span><span>Open now</span><span>200m</span></div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn saved">♥</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+      <div class="list-card">
+        <div class="list-card-img">🎡</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Ain Dubai</div>
+          <div class="list-card-vibe">Scenic · Views</div>
+          <div class="list-card-meta"><span>⭐ 4.5</span><span>Closes 8 PM</span><span>1.2 km</span></div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn">♡</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+      <div class="list-card">
+        <div class="list-card-img">🍽</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Nobu Dubai</div>
+          <div class="list-card-vibe">Japanese · Luxury</div>
+          <div class="list-card-meta"><span>⭐ 4.8</span><span>Open now</span><span>300m</span></div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn">♡</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar"><div class="ob-orb">🌟</div><div class="ob-text">Ask about Dubai Marina...</div><div class="ob-mic">🎤</div></div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn active">☰</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== LIST VIEW: SAVED TAB ===== -->
+<div class="step">
+  <div class="step-head"><div class="sn">3</div><div class="st">List view — Saved tab</div></div>
+  <div class="sd">Tap <span class="k">Saved</span> tab → all saves across all areas. Each card shows which area it's from. Grouped by recency. 18 total saves. This replaces the separate saved places screen.</div>
+  <div class="phone">
+    <div class="p-status"><span>9:41</span><div class="p-island"></div><span>📶 🔋</span></div>
+    <div class="dh"><div class="dh-row">
+      <div class="dh-info">
+        <div class="dh-name">Dubai Marina <div class="safety-dot"></div></div>
+        <div class="dh-meta">🌤 82°F <span class="sep">·</span> 3:42 PM <span class="sep">·</span> 5 places</div>
+      </div>
+      <div class="count-pill"><span class="cp-icon">📍</span><span class="cp-num">5</span><span class="cp-saved">♥2</span></div>
+      <button class="dh-surp"><span class="shm"></span>🎲</button>
+      <div class="dh-chev">▼</div>
+    </div></div>
+    <div class="list-tabs">
+      <div class="list-tab disc">Discovered <span class="tab-count">5</span></div>
+      <div class="list-tab saved-tab active">Saved <span class="tab-count">18</span></div>
+    </div>
+    <div class="list-view">
+      <div class="list-card saved-card">
+        <div class="list-card-img">🏬</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Dubai Mall</div>
+          <div class="list-card-vibe">Shopping · Luxury · ⭐ 4.8</div>
+          <div class="list-card-area">📍 Dubai Marina · saved today</div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn saved">♥</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+      <div class="list-card saved-card">
+        <div class="list-card-img">🌅</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Marina Walk</div>
+          <div class="list-card-vibe">Scenic · Nightlife · ⭐ 4.6</div>
+          <div class="list-card-area">📍 Dubai Marina · saved today</div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn saved">♥</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+      <div class="list-card saved-card">
+        <div class="list-card-img">🏛</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Griffith Observatory</div>
+          <div class="list-card-vibe">Scenic · Landmark · ⭐ 4.9</div>
+          <div class="list-card-area">📍 Griffith Park, LA · saved yesterday</div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn saved">♥</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+      <div class="list-card saved-card">
+        <div class="list-card-img">🏯</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Kinkaku-ji Temple</div>
+          <div class="list-card-vibe">Cultural · Historic · ⭐ 4.9</div>
+          <div class="list-card-area">📍 Kyoto, Japan · saved 1 week ago</div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn saved">♥</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+      <div class="list-card saved-card">
+        <div class="list-card-img">🏝</div>
+        <div class="list-card-info">
+          <div class="list-card-name">Blue Hole</div>
+          <div class="list-card-vibe">Adventure · Nature · ⭐ 4.7</div>
+          <div class="list-card-area">📍 Belize City · saved 3 days ago</div>
+        </div>
+        <div class="list-card-actions">
+          <button class="list-card-btn saved">♥</button>
+          <button class="list-card-btn">→</button>
+        </div>
+      </div>
+    </div>
+    <div class="orb-bar-wrap">
+      <div class="orb-bar"><div class="ob-orb">🌟</div><div class="ob-text">Ask about your saved places...</div><div class="ob-mic">🎤</div></div>
+      <div class="avatar">AC</div>
+      <div class="nav-btn active">☰</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
