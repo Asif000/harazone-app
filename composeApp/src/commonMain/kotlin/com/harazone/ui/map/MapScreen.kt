@@ -696,12 +696,6 @@ private fun ReadyContent(
                         state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
                     )
                 },
-                onMicTap = {
-                    // TODO(#59): STT voice input — for now opens chat
-                    chatViewModel.openChat(
-                        state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
-                    )
-                },
                 onNudgeTellMeMore = {
                     val nudge = state.companionNudge
                     viewModel.dismissCompanionCard()

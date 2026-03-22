@@ -57,7 +57,6 @@ fun UnifiedBottomBar(
     // Orb actions
     onOrbTap: () -> Unit,
     onTextTap: () -> Unit,
-    onMicTap: () -> Unit,
     // Nudge actions
     onNudgeTellMeMore: () -> Unit,
     onNudgeDismiss: () -> Unit,
@@ -165,7 +164,6 @@ fun UnifiedBottomBar(
                     onHamburgerOpenChanged(false)
                     onPeekOpenChanged(true)
                 },
-                onMicTap = onMicTap,
                 modifier = Modifier.weight(1f),
             )
         }

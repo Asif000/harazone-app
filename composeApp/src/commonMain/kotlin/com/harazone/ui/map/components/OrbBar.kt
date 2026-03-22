@@ -23,10 +23,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -75,7 +73,6 @@ fun OrbBar(
     onOrbTap: () -> Unit,
     onTextTap: () -> Unit,
     onNudgeTextTap: () -> Unit,
-    onMicTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Ghost phrase rotation for idle state — includes area-specific prompt
@@ -201,17 +198,5 @@ fun OrbBar(
             )
         }
 
-        // Mic button — 48dp touch target
-        IconButton(
-            onClick = onMicTap,
-            modifier = Modifier.size(40.dp),
-        ) {
-            Icon(
-                Icons.Default.Mic,
-                contentDescription = "Voice search",
-                tint = Color.White.copy(alpha = 0.6f),
-                modifier = Modifier.size(20.dp),
-            )
-        }
     }
 }
