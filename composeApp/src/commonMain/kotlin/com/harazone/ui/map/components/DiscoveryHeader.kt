@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -38,8 +40,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,8 +58,8 @@ import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.MetaLine
 import com.harazone.domain.model.RecentPlace
 import com.harazone.domain.model.WeatherState
-import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.ui.theme.MapFloatingUiDark
+import com.harazone.ui.theme.Spacing
 
 /**
  * Unified Discovery Header — replaces TopContextBar, GeocodingSearchBar,
@@ -125,33 +125,34 @@ fun DiscoveryHeader(
     // Recent explorations (expanded panel)
     recentExplorations: List<RecentPlace>,
     onTeleport: (RecentPlace) -> Unit,
-    // Callbacks
-    onHeaderExpandedChanged: (Boolean) -> Unit,
+    // Hoisted expansion state (caller owns for back handler priority — H2)
+    isExpanded: Boolean,
+    onExpandedChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var isExpanded by remember { mutableStateOf(false) }
-
     fun collapse() {
-        isExpanded = false
-        onHeaderExpandedChanged(false)
+        onExpandedChanged(false)
     }
 
     fun expand() {
-        isExpanded = true
-        onHeaderExpandedChanged(true)
+        onExpandedChanged(true)
     }
 
-    // Back handler for expanded state
-    PlatformBackHandler(enabled = isExpanded) { collapse() }
+    // Scrim bottom exclusion — keep bottom bar interactive (H1 / M16)
+    val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val bottomBarExclusion = Spacing.bottomBarHeight + navBarPadding
 
     Box(modifier = modifier.zIndex(2f)) {
         // Scrim — behind panel content, consumes all pointer events to block MapLibre
+        // Excludes bottom bar zone so it remains fully interactive (spec M16)
         if (isExpanded) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .padding(bottom = bottomBarExclusion)
                     .background(Color.Black.copy(alpha = 0.4f))
                     .zIndex(1f)
+                    // TODO(BACKLOG-LOW): L1 — scrim collapse fires on pointer-down, not tap-release (standard tap = down+up)
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
                             while (true) {
@@ -197,6 +198,7 @@ fun DiscoveryHeader(
                 showCancel = showCancel,
                 onCancel = onCancel,
                 metaLines = metaLines,
+                activeVibeFilters = activeVibeFilters,
                 isExpanded = isExpanded,
                 onTap = { if (isExpanded) collapse() else expand() },
             )
@@ -280,6 +282,7 @@ private fun CollapsedBar(
     showCancel: Boolean,
     onCancel: () -> Unit,
     metaLines: List<MetaLine>,
+    activeVibeFilters: Set<String>,
     isExpanded: Boolean,
     onTap: () -> Unit,
 ) {
@@ -297,7 +300,7 @@ private fun CollapsedBar(
                 areaName = areaName,
                 showCancel = showCancel,
                 onCancel = onCancel,
-                activeVibeFilters = emptySet(), // TODO: pass through
+                activeVibeFilters = activeVibeFilters,
                 onTap = onTap,
             )
             else -> NormalRow(

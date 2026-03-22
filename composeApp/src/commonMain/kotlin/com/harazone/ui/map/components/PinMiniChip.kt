@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import com.harazone.domain.model.POI
 import com.harazone.ui.theme.MapFloatingUiDark
 
-/** Maps a vibe name to its accent color. Mirrors the lookup in VibeRail.kt. */
+/** Maps a vibe name to its accent color. */
 private fun vibeAccentColor(vibeName: String?): Color = when (vibeName?.lowercase()) {
     "food", "eat"       -> Color(0xFFFF7043)
     "coffee"            -> Color(0xFF8D6E63)

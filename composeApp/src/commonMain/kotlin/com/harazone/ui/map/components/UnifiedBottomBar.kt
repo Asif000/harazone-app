@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.ui.theme.MapFloatingUiDark
+import com.harazone.ui.theme.Spacing
 
 private val TealTint = Color(0xFF2BBCB3)
 
@@ -96,6 +97,7 @@ fun UnifiedBottomBar(
     }
 
     val activeVibeFilterName = activeVibeFilters.firstOrNull() ?: ""
+    // TODO(BACKLOG-LOW): L2 — spec M9 prescribes WindowInsets.safeDrawingBottom instead of navigationBars
     val navBarPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(modifier = modifier.fillMaxSize()) {
@@ -176,7 +178,7 @@ fun UnifiedBottomBar(
             onAIPersonality = onAIPersonality,
             onSettings = onSettings,
             onFeedback = onFeedback,
-            bottomBarHeight = 56.dp + navBarPadding,
+            bottomBarHeight = Spacing.bottomBarHeight + navBarPadding,
         )
 
         if (companionNudge != null) {
@@ -197,7 +199,7 @@ fun UnifiedBottomBar(
                 },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(bottom = 56.dp + navBarPadding, end = 8.dp),
+                    .padding(bottom = Spacing.bottomBarHeight + navBarPadding, end = 8.dp),
             )
         }
     }

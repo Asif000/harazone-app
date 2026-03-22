@@ -19,7 +19,7 @@ import org.koin.core.context.stopKoin
 
 /**
  * Instrumented tests for the AI Chat overlay feature.
- * Chat is triggered by tapping the AISearchBar on the main map screen.
+ * Chat is triggered by tapping the OrbBar mic icon on the main map screen.
  */
 @RunWith(AndroidJUnit4::class)
 class ChatOverlayInstrumentedTest {
@@ -39,7 +39,7 @@ class ChatOverlayInstrumentedTest {
     }
 
     private fun waitForMapReady() {
-        // AISearchBar shows cycling ghost phrases; use the stable "Voice search" icon as anchor
+        // OrbBar mic icon has contentDescription "Voice search" — use as ready anchor
         composeTestRule.waitUntil(timeoutMillis = 30_000) {
             composeTestRule.onAllNodes(hasContentDescription("Voice search"))
                 .fetchSemanticsNodes().isNotEmpty()
@@ -47,7 +47,7 @@ class ChatOverlayInstrumentedTest {
     }
 
     private fun openChatOverlay() {
-        // Tap the AISearchBar — opens ChatOverlay directly
+        // Tap the OrbBar mic icon — opens ChatOverlay directly
         composeTestRule.onNodeWithContentDescription("Voice search").performClick()
 
         // Wait for ChatOverlay header

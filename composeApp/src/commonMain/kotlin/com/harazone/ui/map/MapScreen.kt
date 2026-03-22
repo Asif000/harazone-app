@@ -44,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -77,6 +76,7 @@ import com.harazone.ui.map.components.SafetyBanner
 import com.harazone.ui.map.components.SafetyGateModal
 import com.harazone.ui.map.components.PoiCarousel
 import com.harazone.ui.theme.MapFloatingUiDark
+import com.harazone.ui.theme.Spacing
 import com.harazone.ui.theme.spacing
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
@@ -224,9 +224,7 @@ private fun ReadyContent(
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var screenHeightPx by remember { mutableStateOf(0f) }
 
-    // Measured onboarding target offsets (Task 11)
-    var vibeRailOffset by remember { mutableStateOf(Offset.Zero) }
-    var savedFabOffset by remember { mutableStateOf(Offset.Zero) }
+    // Measured onboarding target offset — only searchBarOffset remains (VibeRail/SavedFab replaced by header)
     var searchBarOffset by remember { mutableStateOf(Offset.Zero) }
 
     // Idle detection for companion — TODO(BACKLOG-MEDIUM): Move to Remote Config (#55)
@@ -383,8 +381,9 @@ private fun ReadyContent(
                 advisoryLevel = state.advisory?.level,
                 isSearchingArea = state.isSearchingArea,
                 isGpsAcquiring = state.areaName.isBlank() && !state.showMyLocation,
-                isGeocodePending = false,
-                isLocationDenied = false,
+                // GPS acquired but area name not yet resolved — mutually exclusive with isGpsAcquiring
+                isGeocodePending = state.showMyLocation && state.areaName.isBlank(),
+                isLocationDenied = false, // TODO(BACKLOG-MEDIUM): Wire when LocationFailed→Ready refactor supports manual-search-only mode (spec H7)
                 discoveredCount = state.pois.size,
                 savedCount = savedNearbyCount,
                 showDiscoverButton = state.showSearchAreaPill && !state.isSearchingArea,
@@ -431,7 +430,8 @@ private fun ReadyContent(
                 onRefresh = viewModel::onSearchThisArea,
                 recentExplorations = state.recentPlaces.take(3),
                 onTeleport = { viewModel.onRecentSelected(it) },
-                onHeaderExpandedChanged = { isHeaderExpanded = it },
+                isExpanded = isHeaderExpanded,
+                onExpandedChanged = { isHeaderExpanded = it },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
@@ -489,6 +489,8 @@ private fun ReadyContent(
         PlatformBackHandler(enabled = state.selectedPoi == null && state.visitedFilter) {
             viewModel.onVisitedFilterSelected()
         }
+        // Header collapse — higher priority than list/showAll/visitedFilter (H2)
+        PlatformBackHandler(enabled = isHeaderExpanded) { isHeaderExpanded = false }
         // CompanionNudge back handler moved to UnifiedBottomBar (AC38)
 
         // AI Detail Page — replaces ExpandablePoiCard + scrim
@@ -570,8 +572,8 @@ private fun ReadyContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        top = statusBarPadding + 56.dp,
-                        bottom = navBarPadding + 56.dp,
+                        top = statusBarPadding + Spacing.bottomBarHeight,
+                        bottom = navBarPadding + Spacing.bottomBarHeight,
                     ),
             )
         }
@@ -667,7 +669,14 @@ private fun ReadyContent(
                     pendingCapture = true
                 },
                 isHamburgerOpen = isHamburgerOpen,
-                onHamburgerOpenChanged = { isHamburgerOpen = it },
+                onHamburgerOpenChanged = { open ->
+                    // M16: collapse header first when opening hamburger
+                    if (open && isHeaderExpanded) {
+                        isHeaderExpanded = false
+                    } else {
+                        isHamburgerOpen = open
+                    }
+                },
                 isPeekOpen = isPeekOpen,
                 onPeekOpenChanged = { isPeekOpen = it },
                 modifier = Modifier
@@ -819,8 +828,6 @@ private fun ReadyContent(
         OnboardingBubble(
             visible = state.showOnboardingBubble,
             onDismiss = { viewModel.onOnboardingBubbleDismissed() },
-            vibeRailOffset = vibeRailOffset,
-            savedFabOffset = savedFabOffset,
             searchBarOffset = searchBarOffset,
         )
 

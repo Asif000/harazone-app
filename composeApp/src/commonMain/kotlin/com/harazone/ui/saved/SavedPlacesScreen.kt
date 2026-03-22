@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.harazone.domain.model.SavedPoi
 import com.harazone.ui.components.PlatformBackHandler
+import com.harazone.ui.theme.Spacing
 import com.harazone.ui.saved.components.SavedPoiCard
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.stringResource
@@ -394,7 +395,7 @@ fun SavedPlacesScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 56.dp + navBarPadding),
+                .padding(bottom = Spacing.bottomBarHeight + navBarPadding),
         )
     }
 }

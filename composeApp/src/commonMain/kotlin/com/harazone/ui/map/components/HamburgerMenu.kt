@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.harazone.ui.theme.Spacing
 
 private val MenuBg = Color(0xFF1A1A2A)
 private val MenuText = Color(0xFFE0E0E0)
@@ -53,7 +54,7 @@ fun HamburgerMenu(
     onAIPersonality: () -> Unit,
     onSettings: () -> Unit,
     onFeedback: () -> Unit,
-    bottomBarHeight: Dp = 56.dp,
+    bottomBarHeight: Dp = Spacing.bottomBarHeight,
     modifier: Modifier = Modifier,
 ) {
     if (!visible) return

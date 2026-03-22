@@ -21,6 +21,7 @@ object Spacing {
     val borderAccent = 3.dp
     val skeletonTextWidth = 120.dp
     val skeletonTextHeight = 20.dp
+    val bottomBarHeight = 56.dp
 }
 
 val LocalSpacing = staticCompositionLocalOf { Spacing }

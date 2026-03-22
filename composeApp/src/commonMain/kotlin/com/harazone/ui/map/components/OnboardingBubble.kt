@@ -76,8 +76,6 @@ private val fallbackTips = OnboardingTipsData(
 fun OnboardingBubble(
     visible: Boolean,
     onDismiss: () -> Unit,
-    vibeRailOffset: Offset = Offset.Zero,
-    savedFabOffset: Offset = Offset.Zero,
     searchBarOffset: Offset = Offset.Zero,
 ) {
     val localizedFallback = OnboardingTipsData(
@@ -111,20 +109,7 @@ fun OnboardingBubble(
         ) {
             // Callout dots — positioned at measured layout bounds of target UI elements.
             // Offset.Zero means not yet measured (first frame); dots skip rendering until measured.
-            if (vibeRailOffset != Offset.Zero) {
-                CalloutDot(
-                    modifier = Modifier.offset {
-                        IntOffset(vibeRailOffset.x.roundToInt(), vibeRailOffset.y.roundToInt())
-                    }
-                )
-            }
-            if (savedFabOffset != Offset.Zero) {
-                CalloutDot(
-                    modifier = Modifier.offset {
-                        IntOffset(savedFabOffset.x.roundToInt(), savedFabOffset.y.roundToInt())
-                    }
-                )
-            }
+            // vibeRailOffset and savedFabOffset removed — VibeRail and SavedFab no longer exist (M3)
             if (searchBarOffset != Offset.Zero) {
                 CalloutDot(
                     modifier = Modifier.offset {
