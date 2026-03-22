@@ -18,6 +18,8 @@ sealed class BucketUpdate {
     data class PortraitComplete(
         val pois: List<POI>,
         val areaHighlights: List<String> = emptyList(),
+        val currencyText: String? = null,
+        val languageText: String? = null,
     ) : BucketUpdate()
 
     data class ContentAvailabilityNote(

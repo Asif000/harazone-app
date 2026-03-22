@@ -68,6 +68,8 @@ sealed class MapUiState {
         val poiStreamingCount: Int = 0,
         val showSurpriseMe: Boolean = false,
         val activeVibeFilters: Set<String> = emptySet(),
+        val areaCurrencyText: String? = null,
+        val areaLanguageText: String? = null,
         val savedLensActive: Boolean = false,
         val ghostPins: List<GhostPin> = emptyList(),
     ) : MapUiState()

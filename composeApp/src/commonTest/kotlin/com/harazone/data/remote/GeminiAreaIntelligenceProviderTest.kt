@@ -32,7 +32,8 @@ class GeminiAreaIntelligenceProviderTest {
     )
 
     private class FakeApiKeyProvider(
-        override val geminiApiKey: String = "test-key"
+        override val geminiApiKey: String = "test-key",
+        override val placesApiKey: String = "",
     ) : ApiKeyProvider
 
     private fun createProvider(apiKey: String = "test-key"): GeminiAreaIntelligenceProvider {

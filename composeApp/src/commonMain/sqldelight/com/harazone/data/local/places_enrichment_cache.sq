@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS places_enrichment_cache (
+    saved_id TEXT NOT NULL PRIMARY KEY,
+    hours TEXT,
+    live_status TEXT,
+    rating REAL,
+    review_count INTEGER,
+    price_range TEXT,
+    expires_at INTEGER NOT NULL,
+    cached_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_places_cache_expires_at
+    ON places_enrichment_cache(expires_at);
+
+getPlacesData:
+SELECT * FROM places_enrichment_cache WHERE saved_id = :saved_id;
+
+insertOrReplace:
+INSERT OR REPLACE INTO places_enrichment_cache(saved_id, hours, live_status, rating, review_count, price_range, expires_at, cached_at)
+VALUES (:saved_id, :hours, :live_status, :rating, :review_count, :price_range, :expires_at, :cached_at);
+
+deleteExpired:
+DELETE FROM places_enrichment_cache WHERE expires_at <= :current_time;

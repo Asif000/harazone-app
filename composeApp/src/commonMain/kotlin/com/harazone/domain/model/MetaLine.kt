@@ -16,6 +16,12 @@ sealed class MetaLine(val priority: Int) {
         val text: String get() = "From $fromCity \u00b7 $distance"
     }
 
+    /** Priority 2 — local currency + exchange rate. Teal text. Remote areas only. */
+    data class CurrencyContext(val text: String) : MetaLine(2)
+
+    /** Priority 2 — primary local language. Teal text. Remote areas only. */
+    data class LanguageContext(val text: String) : MetaLine(2)
+
     /** Priority 3 — active vibe filter summary. Purple text. */
     data class VibeFilter(val matchCount: Int, val totalCount: Int, val vibeNames: String) : MetaLine(3) {
         val text: String get() = "\uD83C\uDFAD $matchCount/$totalCount $vibeNames"
@@ -44,6 +50,8 @@ val MetaLine.text: String
     get() = when (this) {
         is MetaLine.SafetyWarning -> text
         is MetaLine.RemoteContext -> text
+        is MetaLine.CurrencyContext -> text
+        is MetaLine.LanguageContext -> text
         is MetaLine.VibeFilter -> text
         is MetaLine.CompanionNudge -> text
         is MetaLine.PoiHighlight -> text
@@ -56,6 +64,8 @@ val MetaLine.text: String
 fun MetaLine.displayColor(): Color = when (this) {
     is MetaLine.SafetyWarning -> Color(0xFFFFB300)
     is MetaLine.RemoteContext -> Color(0xFF26A69A)
+    is MetaLine.CurrencyContext -> Color(0xFF26A69A)
+    is MetaLine.LanguageContext -> Color(0xFF26A69A)
     is MetaLine.VibeFilter -> Color(0xFFB39DDB)
     is MetaLine.CompanionNudge -> Color(0xFFB39DDB)
     is MetaLine.PoiHighlight -> Color(0xFF26A69A)
@@ -88,6 +98,8 @@ fun buildMetaLines(
     visitTag: String = "First visit",
     isSearching: Boolean = false,
     areaName: String = "",
+    currencyText: String? = null,
+    languageText: String? = null,
 ): List<MetaLine> {
     if (isSearching) {
         return listOf(MetaLine.Discovering(areaName))
@@ -111,6 +123,12 @@ fun buildMetaLines(
     // Priority 2: Remote/teleported area
     if (isRemote && homeCity != null && remoteDistance != null) {
         lines.add(MetaLine.RemoteContext(homeCity, remoteDistance))
+    }
+    if (isRemote && currencyText != null) {
+        lines.add(MetaLine.CurrencyContext(currencyText))
+    }
+    if (isRemote && languageText != null) {
+        lines.add(MetaLine.LanguageContext(languageText))
     }
 
     // Priority 3: Active vibe filter

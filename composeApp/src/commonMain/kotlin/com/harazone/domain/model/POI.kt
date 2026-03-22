@@ -22,6 +22,7 @@ data class POI(
     val imageUrls: List<String> = emptyList(),
     val userNote: String? = null,
     val priceRange: String? = null,
+    val reviewCount: Int? = null,
 ) {
     val savedId: String get() = "$name|${latitude ?: 0.0}|${longitude ?: 0.0}"
 

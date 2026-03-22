@@ -34,6 +34,11 @@ buildkonfig {
         )
         buildConfigField(
             com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "GOOGLE_PLACES_API_KEY",
+            localProperties.getProperty("GOOGLE_PLACES_API_KEY") ?: project.findProperty("GOOGLE_PLACES_API_KEY")?.toString() ?: ""
+        )
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
             "VERSION_NAME",
             "1.0"
         )

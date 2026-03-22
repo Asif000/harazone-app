@@ -5,4 +5,5 @@ import com.harazone.domain.provider.ApiKeyProvider
 
 internal class BuildKonfigApiKeyProvider : ApiKeyProvider {
     override val geminiApiKey: String = BuildKonfig.GEMINI_API_KEY
+    override val placesApiKey: String = BuildKonfig.GOOGLE_PLACES_API_KEY
 }

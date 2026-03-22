@@ -22,11 +22,13 @@ internal class GeminiPromptBuilder {
         } else ""
         return """
 Area: "$areaName". Return JSON only, no other text.
-Schema: {"vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art","p":"$$","h":"9am-10pm","s":"open"}],"ah":["highlight1","highlight2"]}
+Schema: {"cc":"¥ · ~149 JPY/USD","lg":"日本語 · Japanese","vibes":[{"label":"Street Art","icon":"🎨"}],"pois":[{"n":"Name","t":"type","lat":0.0,"lng":0.0,"v":"Street Art","p":"$$","h":"9am-10pm","s":"open"}],"ah":["highlight1","highlight2"]}
 Rules:
 - vibes: 4-6 most distinctive dimensions of THIS area.
 - pois: 3 best POIs. Each "v" MUST exactly match a vibe label. "p" is price range ($ to $$$$, omit if N/A). "h" is current hours. "s" is status: open, busy, or closed.
 - ah: REQUIRED — 2-3 short area highlights (recurring events, seasonal notes, trending now, local tips). Max 80 chars each. ALWAYS include at least 2 highlights. Examples: "Live jazz every Friday at Praça do Comércio", "Flea market Sat 8am-2pm", "Best pastel de nata in the city".
+- cc: Currency symbol + approximate USD rate prefixed with ~ (e.g. "¥ · ~149 JPY/USD"). Omit cc entirely for USD-based regions. Approximate is fine — use current knowledge.
+- lg: Primary local language in format "NativeName · EnglishName" (e.g. "日本語 · Japanese"). Omit lg entirely for English-speaking regions.
 - t: food|entertainment|park|historic|shopping|arts|transit|safety|beach|district
 - GPS to 4 decimal places. Prefer accurate placement; if unsure of exact location, use the city center coordinates as fallback. Never omit a POI for lack of coordinates.
 - LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.$newUserHint$tasteHint${if (!languageTag.startsWith("en")) "\n- LANGUAGE RULE: All vibe labels and POI names MUST be in the language identified by locale '$languageTag'." else ""}

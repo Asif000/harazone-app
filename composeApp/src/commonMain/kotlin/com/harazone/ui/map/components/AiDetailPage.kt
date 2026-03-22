@@ -23,11 +23,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -534,7 +536,7 @@ private fun PoiDetailHeader(
                         modifier = Modifier.size(16.dp),
                     )
                     Text(
-                        text = " ${poi.rating}",
+                        text = if ((poi.reviewCount ?: 0) > 0) " ${poi.rating} (${poi.reviewCount})" else " ${poi.rating}",
                         style = MaterialTheme.typography.bodySmall,
                         color = DetailPageTextDark,
                     )
@@ -555,6 +557,25 @@ private fun PoiDetailHeader(
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF6B6B6B),
                 )
+            }
+
+            // Hours
+            // TODO(BACKLOG-LOW): replace with "Today: X (tap for full schedule)" affordance post-beta
+            if (poi.hours != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = poi.hours,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF6B6B6B),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+
+            // Verified by Google chip
+            if (poi.reviewCount != null) {
+                Spacer(Modifier.height(6.dp))
+                VerifiedByGoogleChip()
             }
 
             // Insight
@@ -696,5 +717,28 @@ private fun BuzzMeter(liveStatus: String, vibeColor: Color) {
                     ),
             )
         }
+    }
+}
+
+@Composable
+private fun VerifiedByGoogleChip() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .background(Color(0xFFF1F1F1), RoundedCornerShape(6.dp))
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Icon(
+            Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = Color(0xFF4285F4),
+            modifier = Modifier.size(12.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = "Verified by Google",
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF5F6368),
+        )
     }
 }

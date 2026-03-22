@@ -28,6 +28,8 @@ import com.harazone.util.ConnectivityMonitor
 import com.harazone.domain.companion.CompanionNudgeEngine
 import com.harazone.domain.provider.AdvisoryProvider
 import com.harazone.data.remote.FcdoAdvisoryProvider
+import com.harazone.data.remote.GooglePlacesProvider
+import com.harazone.domain.provider.PlacesProvider
 import com.harazone.util.SystemClock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +53,7 @@ val dataModule = module {
     single { AreaDiscoveryDatabase(get<DatabaseDriverFactory>().createDriver()) }
     single<AppClock> { SystemClock() }
     single(named("appScope")) { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
+    single<PlacesProvider> { GooglePlacesProvider(get(), get(), get(), get()) }
     single<AreaRepository> {
         AreaRepositoryImpl(
             aiProvider = get(),
@@ -59,6 +62,7 @@ val dataModule = module {
             clock = get(),
             connectivityObserver = { get<ConnectivityMonitor>().observe() },
             wikipediaImageRepository = get(),
+            placesProvider = get(),
         )
     }
     single { GetAreaPortraitUseCase(get()) }

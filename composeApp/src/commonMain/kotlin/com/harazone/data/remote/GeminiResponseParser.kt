@@ -84,6 +84,8 @@ internal data class Stage1Response(
     val vibes: List<VibeJson> = emptyList(),
     val pois: List<PoiJson> = emptyList(),
     val ah: List<String> = emptyList(),
+    val cc: String? = null,
+    val lg: String? = null,
 )
 
 @Serializable
@@ -96,6 +98,8 @@ internal data class EnrichmentResponseJson(
 internal data class PortraitPoisJson(
     val pois: List<PoiJson> = emptyList(),
     val ah: List<String> = emptyList(),
+    val cc: String? = null,
+    val lg: String? = null,
 )
 
 @Serializable
@@ -116,6 +120,8 @@ internal data class Stage1ParseResult(
     val vibes: List<DynamicVibe>,
     val pois: List<POI>,
     val areaHighlights: List<String> = emptyList(),
+    val currencyText: String? = null,
+    val languageText: String? = null,
 )
 
 internal data class EnrichmentParseResult(
@@ -254,7 +260,7 @@ internal class GeminiResponseParser {
                             liveStatus = poiJson.s,
                         )
                     }
-                Stage1ParseResult(vibes, pois, stage1.ah)
+                Stage1ParseResult(vibes, pois, stage1.ah, currencyText = stage1.cc, languageText = stage1.lg)
             } catch (_: Exception) {
                 // Fallback: old flat array format
                 val poisJson = json.decodeFromString<List<PoiJson>>(cleaned)
@@ -403,7 +409,7 @@ internal class GeminiResponseParser {
                 PoisWithHighlights(emptyList())
             }
 
-            updates.add(BucketUpdate.PortraitComplete(poisResult.pois, areaHighlights = poisResult.areaHighlights))
+            updates.add(BucketUpdate.PortraitComplete(poisResult.pois, areaHighlights = poisResult.areaHighlights, currencyText = poisResult.currencyText, languageText = poisResult.languageText))
 
             Result.success(updates)
         } catch (e: Exception) {
@@ -495,7 +501,7 @@ internal class GeminiResponseParser {
         }
     }
 
-    private data class PoisWithHighlights(val pois: List<POI>, val areaHighlights: List<String> = emptyList())
+    private data class PoisWithHighlights(val pois: List<POI>, val areaHighlights: List<String> = emptyList(), val currencyText: String? = null, val languageText: String? = null)
 
     private fun parsePoisJson(jsonString: String): List<POI> = parsePoisJsonWithHighlights(jsonString).pois
 
@@ -507,6 +513,8 @@ internal class GeminiResponseParser {
                 PoisWithHighlights(
                     pois = wrapper.pois.filter { it.n.isNotBlank() }.map { it.toPoi() },
                     areaHighlights = wrapper.ah,
+                    currencyText = wrapper.cc,
+                    languageText = wrapper.lg,
                 )
             } catch (_: Exception) {
                 // Backward-compatible fallback: old flat array format
@@ -614,7 +622,7 @@ internal class GeminiResponseParser {
             // Parse POIs
             val poisStr = poisText.toString().trim()
             val poisResult = if (poisStr.isNotEmpty()) parsePoisJsonWithHighlights(poisStr) else PoisWithHighlights(emptyList())
-            results.add(BucketUpdate.PortraitComplete(poisResult.pois, areaHighlights = poisResult.areaHighlights))
+            results.add(BucketUpdate.PortraitComplete(poisResult.pois, areaHighlights = poisResult.areaHighlights, currencyText = poisResult.currencyText, languageText = poisResult.languageText))
 
             return results
         }

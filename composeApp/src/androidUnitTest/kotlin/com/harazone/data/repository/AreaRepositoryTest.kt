@@ -18,6 +18,7 @@ import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.headersOf
+import com.harazone.domain.provider.PlacesProvider
 import com.harazone.fakes.FakeAreaIntelligenceProvider
 import com.harazone.fakes.FakeClock
 import com.harazone.fakes.FakeConnectivityMonitor
@@ -35,6 +36,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AreaRepositoryTest {
+
+    private val fakePlacesProvider = object : PlacesProvider {
+        override suspend fun enrichPoi(poi: POI): Result<POI> = Result.success(poi)
+    }
 
     private lateinit var driver: JdbcSqliteDriver
     private lateinit var database: AreaDiscoveryDatabase
@@ -64,6 +69,7 @@ class AreaRepositoryTest {
             fakeProvider, database, testScope, fakeClock,
             connectivityObserver = { fakeConnectivity.observe() },
             wikipediaImageRepository = WikipediaImageRepository(HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) })),
+            placesProvider = fakePlacesProvider,
             ioDispatcher = testDispatcher
         )
     }
@@ -678,6 +684,7 @@ class AreaRepositoryTest {
             clock = fakeClock,
             connectivityObserver = { fakeConnectivity.observe() },
             wikipediaImageRepository = WikipediaImageRepository(HttpClient(wikiMockEngine)),
+            placesProvider = fakePlacesProvider,
             ioDispatcher = testDispatcher,
         )
 
@@ -725,6 +732,7 @@ class AreaRepositoryTest {
             clock = fakeClock,
             connectivityObserver = { fakeConnectivity.observe() },
             wikipediaImageRepository = WikipediaImageRepository(HttpClient(wikiMockEngine)),
+            placesProvider = fakePlacesProvider,
             ioDispatcher = testDispatcher,
         )
 
@@ -766,6 +774,7 @@ class AreaRepositoryTest {
             clock = fakeClock,
             connectivityObserver = { fakeConnectivity.observe() },
             wikipediaImageRepository = WikipediaImageRepository(HttpClient(countingEngine)),
+            placesProvider = fakePlacesProvider,
             ioDispatcher = testDispatcher,
         )
 

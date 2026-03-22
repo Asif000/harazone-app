@@ -87,7 +87,7 @@ internal class GeminiAreaIntelligenceProvider(
 
         AppLogger.d { "GeminiAreaIntelligenceProvider: streaming portrait for '$areaName'" }
 
-        data class Stage1Result(val names: List<String>, val vibes: List<DynamicVibe>, val vibeLabels: List<String>)
+        data class Stage1Result(val names: List<String>, val vibes: List<DynamicVibe>, val vibeLabels: List<String>, val currencyText: String? = null, val languageText: String? = null)
         val stage1Deferred = CompletableDeferred<Stage1Result>()
 
         // Stage 1 — fast pin call (returns vibes + POIs)
@@ -127,7 +127,7 @@ internal class GeminiAreaIntelligenceProvider(
                 val dynamicVibes = stage1Parsed.vibes
                 val pois = stage1Parsed.pois
                 val areaHighlights = stage1Parsed.areaHighlights
-                stage1Deferred.complete(Stage1Result(pois.map { it.name }, dynamicVibes, dynamicVibes.map { it.label }))
+                stage1Deferred.complete(Stage1Result(pois.map { it.name }, dynamicVibes, dynamicVibes.map { it.label }, currencyText = stage1Parsed.currencyText, languageText = stage1Parsed.languageText))
                 if (pois.isNotEmpty()) {
                     if (dynamicVibes.isNotEmpty()) {
                         send(BucketUpdate.VibesReady(vibes = dynamicVibes, pois = pois, areaHighlights = areaHighlights))
@@ -201,7 +201,7 @@ internal class GeminiAreaIntelligenceProvider(
                     for (vc in vibeContents) {
                         send(BucketUpdate.DynamicVibeComplete(vc))
                     }
-                    send(BucketUpdate.PortraitComplete(enrichedPois))
+                    send(BucketUpdate.PortraitComplete(enrichedPois, currencyText = stage1Result.currencyText, languageText = stage1Result.languageText))
                 } else if (stage1Names.isNotEmpty()) {
                     val enrichResult = responseParser.parseEnrichmentWithHighlights(fullText.toString())
                     val enriched = enrichResult.enrichments
@@ -213,6 +213,8 @@ internal class GeminiAreaIntelligenceProvider(
                                 hours = e.h, liveStatus = e.s, rating = e.r, priceRange = e.p)
                         },
                         areaHighlights = enrichResult.areaHighlights,
+                        currencyText = stage1Result.currencyText,
+                        languageText = stage1Result.languageText,
                     ))
                 }
                 AppLogger.d { "GeminiAreaIntelligenceProvider: portrait streaming complete for '$areaName'" }

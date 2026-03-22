@@ -403,6 +403,7 @@ private fun ReadyContent(
             val metaLines = remember(
                 state.advisory, state.showMyLocation, state.activeVibeFilters,
                 state.areaHighlights, weatherText, timeText, state.visitTag, state.isSearchingArea, state.areaName,
+                state.areaCurrencyText, state.areaLanguageText,
             ) {
                 com.harazone.domain.model.buildMetaLines(
                     advisoryLevel = state.advisory?.level,
@@ -417,6 +418,8 @@ private fun ReadyContent(
                     activeVibeFilters = state.activeVibeFilters,
                     vibeMatchCount = state.pois.size,
                     totalPoiCount = state.allDiscoveredPois.size,
+                    currencyText = state.areaCurrencyText,
+                    languageText = state.areaLanguageText,
                 )
             }
 

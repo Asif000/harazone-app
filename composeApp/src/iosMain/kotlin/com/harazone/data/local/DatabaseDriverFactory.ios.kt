@@ -18,8 +18,25 @@ actual class DatabaseDriverFactory {
             ),
         )
         driver.ensureSavedPoisTable()
+        driver.ensurePlacesEnrichmentCacheTable()
         return driver
     }
+}
+
+private fun SqlDriver.ensurePlacesEnrichmentCacheTable() {
+    execute(null, """
+        CREATE TABLE IF NOT EXISTS places_enrichment_cache (
+            saved_id    TEXT NOT NULL PRIMARY KEY,
+            hours       TEXT,
+            live_status TEXT,
+            rating      REAL,
+            review_count INTEGER,
+            price_range TEXT,
+            expires_at  INTEGER NOT NULL,
+            cached_at   INTEGER NOT NULL
+        )
+    """.trimIndent(), 0)
+    execute(null, "CREATE INDEX IF NOT EXISTS idx_places_cache_expires_at ON places_enrichment_cache(expires_at)", 0)
 }
 
 private fun SqlDriver.ensureSavedPoisTable() {

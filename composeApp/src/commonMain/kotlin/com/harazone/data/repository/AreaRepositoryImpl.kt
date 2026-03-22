@@ -14,6 +14,7 @@ import com.harazone.domain.model.ConnectivityState
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.Source
 import com.harazone.domain.provider.AreaIntelligenceProvider
+import com.harazone.domain.provider.PlacesProvider
 import com.harazone.domain.repository.AreaRepository
 import com.harazone.util.AppClock
 import com.harazone.util.AppLogger
@@ -45,6 +46,7 @@ internal class AreaRepositoryImpl(
     private val clock: AppClock = SystemClock(),
     private val connectivityObserver: () -> Flow<ConnectivityState>,
     private val wikipediaImageRepository: WikipediaImageRepository,
+    private val placesProvider: PlacesProvider,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AreaRepository {
 
@@ -55,6 +57,7 @@ internal class AreaRepositoryImpl(
         const val CACHE_TTL_SEMI_STATIC_MS = 3 * MS_PER_DAY
         const val CACHE_TTL_DYNAMIC_MS = 12 * MS_PER_HOUR
         private val json = Json { ignoreUnknownKeys = true }
+        private const val PLACES_MAX_CONCURRENT_REQUESTS = 3
 
     }
 
@@ -114,7 +117,7 @@ internal class AreaRepositoryImpl(
                     if (needsEnrichment) {
                         scope.launch {
                             try {
-                                val enriched = enrichPoisWithImages(cachedPois)
+                                val enriched = enrichPois(cachedPois)
                                 withContext(ioDispatcher) { writePoisToCache(enriched, areaName, language) }
                             } catch (e: CancellationException) { throw e }
                             catch (e: Exception) {
@@ -166,7 +169,7 @@ internal class AreaRepositoryImpl(
                                 val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
                                 if (hasCoords) {
                                     withContext(ioDispatcher) {
-                                        val enriched = enrichPoisWithImages(update.pois)
+                                        val enriched = enrichPois(update.pois)
                                         writePoisToCache(enriched, areaName, language)
                                     }
                                 }
@@ -205,22 +208,22 @@ internal class AreaRepositoryImpl(
                     is BucketUpdate.PortraitComplete -> {
                         val hasCoords = update.pois.any { it.latitude != null && it.longitude != null }
                         if (hasCoords) {
-                            val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                            val enriched = if (update.pois.isNotEmpty()) enrichPois(update.pois) else update.pois
                             if (!context.skipCache && enriched.isNotEmpty()) writePoisToCache(enriched, areaName, language)
-                            emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched)))
+                            emit(BucketUpdate.PortraitComplete(resolveTileRefs(enriched), currencyText = update.currencyText, languageText = update.languageText))
                         } else {
-                            val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                            val enriched = if (update.pois.isNotEmpty()) enrichPois(update.pois) else update.pois
                             if (!context.skipCache) {
                                 val cachedStage1 = loadPoisFromCache(areaName, language, clock.nowMs())
                                 if (cachedStage1.isNotEmpty() && enriched.isNotEmpty()) {
                                     val merged = mergeStage2OntoCached(cachedStage1, enriched)
                                     writePoisToCache(merged, areaName, language)
-                                    emit(BucketUpdate.PortraitComplete(resolveTileRefs(merged)))
+                                    emit(BucketUpdate.PortraitComplete(resolveTileRefs(merged), currencyText = update.currencyText, languageText = update.languageText))
                                 } else {
-                                    emit(BucketUpdate.PortraitComplete(enriched))
+                                    emit(BucketUpdate.PortraitComplete(enriched, currencyText = update.currencyText, languageText = update.languageText))
                                 }
                             } else {
-                                emit(BucketUpdate.PortraitComplete(enriched))
+                                emit(BucketUpdate.PortraitComplete(enriched, currencyText = update.currencyText, languageText = update.languageText))
                             }
                         }
                     }
@@ -228,7 +231,7 @@ internal class AreaRepositoryImpl(
                         emit(update)
                     }
                     is BucketUpdate.BackgroundEnrichmentComplete -> {
-                        val enriched = if (update.pois.isNotEmpty()) enrichPoisWithImages(update.pois) else update.pois
+                        val enriched = if (update.pois.isNotEmpty()) enrichPois(update.pois) else update.pois
                         if (!context.skipCache && enriched.isNotEmpty()) mergePoisIntoCache(enriched, areaName, language)
                         emit(BucketUpdate.BackgroundEnrichmentComplete(enriched, update.batchIndex))
                     }
@@ -287,6 +290,26 @@ internal class AreaRepositoryImpl(
         }.awaitAll()
         AppLogger.d { "enrichPoisWithImages: done — ${result.count { it.imageUrl != null }}/${result.size} have images" }
         result
+    }
+
+    private suspend fun enrichPoisWithPlaces(pois: List<POI>): List<POI> = coroutineScope {
+        AppLogger.d { "enrichPoisWithPlaces: enriching ${pois.size} POIs" }
+        database.places_enrichment_cacheQueries.deleteExpired(clock.nowMs())
+        val semaphore = Semaphore(PLACES_MAX_CONCURRENT_REQUESTS)
+        pois.map { poi ->
+            async {
+                semaphore.withPermit {
+                    placesProvider.enrichPoi(poi).getOrDefault(poi)
+                }
+            }
+        }.awaitAll().also { result ->
+            AppLogger.d { "enrichPoisWithPlaces: done — ${result.count { it.reviewCount != null }}/${result.size} verified" }
+        }
+    }
+
+    private suspend fun enrichPois(pois: List<POI>): List<POI> {
+        val imageEnriched = enrichPoisWithImages(pois)
+        return enrichPoisWithPlaces(imageEnriched)
     }
 
     private fun mergeStage2OntoCached(stage1: List<POI>, stage2: List<POI>): List<POI> {
