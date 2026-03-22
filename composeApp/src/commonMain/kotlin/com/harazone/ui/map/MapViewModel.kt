@@ -302,6 +302,9 @@ class MapViewModel(
             visitedPois = current.visitedPois + savedPoiObj,
             ghostPins = ghosts,
         )
+        if (ghosts.isNotEmpty()) {
+            _errorEvents.tryEmit("Saved! ${ghosts.size} similar nearby")
+        }
         viewModelScope.launch {
             companionEngine.checkInstantNeighbor(savedPoiObj, current.allDiscoveredPois, current.visitedPoiIds)
                 ?.let { enqueueNudge(it) }
@@ -534,13 +537,27 @@ class MapViewModel(
 
     fun onSavedLensTap() {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(savedLensActive = !current.savedLensActive)
+        val entering = !current.savedLensActive
+        if (entering) {
+            vibeBeforeSavedFilter = current.activeDynamicVibe
+        }
+        _uiState.value = current.copy(
+            savedLensActive = entering,
+            visitedFilter = entering,
+            activeDynamicVibe = if (entering) null else vibeBeforeSavedFilter,
+        )
+        if (!entering) vibeBeforeSavedFilter = null
     }
 
     fun onExitSavedLens() {
         val current = _uiState.value as? MapUiState.Ready ?: return
         if (!current.savedLensActive) return
-        _uiState.value = current.copy(savedLensActive = false)
+        _uiState.value = current.copy(
+            savedLensActive = false,
+            visitedFilter = false,
+            activeDynamicVibe = vibeBeforeSavedFilter,
+        )
+        vibeBeforeSavedFilter = null
     }
 
     /**
@@ -557,7 +574,7 @@ class MapViewModel(
         val savedLat = savedPoi.latitude ?: return emptyList()
         val savedLng = savedPoi.longitude ?: return emptyList()
 
-        return allPois
+        val candidates = allPois
             .filter { poi ->
                 poi.savedId != savedId &&
                 poi.savedId !in visitedIds &&
@@ -568,15 +585,19 @@ class MapViewModel(
                 haversineDistanceMeters(savedLat, savedLng, poi.latitude!!, poi.longitude!!)
             }
             .take(3)
-            .map { poi -> GhostPin(poi = poi, sourcePoiSavedId = savedId) }
+        // Spec D22: "2-3 ghost pins" — skip if fewer than 2
+        if (candidates.size < 2) return emptyList()
+        return candidates.map { poi -> GhostPin(poi = poi, sourcePoiSavedId = savedId) }
     }
 
     fun saveGhostPin(ghostPin: GhostPin) {
         val current = _uiState.value as? MapUiState.Ready ?: return
-        _uiState.value = current.copy(
-            ghostPins = current.ghostPins.filter { it.poi.savedId != ghostPin.poi.savedId },
-        )
+        val remainingGhosts = current.ghostPins.filter { it.poi.savedId != ghostPin.poi.savedId }
+        _uiState.value = current.copy(ghostPins = remainingGhosts)
+        // visitPoi generates new ghosts — suppress by saving the remaining list and restoring after
         visitPoi(ghostPin.poi, current.areaName)
+        val afterVisit = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = afterVisit.copy(ghostPins = remainingGhosts)
     }
 
     fun closeVisitsSheet() {
@@ -972,6 +993,7 @@ class MapViewModel(
             poiStreamingCount = 0,
             activeDynamicVibe = null,
             selectedPinIndex = null,
+            ghostPins = emptyList(),
         )
         areaFetchJob = viewModelScope.launch {
             collectPortraitWithRetry(

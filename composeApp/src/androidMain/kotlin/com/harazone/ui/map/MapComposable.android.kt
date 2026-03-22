@@ -506,7 +506,8 @@ actual fun MapComposable(
             val poi = ghost.poi
             val lat = poi.latitude ?: return@forEach
             val lng = poi.longitude ?: return@forEach
-            val iconKey = ensureIcon(style, Vibe.DEFAULT, poi.type, isSaved = false, isGhost = true)
+            val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) } ?: Vibe.DEFAULT
+            val iconKey = ensureIcon(style, poiVibe, poi.type, isSaved = false, isGhost = true)
             val symbol = sm.create(
                 SymbolOptions()
                     .withLatLng(LatLng(lat, lng))

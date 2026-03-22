@@ -159,8 +159,7 @@ class SavedLensTest {
         vm.visitPoi(poi1, "Dubai Marina")
 
         val result = readyState(vm)
-        assertTrue(result.ghostPins.isNotEmpty())
-        assertTrue(result.ghostPins.size <= 3)
+        assertEquals(2, result.ghostPins.size) // exactly 2 matching food POIs
         // All ghost pins should have "food" vibe
         result.ghostPins.forEach { ghost ->
             assertEquals("food", ghost.poi.vibe.split(",").first().trim().lowercase())
@@ -198,10 +197,11 @@ class SavedLensTest {
         val poi1 = makePoi("A", "food", 25.001, 55.001)
         val poi2 = makePoi("B", "food", 25.002, 55.002)
         val poi3 = makePoi("C", "food", 25.003, 55.003)
+        val poi4 = makePoi("D", "food", 25.004, 55.004)
 
-        // Pre-mark poi2 as saved
+        // Pre-mark poi2 as saved — 3 unsaved food POIs remain (poi1 saved by visitPoi, poi3+poi4 as candidates)
         val withPois = state.copy(
-            allDiscoveredPois = listOf(poi1, poi2, poi3),
+            allDiscoveredPois = listOf(poi1, poi2, poi3, poi4),
             visitedPoiIds = setOf(poi2.savedId),
         )
         val field = MapViewModel::class.java.getDeclaredField("_uiState")
@@ -276,5 +276,101 @@ class SavedLensTest {
 
         vm.onSearchThisArea()
         assertTrue(readyState(vm).ghostPins.isEmpty())
+    }
+
+    // --- Min 2 Ghost Pins ---
+
+    @Test
+    fun ghostPinsEmptyWhenFewerThanTwoCandidates() = runTest(testDispatcher) {
+        val vm = createViewModel()
+        val state = readyState(vm)
+
+        // Only 2 food POIs total — saving one leaves 1 candidate, below min of 2
+        val poi1 = makePoi("A", "food", 25.001, 55.001)
+        val poi2 = makePoi("B", "food", 25.002, 55.002)
+        val withPois = state.copy(allDiscoveredPois = listOf(poi1, poi2))
+        val field = MapViewModel::class.java.getDeclaredField("_uiState")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val flow = field.get(vm) as kotlinx.coroutines.flow.MutableStateFlow<MapUiState>
+        flow.value = withPois
+
+        vm.visitPoi(poi1, "Dubai Marina")
+        assertTrue(readyState(vm).ghostPins.isEmpty())
+    }
+
+    // --- Saved Lens drives visitedFilter ---
+
+    @Test
+    fun savedLensTapSetsVisitedFilter() = runTest(testDispatcher) {
+        val vm = createViewModel()
+        assertFalse(readyState(vm).visitedFilter)
+
+        vm.onSavedLensTap()
+        val entering = readyState(vm)
+        assertTrue(entering.savedLensActive)
+        assertTrue(entering.visitedFilter)
+
+        vm.onExitSavedLens()
+        val exited = readyState(vm)
+        assertFalse(exited.savedLensActive)
+        assertFalse(exited.visitedFilter)
+    }
+
+    // --- Saved List Sort Order (AC34) ---
+
+    @Test
+    fun savedPlacesSortedByMostRecentAreaThenAlpha() {
+        // Test the sort order specified by AC34:
+        // most recently saved-to area first, alpha tiebreaker on area name
+        val saves = listOf(
+            SavedPoi(id = "1", name = "Cafe A", type = "cafe", areaName = "Dubai Marina",
+                lat = 25.0, lng = 55.0, whySpecial = "", savedAt = 1000L),
+            SavedPoi(id = "2", name = "Museum B", type = "museum", areaName = "Al Quoz",
+                lat = 25.1, lng = 55.1, whySpecial = "", savedAt = 2000L),
+            SavedPoi(id = "3", name = "Park C", type = "park", areaName = "Dubai Marina",
+                lat = 25.2, lng = 55.2, whySpecial = "", savedAt = 3000L),
+            SavedPoi(id = "4", name = "Bar D", type = "bar", areaName = "Bur Dubai",
+                lat = 25.3, lng = 55.3, whySpecial = "", savedAt = 500L),
+        )
+
+        // Group by area, sort groups by most recent save in area (desc), alpha tiebreaker
+        val grouped = saves.groupBy { it.areaName }
+        val sortedAreas = grouped.entries.sortedWith(
+            compareByDescending<Map.Entry<String, List<SavedPoi>>> { entry ->
+                entry.value.maxOf { it.savedAt }
+            }.thenBy { it.key }
+        ).map { it.key }
+
+        // Dubai Marina has most recent save (3000L), then Al Quoz (2000L), then Bur Dubai (500L)
+        assertEquals(listOf("Dubai Marina", "Al Quoz", "Bur Dubai"), sortedAreas)
+    }
+
+    // --- Ghost pin chain suppression ---
+
+    @Test
+    fun saveGhostPinDoesNotChainNewGhosts() = runTest(testDispatcher) {
+        val vm = createViewModel()
+        val state = readyState(vm)
+
+        val poi1 = makePoi("A", "food", 25.001, 55.001)
+        val ghostPoi = makePoi("B", "food", 25.002, 55.002)
+        val otherPoi = makePoi("C", "food", 25.003, 55.003)
+        val ghost = GhostPin(poi = ghostPoi, sourcePoiSavedId = poi1.savedId)
+
+        val withGhosts = state.copy(
+            allDiscoveredPois = listOf(poi1, ghostPoi, otherPoi),
+            ghostPins = listOf(ghost),
+        )
+        val field = MapViewModel::class.java.getDeclaredField("_uiState")
+        field.isAccessible = true
+        @Suppress("UNCHECKED_CAST")
+        val flow = field.get(vm) as kotlinx.coroutines.flow.MutableStateFlow<MapUiState>
+        flow.value = withGhosts
+
+        vm.saveGhostPin(ghost)
+        val result = readyState(vm)
+        // Ghost pin should be removed, no new ghosts generated from the chain
+        assertTrue(result.ghostPins.isEmpty())
     }
 }

@@ -287,7 +287,7 @@ private fun ReadyContent(
                 longitude = state.longitude,
                 zoomLevel = state.cameraZoomLevel,
                 cameraMoveId = state.cameraMoveId,
-                pois = if (state.visitedFilter) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
+                pois = if (state.visitedFilter || state.savedLensActive) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
                 activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled on map
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
@@ -504,9 +504,6 @@ private fun ReadyContent(
         PlatformBackHandler(enabled = state.showListView) { viewModel.toggleListView() }
         PlatformBackHandler(enabled = state.showAllMode && state.selectedPoi == null) {
             viewModel.onPrevBatch()
-        }
-        PlatformBackHandler(enabled = state.selectedPoi == null && state.visitedFilter) {
-            viewModel.onVisitedFilterSelected()
         }
         // Header collapse — higher priority than list/showAll/visitedFilter (H2)
         PlatformBackHandler(enabled = isHeaderExpanded) { isHeaderExpanded = false }
