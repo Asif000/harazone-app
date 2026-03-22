@@ -56,6 +56,8 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -296,6 +298,7 @@ internal fun ChatOverlay(
                 isStreaming = chatState.isStreaming,
                 onInputChange = { viewModel.updateInput(it) },
                 onSend = { viewModel.sendMessage() },
+                autoFocus = true,
             )
         }
     }
@@ -638,7 +641,16 @@ internal fun ChatInputBar(
     onInputChange: (String) -> Unit,
     onSend: () -> Unit,
     placeholder: String? = null,
+    autoFocus: Boolean = false,
 ) {
+    val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
+    if (autoFocus) {
+        LaunchedEffect(Unit) {
+            kotlinx.coroutines.delay(300) // wait for overlay animation
+            focusRequester.requestFocus()
+        }
+    }
+
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -660,7 +672,9 @@ internal fun ChatInputBar(
                 unfocusedIndicatorColor = Color.Transparent,
                 disabledIndicatorColor = Color.Transparent,
             ),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .then(if (autoFocus) Modifier.focusRequester(focusRequester) else Modifier),
         )
         Spacer(Modifier.width(8.dp))
         Surface(

@@ -25,6 +25,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.harazone.BuildKonfig
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.GhostPin
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Vibe
@@ -71,12 +72,16 @@ actual fun MapComposable(
     visitedFilter: Boolean,
     onPinTapped: (Int) -> Unit,
     selectedPinIndex: Int?,
+    ghostPins: List<GhostPin>,
+    onGhostPinTapped: (GhostPin) -> Unit,
+    savedLensActive: Boolean,
 ) {
     val context = LocalContext.current
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnMapRenderFailed = rememberUpdatedState(onMapRenderFailed)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
     val currentOnPinTapped = rememberUpdatedState(onPinTapped)
+    val currentOnGhostPinTapped = rememberUpdatedState(onGhostPinTapped)
     val currentPois = rememberUpdatedState(pois)
 
     val isDestroyed = remember { booleanArrayOf(false) }
@@ -88,6 +93,8 @@ actual fun MapComposable(
     val symbolPoiMap = remember { mutableMapOf<Long, POI>() }
     val savedSymbolsRef = remember { mutableListOf<Symbol>() }
     val symbolSavedPoiMap = remember { mutableMapOf<Long, SavedPoi>() }
+    val ghostSymbolsRef = remember { mutableListOf<Symbol>() }
+    val symbolGhostPinMap = remember { mutableMapOf<Long, GhostPin>() }
     val glowLayerIds = remember { mutableListOf<String>() }
     val glowSourceIds = remember { mutableListOf<String>() }
     val glowAnimators = remember { mutableListOf<ValueAnimator>() }
@@ -144,25 +151,30 @@ actual fun MapComposable(
                         symbolManagerRef[0] = sm
 
                         sm.addClickListener { symbol ->
-                            val savedPoi = symbolSavedPoiMap[symbol.id]
-                            if (savedPoi != null) {
-                                val poi = POI(
-                                    name = savedPoi.name,
-                                    type = savedPoi.type,
-                                    description = savedPoi.description ?: savedPoi.whySpecial,
-                                    insight = savedPoi.whySpecial,
-                                    confidence = Confidence.HIGH,
-                                    latitude = savedPoi.lat,
-                                    longitude = savedPoi.lng,
-                                    imageUrl = savedPoi.imageUrl,
-                                    rating = savedPoi.rating,
-                                )
-                                currentOnPoiSelected.value(poi)
+                            val ghostPin = symbolGhostPinMap[symbol.id]
+                            if (ghostPin != null) {
+                                currentOnGhostPinTapped.value(ghostPin)
                             } else {
-                                symbolPoiMap[symbol.id]?.let { poi ->
-                                    val index = currentPois.value.indexOfFirst { it.savedId == poi.savedId }
-                                    if (index >= 0) {
-                                        currentOnPinTapped.value(index)
+                                val savedPoi = symbolSavedPoiMap[symbol.id]
+                                if (savedPoi != null) {
+                                    val poi = POI(
+                                        name = savedPoi.name,
+                                        type = savedPoi.type,
+                                        description = savedPoi.description ?: savedPoi.whySpecial,
+                                        insight = savedPoi.whySpecial,
+                                        confidence = Confidence.HIGH,
+                                        latitude = savedPoi.lat,
+                                        longitude = savedPoi.lng,
+                                        imageUrl = savedPoi.imageUrl,
+                                        rating = savedPoi.rating,
+                                    )
+                                    currentOnPoiSelected.value(poi)
+                                } else {
+                                    symbolPoiMap[symbol.id]?.let { poi ->
+                                        val index = currentPois.value.indexOfFirst { it.savedId == poi.savedId }
+                                        if (index >= 0) {
+                                            currentOnPinTapped.value(index)
+                                        }
                                     }
                                 }
                             }
@@ -479,6 +491,40 @@ actual fun MapComposable(
             }
     }
 
+    // Ghost pins — dashed-outline suggested POIs
+    LaunchedEffect(ghostPins, styleLoaded.value) {
+        if (!styleLoaded.value) return@LaunchedEffect
+        val style = styleRef[0] ?: return@LaunchedEffect
+        val sm = symbolManagerRef[0] ?: return@LaunchedEffect
+
+        ghostSymbolsRef.forEach { sm.delete(it) }
+        ghostSymbolsRef.clear()
+        symbolGhostPinMap.clear()
+
+        ghostPins.forEach { ghost ->
+            if (isDestroyed[0]) return@LaunchedEffect
+            val poi = ghost.poi
+            val lat = poi.latitude ?: return@forEach
+            val lng = poi.longitude ?: return@forEach
+            val poiVibe = Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) } ?: Vibe.DEFAULT
+            val iconKey = ensureIcon(style, poiVibe, poi.type, isSaved = false, isGhost = true)
+            val symbol = sm.create(
+                SymbolOptions()
+                    .withLatLng(LatLng(lat, lng))
+                    .withIconImage(iconKey)
+                    .withIconSize(1.0f)
+                    .withTextField(poi.name)
+                    .withTextSize(11f)
+                    .withTextColor("#80CBC4") // muted teal
+                    .withTextOffset(arrayOf(0f, 1.8f))
+                    .withTextHaloColor("rgba(0,0,0,0.7)")
+                    .withTextHaloWidth(1.5f)
+            )
+            ghostSymbolsRef.add(symbol)
+            symbolGhostPinMap[symbol.id] = ghost
+        }
+    }
+
     AndroidView(
         factory = { mapView },
         modifier = modifier,
@@ -514,6 +560,8 @@ actual fun MapComposable(
             symbolPoiMap.clear()
             savedSymbolsRef.clear()
             symbolSavedPoiMap.clear()
+            ghostSymbolsRef.clear()
+            symbolGhostPinMap.clear()
             context.unregisterComponentCallbacks(lowMemoryCallback)
             lifecycleOwner.lifecycle.removeObserver(observer)
             cameraIdleListenerRef[0]?.let { mapRef[0]?.removeOnCameraIdleListener(it) }
@@ -534,16 +582,36 @@ private fun ensureIcon(
     liveStatus: String? = null,
     isSelected: Boolean = false,
     badgeType: PinBadge? = null,
+    isGhost: Boolean = false,
 ): String {
     val typeKey = poiType.lowercase().trim()
     val statusKey = liveStatusToColor(liveStatus).name
-    val iconKey = "poi_${vibe.name}_${typeKey}_${statusKey}_${badgeType?.name ?: "none"}_${isSelected}_$isSaved"
+    val iconKey = "poi_${vibe.name}_${typeKey}_${statusKey}_${badgeType?.name ?: "none"}_${isSelected}_${isSaved}_$isGhost"
     if (style.getImage(iconKey) == null) {
         val vibeColorArgb = vibe.toColor().toArgb()
         val emoji = poiTypeEmoji(typeKey)
         val size = 64
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
+        // Ghost pin: dashed outline, muted emoji, no fill
+        if (isGhost) {
+            val dashPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.parseColor("#80CBC4") // muted teal
+                this.style = Paint.Style.STROKE
+                strokeWidth = 3f
+                pathEffect = android.graphics.DashPathEffect(floatArrayOf(8f, 6f), 0f)
+            }
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f - 2f, dashPaint)
+            val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                textSize = size * 0.45f
+                textAlign = Paint.Align.CENTER
+                alpha = 160 // muted
+            }
+            val textY = size / 2f - (textPaint.descent() + textPaint.ascent()) / 2f
+            canvas.drawText(emoji, size / 2f, textY, textPaint)
+            style.addImage(iconKey, bitmap)
+            return iconKey
+        }
         val closed = isClosed(liveStatus)
         // Vibe-colored circle background
         val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {

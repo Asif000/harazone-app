@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
@@ -101,6 +103,8 @@ internal fun AiDetailPage(
     onDismiss: () -> Unit,
     onNavigateToMaps: (Double, Double, String) -> Boolean,
     onDirectionsFailed: () -> Unit,
+    isGhostPin: Boolean = false,
+    onDiscoverGhostPin: () -> Unit = {},
     onPoiCardClick: (ChatPoiCard) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -162,6 +166,25 @@ internal fun AiDetailPage(
                         onDismiss = onDismiss,
                         onImageClick = { showGallery = true },
                     )
+                }
+
+                // Ghost pin CTA — "Discover this one too"
+                if (isGhostPin && !isVisited) {
+                    item(key = "ghost_cta") {
+                        Button(
+                            onClick = onDiscoverGhostPin,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = com.harazone.ui.theme.SavedLensTeal,
+                                contentColor = Color.White,
+                            ),
+                            shape = RoundedCornerShape(24.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                        ) {
+                            Text("Discover this one too")
+                        }
+                    }
                 }
 
                 // Context block — between header and chat (hidden when empty and not loading)

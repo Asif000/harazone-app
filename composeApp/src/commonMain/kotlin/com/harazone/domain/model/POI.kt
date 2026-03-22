@@ -24,4 +24,7 @@ data class POI(
     val priceRange: String? = null,
 ) {
     val savedId: String get() = "$name|${latitude ?: 0.0}|${longitude ?: 0.0}"
+
+    /** First comma-separated vibe token, normalized for comparison. */
+    val primaryVibe: String? get() = vibe.split(",").firstOrNull()?.trim()?.lowercase()?.ifBlank { null }
 }

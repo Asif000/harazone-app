@@ -6,7 +6,7 @@
 **Source:** Brainstorming session `_bmad-output/brainstorming/brainstorming-session-2026-03-20-001.md` (22 decisions)
 **Prototypes:** `_bmad-output/brainstorming/prototype-FINAL.html` (12 screens)
 **Date:** 2026-03-21
-**Review:** 8H / 16M / 7L — all resolved (2026-03-21)
+**Review:** 8H / 16M / 7L — all resolved (2026-03-21); adversarial review 15 findings — 7 pre-planned, 4 spec-fixed, 4 design-decided (2026-03-21)
 
 ---
 
@@ -20,24 +20,28 @@ Replace five separate header/bar components with two unified surfaces: a **Disco
 
 ## Dependencies
 
-- **Safety Advisory** (`tech-spec-safety-travel-advisory.md`) — already implemented (commit `ac8f321`). Safety dot reads from `SafetyRepository` / `SafetyAdvisoryLevel` enum defined there. If for any reason `SafetyRepository` is unavailable, the dot is hidden (unknown/safe default). Do not redefine the `SafetyAdvisoryLevel` enum — import it.
-- **Surprise Here** (`tech-spec-streaming-discovery-ux.md`) — already implemented. 🎲 calls `SurpriseHereViewModel.triggerSurprise()` unchanged.
-- **Streaming discovery pipeline** — already implemented. `Discover` button calls `DiscoveryViewModel.discoverArea()` unchanged.
+- **Safety Advisory** (`tech-spec-safety-travel-advisory.md`) — already implemented (commit `ac8f321`). Safety dot reads from `AdvisoryProvider` / `AdvisoryLevel` enum (in `AreaAdvisory.kt`). Values: `SAFE`, `CAUTION`, `RECONSIDER`, `DO_NOT_TRAVEL`, `UNKNOWN`. If `AdvisoryProvider` is unavailable, the dot is hidden (unknown/safe default). Do not redefine the `AdvisoryLevel` enum — import it.
+- **Surprise Here** (`tech-spec-streaming-discovery-ux.md`) — already implemented. 🎲 calls `MapViewModel.onSurpriseMe()` unchanged.
+- **Streaming discovery pipeline** — already implemented. `Discover` button calls `MapViewModel.onSearchThisArea()` unchanged.
 
 ---
 
 ## Components Removed
 
-| Removed | Replaced By |
-|---------|-------------|
-| `TopContextBar` | Discovery Header — collapsed row |
-| `GeocodingSearchBar` | Discovery Header — expanded panel search input |
-| `AmbientTicker` | Rotating meta line (collapsed) + Intel strip (expanded) |
-| `SearchSurprisePill` | 🎲 Surprise on header bar; `Discover` button on pan |
-| `VibeRail` (floating right-side) | Vibe chips inside expanded header |
-| `Floating companion orb` | Unified bottom orb bar |
+| Removed | Replaced By | Deleted In |
+|---------|-------------|------------|
+| `TopContextBar` | Discovery Header — collapsed row | Commit A |
+| `GeocodingSearchBar` | Discovery Header — expanded panel search input | Commit A |
+| `AmbientTicker` | Rotating meta line (collapsed) + Intel strip (expanded) | Commit A |
+| `SearchSurpriseTogglePill` (private in MapScreen.kt) | 🎲 Surprise on header bar; `Discover` button on pan | Commit A |
+| `VibeRail` (floating right-side) | Vibe chips inside expanded header | Commit A |
+| `CompanionOrb` (floating FAB) | Unified bottom orb bar | Commit B |
+| `CompanionCard` | Peek card in bottom bar | Commit B |
+| `AISearchBar` | Orb bar text + mic | Commit B |
+| `MapListToggle` | ▤/🗺 toggle in bottom bar | Commit B |
+| `SavesNearbyPill` (private in MapScreen.kt) | Count pill in header | Commit B |
 
-Old components must be **deleted** in the same PR as new components are introduced. No dead code.
+Each component is deleted in the SAME commit that introduces its replacement. No dead code windows between commits.
 
 ---
 
@@ -104,6 +108,8 @@ This preserves Jamie's (location-denied user) path to value via manual search. T
 
 ### Collapsed State (~52dp, always visible)
 
+**Top safe area:** The `DiscoveryHeader` composable must apply `windowInsetsPadding(WindowInsets.safeDrawingTop)` (or `statusBarsPadding()`) so it renders below the status bar / Dynamic Island on iOS and below the Android status bar. Without this the header will render under the notch on iOS devices.
+
 **Layout (left → right):**
 ```
 [Area Name 🟢] [rotating meta line] [📍5 ♥2] [🎲] [▼]
@@ -125,7 +131,7 @@ This preserves Jamie's (location-denied user) path to value via manual search. T
 - 🎲 → triggers Surprise Here (local, filter-aware)
 - ♥ in count pill → saved lens toggle (48dp tap area extending beyond the ♥ glyph)
 
-**Bottom bar during expanded header:** The bottom bar is NOT behind the scrim. It remains fully interactive when the header is expanded. Opening chat or hamburger from the bottom bar while header is expanded collapses the header first, then opens the requested surface. (M16)
+**Bottom bar during expanded header:** The bottom bar is NOT behind the scrim. It remains fully interactive when the header is expanded. Opening chat or hamburger from the bottom bar while header is expanded collapses the header first, then opens the requested surface. (M16) **Nudge deferral:** If a nudge arrives while the header is expanded, it queues silently and displays only after the header collapses. No z-order conflict between peek card and header scrim. (R15)
 
 ### Rotating Meta Ticker (D3)
 
@@ -133,11 +139,12 @@ Single 14px line. Rotates every 4s on a smooth crossfade. Priority order when mu
 
 | Priority | Condition | Format | Color |
 |----------|-----------|--------|-------|
-| 1 | Safety caution or warning | `⚠️ Reconsider travel · Check advisory` | Amber |
+| 1 | Safety CAUTION, RECONSIDER, or DO_NOT_TRAVEL | `⚠️ Reconsider travel · Check advisory` | Amber |
 | 2 | Remote/teleported area | `From Dubai · 8,300 mi` | Teal |
-| 3 | Companion nudge available | `✨ Try Surprise — 3 spots match your taste` | Purple |
-| 4 | Featured POI nearby | `🎡 Ain Dubai 1.2 km · sunset at 6:15 PM` | Teal |
-| 5 | Default (always present) | `🌤 82°F · 3:42 PM · First visit` | White/muted |
+| 3 | Active vibe filter (when collapsed) | `🎭 3/5 Arts · History` | Purple |
+| 4 | Companion nudge available | `✨ Try Surprise — 3 spots match your taste` | Purple |
+| 5 | Featured POI nearby | `🎡 Ain Dubai 1.2 km · sunset at 6:15 PM` | Teal |
+| 6 | Default (always present) | `🌤 82°F · 3:42 PM · First visit` | White/muted |
 
 Rules:
 - Safety warning (priority 1) does NOT rotate — it stays fixed until area changes. This is the **primary accessible signal** for safety state (color dot is secondary). (H3)
@@ -179,7 +186,22 @@ During POI discovery (after tapping Discover, or initial load):
 
 Tapping collapsed bar (outside 🎲 and count pill) expands the header into a full panel. Slides down with a smooth spring animation. Scrim covers the map only (not the bottom bar). Tap scrim → collapses.
 
-**Keyboard behavior:** On expand, the search input auto-focuses and the software keyboard opens. The layout uses `WindowCompat.setDecorFitsSystemWindows(false)` + `Modifier.imePadding()` so the bottom bar stays visible above the keyboard. The POI carousel is pushed off-screen (acceptable — the keyboard is for search). The map tiles remain visible above the keyboard. (M11)
+**Gesture conflict (iOS):** The scrim composable must consume ALL pointer events (tap, drag, pinch) so MapLibre's underlying gesture recognizers do not fire while the panel is open. `detectTapGestures` alone is insufficient — it only handles taps, allowing drag/pinch to leak through to MapLibre on iOS. Use `awaitPointerEventScope` with `PointerEventPass.Initial` consuming every `PointerEvent`:
+```kotlin
+Modifier.pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            event.changes.forEach { it.consume() }
+        }
+    }
+}
+```
+The expanded panel's own horizontal chip scroll and vertical content scroll are unaffected — they sit above the scrim in z-order. **Implementation constraint:** Apply the consuming `pointerInput` to the scrim layer only (a sibling composable behind the panel content in the composition tree), NOT to any composable that wraps the panel content — otherwise panel scrolling will be blocked.
+
+**Keyboard behavior:** On expand, the search input auto-focuses and the software keyboard opens. Use `Modifier.imePadding()` on the expanded panel so the bottom bar stays visible above the keyboard. The POI carousel is pushed off-screen (acceptable — the keyboard is for search). The map tiles remain visible above the keyboard.
+- **Android only:** call `WindowCompat.setDecorFitsSystemWindows(window, false)` in `MainActivity` (likely already set). Do not add this call in common code.
+- **iOS:** keyboard avoidance is handled automatically by the system — no additional Compose modifier needed. `imePadding()` is a no-op on iOS and safe to leave in common code. (M11)
 
 **Panel contents (top to bottom):**
 
@@ -209,8 +231,8 @@ Tapping collapsed bar (outside 🎲 and count pill) expands the header into a fu
 
 5. **Action buttons** (horizontal row)
    - `✨ Surprise` (primary, purple) — same as 🎲 but labeled
-   - `🔄 Refresh` — re-runs discovery for current area
-   - `🔖 Save Area` — saves the area itself (not a POI)
+   - `🔄 Refresh` — re-runs discovery for current area (`onSearchThisArea()`)
+   - `🔖 Save Area` — hidden until area-save feature is implemented (future spec)
 
 6. **Recent explorations** (bottom of panel)
    - Up to 3 cards: past teleportations
@@ -256,26 +278,24 @@ One search input handles everything. Results split into three sections:
   - Meta line shows: `🎭 3/5 Arts · History` (count + active vibe names, truncated)
   - A small filter badge appears on the map canvas (top-left, non-interactive, status indicator only)
   - Non-matching pins dim to 30% opacity
-- **Surprise with active filter:** 🎲 picks from the filtered (OR union) set. If the filtered set is empty (zero matching POIs for selected vibes), 🎲 does not fire — instead the orb bar shows: `"No [Vibe] spots here — try nearby?"` and the 🎲 button briefly pulses then returns to enabled. The user can tap again to get the same message, change vibes, or clear the filter. (H8)
+- **Surprise with active filter:** 🎲 picks from the filtered (OR union) set. If the filtered set is empty (zero matching POIs for selected vibes), 🎲 does not fire — instead the orb bar shows: `"No [Vibe] spots here — try nearby?"` and the 🎲 button briefly pulses then returns to enabled. Repeated taps keep showing the same orb message (not silently no-op). The user can change vibes or clear the filter. (H8)
 - Clear filter: tap active chip again, or swipe the filter badge in the meta line
 
 ### Safety Dot (D11)
 
 Small colored dot rendered immediately after area name text, vertically centered. **Color is a secondary indicator.** The primary accessible signal for safety state is the priority-1 rotating meta ticker text. (H3)
 
-| State | Color | Animation | `contentDescription` |
-|-------|-------|-----------|----------------------|
-| Safe | Green `#4CAF50` | None | "Area safety: safe" |
-| Exercise caution | Orange `#FF9800` | Slow pulse (2s) | "Area safety: exercise caution" |
-| Do not travel | Red `#F44336` | Fast pulse (1s) | "Area safety: do not travel" |
-| Unknown | Hidden | — | (no dot, no announcement) |
+| AdvisoryLevel | Color | Animation | `contentDescription` |
+|---------------|-------|-----------|----------------------|
+| `SAFE` | Green `#4CAF50` | None | "Area safety: safe" |
+| `CAUTION` | Amber `#E3B341` | Slow pulse (2s) | "Area safety: exercise caution" |
+| `RECONSIDER` | Orange `#DB6D28` | Slow pulse (2s) | "Area safety: reconsider travel" |
+| `DO_NOT_TRAVEL` | Red `#DA3633` | Fast pulse (1s) | "Area safety: do not travel" |
+| `UNKNOWN` | Hidden | — | (no dot, no announcement) |
 
-Safety dot reads from `SafetyAdvisoryLevel` (defined in Safety Advisory spec, already implemented):
-- `SAFE` → Green
-- `CAUTION` → Orange
-- `WARNING` / `DO_NOT_TRAVEL` → Red
+Safety dot reads from `AdvisoryLevel` (defined in `AreaAdvisory.kt`, already implemented). Colors match existing `TopContextBar.kt` dot color mapping.
 
-When orange or red: warning text occupies priority-1 in the rotating meta ticker (overrides all other lines, stays fixed).
+When `AdvisoryLevel` is `CAUTION`, `RECONSIDER`, or `DO_NOT_TRAVEL`: warning text occupies priority-1 in the rotating meta ticker (overrides all other lines, stays fixed). `SAFE` and `UNKNOWN` do not trigger a priority-1 override.
 
 ### Count Pill (D12)
 
@@ -364,7 +384,7 @@ The bottom bar orb IS the companion. Replaces the floating companion orb entirel
 - Slides up 120dp above bar, contained to right side
 - **Z-order:** Peek card renders above the POI carousel (carousel is not pushed up; peek overlaps it). The carousel remains visible and interactive in the left/center portion of the screen. (M4)
 - Shows full nudge text + action buttons (e.g., "Navigate", "Save", "Dismiss")
-- **"Navigate" action:** Opens platform maps intent. KMP `expect/actual`: Android = `Intent(ACTION_VIEW, geo:lat,lng)`, iOS = `MapsUrl` scheme. Implement as `expect fun openMapsNavigation(lat: Double, lng: Double)` in `commonMain`. (L2)
+- **"Navigate" action:** Opens platform maps intent. KMP `expect/actual`: Android = `Intent(ACTION_VIEW, geo:lat,lng?q=lat,lng(name))`, iOS = Maps URL scheme. Implement as `expect fun openMapsNavigation(lat: Double, lng: Double, name: String)` in `commonMain`. (L2)
 - Tap scrim or swipe down → dismisses peek
 - `PlatformBackHandler` required (collapses peek before closing chat)
 
@@ -570,10 +590,29 @@ Orb bar: 💬 pip + "Ain Dubai closes in 2 hrs!"
 - [ ] AC36: Ghost pin tap → POI card; "Discover this one too" CTA saves the POI + converts pin to heart pin
 - [ ] AC37: Saved banner shows count; ✕ exits lens; back press exits lens
 
+### Additional Behaviors
+
+- [ ] AC40: Nudge queue respects max depth 3; priority: safety → time-sensitive → taste; excess nudges dropped
+- [ ] AC41: Intel strip tap opens companion chat pre-loaded with the tapped fact text as entry context
+- [ ] AC42: "Refresh" button in expanded panel re-runs `onSearchThisArea()` and shows spinner
+- [ ] AC43: "Save Area" button is hidden if area-save feature is not yet implemented; renders only when the feature exists
+- [ ] AC44: Meta line posts `LiveRegion.POLITE` on rotation; `LiveRegion.ASSERTIVE` for safety warnings
+- [ ] AC45: Repeated 🎲 taps with zero-match filter keep showing orb message each time (not silent no-op)
+- [ ] AC46: Ghost pin visual converts from dashed outline to filled heart pin after "Discover this one too" tap
+- [ ] AC47: DiscoveryHeader applies `statusBarsPadding()` — does not render under notch/Dynamic Island
+
 ### Back Button / PlatformBackHandler
 
-- [ ] AC38: Back press priority (topmost wins): keyboard dismiss → hamburger menu → expanded header → orb peek → saved lens → app exit
+- [ ] AC38: Back press priority (topmost wins): hamburger menu → expanded header → orb peek → saved lens → app exit (keyboard dismiss handled natively by Android, not via PlatformBackHandler)
 - [ ] AC39: Each layer has its own enabled `PlatformBackHandler` that fires only when that layer is active
+
+### Test Migration
+
+Each commit must update or create tests for replaced components:
+
+- **Commit A:** `AmbientTickerTest.kt` → `RotatingMetaTickerTest.kt` (test `buildMetaLines()` priority sorting, safety override, rotation pause). `TopContextBar`, `GeocodingSearchBar`, `VibeRail`, `SearchSurpriseTogglePill` had no tests — no migration needed, but new unit tests for `MetaLine` priority logic and `CountPill` debounce are required.
+- **Commit B:** `CompanionOrb`, `CompanionCard`, `AISearchBar`, `MapListToggle`, `SavesNearbyPill` had no dedicated test files. New unit tests required: orb state mapping (7 states → correct icon/text/glow), mutual exclusion logic (hamburger dismisses peek and vice versa), nudge queue priority ordering + max depth 3. Verify `CompanionNudgeEngineTest.kt` still passes (engine is unchanged, but call sites move).
+- **Commit C:** New unit tests required: ghost pin generation logic (same vibe filter, nearest by distance, max 2-3 pins), ghost pin → heart pin conversion on save, saved lens toggle state (pan detection disabled, Discover button suppressed). Test saved list sort order (most recent area first, alpha tiebreaker).
 
 ---
 
@@ -581,20 +620,56 @@ Orb bar: 💬 pip + "Ain Dubai closes in 2 hrs!"
 
 ### Kotlin/KMP Architecture
 
-- `DiscoveryHeader` composable replaces `TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurprisePill`, `VibeRail`
+- `DiscoveryHeader` composable replaces `TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurpriseTogglePill`, `VibeRail`
 - `UnifiedBottomBar` composable replaces floating `CompanionOrb` + existing bottom area
-- `SavedLensViewModel` (or state in `MapViewModel`) — manages saved lens mode flag, ghost pins list, cluster state
+- Saved lens state lives in `MapUiState.Ready` (fields: `savedLensActive: Boolean`, `ghostPins: List<GhostPin>`), managed by `MapViewModel`. No separate ViewModel.
 - Rotating meta: `LaunchedEffect` cycling a priority-sorted `List<MetaLine>` sealed class with `delay(4_000)`. Paused via a `isPaused` flag during spinner state.
 - Intel strip: separate `LaunchedEffect` with `delay(8_000)` cycling `List<String>` from area CHARACTER bucket. No shared state with `MetaLine`.
-- Safety dot: reads `SafetyAdvisoryLevel` from `SafetyRepository` (already defined in Safety Advisory impl). Import — do not redefine.
-- Vibe filter: `MapViewModel.activeVibeFilters: Set<VibeCategory>` — cleared on `discoverArea()` call that results from a teleport, not from a local Discover tap.
-- Ghost pins: `DiscoveryViewModel.ghostPins: List<GhostPin>` — cleared on next `discoverArea()` call.
-- Platform maps navigation: `expect fun openMapsNavigation(lat: Double, lng: Double)` in `commonMain`; `actual` in `androidMain` (geo intent) and `iosMain` (Maps URL scheme).
+- Safety dot: reads `AdvisoryLevel` from `AdvisoryProvider` (already defined in `AreaAdvisory.kt`). Import — do not redefine.
+- Vibe filter: `MapUiState.Ready.activeVibeFilters: Set<String>` (matching `DynamicVibe.label` values) — cleared on `onSearchThisArea()` call that results from a teleport, not from a local Discover tap. Multi-select uses OR-union of `DynamicVibe.poiIds` lists. Label matching must be case-insensitive and trimmed (`label.trim().lowercase()`) to handle Gemini response variance. **Known limitation:** streaming POIs that arrive after vibe association may not appear in filtered results; accepted for now, fix in a future pass.
+- Ghost pins: `MapUiState.Ready.ghostPins: List<GhostPin>` — managed by `MapViewModel`, cleared on next `onSearchThisArea()` call.
+- Platform maps navigation: `expect fun openMapsNavigation(lat: Double, lng: Double, name: String)` in `commonMain`; `actual` in `androidMain` (geo intent with label) and `iosMain` (Maps URL scheme).
 - Bottom bar safe area: `Modifier.windowInsetsPadding(WindowInsets.safeDrawingBottom)` on the bottom bar container.
+
+### New Type Definitions
+
+```kotlin
+// domain/model/MetaLine.kt
+sealed class MetaLine(val priority: Int) {
+    data class SafetyWarning(val text: String) : MetaLine(1)       // Amber, fixed (no rotation)
+    data class RemoteContext(val fromCity: String, val distance: String) : MetaLine(2) // Teal
+    data class VibeFilter(val count: Int, val total: Int, val names: String) : MetaLine(3) // Purple
+    data class CompanionNudge(val text: String) : MetaLine(4)      // Purple
+    data class PoiHighlight(val text: String) : MetaLine(5)        // Teal
+    data class Default(val text: String) : MetaLine(6)             // White/muted
+    data object GpsAcquiring : MetaLine(99)                        // Static, no rotation
+    data object LocationDenied : MetaLine(99)                      // Static
+    data class Discovering(val areaName: String) : MetaLine(99)    // Pauses rotation
+}
+
+// domain/model/GhostPin.kt
+data class GhostPin(
+    val poi: POI,               // The suggested POI
+    val sourcePoiSavedId: String, // The saved POI that triggered this suggestion
+)
+
+// expect/actual in commonMain
+expect fun openMapsNavigation(lat: Double, lng: Double, name: String)
+// Android actual: Intent(ACTION_VIEW, Uri.parse("geo:$lat,$lng?q=$lat,$lng($name)"))
+// iOS actual: URL("http://maps.apple.com/?daddr=$lat,$lng&dirflg=d")
+```
+
+### Phased Implementation Plan (3 commits on one branch)
+
+**Commit A — DiscoveryHeader:** Build `DiscoveryHeader` (collapsed + expanded), `RotatingMetaTicker`, `CountPill`, `SafetyDot` (extracted), `SmartSearchPanel`, `VibeChipRow`. Add `activeVibeFilters: Set<String>` to `MapUiState.Ready`. Header expanded/collapsed is ephemeral UI state — use `remember { mutableStateOf(false) }` local to `DiscoveryHeader`, NOT in `MapUiState.Ready`. Wire into `MapScreen.kt` replacing `TopContextBar` + `GeocodingSearchBar` + `AmbientTicker` + `SearchSurpriseTogglePill` + `VibeRail`. Delete replaced component files in this commit. Update `AmbientTickerTest` → `RotatingMetaTickerTest`. Smoke test.
+
+**Commit B — UnifiedBottomBar:** Build `UnifiedBottomBar`, `OrbBar` (7 states), `PeekCard`, `HamburgerMenu`. Add `expect fun openMapsNavigation(lat, lng, name)`. Wire into `MapScreen.kt` replacing `CompanionOrb` + `CompanionCard` + `AISearchBar` + `MapListToggle` + `SavesNearbyPill`. Delete those 5 old component files/private fns in this commit. Add mutual exclusion + PlatformBackHandler chain. Smoke test.
+
+**Commit C — SavedLens:** Build `SavedLensBanner`, saved map overlay, ghost pin rendering. Add `savedLensActive: Boolean` + `ghostPins: List<GhostPin>` to `MapUiState.Ready`. Wire saved lens toggle, pan detection disable, ghost pin CTA. No component deletions in this commit (all deletions handled in A and B). Smoke test.
 
 ### Component Deprecation
 
-Old components (`TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurprisePill`, `VibeRail`, floating `CompanionOrb`) must be deleted in the same PR. Do not leave dead code behind.
+Old components (`TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurpriseTogglePill` (private in MapScreen.kt), `VibeRail`, floating `CompanionOrb`, `AISearchBar`, `MapListToggle`, `SavesNearbyPill` (private in MapScreen.kt)) must be deleted in the same PR. Do not leave dead code behind.
 
 ---
 

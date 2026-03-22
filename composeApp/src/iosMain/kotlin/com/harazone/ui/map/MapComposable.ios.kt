@@ -20,6 +20,7 @@ import cocoapods.MapLibre.MLNShapeSource
 import cocoapods.MapLibre.MLNStyle
 import cocoapods.MapLibre.MLNSymbolStyleLayer
 import com.harazone.BuildKonfig
+import com.harazone.domain.model.GhostPin
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Vibe
@@ -72,6 +73,9 @@ actual fun MapComposable(
     visitedFilter: Boolean,
     onPinTapped: (Int) -> Unit,
     selectedPinIndex: Int?,
+    ghostPins: List<GhostPin>,
+    onGhostPinTapped: (GhostPin) -> Unit,
+    savedLensActive: Boolean,
 ) {
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)
@@ -79,8 +83,10 @@ actual fun MapComposable(
     val currentOnPinTapped = rememberUpdatedState(onPinTapped)
     val currentPois = rememberUpdatedState(pois)
 
+    val currentOnGhostPinTapped = rememberUpdatedState(onGhostPinTapped)
     val suppressCameraIdle = remember { booleanArrayOf(false) }
     val annotationPoiMap = remember { mutableMapOf<MLNPointAnnotation, POI>() }
+    val ghostAnnotationMap = remember { mutableMapOf<MLNPointAnnotation, GhostPin>() }
     val currentAnnotations = remember { mutableListOf<MLNPointAnnotation>() }
     val styleLoaded = remember { mutableStateOf(false) }
     val lastFittedPois = remember { mutableStateOf<List<POI>>(emptyList()) }
@@ -292,6 +298,30 @@ actual fun MapComposable(
         }
     }
 
+    // Ghost pins — dashed-outline suggested POIs
+    LaunchedEffect(ghostPins, styleLoaded.value) {
+        if (!styleLoaded.value) return@LaunchedEffect
+        // Remove old ghost annotations
+        val oldGhosts = ghostAnnotationMap.keys.toList()
+        if (oldGhosts.isNotEmpty()) {
+            @Suppress("UNCHECKED_CAST")
+            mapView.removeAnnotations(oldGhosts as List<*>)
+        }
+        ghostAnnotationMap.clear()
+
+        ghostPins.forEach { ghost ->
+            val poi = ghost.poi
+            val lat = poi.latitude ?: return@forEach
+            val lng = poi.longitude ?: return@forEach
+            val annotation = MLNPointAnnotation()
+            annotation.setCoordinate(CLLocationCoordinate2DMake(lat, lng))
+            annotation.setTitle(poi.name)
+            annotation.setSubtitle("ghost")
+            ghostAnnotationMap[annotation] = ghost
+            mapView.addAnnotation(annotation)
+        }
+    }
+
     // Cleanup on disposal
     DisposableEffect(Unit) {
         onDispose {
@@ -304,8 +334,14 @@ actual fun MapComposable(
                 @Suppress("UNCHECKED_CAST")
                 mapView.removeAnnotations(currentAnnotations as List<*>)
             }
+            val ghosts = ghostAnnotationMap.keys.toList()
+            if (ghosts.isNotEmpty()) {
+                @Suppress("UNCHECKED_CAST")
+                mapView.removeAnnotations(ghosts as List<*>)
+            }
             currentAnnotations.clear()
             annotationPoiMap.clear()
+            ghostAnnotationMap.clear()
         }
     }
 

@@ -4,6 +4,7 @@ import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
+import com.harazone.domain.model.GhostPin
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.RecentPlace
 import com.harazone.domain.model.SavedPoi
@@ -66,6 +67,9 @@ sealed class MapUiState {
         val previousAreaLng: Double? = null,
         val poiStreamingCount: Int = 0,
         val showSurpriseMe: Boolean = false,
+        val activeVibeFilters: Set<String> = emptySet(),
+        val savedLensActive: Boolean = false,
+        val ghostPins: List<GhostPin> = emptyList(),
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

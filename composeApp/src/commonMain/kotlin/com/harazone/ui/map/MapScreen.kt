@@ -2,7 +2,6 @@ package com.harazone.ui.map
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,11 +20,9 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -47,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -68,26 +64,21 @@ import com.harazone.ui.components.ContentNoteBanner
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.ui.settings.FeedbackPreviewSheet
 import com.harazone.ui.settings.SettingsSheet
-import com.harazone.ui.map.components.AISearchBar
 import com.harazone.ui.map.components.OnboardingBubble
 import com.harazone.ui.map.components.AiDetailPage
-import com.harazone.ui.map.components.GeocodingSearchBar
+import com.harazone.ui.map.components.DiscoveryHeader
+import com.harazone.ui.map.components.UnifiedBottomBar
 import com.harazone.ui.profile.ProfileScreen
 import com.harazone.ui.profile.ProfileViewModel
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.domain.model.AdvisoryLevel
-import com.harazone.ui.map.components.CompanionCard
-import com.harazone.ui.map.components.CompanionOrb
+import com.harazone.ui.map.components.SavedLensBanner
 import com.harazone.ui.map.components.SafetyBanner
 import com.harazone.ui.map.components.SafetyGateModal
-import com.harazone.ui.map.components.MapListToggle
-import com.harazone.ui.map.components.TopContextBar
-import com.harazone.ui.map.components.AmbientTicker
 import com.harazone.ui.map.components.PoiCarousel
-import com.harazone.ui.map.components.VibeRail
 import com.harazone.ui.theme.MapFloatingUiDark
+import com.harazone.ui.theme.Spacing
 import com.harazone.ui.theme.spacing
-import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
 import androidx.compose.runtime.mutableLongStateOf
@@ -173,7 +164,13 @@ private fun ReadyContent(
     var pendingCapture by remember { mutableStateOf(false) }
     var pendingShakeCapture by remember { mutableStateOf(false) }
 
+    // Hoisted bottom bar overlay state (AC38 back handler priority)
+    var isHamburgerOpen by remember { mutableStateOf(false) }
+    var isPeekOpen by remember { mutableStateOf(false) }
+
     fun dismissAllOverlays() {
+        isHamburgerOpen = false
+        isPeekOpen = false
         if (state.companionNudge != null) viewModel.dismissCompanionCard()
         if (chatState.isOpen) chatViewModel.closeChat()
         if (state.showVisitsSheet) viewModel.closeVisitsSheet()
@@ -228,9 +225,7 @@ private fun ReadyContent(
     val statusBarPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var screenHeightPx by remember { mutableStateOf(0f) }
 
-    // Measured onboarding target offsets (Task 11)
-    var vibeRailOffset by remember { mutableStateOf(Offset.Zero) }
-    var savedFabOffset by remember { mutableStateOf(Offset.Zero) }
+    // Measured onboarding target offset — only searchBarOffset remains (VibeRail/SavedFab replaced by header)
     var searchBarOffset by remember { mutableStateOf(Offset.Zero) }
 
     // Idle detection for companion — TODO(BACKLOG-MEDIUM): Move to Remote Config (#55)
@@ -252,8 +247,47 @@ private fun ReadyContent(
         }.onGloballyPositioned { coords ->
         screenHeightPx = coords.size.height.toFloat()
     }) {
-        // Base: map or list
-        if (state.showListView) {
+        // Base: map or list (saved lens swaps to SavedPlacesScreen)
+        if (state.showListView && state.savedLensActive) {
+            SavedPlacesScreen(
+                userLat = state.gpsLatitude.takeIf { state.showMyLocation },
+                userLng = state.gpsLongitude.takeIf { state.showMyLocation },
+                sortByRecent = true,
+                onDismiss = { viewModel.toggleListView() },
+                onAskAi = { poi ->
+                    viewModel.toggleListView()
+                    if (poi != null) {
+                        chatViewModel.openChat(
+                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
+                            entryPoint = ChatEntryPoint.SavedCard(poi.name),
+                        )
+                    } else {
+                        chatViewModel.openChat(
+                            state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
+                            entryPoint = ChatEntryPoint.SavesSheet,
+                        )
+                    }
+                },
+                onDirections = { lat, lng, name -> onNavigateToMaps(lat, lng, name) },
+                onShare = { /* TODO: platform share intent */ },
+                onPoiSelected = { saved ->
+                    viewModel.toggleListView()
+                    viewModel.selectPoi(
+                        POI(
+                            name = saved.name,
+                            type = saved.type,
+                            description = saved.description ?: saved.whySpecial,
+                            insight = saved.whySpecial,
+                            confidence = Confidence.HIGH,
+                            latitude = saved.lat,
+                            longitude = saved.lng,
+                            imageUrl = saved.imageUrl,
+                            rating = saved.rating,
+                        )
+                    )
+                },
+            )
+        } else if (state.showListView) {
             POIListView(
                 pois = state.pois,
                 dynamicVibes = state.dynamicVibes,
@@ -292,7 +326,7 @@ private fun ReadyContent(
                 longitude = state.longitude,
                 zoomLevel = state.cameraZoomLevel,
                 cameraMoveId = state.cameraMoveId,
-                pois = if (state.visitedFilter) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
+                pois = if (state.visitedFilter || state.savedLensActive) emptyList() else if (state.showAllMode) state.allDiscoveredPois else state.pois,
                 activeVibe = null, // Dynamic vibes — old Vibe enum filtering disabled on map
                 onPoiSelected = { poi -> viewModel.selectPoi(poi) },
                 onMapRenderFailed = { viewModel.onMapRenderFailed() },
@@ -302,6 +336,12 @@ private fun ReadyContent(
                 visitedFilter = state.visitedFilter,
                 onPinTapped = { index -> viewModel.onPinTapped(index) },
                 selectedPinIndex = state.autoSlideshowIndex ?: state.selectedPinIndex,
+                ghostPins = state.ghostPins,
+                onGhostPinTapped = { ghost ->
+                    // Open detail card for the ghost POI — CTA handled in AiDetailPage
+                    viewModel.selectPoiWithImageResolve(ghost.poi)
+                },
+                savedLensActive = state.savedLensActive,
             )
         }
 
@@ -330,21 +370,122 @@ private fun ReadyContent(
         }
 
 
-        // Top context bar
-        if (!showProfile) {
-        TopContextBar(
-            areaName = state.areaName,
-            visitTag = state.visitTag,
-            weather = state.weather,
-            advisoryLevel = state.advisory?.level,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = statusBarPadding + 8.dp),
-        )
+        // Discovery Header — replaces TopContextBar, GeocodingSearchBar,
+        // AmbientTicker, SearchSurpriseTogglePill, and VibeRail
+        val advisory = state.advisory
+        var isHeaderExpanded by remember { mutableStateOf(false) }
+
+        if (state.selectedPoi == null && !showProfile) {
+            // Build meta lines from current state
+            val weatherText = state.weather?.let { "${it.emoji} ${it.temperatureF}\u00B0F" }
+            val timeText = remember(state.weather?.utcOffsetSeconds) {
+                val utcOffset = state.weather?.utcOffsetSeconds
+                val hour: Int
+                val minute: Int
+                if (utcOffset != null) {
+                    val nowUtcMs = com.harazone.ui.components.currentTimeMillis()
+                    val localMs = nowUtcMs + (utcOffset * 1000L)
+                    val totalMinutes = (localMs / 60_000) % (24 * 60)
+                    hour = (totalMinutes / 60).toInt()
+                    minute = (totalMinutes % 60).toInt()
+                } else {
+                    hour = com.harazone.ui.components.currentHour()
+                    minute = com.harazone.ui.components.currentMinute()
+                }
+                val amPm = if (hour < 12) "AM" else "PM"
+                val displayHour = when {
+                    hour == 0 -> 12
+                    hour > 12 -> hour - 12
+                    else -> hour
+                }
+                "$displayHour:${minute.toString().padStart(2, '0')} $amPm"
+            }
+            val metaLines = remember(
+                state.advisory, state.showMyLocation, state.activeVibeFilters,
+                state.areaHighlights, weatherText, timeText, state.visitTag, state.isSearchingArea, state.areaName,
+            ) {
+                com.harazone.domain.model.buildMetaLines(
+                    advisoryLevel = state.advisory?.level,
+                    advisoryCountryName = state.advisory?.countryName,
+                    isRemote = state.showMyLocation && state.gpsLatitude != state.latitude,
+                    poiHighlights = state.areaHighlights,
+                    weatherText = weatherText,
+                    timeText = timeText,
+                    visitTag = state.visitTag,
+                    isSearching = state.isSearchingArea,
+                    areaName = state.areaName,
+                    activeVibeFilters = state.activeVibeFilters,
+                    vibeMatchCount = state.pois.size,
+                    totalPoiCount = state.allDiscoveredPois.size,
+                )
+            }
+
+            val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.visitedPoiIds }
+
+            DiscoveryHeader(
+                areaName = state.areaName,
+                advisoryLevel = state.advisory?.level,
+                isSearchingArea = state.isSearchingArea,
+                isGpsAcquiring = state.areaName.isBlank() && !state.showMyLocation,
+                // GPS acquired but area name not yet resolved — mutually exclusive with isGpsAcquiring
+                isGeocodePending = state.showMyLocation && state.areaName.isBlank(),
+                isLocationDenied = false, // TODO(BACKLOG-MEDIUM): Wire when LocationFailed→Ready refactor supports manual-search-only mode (spec H7)
+                discoveredCount = state.pois.size,
+                savedCount = savedNearbyCount,
+                showDiscoverButton = state.showSearchAreaPill && !state.isSearchingArea && !state.savedLensActive,
+                onDiscover = viewModel::onSearchThisArea,
+                surpriseEnabled = state.showSurpriseMe || state.pois.isNotEmpty(),
+                onSurprise = viewModel::onSurpriseMe,
+                onSavedLensTap = viewModel::onSavedLensTap,
+                savedLensActive = state.savedLensActive,
+                showCancel = state.isSearchingArea && state.isGeocodingInitiatedSearch,
+                onCancel = { viewModel.onGeocodingCancelLoad() },
+                metaLines = metaLines,
+                searchQuery = state.geocodingQuery,
+                searchSuggestions = state.geocodingSuggestions,
+                isGeocodingLoading = state.isGeocodingLoading,
+                onQueryChanged = { viewModel.onGeocodingQueryChanged(it) },
+                onSuggestionSelected = { viewModel.onGeocodingSuggestionSelected(it) },
+                onSubmitEmpty = { viewModel.onGeocodingSubmitEmpty() },
+                onSearchClear = { viewModel.onGeocodingCleared() },
+                recentPlaces = state.recentPlaces,
+                onRecentSelected = { viewModel.onRecentSelected(it) },
+                onClearRecents = { viewModel.onClearRecents() },
+                weather = state.weather,
+                visitTag = state.visitTag,
+                vibes = state.dynamicVibes,
+                activeVibeFilters = state.activeVibeFilters,
+                adHocFilters = emptyList(), // TODO: ad-hoc filter state
+                onVibeToggle = { label ->
+                    val vibe = state.dynamicVibes.firstOrNull {
+                        it.label.trim().equals(label.trim(), ignoreCase = true)
+                    }
+                    if (vibe != null) viewModel.switchDynamicVibe(vibe)
+                },
+                onAdHocRemove = { /* TODO: ad-hoc filter removal */ },
+                areaHighlights = state.areaHighlights,
+                onIntelTapped = { fact ->
+                    chatViewModel.openChat(
+                        areaName = state.areaName,
+                        pois = state.pois,
+                        activeDynamicVibe = state.activeDynamicVibe,
+                        entryPoint = ChatEntryPoint.CompanionNudge(fact),
+                        forceReset = true,
+                    )
+                },
+                onRefresh = viewModel::onSearchThisArea,
+                recentExplorations = state.recentPlaces.take(3),
+                onTeleport = { viewModel.onRecentSelected(it) },
+                isExpanded = isHeaderExpanded,
+                onExpandedChanged = { isHeaderExpanded = it },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .zIndex(2f),
+            )
         }
 
-        // Safety banner (below TopContextBar)
-        val advisory = state.advisory
+        // Safety banner (below Discovery Header)
         val showBanner = advisory != null &&
             advisory.level.isAtLeast(AdvisoryLevel.CAUTION) &&
             !state.isAdvisoryBannerDismissed &&
@@ -356,63 +497,23 @@ private fun ReadyContent(
                 onDismiss = { viewModel.dismissAdvisoryBanner() },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 96.dp)
+                    .padding(top = statusBarPadding + Spacing.discoveryHeaderOffset)
                     .padding(horizontal = 16.dp)
                     .zIndex(1f),
             )
         }
 
-        // Geocoding search bar (always visible, replaces Refresh Area button)
-        // statusBarPadding + 56dp = status bar + TopContextBar height + top inset padding
-        if (state.selectedPoi == null && !showProfile) GeocodingSearchBar(
-            query = state.geocodingQuery,
-            suggestions = state.geocodingSuggestions,
-            isGeocodingLoading = state.isGeocodingLoading,
-            selectedPlace = state.geocodingSelectedPlace,
-            isSearchingArea = state.isSearchingArea,
-            isGeocodingInitiatedSearch = state.isGeocodingInitiatedSearch,
-            onQueryChanged = { viewModel.onGeocodingQueryChanged(it) },
-            onSuggestionSelected = { viewModel.onGeocodingSuggestionSelected(it) },
-            onSubmitEmpty = { viewModel.onGeocodingSubmitEmpty() },
-            onClear = { viewModel.onGeocodingCleared() },
-            onCancelLoad = { viewModel.onGeocodingCancelLoad() },
-            recentPlaces = state.recentPlaces,
-            onRecentSelected = { viewModel.onRecentSelected(it) },
-            onClearRecents = { viewModel.onClearRecents() },
-            poiCount = state.pois.size,
+        // Saved Lens banner (below Safety Banner)
+        SavedLensBanner(
+            totalSavedCount = state.visitedPoiCount,
+            onExit = viewModel::onExitSavedLens,
+            visible = state.savedLensActive,
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = statusBarPadding + 56.dp)
+                .padding(top = statusBarPadding + Spacing.discoveryHeaderOffset + if (showBanner) Spacing.safetyBannerHeight else 0.dp)
                 .fillMaxWidth()
-                .zIndex(1f), // Above AmbientTicker so suggestions aren't blocked
+                .zIndex(1f),
         )
-
-        // Ambient ticker — rotating area intel below search bar
-        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null && !showProfile) {
-            AmbientTicker(
-                pois = state.pois,
-                latitude = state.latitude,
-                longitude = state.longitude,
-                areaHighlights = state.areaHighlights,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 56.dp + 48.dp + 4.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-            )
-        }
-
-        // Search / Surprise Me toggle pill
-        if (state.showSearchAreaPill && !state.isSearchingArea && !state.showListView && state.selectedPoi == null && !showProfile) {
-            SearchSurpriseTogglePill(
-                onSearchHere = viewModel::onSearchThisArea,
-                onSurpriseMe = viewModel::onSurpriseMe,
-                surpriseMeEnabled = state.showSurpriseMe,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 56.dp + 48.dp + 32.dp),
-            )
-        }
 
         // Bottom carousel — snap-scroll POI cards
         if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null && !showProfile) {
@@ -436,44 +537,20 @@ private fun ReadyContent(
             )
         }
 
-        // Vibe rail (right side, bottom-aligned above FAB) — map mode only
-        if (!state.showListView && state.selectedPoi == null && !showProfile) {
-            VibeRail(
-                vibes = state.dynamicVibes,
-                activeDynamicVibe = state.activeDynamicVibe,
-                dynamicVibePoiCounts = state.dynamicVibePoiCounts,
-                dynamicVibeAreaSaveCounts = state.dynamicVibeAreaSaveCounts,
-                savedVibeActive = state.visitedFilter,
-                totalAreaSaveCount = state.visitedPois.size,
-                isLoadingVibes = state.isLoadingVibes,
-                isOfflineVibes = state.isOfflineVibes,
-                pinnedVibeLabels = viewModel.pinnedVibeLabels,
-                onVibeSelected = { viewModel.switchDynamicVibe(it) },
-                onSavedVibeSelected = viewModel::onVisitedFilterSelected,
-                onProfileSelected = { showProfile = true },
-                onLongPressVibe = { viewModel.togglePin(it) },
-                onExploreRetry = { viewModel.retryAreaFetch() },
-                showCalloutDot = state.showOnboardingBubble,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 8.dp, bottom = navBarPadding + 88.dp)
-                    .onGloballyPositioned { coords ->
-                        vibeRailOffset = coords.boundsInRoot().centerLeft
-                    },
-            )
-        }
+        // VibeRail removed — replaced by vibe chips inside DiscoveryHeader expanded panel
 
         // Back button: List view > Show All mode > POI card > FAB (priority order)
         PlatformBackHandler(enabled = state.showListView) { viewModel.toggleListView() }
         PlatformBackHandler(enabled = state.showAllMode && state.selectedPoi == null) {
             viewModel.onPrevBatch()
         }
-        PlatformBackHandler(enabled = state.selectedPoi == null && state.visitedFilter) {
-            viewModel.onVisitedFilterSelected()
+        // Header collapse — higher priority than list/showAll/visitedFilter (H2)
+        PlatformBackHandler(enabled = isHeaderExpanded) { isHeaderExpanded = false }
+        // Saved lens exit — lower priority than header expand, higher than overlays (AC38)
+        PlatformBackHandler(enabled = state.savedLensActive && !isHeaderExpanded) {
+            viewModel.onExitSavedLens()
         }
-        PlatformBackHandler(enabled = state.companionNudge != null && !showProfile) {
-            viewModel.dismissCompanionCard()
-        }
+        // CompanionNudge back handler moved to UnifiedBottomBar (AC38)
 
         // AI Detail Page — replaces ExpandablePoiCard + scrim
         if (state.selectedPoi != null) {
@@ -499,6 +576,8 @@ private fun ReadyContent(
                     .background(Color.Black.copy(alpha = 0.4f))
                     .clickable { dismissDetail() },
             )
+
+            val matchingGhost = state.ghostPins.firstOrNull { it.poi.savedId == state.selectedPoi.savedId }
 
             AiDetailPage(
                 poi = state.selectedPoi,
@@ -537,6 +616,13 @@ private fun ReadyContent(
                         snackbarHostState.showSnackbar(noMapsAppMessage)
                     }
                 },
+                isGhostPin = matchingGhost != null,
+                onDiscoverGhostPin = {
+                    matchingGhost?.let {
+                        viewModel.saveGhostPin(it)
+                        dismissDetail()
+                    }
+                },
                 onPoiCardClick = { card ->
                     val enriched = state.allDiscoveredPois.firstOrNull { it.name.equals(card.name, ignoreCase = true) }
                     val fallbackPoi = POI(
@@ -554,76 +640,20 @@ private fun ReadyContent(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
-                        top = statusBarPadding + 56.dp,
-                        bottom = navBarPadding + 56.dp,
+                        top = statusBarPadding + Spacing.bottomBarHeight,
+                        bottom = navBarPadding + Spacing.bottomBarHeight,
                     ),
             )
         }
 
-        // Saves nearby pill
-        // Cross-reference current-area POIs against savedPoiIds for accurate nearby count.
-        // NOTE: state.visitedPois contains ALL saves across all areas; the .count filter IS the area-scoping
-        // — do not simplify to savedPoiIds.size (that would count saves from every area ever visited).
-        val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.visitedPoiIds }
-        val carouselVisible = state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null
-        AnimatedVisibility(
-            visible = savedNearbyCount > 0 && !state.isSearchingArea && !chatState.isOpen && !carouselVisible && state.selectedPoi == null && !showProfile && state.companionNudge == null,
-            enter = fadeIn(),
-            exit = fadeOut(),
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = navBarPadding + 72.dp),
-        ) {
-            // TODO(BACKLOG-LOW): upgrade saves nearby to haversine radius — areaName match misses saves when geocoding drifts
-            SavesNearbyPill(count = savedNearbyCount)
-        }
-
-        // Companion Orb (replaces FAB)
-        if (!showProfile) {
-            CompanionOrb(
-                isPulsing = state.isCompanionPulsing && state.companionNudge == null,
-                onClick = { viewModel.showCompanionCard() },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = navBarPadding + 16.dp, end = 16.dp)
-                    .onGloballyPositioned { coords ->
-                        savedFabOffset = coords.boundsInRoot().center
-                    },
-            )
-        }
-
-        // Companion Card
-        if (state.companionNudge != null && !showProfile) {
-            CompanionCard(
-                nudge = state.companionNudge,
-                onTellMeMore = {
-                    val nudge = state.companionNudge
-                    viewModel.dismissCompanionCard()
-                    if (nudge != null) {
-                        chatViewModel.openChat(
-                            areaName = state.areaName,
-                            pois = state.pois,
-                            activeDynamicVibe = state.activeDynamicVibe,
-                            entryPoint = ChatEntryPoint.CompanionNudge(nudge.chatContext),
-                            forceReset = true,
-                        )
-                    }
-                },
-                onDismiss = { viewModel.dismissCompanionCard() },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = navBarPadding),
-            )
-        }
-
-        // MyLocation button (Position C — left side, above AI bar)
+        // MyLocation button (Position C — bottom-right, above bottom bar)
         AnimatedVisibility(
             visible = state.showMyLocation && !state.isSearchingArea && !chatState.isOpen && state.selectedPoi == null && !showProfile,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 12.dp, bottom = navBarPadding + 84.dp),
+                .align(Alignment.BottomEnd)
+                .padding(end = 12.dp, bottom = navBarPadding + 72.dp),
         ) {
             Surface(
                 onClick = { viewModel.returnToCurrentLocation() },
@@ -642,28 +672,84 @@ private fun ReadyContent(
             }
         }
 
-        // Map/List toggle
+        // Unified Bottom Bar — replaces CompanionOrb, CompanionCard, AISearchBar,
+        // MapListToggle, and SavesNearbyPill (D14, D15, D16, D17)
         if (state.selectedPoi == null && !showProfile) {
-            MapListToggle(
+            UnifiedBottomBar(
                 showListView = state.showListView,
-                onToggle = { viewModel.toggleListView() },
+                onToggleListView = { viewModel.toggleListView() },
+                areaName = state.areaName,
+                companionNudge = state.companionNudge,
+                isCompanionPulsing = state.isCompanionPulsing,
+                isRemoteExploring = state.showMyLocation && state.gpsLatitude != state.latitude,
+                isStreaming = state.isSearchingArea && state.poiStreamingCount > 0,
+                activeVibeFilters = state.activeVibeFilters,
+                onShowCompanionCard = { viewModel.showCompanionCard() },
+                onOrbTap = {
+                    // Orb tap → show companion popup (peek card)
+                    viewModel.showCompanionCard()
+                    isPeekOpen = true
+                },
+                onTextTap = {
+                    // Text tap → open chat with keyboard for area questions
+                    chatViewModel.openChat(
+                        state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
+                    )
+                },
+                onMicTap = {
+                    // TODO(#59): STT voice input — for now opens chat
+                    chatViewModel.openChat(
+                        state.areaName, state.allDiscoveredPois, state.activeDynamicVibe,
+                    )
+                },
+                onNudgeTellMeMore = {
+                    val nudge = state.companionNudge
+                    viewModel.dismissCompanionCard()
+                    if (nudge != null) {
+                        chatViewModel.openChat(
+                            areaName = state.areaName,
+                            pois = state.pois,
+                            activeDynamicVibe = state.activeDynamicVibe,
+                            entryPoint = ChatEntryPoint.CompanionNudge(nudge.chatContext),
+                            forceReset = true,
+                        )
+                    }
+                },
+                onNudgeDismiss = { viewModel.dismissCompanionCard() },
+                onSwipeUpToChat = {
+                    val nudge = state.companionNudge
+                    viewModel.dismissCompanionCard()
+                    if (nudge != null) {
+                        chatViewModel.openChat(
+                            areaName = state.areaName,
+                            pois = state.pois,
+                            activeDynamicVibe = state.activeDynamicVibe,
+                            entryPoint = ChatEntryPoint.CompanionNudge(nudge.chatContext),
+                            forceReset = true,
+                        )
+                    }
+                },
+                onProfile = { showProfile = true },
+                onAIPersonality = { /* TODO: AI Personality screen */ },
+                onSettings = { showSettings = true },
+                onFeedback = {
+                    dismissAllOverlays()
+                    pendingCapture = true
+                },
+                isHamburgerOpen = isHamburgerOpen,
+                onHamburgerOpenChanged = { open ->
+                    // M16: collapse header first when opening hamburger
+                    if (open && isHeaderExpanded) {
+                        isHeaderExpanded = false
+                    } else {
+                        isHamburgerOpen = open
+                    }
+                },
+                isPeekOpen = isPeekOpen,
+                onPeekOpenChanged = { isPeekOpen = it },
                 modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(bottom = navBarPadding + 16.dp, end = 80.dp),
-            )
-        }
-
-        // AI search bar — tapping opens the ChatOverlay directly
-        if (state.selectedPoi == null && !showProfile) {
-            AISearchBar(
-                onTap = { chatViewModel.openChat(state.areaName, state.allDiscoveredPois, state.activeDynamicVibe) },
-                chatIsOpen = chatState.isOpen,
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = navBarPadding + 16.dp, end = 168.dp)
-                    .onGloballyPositioned { coords ->
-                        searchBarOffset = coords.boundsInRoot().center
-                    },
+                    .fillMaxSize()
+                    .zIndex(1f),
             )
         }
 
@@ -810,8 +896,6 @@ private fun ReadyContent(
         OnboardingBubble(
             visible = state.showOnboardingBubble,
             onDismiss = { viewModel.onOnboardingBubbleDismissed() },
-            vibeRailOffset = vibeRailOffset,
-            savedFabOffset = savedFabOffset,
             searchBarOffset = searchBarOffset,
         )
 
@@ -823,10 +907,18 @@ private fun ReadyContent(
             feedbackScreenshot = null
         }
 
-        // Must be LAST PlatformBackHandler in ReadyContent — last-composed = highest priority
         // Suppressed when AiDetailPage is open (AiDetailPage has its own back handler)
         PlatformBackHandler(enabled = chatState.isOpen && state.selectedPoi == null) {
             chatViewModel.closeChat()
+        }
+
+        // Bottom bar overlay back handlers (AC38) — MUST be last-composed for highest priority
+        PlatformBackHandler(enabled = isPeekOpen) {
+            isPeekOpen = false
+            viewModel.dismissCompanionCard()
+        }
+        PlatformBackHandler(enabled = isHamburgerOpen) {
+            isHamburgerOpen = false
         }
 
         // Safety Gate Modal (Level 4: Do Not Travel)
@@ -868,70 +960,6 @@ private fun ReadyContent(
 }
 
 
-@Composable
-private fun SearchSurpriseTogglePill(
-    onSearchHere: () -> Unit,
-    onSurpriseMe: () -> Unit,
-    surpriseMeEnabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MapFloatingUiDark.copy(alpha = 0.92f))
-            .padding(3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Search here — single tap executes
-        Surface(
-            onClick = onSearchHere,
-            shape = RoundedCornerShape(17.dp),
-            color = Color.White.copy(alpha = 0.15f),
-        ) {
-            Text(
-                text = "↻ Search here",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-        Spacer(Modifier.width(4.dp))
-        // Surprise Me — single tap executes
-        Surface(
-            onClick = onSurpriseMe,
-            shape = RoundedCornerShape(17.dp),
-            color = Color.Transparent,
-        ) {
-            Text(
-                text = "\uD83C\uDFB2 ${stringResource(Res.string.vibe_surprise_me)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.8f),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun SavesNearbyPill(count: Int, modifier: Modifier = Modifier) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(Color(0xFF1A1A2A).copy(alpha = 0.92f))
-            .border(1.dp, Color(0xFFFFD700).copy(alpha = 0.4f), RoundedCornerShape(20.dp))
-            .padding(horizontal = 14.dp, vertical = 6.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(6.dp)
-                .background(Color(0xFFFFD700), CircleShape)
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = pluralStringResource(Res.plurals.saved_places_nearby, count, count),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFFE0E0E0),
-        )
-    }
-}
+// SearchSurpriseTogglePill removed — replaced by DiscoveryHeader (Discover button + 🎲 Surprise)
+// SavesNearbyPill removed — absorbed into count pill in DiscoveryHeader (Commit B)
+// CompanionOrb, CompanionCard, AISearchBar, MapListToggle removed — replaced by UnifiedBottomBar (Commit B)
