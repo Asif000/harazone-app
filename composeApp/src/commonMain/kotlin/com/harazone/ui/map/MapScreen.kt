@@ -71,7 +71,7 @@ import com.harazone.ui.settings.SettingsSheet
 import com.harazone.ui.map.components.AISearchBar
 import com.harazone.ui.map.components.OnboardingBubble
 import com.harazone.ui.map.components.AiDetailPage
-import com.harazone.ui.map.components.GeocodingSearchBar
+import com.harazone.ui.map.components.DiscoveryHeader
 import com.harazone.ui.profile.ProfileScreen
 import com.harazone.ui.profile.ProfileViewModel
 import com.harazone.ui.saved.SavedPlacesScreen
@@ -81,10 +81,7 @@ import com.harazone.ui.map.components.CompanionOrb
 import com.harazone.ui.map.components.SafetyBanner
 import com.harazone.ui.map.components.SafetyGateModal
 import com.harazone.ui.map.components.MapListToggle
-import com.harazone.ui.map.components.TopContextBar
-import com.harazone.ui.map.components.AmbientTicker
 import com.harazone.ui.map.components.PoiCarousel
-import com.harazone.ui.map.components.VibeRail
 import com.harazone.ui.theme.MapFloatingUiDark
 import com.harazone.ui.theme.spacing
 import org.jetbrains.compose.resources.pluralStringResource
@@ -330,21 +327,120 @@ private fun ReadyContent(
         }
 
 
-        // Top context bar
-        if (!showProfile) {
-        TopContextBar(
-            areaName = state.areaName,
-            visitTag = state.visitTag,
-            weather = state.weather,
-            advisoryLevel = state.advisory?.level,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = statusBarPadding + 8.dp),
-        )
+        // Discovery Header — replaces TopContextBar, GeocodingSearchBar,
+        // AmbientTicker, SearchSurpriseTogglePill, and VibeRail
+        val advisory = state.advisory
+        var isHeaderExpanded by remember { mutableStateOf(false) }
+
+        if (state.selectedPoi == null && !showProfile) {
+            // Build meta lines from current state
+            val weatherText = state.weather?.let { "${it.emoji} ${it.temperatureF}\u00B0F" }
+            val timeText = remember(state.weather?.utcOffsetSeconds) {
+                val utcOffset = state.weather?.utcOffsetSeconds
+                val hour: Int
+                val minute: Int
+                if (utcOffset != null) {
+                    val nowUtcMs = com.harazone.ui.components.currentTimeMillis()
+                    val localMs = nowUtcMs + (utcOffset * 1000L)
+                    val totalMinutes = (localMs / 60_000) % (24 * 60)
+                    hour = (totalMinutes / 60).toInt()
+                    minute = (totalMinutes % 60).toInt()
+                } else {
+                    hour = com.harazone.ui.components.currentHour()
+                    minute = com.harazone.ui.components.currentMinute()
+                }
+                val amPm = if (hour < 12) "AM" else "PM"
+                val displayHour = when {
+                    hour == 0 -> 12
+                    hour > 12 -> hour - 12
+                    else -> hour
+                }
+                "$displayHour:${minute.toString().padStart(2, '0')} $amPm"
+            }
+            val metaLines = remember(
+                state.advisory, state.showMyLocation, state.activeVibeFilters,
+                state.areaHighlights, weatherText, timeText, state.visitTag, state.isSearchingArea, state.areaName,
+            ) {
+                com.harazone.domain.model.buildMetaLines(
+                    advisoryLevel = state.advisory?.level,
+                    advisoryCountryName = state.advisory?.countryName,
+                    isRemote = state.showMyLocation && state.gpsLatitude != state.latitude,
+                    poiHighlights = state.areaHighlights,
+                    weatherText = weatherText,
+                    timeText = timeText,
+                    visitTag = state.visitTag,
+                    isSearching = state.isSearchingArea,
+                    areaName = state.areaName,
+                    activeVibeFilters = state.activeVibeFilters,
+                    vibeMatchCount = state.pois.size,
+                    totalPoiCount = state.allDiscoveredPois.size,
+                )
+            }
+
+            val savedNearbyCount = state.allDiscoveredPois.count { it.savedId in state.visitedPoiIds }
+
+            DiscoveryHeader(
+                areaName = state.areaName,
+                advisoryLevel = state.advisory?.level,
+                isSearchingArea = state.isSearchingArea,
+                isGpsAcquiring = state.areaName.isBlank() && !state.showMyLocation,
+                isGeocodePending = false,
+                isLocationDenied = false,
+                discoveredCount = state.pois.size,
+                savedCount = savedNearbyCount,
+                showDiscoverButton = state.showSearchAreaPill && !state.isSearchingArea,
+                onDiscover = viewModel::onSearchThisArea,
+                surpriseEnabled = state.showSurpriseMe || state.pois.isNotEmpty(),
+                onSurprise = viewModel::onSurpriseMe,
+                onSavedLensTap = { /* Commit C: saved lens */ },
+                savedLensActive = false, // Commit C
+                showCancel = state.isSearchingArea && state.isGeocodingInitiatedSearch,
+                onCancel = { viewModel.onGeocodingCancelLoad() },
+                metaLines = metaLines,
+                searchQuery = state.geocodingQuery,
+                searchSuggestions = state.geocodingSuggestions,
+                isGeocodingLoading = state.isGeocodingLoading,
+                onQueryChanged = { viewModel.onGeocodingQueryChanged(it) },
+                onSuggestionSelected = { viewModel.onGeocodingSuggestionSelected(it) },
+                onSubmitEmpty = { viewModel.onGeocodingSubmitEmpty() },
+                onSearchClear = { viewModel.onGeocodingCleared() },
+                recentPlaces = state.recentPlaces,
+                onRecentSelected = { viewModel.onRecentSelected(it) },
+                onClearRecents = { viewModel.onClearRecents() },
+                weather = state.weather,
+                visitTag = state.visitTag,
+                vibes = state.dynamicVibes,
+                activeVibeFilters = state.activeVibeFilters,
+                adHocFilters = emptyList(), // TODO: ad-hoc filter state
+                onVibeToggle = { label ->
+                    val vibe = state.dynamicVibes.firstOrNull {
+                        it.label.trim().equals(label.trim(), ignoreCase = true)
+                    }
+                    if (vibe != null) viewModel.switchDynamicVibe(vibe)
+                },
+                onAdHocRemove = { /* TODO: ad-hoc filter removal */ },
+                areaHighlights = state.areaHighlights,
+                onIntelTapped = { fact ->
+                    chatViewModel.openChat(
+                        areaName = state.areaName,
+                        pois = state.pois,
+                        activeDynamicVibe = state.activeDynamicVibe,
+                        entryPoint = ChatEntryPoint.CompanionNudge(fact),
+                        forceReset = true,
+                    )
+                },
+                onRefresh = viewModel::onSearchThisArea,
+                recentExplorations = state.recentPlaces.take(3),
+                onTeleport = { viewModel.onRecentSelected(it) },
+                onHeaderExpandedChanged = { isHeaderExpanded = it },
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .zIndex(2f),
+            )
         }
 
-        // Safety banner (below TopContextBar)
-        val advisory = state.advisory
+        // Safety banner (below Discovery Header)
         val showBanner = advisory != null &&
             advisory.level.isAtLeast(AdvisoryLevel.CAUTION) &&
             !state.isAdvisoryBannerDismissed &&
@@ -356,61 +452,9 @@ private fun ReadyContent(
                 onDismiss = { viewModel.dismissAdvisoryBanner() },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 96.dp)
+                    .padding(top = statusBarPadding + 60.dp)
                     .padding(horizontal = 16.dp)
                     .zIndex(1f),
-            )
-        }
-
-        // Geocoding search bar (always visible, replaces Refresh Area button)
-        // statusBarPadding + 56dp = status bar + TopContextBar height + top inset padding
-        if (state.selectedPoi == null && !showProfile) GeocodingSearchBar(
-            query = state.geocodingQuery,
-            suggestions = state.geocodingSuggestions,
-            isGeocodingLoading = state.isGeocodingLoading,
-            selectedPlace = state.geocodingSelectedPlace,
-            isSearchingArea = state.isSearchingArea,
-            isGeocodingInitiatedSearch = state.isGeocodingInitiatedSearch,
-            onQueryChanged = { viewModel.onGeocodingQueryChanged(it) },
-            onSuggestionSelected = { viewModel.onGeocodingSuggestionSelected(it) },
-            onSubmitEmpty = { viewModel.onGeocodingSubmitEmpty() },
-            onClear = { viewModel.onGeocodingCleared() },
-            onCancelLoad = { viewModel.onGeocodingCancelLoad() },
-            recentPlaces = state.recentPlaces,
-            onRecentSelected = { viewModel.onRecentSelected(it) },
-            onClearRecents = { viewModel.onClearRecents() },
-            poiCount = state.pois.size,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = statusBarPadding + 56.dp)
-                .fillMaxWidth()
-                .zIndex(1f), // Above AmbientTicker so suggestions aren't blocked
-        )
-
-        // Ambient ticker — rotating area intel below search bar
-        if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null && !showProfile) {
-            AmbientTicker(
-                pois = state.pois,
-                latitude = state.latitude,
-                longitude = state.longitude,
-                areaHighlights = state.areaHighlights,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 56.dp + 48.dp + 4.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp),
-            )
-        }
-
-        // Search / Surprise Me toggle pill
-        if (state.showSearchAreaPill && !state.isSearchingArea && !state.showListView && state.selectedPoi == null && !showProfile) {
-            SearchSurpriseTogglePill(
-                onSearchHere = viewModel::onSearchThisArea,
-                onSurpriseMe = viewModel::onSurpriseMe,
-                surpriseMeEnabled = state.showSurpriseMe,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 56.dp + 48.dp + 32.dp),
             )
         }
 
@@ -436,32 +480,7 @@ private fun ReadyContent(
             )
         }
 
-        // Vibe rail (right side, bottom-aligned above FAB) — map mode only
-        if (!state.showListView && state.selectedPoi == null && !showProfile) {
-            VibeRail(
-                vibes = state.dynamicVibes,
-                activeDynamicVibe = state.activeDynamicVibe,
-                dynamicVibePoiCounts = state.dynamicVibePoiCounts,
-                dynamicVibeAreaSaveCounts = state.dynamicVibeAreaSaveCounts,
-                savedVibeActive = state.visitedFilter,
-                totalAreaSaveCount = state.visitedPois.size,
-                isLoadingVibes = state.isLoadingVibes,
-                isOfflineVibes = state.isOfflineVibes,
-                pinnedVibeLabels = viewModel.pinnedVibeLabels,
-                onVibeSelected = { viewModel.switchDynamicVibe(it) },
-                onSavedVibeSelected = viewModel::onVisitedFilterSelected,
-                onProfileSelected = { showProfile = true },
-                onLongPressVibe = { viewModel.togglePin(it) },
-                onExploreRetry = { viewModel.retryAreaFetch() },
-                showCalloutDot = state.showOnboardingBubble,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 8.dp, bottom = navBarPadding + 88.dp)
-                    .onGloballyPositioned { coords ->
-                        vibeRailOffset = coords.boundsInRoot().centerLeft
-                    },
-            )
-        }
+        // VibeRail removed — replaced by vibe chips inside DiscoveryHeader expanded panel
 
         // Back button: List view > Show All mode > POI card > FAB (priority order)
         PlatformBackHandler(enabled = state.showListView) { viewModel.toggleListView() }
@@ -868,49 +887,7 @@ private fun ReadyContent(
 }
 
 
-@Composable
-private fun SearchSurpriseTogglePill(
-    onSearchHere: () -> Unit,
-    onSurpriseMe: () -> Unit,
-    surpriseMeEnabled: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(MapFloatingUiDark.copy(alpha = 0.92f))
-            .padding(3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        // Search here — single tap executes
-        Surface(
-            onClick = onSearchHere,
-            shape = RoundedCornerShape(17.dp),
-            color = Color.White.copy(alpha = 0.15f),
-        ) {
-            Text(
-                text = "↻ Search here",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-        Spacer(Modifier.width(4.dp))
-        // Surprise Me — single tap executes
-        Surface(
-            onClick = onSurpriseMe,
-            shape = RoundedCornerShape(17.dp),
-            color = Color.Transparent,
-        ) {
-            Text(
-                text = "\uD83C\uDFB2 ${stringResource(Res.string.vibe_surprise_me)}",
-                style = MaterialTheme.typography.labelMedium,
-                color = Color.White.copy(alpha = 0.8f),
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            )
-        }
-    }
-}
+// SearchSurpriseTogglePill removed — replaced by DiscoveryHeader (Discover button + 🎲 Surprise)
 
 @Composable
 private fun SavesNearbyPill(count: Int, modifier: Modifier = Modifier) {

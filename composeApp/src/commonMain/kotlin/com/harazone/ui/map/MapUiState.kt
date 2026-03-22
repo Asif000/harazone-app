@@ -66,6 +66,7 @@ sealed class MapUiState {
         val previousAreaLng: Double? = null,
         val poiStreamingCount: Int = 0,
         val showSurpriseMe: Boolean = false,
+        val activeVibeFilters: Set<String> = emptySet(),
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }
