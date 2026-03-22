@@ -72,6 +72,7 @@ import com.harazone.ui.profile.ProfileScreen
 import com.harazone.ui.profile.ProfileViewModel
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.domain.model.AdvisoryLevel
+import com.harazone.ui.map.components.SavedLensBanner
 import com.harazone.ui.map.components.SafetyBanner
 import com.harazone.ui.map.components.SafetyGateModal
 import com.harazone.ui.map.components.PoiCarousel
@@ -296,6 +297,12 @@ private fun ReadyContent(
                 visitedFilter = state.visitedFilter,
                 onPinTapped = { index -> viewModel.onPinTapped(index) },
                 selectedPinIndex = state.autoSlideshowIndex ?: state.selectedPinIndex,
+                ghostPins = state.ghostPins,
+                onGhostPinTapped = { ghost ->
+                    // Open detail card for the ghost POI — CTA handled in AiDetailPage
+                    viewModel.selectPoiWithImageResolve(ghost.poi)
+                },
+                savedLensActive = state.savedLensActive,
             )
         }
 
@@ -386,12 +393,12 @@ private fun ReadyContent(
                 isLocationDenied = false, // TODO(BACKLOG-MEDIUM): Wire when LocationFailed→Ready refactor supports manual-search-only mode (spec H7)
                 discoveredCount = state.pois.size,
                 savedCount = savedNearbyCount,
-                showDiscoverButton = state.showSearchAreaPill && !state.isSearchingArea,
+                showDiscoverButton = state.showSearchAreaPill && !state.isSearchingArea && !state.savedLensActive,
                 onDiscover = viewModel::onSearchThisArea,
                 surpriseEnabled = state.showSurpriseMe || state.pois.isNotEmpty(),
                 onSurprise = viewModel::onSurpriseMe,
-                onSavedLensTap = { /* Commit C: saved lens */ },
-                savedLensActive = false, // Commit C
+                onSavedLensTap = viewModel::onSavedLensTap,
+                savedLensActive = state.savedLensActive,
                 showCancel = state.isSearchingArea && state.isGeocodingInitiatedSearch,
                 onCancel = { viewModel.onGeocodingCancelLoad() },
                 metaLines = metaLines,
@@ -451,11 +458,23 @@ private fun ReadyContent(
                 onDismiss = { viewModel.dismissAdvisoryBanner() },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = statusBarPadding + 60.dp)
+                    .padding(top = statusBarPadding + Spacing.discoveryHeaderOffset)
                     .padding(horizontal = 16.dp)
                     .zIndex(1f),
             )
         }
+
+        // Saved Lens banner (below Safety Banner)
+        SavedLensBanner(
+            totalSavedCount = state.visitedPois.size,
+            onExit = viewModel::onExitSavedLens,
+            visible = state.savedLensActive,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = statusBarPadding + Spacing.discoveryHeaderOffset + if (showBanner) Spacing.safetyBannerHeight else 0.dp)
+                .fillMaxWidth()
+                .zIndex(1f),
+        )
 
         // Bottom carousel — snap-scroll POI cards
         if (state.pois.isNotEmpty() && !state.showListView && state.selectedPoi == null && !showProfile) {
@@ -491,6 +510,10 @@ private fun ReadyContent(
         }
         // Header collapse — higher priority than list/showAll/visitedFilter (H2)
         PlatformBackHandler(enabled = isHeaderExpanded) { isHeaderExpanded = false }
+        // Saved lens exit — lower priority than header expand, higher than overlays (AC38)
+        PlatformBackHandler(enabled = state.savedLensActive && !isHeaderExpanded) {
+            viewModel.onExitSavedLens()
+        }
         // CompanionNudge back handler moved to UnifiedBottomBar (AC38)
 
         // AI Detail Page — replaces ExpandablePoiCard + scrim
@@ -517,6 +540,8 @@ private fun ReadyContent(
                     .background(Color.Black.copy(alpha = 0.4f))
                     .clickable { dismissDetail() },
             )
+
+            val matchingGhost = state.ghostPins.firstOrNull { it.poi.savedId == state.selectedPoi.savedId }
 
             AiDetailPage(
                 poi = state.selectedPoi,
@@ -553,6 +578,13 @@ private fun ReadyContent(
                 onDirectionsFailed = {
                     coroutineScope.launch {
                         snackbarHostState.showSnackbar(noMapsAppMessage)
+                    }
+                },
+                isGhostPin = matchingGhost != null,
+                onDiscoverGhostPin = {
+                    matchingGhost?.let {
+                        viewModel.saveGhostPin(it)
+                        dismissDetail()
                     }
                 },
                 onPoiCardClick = { card ->

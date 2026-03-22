@@ -20,6 +20,7 @@ import cocoapods.MapLibre.MLNShapeSource
 import cocoapods.MapLibre.MLNStyle
 import cocoapods.MapLibre.MLNSymbolStyleLayer
 import com.harazone.BuildKonfig
+import com.harazone.domain.model.GhostPin
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Vibe
@@ -72,6 +73,9 @@ actual fun MapComposable(
     visitedFilter: Boolean,
     onPinTapped: (Int) -> Unit,
     selectedPinIndex: Int?,
+    ghostPins: List<GhostPin>,
+    onGhostPinTapped: (GhostPin) -> Unit,
+    savedLensActive: Boolean,
 ) {
     val currentOnPoiSelected = rememberUpdatedState(onPoiSelected)
     val currentOnCameraIdle = rememberUpdatedState(onCameraIdle)

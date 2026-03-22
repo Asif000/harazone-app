@@ -22,6 +22,8 @@ object Spacing {
     val skeletonTextWidth = 120.dp
     val skeletonTextHeight = 20.dp
     val bottomBarHeight = 56.dp
+    val discoveryHeaderOffset = 60.dp
+    val safetyBannerHeight = 48.dp
 }
 
 val LocalSpacing = staticCompositionLocalOf { Spacing }

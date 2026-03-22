@@ -9,6 +9,7 @@ import com.harazone.domain.model.AreaContext
 import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
+import com.harazone.domain.model.GhostPin
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.RecentPlace
 import com.harazone.domain.model.SavedPoi
@@ -294,9 +295,12 @@ class MapViewModel(
                 ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
             visitState = visitState,
         )
+        val newVisitedIds = current.visitedPoiIds + poiId
+        val ghosts = generateGhostPins(poi, current.allDiscoveredPois, newVisitedIds)
         _uiState.value = current.copy(
-            visitedPoiIds = current.visitedPoiIds + poiId,
+            visitedPoiIds = newVisitedIds,
             visitedPois = current.visitedPois + savedPoiObj,
+            ghostPins = ghosts,
         )
         viewModelScope.launch {
             companionEngine.checkInstantNeighbor(savedPoiObj, current.allDiscoveredPois, current.visitedPoiIds)
@@ -524,6 +528,55 @@ class MapViewModel(
             activeDynamicVibe = if (newFilter) null else vibeBeforeSavedFilter,
         )
         if (!newFilter) vibeBeforeSavedFilter = null
+    }
+
+    // --- Saved Lens ---
+
+    fun onSavedLensTap() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(savedLensActive = !current.savedLensActive)
+    }
+
+    fun onExitSavedLens() {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        if (!current.savedLensActive) return
+        _uiState.value = current.copy(savedLensActive = false)
+    }
+
+    /**
+     * Generate 2-3 ghost pins for a just-saved POI: same vibe, nearest by distance,
+     * not already saved. Uses the current allDiscoveredPois — no new API call.
+     */
+    private fun generateGhostPins(
+        savedPoi: POI,
+        allPois: List<POI>,
+        visitedIds: Set<String>,
+    ): List<GhostPin> {
+        val savedId = savedPoi.savedId
+        val savedVibe = savedPoi.primaryVibe ?: return emptyList()
+        val savedLat = savedPoi.latitude ?: return emptyList()
+        val savedLng = savedPoi.longitude ?: return emptyList()
+
+        return allPois
+            .filter { poi ->
+                poi.savedId != savedId &&
+                poi.savedId !in visitedIds &&
+                poi.latitude != null && poi.longitude != null &&
+                poi.primaryVibe == savedVibe
+            }
+            .sortedBy { poi ->
+                haversineDistanceMeters(savedLat, savedLng, poi.latitude!!, poi.longitude!!)
+            }
+            .take(3)
+            .map { poi -> GhostPin(poi = poi, sourcePoiSavedId = savedId) }
+    }
+
+    fun saveGhostPin(ghostPin: GhostPin) {
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        _uiState.value = current.copy(
+            ghostPins = current.ghostPins.filter { it.poi.savedId != ghostPin.poi.savedId },
+        )
+        visitPoi(ghostPin.poi, current.areaName)
     }
 
     fun closeVisitsSheet() {
@@ -780,6 +833,7 @@ class MapViewModel(
             advisory = null,
             isAdvisoryBannerDismissed = false,
             hasAcknowledgedGate = false,
+            ghostPins = emptyList(),
         )
         fetchWeatherForLocation(lat, lng)
         fetchAdvisory(lat, lng, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
@@ -966,6 +1020,8 @@ class MapViewModel(
         pendingLng = lng
         if (_uiState.value !is MapUiState.Ready) return
         val readyState = _uiState.value as? MapUiState.Ready ?: return
+        // Saved lens blocks pan → Discover threshold detection
+        if (readyState.savedLensActive) return
         if (!isAwayFromGps(lat, lng, readyState)) {
             if (readyState.showMyLocation) {
                 _uiState.value = readyState.copy(showMyLocation = false)
