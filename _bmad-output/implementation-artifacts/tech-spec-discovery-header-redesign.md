@@ -6,7 +6,7 @@
 **Source:** Brainstorming session `_bmad-output/brainstorming/brainstorming-session-2026-03-20-001.md` (22 decisions)
 **Prototypes:** `_bmad-output/brainstorming/prototype-FINAL.html` (12 screens)
 **Date:** 2026-03-21
-**Review:** 8H / 16M / 7L — all resolved (2026-03-21)
+**Review:** 8H / 16M / 7L — all resolved (2026-03-21); adversarial review 15 findings — 7 pre-planned, 4 spec-fixed, 4 design-decided (2026-03-21)
 
 ---
 
@@ -20,9 +20,9 @@ Replace five separate header/bar components with two unified surfaces: a **Disco
 
 ## Dependencies
 
-- **Safety Advisory** (`tech-spec-safety-travel-advisory.md`) — already implemented (commit `ac8f321`). Safety dot reads from `SafetyRepository` / `SafetyAdvisoryLevel` enum defined there. If for any reason `SafetyRepository` is unavailable, the dot is hidden (unknown/safe default). Do not redefine the `SafetyAdvisoryLevel` enum — import it.
-- **Surprise Here** (`tech-spec-streaming-discovery-ux.md`) — already implemented. 🎲 calls `SurpriseHereViewModel.triggerSurprise()` unchanged.
-- **Streaming discovery pipeline** — already implemented. `Discover` button calls `DiscoveryViewModel.discoverArea()` unchanged.
+- **Safety Advisory** (`tech-spec-safety-travel-advisory.md`) — already implemented (commit `ac8f321`). Safety dot reads from `AdvisoryProvider` / `AdvisoryLevel` enum (in `AreaAdvisory.kt`). Values: `SAFE`, `CAUTION`, `RECONSIDER`, `DO_NOT_TRAVEL`, `UNKNOWN`. If `AdvisoryProvider` is unavailable, the dot is hidden (unknown/safe default). Do not redefine the `AdvisoryLevel` enum — import it.
+- **Surprise Here** (`tech-spec-streaming-discovery-ux.md`) — already implemented. 🎲 calls `MapViewModel.onSurpriseMe()` unchanged.
+- **Streaming discovery pipeline** — already implemented. `Discover` button calls `MapViewModel.onSearchThisArea()` unchanged.
 
 ---
 
@@ -33,7 +33,7 @@ Replace five separate header/bar components with two unified surfaces: a **Disco
 | `TopContextBar` | Discovery Header — collapsed row |
 | `GeocodingSearchBar` | Discovery Header — expanded panel search input |
 | `AmbientTicker` | Rotating meta line (collapsed) + Intel strip (expanded) |
-| `SearchSurprisePill` | 🎲 Surprise on header bar; `Discover` button on pan |
+| `SearchSurpriseTogglePill` (private in MapScreen.kt) | 🎲 Surprise on header bar; `Discover` button on pan |
 | `VibeRail` (floating right-side) | Vibe chips inside expanded header |
 | `Floating companion orb` | Unified bottom orb bar |
 
@@ -125,7 +125,7 @@ This preserves Jamie's (location-denied user) path to value via manual search. T
 - 🎲 → triggers Surprise Here (local, filter-aware)
 - ♥ in count pill → saved lens toggle (48dp tap area extending beyond the ♥ glyph)
 
-**Bottom bar during expanded header:** The bottom bar is NOT behind the scrim. It remains fully interactive when the header is expanded. Opening chat or hamburger from the bottom bar while header is expanded collapses the header first, then opens the requested surface. (M16)
+**Bottom bar during expanded header:** The bottom bar is NOT behind the scrim. It remains fully interactive when the header is expanded. Opening chat or hamburger from the bottom bar while header is expanded collapses the header first, then opens the requested surface. (M16) **Nudge deferral:** If a nudge arrives while the header is expanded, it queues silently and displays only after the header collapses. No z-order conflict between peek card and header scrim. (R15)
 
 ### Rotating Meta Ticker (D3)
 
@@ -256,24 +256,22 @@ One search input handles everything. Results split into three sections:
   - Meta line shows: `🎭 3/5 Arts · History` (count + active vibe names, truncated)
   - A small filter badge appears on the map canvas (top-left, non-interactive, status indicator only)
   - Non-matching pins dim to 30% opacity
-- **Surprise with active filter:** 🎲 picks from the filtered (OR union) set. If the filtered set is empty (zero matching POIs for selected vibes), 🎲 does not fire — instead the orb bar shows: `"No [Vibe] spots here — try nearby?"` and the 🎲 button briefly pulses then returns to enabled. The user can tap again to get the same message, change vibes, or clear the filter. (H8)
+- **Surprise with active filter:** 🎲 picks from the filtered (OR union) set. If the filtered set is empty (zero matching POIs for selected vibes), 🎲 does not fire — instead the orb bar shows: `"No [Vibe] spots here — try nearby?"` and the 🎲 button briefly pulses then returns to enabled. Repeated taps keep showing the same orb message (not silently no-op). The user can change vibes or clear the filter. (H8)
 - Clear filter: tap active chip again, or swipe the filter badge in the meta line
 
 ### Safety Dot (D11)
 
 Small colored dot rendered immediately after area name text, vertically centered. **Color is a secondary indicator.** The primary accessible signal for safety state is the priority-1 rotating meta ticker text. (H3)
 
-| State | Color | Animation | `contentDescription` |
-|-------|-------|-----------|----------------------|
-| Safe | Green `#4CAF50` | None | "Area safety: safe" |
-| Exercise caution | Orange `#FF9800` | Slow pulse (2s) | "Area safety: exercise caution" |
-| Do not travel | Red `#F44336` | Fast pulse (1s) | "Area safety: do not travel" |
-| Unknown | Hidden | — | (no dot, no announcement) |
+| AdvisoryLevel | Color | Animation | `contentDescription` |
+|---------------|-------|-----------|----------------------|
+| `SAFE` | Green `#4CAF50` | None | "Area safety: safe" |
+| `CAUTION` | Amber `#E3B341` | Slow pulse (2s) | "Area safety: exercise caution" |
+| `RECONSIDER` | Orange `#DB6D28` | Slow pulse (2s) | "Area safety: reconsider travel" |
+| `DO_NOT_TRAVEL` | Red `#DA3633` | Fast pulse (1s) | "Area safety: do not travel" |
+| `UNKNOWN` | Hidden | — | (no dot, no announcement) |
 
-Safety dot reads from `SafetyAdvisoryLevel` (defined in Safety Advisory spec, already implemented):
-- `SAFE` → Green
-- `CAUTION` → Orange
-- `WARNING` / `DO_NOT_TRAVEL` → Red
+Safety dot reads from `AdvisoryLevel` (defined in `AreaAdvisory.kt`, already implemented). Colors match existing `TopContextBar.kt` dot color mapping.
 
 When orange or red: warning text occupies priority-1 in the rotating meta ticker (overrides all other lines, stays fixed).
 
@@ -572,7 +570,7 @@ Orb bar: 💬 pip + "Ain Dubai closes in 2 hrs!"
 
 ### Back Button / PlatformBackHandler
 
-- [ ] AC38: Back press priority (topmost wins): keyboard dismiss → hamburger menu → expanded header → orb peek → saved lens → app exit
+- [ ] AC38: Back press priority (topmost wins): hamburger menu → expanded header → orb peek → saved lens → app exit (keyboard dismiss handled natively by Android, not via PlatformBackHandler)
 - [ ] AC39: Each layer has its own enabled `PlatformBackHandler` that fires only when that layer is active
 
 ---
@@ -581,20 +579,56 @@ Orb bar: 💬 pip + "Ain Dubai closes in 2 hrs!"
 
 ### Kotlin/KMP Architecture
 
-- `DiscoveryHeader` composable replaces `TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurprisePill`, `VibeRail`
+- `DiscoveryHeader` composable replaces `TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurpriseTogglePill`, `VibeRail`
 - `UnifiedBottomBar` composable replaces floating `CompanionOrb` + existing bottom area
-- `SavedLensViewModel` (or state in `MapViewModel`) — manages saved lens mode flag, ghost pins list, cluster state
+- Saved lens state lives in `MapUiState.Ready` (fields: `savedLensActive: Boolean`, `ghostPins: List<GhostPin>`), managed by `MapViewModel`. No separate ViewModel.
 - Rotating meta: `LaunchedEffect` cycling a priority-sorted `List<MetaLine>` sealed class with `delay(4_000)`. Paused via a `isPaused` flag during spinner state.
 - Intel strip: separate `LaunchedEffect` with `delay(8_000)` cycling `List<String>` from area CHARACTER bucket. No shared state with `MetaLine`.
-- Safety dot: reads `SafetyAdvisoryLevel` from `SafetyRepository` (already defined in Safety Advisory impl). Import — do not redefine.
-- Vibe filter: `MapViewModel.activeVibeFilters: Set<VibeCategory>` — cleared on `discoverArea()` call that results from a teleport, not from a local Discover tap.
-- Ghost pins: `DiscoveryViewModel.ghostPins: List<GhostPin>` — cleared on next `discoverArea()` call.
+- Safety dot: reads `AdvisoryLevel` from `AdvisoryProvider` (already defined in `AreaAdvisory.kt`). Import — do not redefine.
+- Vibe filter: `MapUiState.Ready.activeVibeFilters: Set<String>` (matching `DynamicVibe.label` values) — cleared on `onSearchThisArea()` call that results from a teleport, not from a local Discover tap. Multi-select uses OR-union of `DynamicVibe.poiIds` lists. **Known limitation:** streaming POIs that arrive after vibe association may not appear in filtered results; accepted for now, fix in a future pass.
+- Ghost pins: `MapUiState.Ready.ghostPins: List<GhostPin>` — managed by `MapViewModel`, cleared on next `onSearchThisArea()` call.
 - Platform maps navigation: `expect fun openMapsNavigation(lat: Double, lng: Double)` in `commonMain`; `actual` in `androidMain` (geo intent) and `iosMain` (Maps URL scheme).
 - Bottom bar safe area: `Modifier.windowInsetsPadding(WindowInsets.safeDrawingBottom)` on the bottom bar container.
 
+### New Type Definitions
+
+```kotlin
+// domain/model/MetaLine.kt
+sealed class MetaLine(val priority: Int) {
+    data class SafetyWarning(val text: String) : MetaLine(1)       // Amber, fixed (no rotation)
+    data class RemoteContext(val fromCity: String, val distance: String) : MetaLine(2) // Teal
+    data class CompanionNudge(val text: String) : MetaLine(3)      // Purple
+    data class PoiHighlight(val text: String) : MetaLine(4)        // Teal
+    data class Default(val text: String) : MetaLine(5)             // White/muted
+    data class VibeFilter(val count: Int, val total: Int, val names: String) : MetaLine(6)
+    data object GpsAcquiring : MetaLine(99)                        // Static, no rotation
+    data object LocationDenied : MetaLine(99)                      // Static
+    data class Discovering(val areaName: String) : MetaLine(99)    // Pauses rotation
+}
+
+// domain/model/GhostPin.kt
+data class GhostPin(
+    val poi: POI,               // The suggested POI
+    val sourcePoiSavedId: String, // The saved POI that triggered this suggestion
+)
+
+// expect/actual in commonMain
+expect fun openMapsNavigation(lat: Double, lng: Double, name: String)
+// Android actual: Intent(ACTION_VIEW, Uri.parse("geo:$lat,$lng?q=$lat,$lng($name)"))
+// iOS actual: URL("http://maps.apple.com/?daddr=$lat,$lng&dirflg=d")
+```
+
+### Phased Implementation Plan (3 commits on one branch)
+
+**Commit A — DiscoveryHeader:** Build `DiscoveryHeader` (collapsed + expanded), `RotatingMetaTicker`, `CountPill`, `SafetyDot` (extracted), `SmartSearchPanel`, `VibeChipRow`. Add `activeVibeFilters: Set<String>` + `isHeaderExpanded: Boolean` to `MapUiState.Ready`. Wire into `MapScreen.kt` replacing `TopContextBar` + `GeocodingSearchBar` + `AmbientTicker` + `SearchSurpriseTogglePill` + `VibeRail`. Update `AmbientTickerTest` → `RotatingMetaTickerTest`. Smoke test.
+
+**Commit B — UnifiedBottomBar:** Build `UnifiedBottomBar`, `OrbBar` (7 states), `PeekCard`, `HamburgerMenu`. Add `expect fun openMapsNavigation()`. Wire into `MapScreen.kt` replacing `CompanionOrb` + `CompanionCard` + `AISearchBar` + `MapListToggle` + `SavesNearbyPill`. Add mutual exclusion + PlatformBackHandler chain. Smoke test.
+
+**Commit C — SavedLens:** Build `SavedLensBanner`, saved map overlay, ghost pin rendering. Add `savedLensActive: Boolean` + `ghostPins: List<GhostPin>` to `MapUiState.Ready`. Wire saved lens toggle, pan detection disable, ghost pin CTA. Delete all old component files. Smoke test.
+
 ### Component Deprecation
 
-Old components (`TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurprisePill`, `VibeRail`, floating `CompanionOrb`) must be deleted in the same PR. Do not leave dead code behind.
+Old components (`TopContextBar`, `GeocodingSearchBar`, `AmbientTicker`, `SearchSurpriseTogglePill` (private in MapScreen.kt), `VibeRail`, floating `CompanionOrb`, `AISearchBar`, `MapListToggle`, `SavesNearbyPill` (private in MapScreen.kt)) must be deleted in the same PR. Do not leave dead code behind.
 
 ---
 
