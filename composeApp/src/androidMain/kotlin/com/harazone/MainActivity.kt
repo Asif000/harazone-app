@@ -21,6 +21,7 @@ import com.harazone.data.local.DatabaseDriverFactory
 import com.harazone.debug.DevSeeder
 import com.google.firebase.Firebase
 import com.google.firebase.crashlytics.crashlytics
+import com.harazone.util.AppContextHolder
 import org.koin.android.ext.koin.androidContext
 
 class MainActivity : ComponentActivity() {
@@ -34,6 +35,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        AppContextHolder.set(this)
 
         val isDebug = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
         Firebase.crashlytics.isCrashlyticsCollectionEnabled = !isDebug
