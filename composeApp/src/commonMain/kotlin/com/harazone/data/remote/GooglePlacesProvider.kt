@@ -56,6 +56,8 @@ internal class GooglePlacesProvider(
 
     override suspend fun enrichPoi(poi: POI): Result<POI> {
         if (poi.latitude == null || poi.longitude == null) return Result.success(poi)
+        // TODO(BACKLOG-LOW): single-token names (e.g. "Starbucks") can false-match nearby branches.
+        // Accepted for beta — 100m locationBias mitigates. Revisit if false matches reported.
         if (poi.name.length < 6) return Result.success(poi)
         if (poi.reviewCount != null) return Result.success(poi) // already enriched
         return try {
