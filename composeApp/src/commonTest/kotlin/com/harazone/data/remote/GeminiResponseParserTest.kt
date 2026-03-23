@@ -375,14 +375,6 @@ not valid json either"""
     // --- priceRange + areaHighlights tests (T13) ---
 
     @Test
-    fun parsePinOnlyResponse_includesPriceRange() {
-        val json = """[{"n":"Cafe X","t":"cafe","lat":1.0,"lng":2.0,"v":"food","p":"$$"}]"""
-        val pois = parser.parsePinOnlyResponse(json)
-        assertEquals(1, pois.size)
-        assertEquals("$$", pois[0].priceRange)
-    }
-
-    @Test
     fun parseStage1Response_includesPriceRange() {
         val json = """{"vibes":[{"label":"food","icon":"🍔"}],"pois":[{"n":"Bistro","t":"restaurant","lat":1.0,"lng":2.0,"v":"food","p":"$$$"}]}"""
         val (vibes, pois) = parser.parseStage1Response(json)
@@ -406,14 +398,6 @@ not valid json either"""
         val cleaned = stripMarkdownFences(json)
         val stage1 = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<Stage1Response>(cleaned)
         assertEquals(emptyList(), stage1.ah)
-    }
-
-    @Test
-    fun parsePinOnlyResponse_missingPriceRange_defaultsToNull() {
-        val json = """[{"n":"Place","t":"park","lat":1.0,"lng":2.0,"v":"nature"}]"""
-        val pois = parser.parsePinOnlyResponse(json)
-        assertEquals(1, pois.size)
-        assertNull(pois[0].priceRange)
     }
 
     // --- parseStage1WithHighlights ---

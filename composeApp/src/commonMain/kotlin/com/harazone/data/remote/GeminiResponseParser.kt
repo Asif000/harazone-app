@@ -170,34 +170,6 @@ internal class GeminiResponseParser {
         private const val VIBE_DELIMITER = "---VIBE---"
     }
 
-    fun parsePinOnlyResponse(text: String): List<POI> {
-        return try {
-            val cleaned = stripMarkdownFences(text)
-            val poisJson = json.decodeFromString<List<PoiJson>>(cleaned)
-            poisJson.filter { it.n.isNotBlank() && it.lat != null && it.lng != null }.map { poiJson ->
-                POI(
-                    name = poiJson.n,
-                    type = poiJson.t,
-                    description = "",
-                    confidence = Confidence.MEDIUM,
-                    latitude = poiJson.lat,
-                    longitude = poiJson.lng,
-                    vibe = poiJson.v,
-                    insight = "",
-                    hours = poiJson.h,
-                    liveStatus = poiJson.s,
-                    rating = null,
-                    vibeInsights = emptyMap(),
-                    wikiSlug = null,
-                    priceRange = poiJson.p,
-                )
-            }
-        } catch (e: Exception) {
-            AppLogger.e(e) { "GeminiResponseParser: failed to parse pin-only response" }
-            emptyList()
-        }
-    }
-
     fun parseStage1Response(text: String): Pair<List<DynamicVibe>, List<POI>> {
         val result = parseStage1WithHighlights(text)
         return Pair(result.vibes, result.pois)
