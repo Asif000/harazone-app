@@ -43,7 +43,7 @@ sealed class MetaLine(val priority: Int) {
     data object LocationDenied : MetaLine(99)
 
     /** Discovery spinner active — pauses rotation. */
-    data class Discovering(val areaName: String) : MetaLine(99)
+    data class Discovering(val areaName: String, val isSurprise: Boolean = false) : MetaLine(99)
 }
 
 val MetaLine.text: String
@@ -58,7 +58,7 @@ val MetaLine.text: String
         is MetaLine.Default -> text
         is MetaLine.GpsAcquiring -> "\uD83D\uDEF0 Getting your location..."
         is MetaLine.LocationDenied -> "\uD83D\uDD0D Search any city, place, or area"
-        is MetaLine.Discovering -> "Discovering $areaName..."
+        is MetaLine.Discovering -> if (isSurprise) "Surprises in $areaName..." else "Discovering $areaName..."
     }
 
 fun MetaLine.displayColor(): Color = when (this) {
@@ -100,9 +100,10 @@ fun buildMetaLines(
     areaName: String = "",
     currencyText: String? = null,
     languageText: String? = null,
+    isSurprise: Boolean = false,
 ): List<MetaLine> {
     if (isSearching) {
-        return listOf(MetaLine.Discovering(areaName))
+        return listOf(MetaLine.Discovering(areaName, isSurprise))
     }
 
     val lines = mutableListOf<MetaLine>()

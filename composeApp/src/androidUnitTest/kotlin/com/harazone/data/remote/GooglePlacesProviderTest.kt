@@ -81,7 +81,7 @@ class GooglePlacesProviderTest {
     @Test
     fun parsePlacesResponse_returns_enriched_poi_on_confident_match() {
         val provider = createProvider()
-        val result = provider.parsePlacesResponse(CONFIDENT_MATCH_RESPONSE, basePoi)
+        val result = provider.parsePlacesResponse(CONFIDENT_MATCH_RESPONSE, basePoi).poi
         assertEquals("open", result.liveStatus)
         assertEquals(4.2f, result.rating)
         assertEquals(1840, result.reviewCount)
@@ -92,14 +92,14 @@ class GooglePlacesProviderTest {
     @Test
     fun parsePlacesResponse_returns_original_poi_on_name_mismatch() {
         val provider = createProvider()
-        val result = provider.parsePlacesResponse(NAME_MISMATCH_RESPONSE, basePoi)
+        val result = provider.parsePlacesResponse(NAME_MISMATCH_RESPONSE, basePoi).poi
         assertEquals(basePoi, result)
     }
 
     @Test
     fun parsePlacesResponse_returns_original_poi_on_empty_places_array() {
         val provider = createProvider()
-        val result = provider.parsePlacesResponse("""{"places":[]}""", basePoi)
+        val result = provider.parsePlacesResponse("""{"places":[]}""", basePoi).poi
         assertEquals(basePoi, result)
     }
 
@@ -107,14 +107,14 @@ class GooglePlacesProviderTest {
     fun parsePlacesResponse_openNow_true_sets_liveStatus_open() {
         val provider = createProvider()
         val poi = basePoi.copy(liveStatus = "closed")
-        val result = provider.parsePlacesResponse(CONFIDENT_MATCH_RESPONSE, poi)
+        val result = provider.parsePlacesResponse(CONFIDENT_MATCH_RESPONSE, poi).poi
         assertEquals("open", result.liveStatus)
     }
 
     @Test
     fun parsePlacesResponse_openNow_false_sets_liveStatus_closed() {
         val provider = createProvider()
-        val result = provider.parsePlacesResponse(CLOSED_RESPONSE, basePoi)
+        val result = provider.parsePlacesResponse(CLOSED_RESPONSE, basePoi).poi
         assertEquals("closed", result.liveStatus)
     }
 
@@ -122,7 +122,7 @@ class GooglePlacesProviderTest {
     fun parsePlacesResponse_openNow_null_preserves_gemini_liveStatus() {
         val provider = createProvider()
         val poi = basePoi.copy(liveStatus = "busy")
-        val result = provider.parsePlacesResponse(NO_OPEN_NOW_RESPONSE, poi)
+        val result = provider.parsePlacesResponse(NO_OPEN_NOW_RESPONSE, poi).poi
         assertEquals("busy", result.liveStatus)
     }
 
@@ -130,9 +130,17 @@ class GooglePlacesProviderTest {
     fun parsePlacesResponse_uses_regularOpeningHours_when_currentOpeningHours_absent() {
         val provider = createProvider()
         val poi = basePoi.copy(liveStatus = null)
-        val result = provider.parsePlacesResponse(REGULAR_HOURS_ONLY_RESPONSE, poi)
+        val result = provider.parsePlacesResponse(REGULAR_HOURS_ONLY_RESPONSE, poi).poi
         assertTrue(result.hours!!.contains("Monday"))
         assertNull(result.liveStatus)
+    }
+
+    @Test
+    fun parsePlacesResponse_extracts_photo_refs() {
+        val provider = createProvider()
+        val result = provider.parsePlacesResponse(RESPONSE_WITH_PHOTOS, basePoi)
+        assertEquals(2, result.photoRefs.size)
+        assertTrue(result.photoRefs[0].contains("photo1"))
     }
 
     // --- mapPriceLevel ---
@@ -232,6 +240,8 @@ class GooglePlacesProviderTest {
             rating = 4.5,
             review_count = 999,
             price_range = "$$$",
+            image_url = "https://cached-photo.jpg",
+            image_urls = "https://cached-photo.jpg|https://cached-photo2.jpg",
             expires_at = clock.nowMs + GooglePlacesProvider.CACHE_TTL_MS,
             cached_at = clock.nowMs,
         )
@@ -251,6 +261,8 @@ class GooglePlacesProviderTest {
         assertEquals(4.5f, enriched.rating)
         assertEquals(999, enriched.reviewCount)
         assertEquals("$$$", enriched.priceRange)
+        assertEquals("https://cached-photo.jpg", enriched.imageUrl)
+        assertEquals(2, enriched.imageUrls.size)
     }
 
     companion object {
@@ -302,6 +314,21 @@ class GooglePlacesProviderTest {
                     "displayName": {"text": "Kyoto Tower"},
                     "rating": 4.0,
                     "userRatingCount": 500
+                }]
+            }
+        """.trimIndent()
+
+        private val RESPONSE_WITH_PHOTOS = """
+            {
+                "places": [{
+                    "id": "abc123",
+                    "displayName": {"text": "Kyoto Tower"},
+                    "rating": 4.2,
+                    "userRatingCount": 1840,
+                    "photos": [
+                        {"name": "places/abc123/photos/photo1", "widthPx": 800, "heightPx": 600},
+                        {"name": "places/abc123/photos/photo2", "widthPx": 800, "heightPx": 600}
+                    ]
                 }]
             }
         """.trimIndent()

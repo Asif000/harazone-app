@@ -403,7 +403,7 @@ private fun ReadyContent(
             val metaLines = remember(
                 state.advisory, state.showMyLocation, state.activeVibeFilters,
                 state.areaHighlights, weatherText, timeText, state.visitTag, state.isSearchingArea, state.areaName,
-                state.areaCurrencyText, state.areaLanguageText,
+                state.areaCurrencyText, state.areaLanguageText, state.isSurpriseSearching,
             ) {
                 com.harazone.domain.model.buildMetaLines(
                     advisoryLevel = state.advisory?.level,
@@ -420,6 +420,7 @@ private fun ReadyContent(
                     totalPoiCount = state.allDiscoveredPois.size,
                     currencyText = state.areaCurrencyText,
                     languageText = state.areaLanguageText,
+                    isSurprise = state.isSurpriseSearching,
                 )
             }
 
@@ -429,6 +430,7 @@ private fun ReadyContent(
                 areaName = state.areaName,
                 advisoryLevel = state.advisory?.level,
                 isSearchingArea = state.isSearchingArea,
+                isSurprise = state.isSurpriseSearching,
                 isGpsAcquiring = state.areaName.isBlank() && !state.showMyLocation,
                 // GPS acquired but area name not yet resolved — mutually exclusive with isGpsAcquiring
                 isGeocodePending = state.showMyLocation && state.areaName.isBlank(),

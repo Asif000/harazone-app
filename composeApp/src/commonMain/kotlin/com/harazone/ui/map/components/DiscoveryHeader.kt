@@ -77,6 +77,7 @@ fun DiscoveryHeader(
     areaName: String,
     advisoryLevel: AdvisoryLevel?,
     isSearchingArea: Boolean,
+    isSurprise: Boolean = false,
     isGpsAcquiring: Boolean,
     isGeocodePending: Boolean,
     isLocationDenied: Boolean,
@@ -184,6 +185,7 @@ fun DiscoveryHeader(
                 areaName = areaName,
                 advisoryLevel = advisoryLevel,
                 isSearchingArea = isSearchingArea,
+                isSurprise = isSurprise,
                 isGpsAcquiring = isGpsAcquiring,
                 isGeocodePending = isGeocodePending,
                 isLocationDenied = isLocationDenied,
@@ -268,6 +270,7 @@ private fun CollapsedBar(
     areaName: String,
     advisoryLevel: AdvisoryLevel?,
     isSearchingArea: Boolean,
+    isSurprise: Boolean = false,
     isGpsAcquiring: Boolean,
     isGeocodePending: Boolean,
     isLocationDenied: Boolean,
@@ -298,6 +301,7 @@ private fun CollapsedBar(
             // Spinning / loading state
             isSearchingArea -> SpinningRow(
                 areaName = areaName,
+                isSurprise = isSurprise,
                 showCancel = showCancel,
                 onCancel = onCancel,
                 activeVibeFilters = activeVibeFilters,
@@ -452,6 +456,7 @@ private fun NormalRow(
 @Composable
 private fun SpinningRow(
     areaName: String,
+    isSurprise: Boolean = false,
     showCancel: Boolean,
     onCancel: () -> Unit,
     activeVibeFilters: Set<String>,
@@ -470,7 +475,7 @@ private fun SpinningRow(
             strokeWidth = 2.dp,
         )
         Text(
-            text = "Discovering $areaName...",
+            text = if (isSurprise) "Surprises in $areaName..." else "Discovering $areaName...",
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.7f),
             maxLines = 1,

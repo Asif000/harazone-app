@@ -28,4 +28,27 @@ data class POI(
 
     /** First comma-separated vibe token, normalized for comparison. */
     val primaryVibe: String? get() = vibe.split(",").firstOrNull()?.trim()?.lowercase()?.ifBlank { null }
+
+    /**
+     * Merge enrichment data onto this POI. Non-default/non-null enrichment values win;
+     * this POI's values are kept as fallback. Use this instead of cherry-picking fields
+     * in merge functions — adding a field to POI automatically includes it here.
+     */
+    fun mergeFrom(other: POI): POI = copy(
+        vibe = other.vibe.ifEmpty { vibe },
+        vibes = other.vibes.ifEmpty { vibes },
+        insight = other.insight.ifEmpty { insight },
+        description = other.description.ifEmpty { description },
+        hours = other.hours ?: hours,
+        liveStatus = other.liveStatus ?: liveStatus,
+        rating = other.rating ?: rating,
+        priceRange = other.priceRange ?: priceRange,
+        reviewCount = other.reviewCount ?: reviewCount,
+        imageUrl = other.imageUrl ?: imageUrl,
+        imageUrls = other.imageUrls.ifEmpty { imageUrls },
+        wikiSlug = other.wikiSlug ?: wikiSlug,
+        latitude = other.latitude ?: latitude,
+        longitude = other.longitude ?: longitude,
+        userNote = other.userNote ?: userNote,
+    )
 }

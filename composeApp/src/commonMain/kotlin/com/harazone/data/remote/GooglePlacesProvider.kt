@@ -8,6 +8,7 @@ import com.harazone.domain.provider.ApiKeyProvider
 import com.harazone.domain.provider.PlacesProvider
 import com.harazone.util.AppClock
 import io.ktor.client.HttpClient
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -64,7 +65,12 @@ internal class GooglePlacesProvider(
             }
 
             val responseText = fetchPlacesData(poi)
-            val enriched = parsePlacesResponse(responseText, poi)
+            val parseResult = parsePlacesResponse(responseText, poi)
+            val enriched = if (parseResult.photoRefs.isNotEmpty()) {
+                applyPhotos(parseResult.poi, parseResult.photoRefs)
+            } else {
+                parseResult.poi
+            }
 
             if (enriched.reviewCount != null) {
                 val now = clock.nowMs()
@@ -75,6 +81,8 @@ internal class GooglePlacesProvider(
                     rating = enriched.rating?.toDouble(),
                     review_count = enriched.reviewCount.toLong(),
                     price_range = enriched.priceRange,
+                    image_url = enriched.imageUrl,
+                    image_urls = enriched.imageUrls.joinToString("|"),
                     expires_at = now + CACHE_TTL_MS,
                     cached_at = now,
                 )
@@ -101,15 +109,21 @@ internal class GooglePlacesProvider(
         }.bodyAsText()
     }
 
-    internal fun parsePlacesResponse(responseText: String, poi: POI): POI {
+    internal data class PlacesParseResult(
+        val poi: POI,
+        val photoRefs: List<String> = emptyList(),
+    )
+
+    internal fun parsePlacesResponse(responseText: String, poi: POI): PlacesParseResult {
         val root = json.parseToJsonElement(responseText).jsonObject
-        val places = root["places"]?.jsonArray ?: return poi
-        if (places.isEmpty()) return poi
+        val places = root["places"]?.jsonArray ?: return PlacesParseResult(poi)
+        if (places.isEmpty()) return PlacesParseResult(poi)
 
         val place = places[0].jsonObject
-        val displayName = place["displayName"]?.jsonObject?.get("text")?.jsonPrimitive?.content ?: return poi
+        val displayName = place["displayName"]?.jsonObject?.get("text")?.jsonPrimitive?.content
+            ?: return PlacesParseResult(poi)
 
-        if (!isConfidentMatch(poi.name, displayName)) return poi
+        if (!isConfidentMatch(poi.name, displayName)) return PlacesParseResult(poi)
 
         val currentHours = place["currentOpeningHours"]?.jsonObject
         val regularHours = place["regularOpeningHours"]?.jsonObject
@@ -121,13 +135,43 @@ internal class GooglePlacesProvider(
         val reviewCount = (place["userRatingCount"] as? JsonPrimitive)?.intOrNull
         val priceLevel = (place["priceLevel"] as? JsonPrimitive)?.contentOrNull
 
-        return poi.copy(
+        val photoRefs = place["photos"]?.jsonArray
+            ?.take(MAX_PHOTOS)
+            ?.mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull }
+            ?: emptyList()
+
+        val enriched = poi.copy(
             liveStatus = when (openNow) { true -> "open"; false -> "closed"; null -> poi.liveStatus },
             hours = if (weekdays != null) weekdays.joinToString("\n") else poi.hours,
             rating = rating?.toFloat() ?: poi.rating,
-            reviewCount = reviewCount,
+            reviewCount = reviewCount ?: 0,
             priceRange = mapPriceLevel(priceLevel) ?: poi.priceRange,
         )
+        return PlacesParseResult(enriched, photoRefs)
+    }
+
+    private suspend fun applyPhotos(poi: POI, photoRefs: List<String>): POI {
+        val urls = photoRefs.mapNotNull { ref -> fetchPhotoUrl(ref) }
+        if (urls.isEmpty()) return poi
+        return poi.copy(
+            imageUrl = urls.first(),
+            imageUrls = urls,
+        )
+    }
+
+    private suspend fun fetchPhotoUrl(photoRef: String): String? = try {
+        val responseText = httpClient.get("$PHOTOS_MEDIA_URL$photoRef/media") {
+            header("X-Goog-Api-Key", apiKeyProvider.placesApiKey)
+            url { parameters.append("maxHeightPx", "800") }
+            url { parameters.append("skipHttpRedirect", "true") }
+        }.bodyAsText()
+        val root = json.parseToJsonElement(responseText).jsonObject
+        root["photoUri"]?.jsonPrimitive?.contentOrNull
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        log.w(e) { "Failed to fetch photo URL for $photoRef" }
+        null
     }
 
     internal fun isConfidentMatch(poiName: String, displayName: String): Boolean {
@@ -139,13 +183,21 @@ internal class GooglePlacesProvider(
         return shorter.all { it in longer }
     }
 
-    private fun applyCache(poi: POI, cached: Places_enrichment_cache): POI = poi.copy(
-        hours = cached.hours ?: poi.hours,
-        liveStatus = cached.live_status ?: poi.liveStatus,
-        rating = cached.rating?.toFloat() ?: poi.rating,
-        reviewCount = cached.review_count?.toInt() ?: 0,
-        priceRange = cached.price_range ?: poi.priceRange,
-    )
+    private fun applyCache(poi: POI, cached: Places_enrichment_cache): POI {
+        val cachedImageUrls = cached.image_urls
+            ?.split("|")
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+        return poi.copy(
+            hours = cached.hours ?: poi.hours,
+            liveStatus = cached.live_status ?: poi.liveStatus,
+            rating = cached.rating?.toFloat() ?: poi.rating,
+            reviewCount = cached.review_count?.toInt() ?: 0,
+            priceRange = cached.price_range ?: poi.priceRange,
+            imageUrl = cached.image_url ?: poi.imageUrl,
+            imageUrls = cachedImageUrls.ifEmpty { poi.imageUrls },
+        )
+    }
 
     internal fun mapPriceLevel(priceLevel: String?): String? = when (priceLevel) {
         "PRICE_LEVEL_FREE" -> "Free"
@@ -158,7 +210,9 @@ internal class GooglePlacesProvider(
 
     companion object {
         private const val PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
-        private const val FIELD_MASK = "places.id,places.displayName,places.currentOpeningHours,places.regularOpeningHours,places.rating,places.userRatingCount,places.priceLevel"
+        private const val FIELD_MASK = "places.id,places.displayName,places.currentOpeningHours,places.regularOpeningHours,places.rating,places.userRatingCount,places.priceLevel,places.photos"
+        private const val PHOTOS_MEDIA_URL = "https://places.googleapis.com/v1/"
+        private const val MAX_PHOTOS = 5
         internal const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L
         private val NON_ALNUM_REGEX = Regex("[^a-z0-9 ]")
     }

@@ -25,6 +25,7 @@ sealed class MapUiState {
         val visitTag: String = "First visit",
         val mapRenderFailed: Boolean = false,
         val isSearchingArea: Boolean = false,
+        val isSurpriseSearching: Boolean = false,
         val isEnrichingArea: Boolean = false,
         val gpsLatitude: Double = 0.0,
         val gpsLongitude: Double = 0.0,

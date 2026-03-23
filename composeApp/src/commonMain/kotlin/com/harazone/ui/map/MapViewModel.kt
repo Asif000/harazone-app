@@ -183,8 +183,16 @@ class MapViewModel(
 
     fun selectPoi(poi: POI?) {
         val current = _uiState.value as? MapUiState.Ready ?: return
+        // Look up from enriched pois list to pick up Places data (reviewCount, images, etc.)
+        val enrichedPoi = if (poi != null) {
+            current.pois.firstOrNull {
+                it.name.trim().lowercase() == poi.name.trim().lowercase()
+            } ?: current.allDiscoveredPois.firstOrNull {
+                it.name.trim().lowercase() == poi.name.trim().lowercase()
+            } ?: poi
+        } else null
         _uiState.value = current.copy(
-            selectedPoi = poi,
+            selectedPoi = enrichedPoi,
             selectedPinIndex = current.selectedPinIndex,
         )
         if (poi != null) {
@@ -653,6 +661,7 @@ class MapViewModel(
             geocodingQuery = "",
             geocodingSuggestions = emptyList(),
             isGeocodingLoading = false,
+            areaName = suggestion.name,
             geocodingSelectedPlace = suggestion.name,
             isGeocodingInitiatedSearch = true,
             latitude = suggestion.latitude,
@@ -742,6 +751,7 @@ class MapViewModel(
             geocodingQuery = "",
             geocodingSuggestions = emptyList(),
             isGeocodingLoading = false,
+            areaName = recent.name,
             geocodingSelectedPlace = recent.name,
             isGeocodingInitiatedSearch = true,
             latitude = recent.latitude,
@@ -988,6 +998,7 @@ class MapViewModel(
         val postCancel = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = postCancel.copy(
             isSearchingArea = true,
+            isSurpriseSearching = true,
             isLoadingVibes = true,
             pois = emptyList(),
             poiStreamingCount = 0,
@@ -1004,6 +1015,8 @@ class MapViewModel(
                     // Force-clear enriching flags — no background batches for surprise queries
                     val s = _uiState.value as? MapUiState.Ready
                     if (s != null) _uiState.value = s.copy(
+                        isSearchingArea = false,
+                        isSurpriseSearching = false,
                         isEnrichingArea = false,
                         isBackgroundFetching = false,
                     )
@@ -1818,16 +1831,7 @@ class MapViewModel(
         val enrichMap = enrichments.associateBy { it.name.trim().lowercase() }
         val merged = stage1.map { pin ->
             val enrich = enrichMap[pin.name.trim().lowercase()]
-            if (enrich != null) pin.copy(
-                vibe = enrich.vibe.ifEmpty { pin.vibe },
-                vibes = enrich.vibes.ifEmpty { pin.vibes },
-                insight = enrich.insight,
-                rating = enrich.rating,
-                hours = enrich.hours,
-                liveStatus = enrich.liveStatus,
-                imageUrl = enrich.imageUrl ?: pin.imageUrl,
-                wikiSlug = enrich.wikiSlug ?: pin.wikiSlug,
-            ) else pin
+            if (enrich != null) pin.mergeFrom(enrich) else pin
         }
         val stage1Keys = stage1.map { it.name.trim().lowercase() }.toSet()
         val newPois = enrichments.filter { it.name.trim().lowercase() !in stage1Keys }

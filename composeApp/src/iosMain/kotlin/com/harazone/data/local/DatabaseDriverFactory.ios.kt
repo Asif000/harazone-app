@@ -32,6 +32,8 @@ private fun SqlDriver.ensurePlacesEnrichmentCacheTable() {
             rating      REAL,
             review_count INTEGER,
             price_range TEXT,
+            image_url   TEXT,
+            image_urls  TEXT,
             expires_at  INTEGER NOT NULL,
             cached_at   INTEGER NOT NULL
         )

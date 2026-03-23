@@ -322,16 +322,7 @@ internal class AreaRepositoryImpl(
                 AppLogger.w { "mergeStage2OntoCached: ${candidates.size} Stage 2 POIs with name '${cached.name}' — using first" }
             }
             val enrichment = candidates.first()
-            cached.copy(
-                vibe = enrichment.vibe.ifEmpty { cached.vibe },
-                vibes = enrichment.vibes.ifEmpty { cached.vibes },
-                insight = enrichment.insight.ifEmpty { cached.insight },
-                description = enrichment.description.ifEmpty { cached.description },
-                imageUrl = enrichment.imageUrl ?: cached.imageUrl,
-                wikiSlug = enrichment.wikiSlug ?: cached.wikiSlug,
-                hours = enrichment.hours ?: cached.hours,
-                rating = enrichment.rating ?: cached.rating,
-            )
+            cached.mergeFrom(enrichment)
         }
         // Append Stage 2-only POIs that had no match in Stage 1
         val unmatched = stage2.filter { it.name.lowercase() !in stage1Names }
@@ -409,18 +400,7 @@ internal class AreaRepositoryImpl(
             seen.add(key)
             val update = newByName[key]
             if (update != null) {
-                merged.add(poi.copy(
-                    vibe = update.vibe.ifEmpty { poi.vibe },
-                    vibes = update.vibes.ifEmpty { poi.vibes },
-                    insight = update.insight.ifEmpty { poi.insight },
-                    description = update.description.ifEmpty { poi.description },
-                    imageUrl = update.imageUrl ?: poi.imageUrl,
-                    wikiSlug = update.wikiSlug ?: poi.wikiSlug,
-                    hours = update.hours ?: poi.hours,
-                    rating = update.rating ?: poi.rating,
-                    latitude = update.latitude ?: poi.latitude,
-                    longitude = update.longitude ?: poi.longitude,
-                ))
+                merged.add(poi.mergeFrom(update))
             } else {
                 merged.add(poi)
             }
