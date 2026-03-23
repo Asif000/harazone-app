@@ -20,8 +20,8 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import com.harazone.domain.model.MetaLine
-import com.harazone.domain.model.displayColor
 import com.harazone.domain.model.isFixed
 import com.harazone.domain.model.text
 import kotlinx.coroutines.delay
@@ -102,4 +102,18 @@ fun RotatingMetaTicker(
             modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE),
         )
     }
+}
+
+fun MetaLine.displayColor(): Color = when (this) {
+    is MetaLine.SafetyWarning -> Color(0xFFFFB300)
+    is MetaLine.RemoteContext -> Color(0xFF26A69A)
+    is MetaLine.CurrencyContext -> Color(0xFF26A69A)
+    is MetaLine.LanguageContext -> Color(0xFF26A69A)
+    is MetaLine.VibeFilter -> Color(0xFFB39DDB)
+    is MetaLine.CompanionNudge -> Color(0xFFB39DDB)
+    is MetaLine.PoiHighlight -> Color(0xFF26A69A)
+    is MetaLine.Default -> Color.White.copy(alpha = 0.7f)
+    is MetaLine.GpsAcquiring -> Color.White.copy(alpha = 0.5f)
+    is MetaLine.LocationDenied -> Color.White.copy(alpha = 0.5f)
+    is MetaLine.Discovering -> Color.White.copy(alpha = 0.5f)
 }

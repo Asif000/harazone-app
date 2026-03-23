@@ -1637,8 +1637,8 @@ class MapViewModel(
                                     // Only clear enriching if no background batches are in flight
                                     isEnrichingArea = s.isBackgroundFetching,
                                     areaHighlights = update.areaHighlights.ifEmpty { s.areaHighlights },
-                                    areaCurrencyText = update.currencyText ?: s.areaCurrencyText,
-                                    areaLanguageText = update.languageText ?: s.areaLanguageText,
+                                    areaCurrencyText = update.currencyText,
+                                    areaLanguageText = update.languageText,
                                 )
                             }
                             // Update selectedPoi if open, so shimmer clears without user closing card
@@ -1772,8 +1772,8 @@ class MapViewModel(
                                     isLoadingVibes = false,
                                     isEnrichingArea = s.isBackgroundFetching,
                                     areaHighlights = update.areaHighlights.ifEmpty { s.areaHighlights },
-                                    areaCurrencyText = update.currencyText ?: s.areaCurrencyText,
-                                    areaLanguageText = update.languageText ?: s.areaLanguageText,
+                                    areaCurrencyText = update.currencyText,
+                                    areaLanguageText = update.languageText,
                                 )
                             }
                         }

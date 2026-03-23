@@ -265,6 +265,50 @@ class GooglePlacesProviderTest {
         assertEquals(2, enriched.imageUrls.size)
     }
 
+    @Test
+    fun enrichPoi_expired_cache_triggers_fresh_fetch() = runTest {
+        val clock = FakeClock(nowMs = 1_000_000_000L)
+        // Pre-populate cache with EXPIRED entry
+        database.places_enrichment_cacheQueries.insertOrReplace(
+            saved_id = basePoi.savedId,
+            hours = "Stale hours",
+            live_status = "closed",
+            rating = 1.0,
+            review_count = 1,
+            price_range = "$",
+            image_url = null,
+            image_urls = null,
+            expires_at = clock.nowMs - 1, // expired
+            cached_at = clock.nowMs - GooglePlacesProvider.CACHE_TTL_MS - 1,
+        )
+        // Fresh API response should be used instead of expired cache
+        val provider = createProvider(
+            responseText = CONFIDENT_MATCH_RESPONSE,
+            clock = clock,
+        )
+        val result = provider.enrichPoi(basePoi)
+        assertTrue(result.isSuccess)
+        val enriched = result.getOrNull()!!
+        // Should have fresh data from API, not stale cache
+        assertEquals(4.2f, enriched.rating)
+        assertEquals(1840, enriched.reviewCount)
+    }
+
+    @Test
+    fun enrichPoi_skips_already_enriched_poi() = runTest {
+        val errorEngine = MockEngine { _ -> error("Should not be called") }
+        val provider = GooglePlacesProvider(
+            httpClient = HttpClient(errorEngine),
+            apiKeyProvider = fakeApiKeyProvider,
+            database = database,
+            clock = FakeClock(),
+        )
+        val alreadyEnriched = basePoi.copy(reviewCount = 500)
+        val result = provider.enrichPoi(alreadyEnriched)
+        assertTrue(result.isSuccess)
+        assertEquals(alreadyEnriched, result.getOrNull())
+    }
+
     companion object {
         private val CONFIDENT_MATCH_RESPONSE = """
             {
