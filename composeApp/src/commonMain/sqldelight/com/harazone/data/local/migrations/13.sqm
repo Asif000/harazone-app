@@ -1,0 +1,18 @@
+-- New columns for Google Places enrichment cache
+ALTER TABLE places_enrichment_cache ADD COLUMN website_uri TEXT;
+ALTER TABLE places_enrichment_cache ADD COLUMN google_maps_uri TEXT;
+ALTER TABLE places_enrichment_cache ADD COLUMN international_phone_number TEXT;
+ALTER TABLE places_enrichment_cache ADD COLUMN formatted_address TEXT;
+
+-- New table for Foursquare social media cache
+CREATE TABLE IF NOT EXISTS foursquare_social_cache (
+    saved_id TEXT NOT NULL PRIMARY KEY,
+    instagram TEXT,
+    facebook TEXT,
+    twitter TEXT,
+    expires_at INTEGER NOT NULL,
+    cached_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_foursquare_social_expires_at
+    ON foursquare_social_cache(expires_at);

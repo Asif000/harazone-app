@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Detail Page v2 — AreaDiscovery (Compact + Ticker)</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    padding: 30px 20px;
+    min-height: 100vh;
+    flex-wrap: wrap;
+  }
+  .label { color: #888; font-size: 13px; text-align: center; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+  .sublabel { color: #555; font-size: 11px; text-align: center; margin-bottom: 14px; max-width: 390px; line-height: 1.4; }
+  .phone {
+    width: 390px; height: 844px; background: #0d1117;
+    border-radius: 32px; border: 3px solid #333; overflow: hidden; position: relative; flex-shrink: 0;
+  }
+  /* Dynamic island notch */
+  .notch {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+    width: 120px; height: 28px; border-radius: 14px;
+    background: #000; z-index: 150;
+  }
+  .phone-inner { height: 100%; overflow-y: auto; scrollbar-width: none; margin: 0; padding: 0; }
+  .phone-inner::-webkit-scrollbar { display: none; }
+  .phone-inner > *:first-child { margin-top: 0; }
+  .column-wrapper { display: flex; flex-direction: column; align-items: center; }
+
+  /* Status bar */
+  .status-bar {
+    height: 54px; display: flex; align-items: flex-end; justify-content: space-between;
+    padding: 0 28px 8px; position: absolute; top: 0; left: 0; right: 0; z-index: 100;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, transparent 100%);
+  }
+  .status-bar .time { color: #fff; font-size: 15px; font-weight: 600; }
+  .status-bar .icons { color: #fff; font-size: 13px; display: flex; gap: 6px; }
+
+  /* Hero */
+  .hero { position: relative; height: 250px; background-color: #2a2a2a; background-size: cover; background-position: center; }
+  .hero-gradient {
+    position: absolute; bottom: 0; left: 0; right: 0; height: 130px;
+    background: linear-gradient(to top, rgba(13,17,23,1) 0%, rgba(13,17,23,0.75) 45%, transparent 100%);
+  }
+  .hero-content { position: absolute; bottom: 12px; left: 20px; right: 60px; z-index: 10; }
+  .hero-name { color: #fff; font-size: 23px; font-weight: 700; line-height: 1.2; text-shadow: 0 2px 12px rgba(0,0,0,0.6); }
+  .hero-meta { color: rgba(255,255,255,0.85); font-size: 13px; margin-top: 4px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .vibe-chip { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; color: #fff; }
+  .vibe-food { background: rgba(240,136,62,0.35); border: 1px solid rgba(240,136,62,0.6); }
+  .vibe-culture { background: rgba(88,166,255,0.35); border: 1px solid rgba(88,166,255,0.6); }
+  .sep { color: rgba(255,255,255,0.3); }
+  .hero-dots { position: absolute; bottom: 56px; left: 50%; transform: translateX(-50%); display: flex; gap: 5px; z-index: 10; }
+  .hero-dots .dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.35); }
+  .hero-dots .dot.active { background: #fff; width: 16px; border-radius: 3px; }
+  .hero-btn {
+    position: absolute; width: 36px; height: 36px; border-radius: 50%;
+    background: rgba(0,0,0,0.45); backdrop-filter: blur(12px);
+    color: #fff; display: flex; align-items: center; justify-content: center; font-size: 18px; z-index: 20; cursor: pointer;
+  }
+  .hero-btn.close { top: 56px; left: 16px; }
+  .hero-btn.overflow { top: 56px; right: 16px; font-size: 20px; letter-spacing: -1px; }
+
+  /* Dividers */
+  .divider { height: 1px; background: rgba(255,255,255,0.12); }
+  .divider-thick { height: 8px; background: rgba(255,255,255,0.06); }
+
+  /* ── Compact rating + status line ── */
+  .rating-line {
+    padding: 10px 20px 4px;
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    font-size: 13px;
+  }
+  .star-inline { color: #f0c040; font-size: 14px; }
+  .rating-num { color: #f0c040; font-weight: 700; }
+  .review-count { color: #666; font-size: 12px; }
+  .price-tag { color: #3fb950; font-weight: 600; }
+  .status-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 2px; }
+  .status-dot.open { background: #3fb950; }
+  .status-dot.closed { background: #f47067; }
+  .status-text { font-size: 12px; font-weight: 600; }
+  .status-text.open { color: #3fb950; }
+  .verified-inline {
+    display: inline-flex; align-items: center; gap: 3px;
+    padding: 1px 8px; border-radius: 8px;
+    background: rgba(66,133,244,0.08); font-size: 10px; font-weight: 600; color: #4285f4;
+  }
+  .area-meta-inline { color: #555; font-size: 11px; margin-left: 4px; }
+
+  /* ── LIVE TICKER — safety/news/context ── */
+  .live-ticker {
+    margin: 8px 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    height: 32px;
+  }
+  .ticker-track {
+    display: flex;
+    animation: tickerScroll 20s linear infinite;
+    height: 100%;
+    align-items: center;
+    white-space: nowrap;
+  }
+  @keyframes tickerScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .ticker-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 20px;
+    font-size: 12px;
+    height: 100%;
+    flex-shrink: 0;
+  }
+  .ticker-item .t-icon { font-size: 14px; }
+  .ticker-safety {
+    background: rgba(240,192,64,0.08);
+    border: 1px solid rgba(240,192,64,0.12);
+    color: #e8d5a0;
+    border-radius: 10px;
+  }
+  .ticker-danger {
+    background: rgba(244,112,103,0.1);
+    border: 1px solid rgba(244,112,103,0.15);
+    color: #f4a8a0;
+    border-radius: 10px;
+  }
+  .ticker-info {
+    background: rgba(88,166,255,0.08);
+    border: 1px solid rgba(88,166,255,0.12);
+    color: #a0c8e8;
+    border-radius: 10px;
+  }
+  .ticker-weather {
+    background: rgba(240,192,64,0.06);
+    border: 1px solid rgba(240,192,64,0.1);
+    color: #d8c888;
+    border-radius: 10px;
+  }
+  /* Static single-line ticker variant */
+  .live-ticker-static {
+    margin: 8px 20px;
+    padding: 7px 12px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+  }
+  .live-ticker-static .pulse-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    flex-shrink: 0;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .live-ticker-static .t-text { flex: 1; line-height: 1.3; }
+  .live-ticker-static.safety-yellow {
+    background: rgba(240,192,64,0.08);
+    border: 1px solid rgba(240,192,64,0.12);
+    color: #e8d5a0;
+  }
+  .live-ticker-static.safety-yellow .pulse-dot { background: #f0c040; }
+  .live-ticker-static.safety-red {
+    background: rgba(244,112,103,0.08);
+    border: 1px solid rgba(244,112,103,0.12);
+    color: #f4a8a0;
+  }
+  .live-ticker-static.safety-red .pulse-dot { background: #f47067; }
+  .live-ticker-static.safety-green {
+    background: rgba(63,185,80,0.06);
+    border: 1px solid rgba(63,185,80,0.1);
+    color: #a0d8a8;
+  }
+  .live-ticker-static.safety-green .pulse-dot { background: #3fb950; }
+
+  /* ── SCROLLING INFO TICKER ── */
+  .info-ticker {
+    margin: 6px 20px;
+    padding: 8px 0;
+    overflow: hidden;
+    position: relative;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .info-ticker::before, .info-ticker::after {
+    content: '';
+    position: absolute;
+    top: 0; bottom: 0; width: 24px;
+    z-index: 2;
+    pointer-events: none;
+  }
+  .info-ticker::before { left: 0; background: linear-gradient(to right, rgba(13,17,23,1), transparent); }
+  .info-ticker::after { right: 0; background: linear-gradient(to left, rgba(13,17,23,1), transparent); }
+  .info-ticker-track {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    animation: infoScroll 18s linear infinite;
+    gap: 0;
+  }
+  @keyframes infoScroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+  }
+  .it-item {
+    font-size: 12px;
+    color: #bbb;
+    padding: 0 8px;
+    flex-shrink: 0;
+  }
+  .it-item.it-tel { color: #3fb950; }
+  .it-sep {
+    color: #444;
+    font-size: 10px;
+    flex-shrink: 0;
+  }
+
+  /* ── Links + Social icon strip ── */
+  .links-social-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+  }
+  .ls-icon {
+    width: 34px; height: 34px; border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; cursor: pointer; transition: all 0.15s;
+  }
+  .ls-icon:hover { transform: scale(1.08); }
+  .ls-call { background: rgba(63,185,80,0.18); border: 1.5px solid rgba(63,185,80,0.45); color: #3fb950; }
+  .ls-web { background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.25); color: #ccc; }
+  .ls-gmaps { background: rgba(66,133,244,0.2); border: 1.5px solid rgba(66,133,244,0.45); color: #6aa3f4; }
+  .ls-ig { background: rgba(225,48,108,0.2); border: 1.5px solid rgba(225,48,108,0.45); color: #e94d82; }
+  .ls-fb { background: rgba(66,103,178,0.2); border: 1.5px solid rgba(66,103,178,0.45); color: #5a7fc2; }
+  .ls-x { background: rgba(255,255,255,0.12); border: 1.5px solid rgba(255,255,255,0.25); color: #ddd; }
+  .ls-yelp { background: rgba(211,35,35,0.2); border: 1.5px solid rgba(211,35,35,0.4); color: #e04040; }
+  .ls-ta { background: rgba(52,224,161,0.18); border: 1.5px solid rgba(52,224,161,0.4); color: #50e8b0; }
+  .ls-fsq { background: rgba(249,72,146,0.18); border: 1.5px solid rgba(249,72,146,0.4); color: #f96ca0; }
+  .ls-div { width: 1px; height: 22px; background: rgba(255,255,255,0.15); margin: 0 2px; }
+  .ls-icon span { font-size: 11px; font-weight: 700; }
+  .ls-icon .ico { font-size: 16px; }
+
+  /* ── CTA strip ── */
+  .cta-strip { display: flex; gap: 10px; padding: 12px 20px; }
+  .cta-btn {
+    flex: 1; padding: 12px 8px; border-radius: 14px; font-size: 14px; font-weight: 600;
+    display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer;
+  }
+  .cta-btn.save-default { background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); color: #ccc; }
+  .cta-btn.save-active { background: rgba(240,136,62,0.18); border: 2px solid rgba(240,136,62,0.5); color: #f0883e; }
+  .cta-btn.go-walk { background: rgba(63,185,80,0.18); border: 2px solid rgba(63,185,80,0.5); color: #3fb950; }
+  .cta-btn.go-far { background: rgba(88,166,255,0.18); border: 2px solid rgba(88,166,255,0.5); color: #58a6ff; }
+  .cta-btn.been-default { background: rgba(255,255,255,0.1); border: 2px solid rgba(255,255,255,0.2); color: #999; }
+  .cta-sub { font-size: 11px; font-weight: 400; opacity: 0.7; margin-left: 2px; }
+
+  /* ── Real-time stats (compact) ── */
+  .rt-row { display: flex; gap: 0; padding: 0 20px; margin: 6px 0 2px; }
+  .rt-stat { flex: 1; padding: 8px 6px; text-align: center; border-right: 1px solid rgba(255,255,255,0.04); }
+  .rt-stat:last-child { border-right: none; }
+  .rt-value { font-size: 15px; font-weight: 700; line-height: 1.2; }
+  .rt-label { font-size: 9px; color: #555; text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+  .rt-value.temp { color: #f0c040; }
+  .rt-value.time { color: #58a6ff; }
+  .rt-value.busy { color: #f47067; }
+  .rt-value.busy-low { color: #3fb950; }
+  .rt-value.dist { color: #999; }
+
+  /* ── AI Context ── */
+  .ai-context { padding: 14px 20px; }
+  .section-header { color: #555; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+  .context-blurb { color: #ccc; font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
+  .context-card { padding: 10px 12px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; line-height: 1.5; }
+  .context-whynow { background: rgba(240,192,64,0.06); border: 1px solid rgba(240,192,64,0.1); color: #e8d5a0; }
+  .context-localtip { background: rgba(63,185,80,0.06); border: 1px solid rgba(63,185,80,0.1); color: #a0d8a8; }
+  .context-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; display: flex; align-items: center; gap: 4px; }
+  .context-whynow .context-label { color: #f0c040; }
+  .context-localtip .context-label { color: #3fb950; }
+  .tip-refresh {
+    margin-left: auto;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s;
+  }
+  .tip-refresh:hover { opacity: 1; transform: rotate(180deg); }
+
+  /* ── Safety ── */
+  .safety-section { padding: 14px 20px; }
+  .safety-card { padding: 12px 14px; border-radius: 10px; background: rgba(244,112,103,0.04); border: 1px solid rgba(244,112,103,0.1); }
+  .safety-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .safety-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .safety-dot.yellow { background: #f0c040; }
+  .safety-level { color: #f0c040; font-size: 12px; font-weight: 600; }
+  .safety-blurb { color: #aaa; font-size: 12px; line-height: 1.5; margin-bottom: 8px; }
+  .safety-disclaimer { color: #444; font-size: 10px; font-style: italic; display: flex; align-items: center; gap: 4px; }
+
+  /* ── Chat ── */
+  .chat-section { padding: 14px 20px; }
+  .pills { display: flex; gap: 7px; flex-wrap: wrap; margin: 6px 0; }
+  .pill { padding: 7px 12px; border-radius: 18px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); color: #888; font-size: 12px; cursor: pointer; }
+  .chat-input { position: sticky; bottom: 0; padding: 8px 20px 34px; background: linear-gradient(to top, #0d1117 80%, transparent); }
+  .input-bar { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 22px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); }
+  .input-bar input { flex: 1; background: none; border: none; color: #fff; font-size: 13px; outline: none; }
+  .input-bar input::placeholder { color: #444; }
+  .send-btn { width: 30px; height: 30px; border-radius: 50%; background: #58a6ff; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: pointer; flex-shrink: 0; }
+
+  /* Go sheet */
+  .go-sheet-overlay { position: absolute; bottom: 0; left: 0; right: 0; z-index: 200; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%); height: 100%; display: flex; align-items: flex-end; }
+  .go-sheet { width: 100%; background: #1a1a1a; border-radius: 24px 24px 0 0; padding: 20px 24px 44px; }
+  .go-sheet-handle { width: 36px; height: 4px; border-radius: 2px; background: #444; margin: 0 auto 20px; }
+  .go-sheet-icon { font-size: 48px; text-align: center; margin-bottom: 12px; }
+  .go-sheet-title { color: #fff; font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 8px; }
+  .go-sheet-body { color: #999; font-size: 14px; text-align: center; line-height: 1.5; margin-bottom: 24px; }
+  .go-sheet-actions { display: flex; gap: 12px; }
+  .go-sheet-btn { flex: 1; padding: 14px; border-radius: 14px; font-size: 15px; font-weight: 600; text-align: center; cursor: pointer; }
+  .go-sheet-btn.secondary { background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.12); color: #fff; }
+  .go-sheet-btn.cta { background: rgba(88,166,255,0.18); border: 1px solid rgba(88,166,255,0.4); color: #58a6ff; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     MOCKUP 1: NEARBY POI
+     Compact info grid + safety ticker
+     ═══════════════════════════════════════ -->
+<div class="column-wrapper">
+  <div class="label">NEARBY POI — Compact Layout</div>
+  <div class="sublabel">2-col info grid, live safety ticker, social strip, then CTAs</div>
+  <div class="phone">
+    <div class="phone-inner">
+      <div class="notch"></div>
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">&#9679; &#9679; &#9679;</span>
+      </div>
+
+      <!-- Hero -->
+      <div class="hero" style="background: url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80') center/cover, #2a1a0a;">
+        <div class="hero-btn close">&#8592;</div>
+        <div class="hero-btn overflow">&#8943;</div>
+        <div class="hero-dots">
+          <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="hero-gradient"></div>
+        <div class="hero-content">
+          <div class="hero-name">La Ventana Colombian</div>
+          <div class="hero-meta">Restaurant <span class="sep">&middot;</span> <span class="vibe-chip vibe-food">Food</span></div>
+        </div>
+      </div>
+
+      <!-- Compact rating line -->
+      <div class="rating-line">
+        <span class="star-inline">&#9733;</span>
+        <span class="rating-num">4.3</span>
+        <span class="review-count">(284)</span>
+        <span class="sep">&middot;</span>
+        <span class="price-tag">$$</span>
+        <span class="sep">&middot;</span>
+        <span class="status-dot open"></span>
+        <span class="status-text open">Open &middot; Closes 10 PM</span>
+        <span class="sep">&middot;</span>
+        <span class="verified-inline">&#10003; Google</span>
+      </div>
+
+      <!-- LIVE SAFETY TICKER -->
+      <div class="live-ticker-static safety-green">
+        <div class="pulse-dot"></div>
+        <div class="t-text">No active advisories &middot; 78&#176;F sunny &middot; Not busy right now</div>
+      </div>
+
+      <!-- SCROLLING INFO TICKER -->
+      <div class="info-ticker">
+        <div class="info-ticker-track">
+          <span class="it-item">&#128205; 8390 NW 53rd St, Doral</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128507; 0.3 mi &middot; 5 min walk</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128205; 8390 NW 53rd St, Doral</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128507; 0.3 mi &middot; 5 min walk</span>
+        </div>
+      </div>
+
+      <!-- Links + Phone + Social icons -->
+      <div class="links-social-strip">
+        <div class="ls-icon ls-call" title="Call"><span class="ico">&#9742;</span></div>
+        <div class="ls-icon ls-web" title="Website"><span class="ico">&#127760;</span></div>
+        <div class="ls-icon ls-gmaps" title="Google Maps"><span class="ico">&#128506;</span></div>
+        <div class="ls-div"></div>
+        <div class="ls-icon ls-ig" title="Instagram"><span>IG</span></div>
+        <div class="ls-icon ls-fb" title="Facebook"><span>f</span></div>
+        <div class="ls-icon ls-yelp" title="Yelp"><span>Y</span></div>
+        <div class="ls-icon ls-fsq" title="Foursquare"><span>4sq</span></div>
+      </div>
+
+      <!-- CTAs -->
+      <div class="cta-strip">
+        <div class="cta-btn save-active">&#9829; Saved</div>
+        <div class="cta-btn go-walk">&#x1F6B6; Go <span class="cta-sub">&middot; 5 min</span></div>
+        <div class="cta-btn been-default">&check; Been</div>
+      </div>
+
+      <div class="divider-thick"></div>
+
+      <!-- AI Context -->
+      <div class="ai-context">
+        <div class="section-header">&#10024; AI Companion Insights</div>
+        <div class="context-blurb">
+          A neighborhood gem serving authentic Colombian comfort food with generous portions. Known for their bandeja paisa and fresh-squeezed juices. Popular with local families, especially on weekends.
+        </div>
+        <div class="context-card context-whynow">
+          <div class="context-label">&#128336; WHY NOW</div>
+          Lunch rush just ended — you'll likely get a table without waiting. Their lunch specials run until 3 PM.
+        </div>
+        <div class="context-card context-localtip">
+          <div class="context-label">&#128161; LOCAL TIP <span class="tip-refresh">&#8635;</span></div>
+          Ask for the "menu del dia" — it's not always on the printed menu but includes soup, main, drink, and dessert for under $15.
+        </div>
+      </div>
+
+      <div class="divider-thick"></div>
+
+      <!-- Chat -->
+      <div class="chat-section">
+        <div class="section-header">&#128172; Ask about this place</div>
+        <div class="pills">
+          <div class="pill">What should I order?</div>
+          <div class="pill">Kid-friendly?</div>
+          <div class="pill">Parking?</div>
+        </div>
+      </div>
+
+      <div class="chat-input">
+        <div class="input-bar">
+          <input type="text" placeholder="Ask about this place...">
+          <div class="send-btn">&#8593;</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MOCKUP 2: FAR-AWAY POI
+     Safety ticker prominent, remote stats
+     ═══════════════════════════════════════ -->
+<div class="column-wrapper">
+  <div class="label">FAR-AWAY POI — Safety Ticker</div>
+  <div class="sublabel">Pulsing yellow safety ticker, remote context in grid, advisory section below</div>
+  <div class="phone">
+    <div class="phone-inner">
+      <div class="notch"></div>
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">&#9679; &#9679; &#9679;</span>
+      </div>
+
+      <!-- Hero -->
+      <div class="hero" style="background: url('https://images.unsplash.com/photo-1587974928442-77dc3e0dba72?w=800&q=80') center/cover, #1a0a2a;">
+        <div class="hero-btn close">&#8592;</div>
+        <div class="hero-btn overflow">&#8943;</div>
+        <div class="hero-dots">
+          <div class="dot active"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="hero-gradient"></div>
+        <div class="hero-content">
+          <div class="hero-name">Jemaa el-Fnaa</div>
+          <div class="hero-meta">Historic Square <span class="sep">&middot;</span> <span class="vibe-chip vibe-culture">Culture</span></div>
+        </div>
+      </div>
+
+      <!-- Rating line -->
+      <div class="rating-line">
+        <span class="star-inline">&#9733;</span>
+        <span class="rating-num">4.6</span>
+        <span class="review-count">(12,847)</span>
+        <span class="sep">&middot;</span>
+        <span class="status-dot open"></span>
+        <span class="status-text open">Open 24h</span>
+        <span class="sep">&middot;</span>
+        <span class="verified-inline">&#10003; Google</span>
+        <span class="area-meta-inline">&#127474;&#127462; MAD</span>
+      </div>
+
+      <!-- LIVE SAFETY TICKER — yellow caution, pulsing -->
+      <div class="live-ticker-static safety-yellow">
+        <div class="pulse-dot"></div>
+        <div class="t-text">&#9888; Exercise caution — pickpocketing common &middot; 91&#176;F &middot; Very busy now &middot; 5:23 PM local</div>
+      </div>
+
+      <!-- SCROLLING INFO TICKER -->
+      <div class="info-ticker">
+        <div class="info-ticker-track">
+          <span class="it-item">&#128205; Marrakech, Morocco</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#9992; 8,100 km away</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128176; MAD (&#1583;.&#1605;.)</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#127474;&#127462; Darija / Arabic</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128205; Marrakech, Morocco</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#9992; 8,100 km away</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128176; MAD (&#1583;.&#1605;.)</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#127474;&#127462; Darija / Arabic</span>
+        </div>
+      </div>
+
+      <!-- Links + Social -->
+      <div class="links-social-strip">
+        <div class="ls-icon ls-gmaps" title="Google Maps"><span class="ico">&#128506;</span></div>
+        <div class="ls-div"></div>
+        <div class="ls-icon ls-ig" title="Instagram"><span>IG</span></div>
+        <div class="ls-icon ls-ta" title="TripAdvisor"><span>TA</span></div>
+      </div>
+
+      <!-- CTAs -->
+      <div class="cta-strip">
+        <div class="cta-btn save-default">&#9825; Save</div>
+        <div class="cta-btn go-far">&#9992; Go <span class="cta-sub">&middot; 8,100 km</span></div>
+        <div class="cta-btn been-default">&check; Been</div>
+      </div>
+
+      <div class="divider-thick"></div>
+
+      <!-- AI Context -->
+      <div class="ai-context">
+        <div class="section-header">&#10024; AI Companion Insights</div>
+        <div class="context-blurb">
+          The beating heart of Marrakech's medina. By day, a maze of orange juice stalls and snake charmers. By night, it transforms into an open-air theatre of food vendors, storytellers, and musicians under lantern light.
+        </div>
+        <div class="context-card context-whynow">
+          <div class="context-label">&#128336; WHY NOW</div>
+          It's late afternoon — the square is shifting from daytime bazaar to evening food market. Golden hour light right now.
+        </div>
+        <div class="context-card context-localtip">
+          <div class="context-label">&#128161; LOCAL TIP <span class="tip-refresh">&#8635;</span></div>
+          Stall 14 and Stall 1 have the best lamb tagine. Walk past the first row of vendors — better food deeper in.
+        </div>
+      </div>
+
+      <div class="divider-thick"></div>
+
+      <!-- Safety (full detail, tappable from ticker) -->
+      <div class="safety-section">
+        <div class="section-header">&#9888; Safety Advisory</div>
+        <div class="safety-card">
+          <div class="safety-header">
+            <div class="safety-dot yellow"></div>
+            <span class="safety-level">Exercise Increased Caution</span>
+          </div>
+          <div class="safety-blurb">
+            Petty theft and pickpocketing common in crowded areas. Keep valuables secured. Be aware of tourist scams. Avoid unlicensed guides.
+          </div>
+          <div class="safety-disclaimer">&#9432; AI-generated safety context</div>
+        </div>
+      </div>
+
+      <div class="divider-thick"></div>
+
+      <!-- Chat -->
+      <div class="chat-section">
+        <div class="section-header">&#128172; Ask about this place</div>
+        <div class="pills">
+          <div class="pill">Best time to visit?</div>
+          <div class="pill">What should I know?</div>
+          <div class="pill">Nearby riads</div>
+        </div>
+      </div>
+
+      <div class="chat-input">
+        <div class="input-bar">
+          <input type="text" placeholder="Ask about this place...">
+          <div class="send-btn">&#8593;</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MOCKUP 3: GO BOTTOM SHEET
+     ═══════════════════════════════════════ -->
+<div class="column-wrapper">
+  <div class="label">GO SHEET — Far-away tap</div>
+  <div class="sublabel">Companion voice, distance context, Save or Plan</div>
+  <div class="phone">
+    <div class="phone-inner" style="position: relative; height: 844px;">
+      <div class="notch"></div>
+      <div class="status-bar">
+        <span class="time">9:41</span>
+        <span class="icons">&#9679; &#9679; &#9679;</span>
+      </div>
+      <div style="opacity: 0.25; filter: blur(3px);">
+        <div class="hero" style="background-color: #1a0a2a; height: 200px;">
+          <div class="hero-gradient"></div>
+          <div class="hero-content">
+            <div class="hero-name">Jemaa el-Fnaa</div>
+            <div class="hero-meta">Historic Square</div>
+          </div>
+        </div>
+        <div class="rating-line" style="padding: 10px 20px;"><span class="rating-num">4.6</span></div>
+      </div>
+      <div class="go-sheet-overlay">
+        <div class="go-sheet">
+          <div class="go-sheet-handle"></div>
+          <div class="go-sheet-icon">&#9992;&#65039;</div>
+          <div class="go-sheet-title">Marrakech is a journey away!</div>
+          <div class="go-sheet-body">
+            8,100 km from where you are right now.<br>
+            Save it for the right moment, or start planning your trip?
+          </div>
+          <div class="go-sheet-actions">
+            <div class="go-sheet-btn secondary">&#9825; Save for later</div>
+            <div class="go-sheet-btn cta">&#128203; Plan a trip</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     MOCKUP 4: LIGHT THEME — Nearby POI
+     ═══════════════════════════════════════ -->
+<style>
+  .phone.light { background: #ffffff; border-color: #ccc; }
+  .phone.light .notch { background: #111; }
+  .phone.light .status-bar .time { color: #000; }
+  .phone.light .status-bar .icons { color: #000; }
+  .phone.light .hero-gradient {
+    background: linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.75) 45%, transparent 100%);
+  }
+  .phone.light .hero-name { color: #111; text-shadow: 0 1px 6px rgba(255,255,255,0.8); }
+  .phone.light .hero-meta { color: rgba(0,0,0,0.7); }
+  .phone.light .sep { color: rgba(0,0,0,0.2); }
+  .phone.light .vibe-food { background: rgba(240,136,62,0.15); border-color: rgba(240,136,62,0.4); color: #c06020; }
+  .phone.light .hero-btn { background: rgba(255,255,255,0.7); color: #333; }
+  .phone.light .hero-dots .dot { background: rgba(0,0,0,0.25); }
+  .phone.light .hero-dots .dot.active { background: #333; }
+
+  .phone.light .rating-line { color: #333; }
+  .phone.light .star-inline { color: #e6a800; }
+  .phone.light .rating-num { color: #e6a800; }
+  .phone.light .review-count { color: #888; }
+  .phone.light .price-tag { color: #1a8a2e; }
+  .phone.light .status-dot.open { background: #1a8a2e; }
+  .phone.light .status-text.open { color: #1a8a2e; }
+  .phone.light .verified-inline { background: rgba(66,133,244,0.1); color: #2962d1; }
+
+  .phone.light .live-ticker-static.safety-green {
+    background: rgba(63,185,80,0.08); border-color: rgba(63,185,80,0.2); color: #1a6e2e;
+  }
+  .phone.light .live-ticker-static .pulse-dot { background: #1a8a2e; }
+
+  .phone.light .info-ticker { background: rgba(0,0,0,0.03); border-color: rgba(0,0,0,0.08); }
+  .phone.light .info-ticker::before { background: linear-gradient(to right, #fff, transparent); }
+  .phone.light .info-ticker::after { background: linear-gradient(to left, #fff, transparent); }
+  .phone.light .it-item { color: #555; }
+  .phone.light .it-sep { color: #ccc; }
+
+  .phone.light .ls-call { background: rgba(63,185,80,0.1); border-color: rgba(63,185,80,0.3); color: #1a8a2e; }
+  .phone.light .ls-web { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.12); color: #555; }
+  .phone.light .ls-gmaps { background: rgba(66,133,244,0.08); border-color: rgba(66,133,244,0.25); color: #2962d1; }
+  .phone.light .ls-ig { background: rgba(225,48,108,0.08); border-color: rgba(225,48,108,0.25); color: #c0245a; }
+  .phone.light .ls-fb { background: rgba(66,103,178,0.08); border-color: rgba(66,103,178,0.25); color: #3b5998; }
+  .phone.light .ls-yelp { background: rgba(211,35,35,0.08); border-color: rgba(211,35,35,0.2); color: #b82020; }
+  .phone.light .ls-fsq { background: rgba(249,72,146,0.08); border-color: rgba(249,72,146,0.2); color: #d04080; }
+  .phone.light .ls-div { background: rgba(0,0,0,0.1); }
+
+  .phone.light .cta-btn.save-active { background: rgba(240,136,62,0.1); border-color: rgba(240,136,62,0.4); color: #c06020; }
+  .phone.light .cta-btn.go-walk { background: rgba(63,185,80,0.1); border-color: rgba(63,185,80,0.4); color: #1a8a2e; }
+  .phone.light .cta-btn.been-default { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.12); color: #888; }
+
+  .phone.light .divider { background: rgba(0,0,0,0.08); }
+  .phone.light .divider-thick { background: rgba(0,0,0,0.04); }
+
+  .phone.light .section-header { color: #888; }
+  .phone.light .context-blurb { color: #333; }
+  .phone.light .context-whynow { background: rgba(240,192,64,0.08); border-color: rgba(240,192,64,0.2); color: #7a5a00; }
+  .phone.light .context-whynow .context-label { color: #b08800; }
+  .phone.light .context-localtip { background: rgba(63,185,80,0.06); border-color: rgba(63,185,80,0.15); color: #1a6e2e; }
+  .phone.light .context-localtip .context-label { color: #1a8a2e; }
+  .phone.light .tip-refresh { color: #1a8a2e; }
+
+  .phone.light .pill { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); color: #666; }
+  .phone.light .chat-input { background: linear-gradient(to top, #fff 80%, transparent); }
+  .phone.light .input-bar { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.1); }
+  .phone.light .input-bar input { color: #333; }
+  .phone.light .input-bar input::placeholder { color: #aaa; }
+  .phone.light .send-btn { background: #2962d1; }
+</style>
+
+<div class="column-wrapper">
+  <div class="label">LIGHT THEME — Nearby POI</div>
+  <div class="sublabel">Same layout, device-level light mode. All colors adapted.</div>
+  <div class="phone light">
+    <div class="phone-inner">
+      <div class="notch"></div>
+      <div class="status-bar" style="background: linear-gradient(to bottom, rgba(255,255,255,0.8) 0%, transparent 100%);">
+        <span class="time">9:41</span>
+        <span class="icons">&#9679; &#9679; &#9679;</span>
+      </div>
+
+      <!-- Hero -->
+      <div class="hero" style="background: url('https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=800&q=80') center/cover, #e8e0d8;">
+        <div class="hero-btn close">&#8592;</div>
+        <div class="hero-btn overflow">&#8943;</div>
+        <div class="hero-dots">
+          <div class="dot active"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+        </div>
+        <div class="hero-gradient"></div>
+        <div class="hero-content">
+          <div class="hero-name">La Ventana Colombian</div>
+          <div class="hero-meta">Restaurant <span class="sep">&middot;</span> <span class="vibe-chip vibe-food">Food</span></div>
+        </div>
+      </div>
+
+      <!-- Rating line -->
+      <div class="rating-line">
+        <span class="star-inline">&#9733;</span>
+        <span class="rating-num">4.3</span>
+        <span class="review-count">(284)</span>
+        <span class="sep">&middot;</span>
+        <span class="price-tag">$$</span>
+        <span class="sep">&middot;</span>
+        <span class="status-dot open"></span>
+        <span class="status-text open">Open &middot; Closes 10 PM</span>
+        <span class="sep">&middot;</span>
+        <span class="verified-inline">&#10003; Google</span>
+      </div>
+
+      <!-- Safety ticker -->
+      <div class="live-ticker-static safety-green">
+        <div class="pulse-dot"></div>
+        <div class="t-text">No active advisories &middot; 78&#176;F sunny &middot; Not busy right now</div>
+      </div>
+
+      <!-- Info ticker -->
+      <div class="info-ticker">
+        <div class="info-ticker-track">
+          <span class="it-item">&#128205; 8390 NW 53rd St, Doral</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128507; 0.3 mi &middot; 5 min walk</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128205; 8390 NW 53rd St, Doral</span>
+          <span class="it-sep">&middot;</span>
+          <span class="it-item">&#128507; 0.3 mi &middot; 5 min walk</span>
+        </div>
+      </div>
+
+      <!-- Links + Social -->
+      <div class="links-social-strip">
+        <div class="ls-icon ls-call" title="Call"><span class="ico">&#9742;</span></div>
+        <div class="ls-icon ls-web" title="Website"><span class="ico">&#127760;</span></div>
+        <div class="ls-icon ls-gmaps" title="Google Maps"><span class="ico">&#128506;</span></div>
+        <div class="ls-div"></div>
+        <div class="ls-icon ls-ig" title="Instagram"><span>IG</span></div>
+        <div class="ls-icon ls-fb" title="Facebook"><span>f</span></div>
+        <div class="ls-icon ls-yelp" title="Yelp"><span>Y</span></div>
+        <div class="ls-icon ls-fsq" title="Foursquare"><span>4sq</span></div>
+      </div>
+
+      <!-- CTAs -->
+      <div class="cta-strip">
+        <div class="cta-btn save-active">&#9829; Saved</div>
+        <div class="cta-btn go-walk">&#x1F6B6; Go <span class="cta-sub">&middot; 5 min</span></div>
+        <div class="cta-btn been-default">&check; Been</div>
+      </div>
+
+      <div class="divider-thick"></div>
+
+      <!-- AI Context -->
+      <div class="ai-context">
+        <div class="section-header">&#10024; AI Companion Insights</div>
+        <div class="context-blurb">
+          A neighborhood gem serving authentic Colombian comfort food with generous portions. Known for their bandeja paisa and fresh-squeezed juices. Popular with local families, especially on weekends.
+        </div>
+        <div class="context-card context-whynow">
+          <div class="context-label">&#128336; WHY NOW</div>
+          Lunch rush just ended — you'll likely get a table without waiting. Their lunch specials run until 3 PM.
+        </div>
+        <div class="context-card context-localtip">
+          <div class="context-label">&#128161; LOCAL TIP <span class="tip-refresh">&#8635;</span></div>
+          Ask for the "menu del dia" — it's not always on the printed menu but includes soup, main, drink, and dessert for under $15.
+        </div>
+      </div>
+
+      <div class="divider-thick"></div>
+
+      <!-- Chat -->
+      <div class="chat-section">
+        <div class="section-header">&#128172; Ask about this place</div>
+        <div class="pills">
+          <div class="pill">What should I order?</div>
+          <div class="pill">Kid-friendly?</div>
+          <div class="pill">Parking?</div>
+        </div>
+      </div>
+
+      <div class="chat-input">
+        <div class="input-bar">
+          <input type="text" placeholder="Ask about this place...">
+          <div class="send-btn">&#8593;</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

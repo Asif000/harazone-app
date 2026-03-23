@@ -7,6 +7,10 @@ CREATE TABLE IF NOT EXISTS places_enrichment_cache (
     price_range TEXT,
     image_url TEXT,
     image_urls TEXT,
+    website_uri TEXT,
+    google_maps_uri TEXT,
+    international_phone_number TEXT,
+    formatted_address TEXT,
     expires_at INTEGER NOT NULL,
     cached_at INTEGER NOT NULL
 );
@@ -18,8 +22,18 @@ getPlacesData:
 SELECT * FROM places_enrichment_cache WHERE saved_id = :saved_id;
 
 insertOrReplace:
-INSERT OR REPLACE INTO places_enrichment_cache(saved_id, hours, live_status, rating, review_count, price_range, image_url, image_urls, expires_at, cached_at)
-VALUES (:saved_id, :hours, :live_status, :rating, :review_count, :price_range, :image_url, :image_urls, :expires_at, :cached_at);
+INSERT OR REPLACE INTO places_enrichment_cache(
+  saved_id, hours, live_status, rating, review_count, price_range,
+  image_url, image_urls,
+  website_uri, google_maps_uri, international_phone_number, formatted_address,
+  expires_at, cached_at
+)
+VALUES (
+  :saved_id, :hours, :live_status, :rating, :review_count, :price_range,
+  :image_url, :image_urls,
+  :website_uri, :google_maps_uri, :international_phone_number, :formatted_address,
+  :expires_at, :cached_at
+);
 
 deleteExpired:
 DELETE FROM places_enrichment_cache WHERE expires_at <= :current_time;

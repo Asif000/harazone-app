@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS foursquare_social_cache (
+    saved_id TEXT NOT NULL PRIMARY KEY,
+    instagram TEXT,
+    facebook TEXT,
+    twitter TEXT,
+    expires_at INTEGER NOT NULL,
+    cached_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_foursquare_social_expires_at
+    ON foursquare_social_cache(expires_at);
+
+getSocialData:
+SELECT * FROM foursquare_social_cache WHERE saved_id = :saved_id;
+
+insertOrReplace:
+INSERT OR REPLACE INTO foursquare_social_cache(saved_id, instagram, facebook, twitter, expires_at, cached_at)
+VALUES (:saved_id, :instagram, :facebook, :twitter, :expires_at, :cached_at);
+
+deleteExpired:
+DELETE FROM foursquare_social_cache WHERE expires_at <= :current_time;

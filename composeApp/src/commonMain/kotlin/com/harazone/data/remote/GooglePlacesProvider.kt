@@ -86,6 +86,10 @@ internal class GooglePlacesProvider(
                     price_range = enriched.priceRange,
                     image_url = enriched.imageUrl,
                     image_urls = enriched.imageUrls.joinToString("|"),
+                    website_uri = enriched.websiteUri,
+                    google_maps_uri = enriched.googleMapsUri,
+                    international_phone_number = enriched.internationalPhoneNumber,
+                    formatted_address = enriched.formattedAddress,
                     expires_at = now + CACHE_TTL_MS,
                     cached_at = now,
                 )
@@ -126,7 +130,7 @@ internal class GooglePlacesProvider(
         val displayName = place["displayName"]?.jsonObject?.get("text")?.jsonPrimitive?.content
             ?: return PlacesParseResult(poi)
 
-        if (!isConfidentMatch(poi.name, displayName)) return PlacesParseResult(poi)
+        if (!PoiMatchUtils.isConfidentMatch(poi.name, displayName)) return PlacesParseResult(poi)
 
         val currentHours = place["currentOpeningHours"]?.jsonObject
         val regularHours = place["regularOpeningHours"]?.jsonObject
@@ -143,12 +147,21 @@ internal class GooglePlacesProvider(
             ?.mapNotNull { it.jsonObject["name"]?.jsonPrimitive?.contentOrNull }
             ?: emptyList()
 
+        val websiteUri = place["websiteUri"]?.jsonPrimitive?.contentOrNull
+        val googleMapsUri = place["googleMapsUri"]?.jsonPrimitive?.contentOrNull
+        val phone = place["internationalPhoneNumber"]?.jsonPrimitive?.contentOrNull
+        val address = place["formattedAddress"]?.jsonPrimitive?.contentOrNull
+
         val enriched = poi.copy(
             liveStatus = when (openNow) { true -> "open"; false -> "closed"; null -> poi.liveStatus },
             hours = if (weekdays != null) weekdays.joinToString("\n") else poi.hours,
             rating = rating?.toFloat() ?: poi.rating,
             reviewCount = reviewCount ?: 0,
             priceRange = mapPriceLevel(priceLevel) ?: poi.priceRange,
+            websiteUri = websiteUri ?: poi.websiteUri,
+            googleMapsUri = googleMapsUri ?: poi.googleMapsUri,
+            internationalPhoneNumber = phone ?: poi.internationalPhoneNumber,
+            formattedAddress = address ?: poi.formattedAddress,
         )
         return PlacesParseResult(enriched, photoRefs)
     }
@@ -177,15 +190,6 @@ internal class GooglePlacesProvider(
         null
     }
 
-    internal fun isConfidentMatch(poiName: String, displayName: String): Boolean {
-        val normalize = { s: String -> s.lowercase().replace(NON_ALNUM_REGEX, "").trim() }
-        val poiTokens = normalize(poiName).split(" ").filter { it.length >= 3 }.toSet()
-        val dispTokens = normalize(displayName).split(" ").filter { it.length >= 3 }.toSet()
-        if (poiTokens.isEmpty() || dispTokens.isEmpty()) return false
-        val (shorter, longer) = if (poiTokens.size <= dispTokens.size) poiTokens to dispTokens else dispTokens to poiTokens
-        return shorter.all { it in longer }
-    }
-
     private fun applyCache(poi: POI, cached: Places_enrichment_cache): POI {
         val cachedImageUrls = cached.image_urls
             ?.split("|")
@@ -199,6 +203,11 @@ internal class GooglePlacesProvider(
             priceRange = cached.price_range ?: poi.priceRange,
             imageUrl = cached.image_url ?: poi.imageUrl,
             imageUrls = cachedImageUrls.ifEmpty { poi.imageUrls },
+            websiteUri = cached.website_uri ?: poi.websiteUri,
+            googleMapsUri = cached.google_maps_uri ?: poi.googleMapsUri,
+            internationalPhoneNumber = cached.international_phone_number ?: poi.internationalPhoneNumber,
+            formattedAddress = cached.formatted_address ?: poi.formattedAddress,
+            // discoveryContext: NOT here — preserved automatically from poi param (poi.copy(...) keeps it)
         )
     }
 
@@ -213,10 +222,12 @@ internal class GooglePlacesProvider(
 
     companion object {
         private const val PLACES_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
-        private const val FIELD_MASK = "places.id,places.displayName,places.currentOpeningHours,places.regularOpeningHours,places.rating,places.userRatingCount,places.priceLevel,places.photos"
+        private const val FIELD_MASK = "places.id,places.displayName,places.currentOpeningHours," +
+            "places.regularOpeningHours,places.rating,places.userRatingCount,places.priceLevel," +
+            "places.photos,places.websiteUri,places.googleMapsUri," +
+            "places.internationalPhoneNumber,places.formattedAddress"
         private const val PHOTOS_MEDIA_URL = "https://places.googleapis.com/v1/"
         private const val MAX_PHOTOS = 5
         internal const val CACHE_TTL_MS = 24 * 60 * 60 * 1000L
-        private val NON_ALNUM_REGEX = Regex("[^a-z0-9 ]")
     }
 }

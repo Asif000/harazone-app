@@ -3,6 +3,16 @@ package com.harazone.domain.model
 import kotlinx.serialization.Serializable
 
 @Serializable
+data class DiscoveryContext(
+    val areaName: String = "",
+    val countryCode: String = "",
+    val currency: String? = null,
+    val language: String? = null,
+    val advisoryLevel: AdvisoryLevel? = null,
+    val advisoryBlurb: String? = null,
+)
+
+@Serializable
 data class POI(
     val name: String,
     val type: String,
@@ -23,6 +33,14 @@ data class POI(
     val userNote: String? = null,
     val priceRange: String? = null,
     val reviewCount: Int? = null,
+    val websiteUri: String? = null,
+    val googleMapsUri: String? = null,
+    val internationalPhoneNumber: String? = null,
+    val formattedAddress: String? = null,
+    val instagram: String? = null,
+    val facebook: String? = null,
+    val twitter: String? = null,
+    val discoveryContext: DiscoveryContext? = null,
 ) {
     val savedId: String get() = "$name|${latitude ?: 0.0}|${longitude ?: 0.0}"
 
@@ -50,5 +68,13 @@ data class POI(
         latitude = other.latitude ?: latitude,
         longitude = other.longitude ?: longitude,
         userNote = other.userNote ?: userNote,
+        websiteUri = other.websiteUri ?: websiteUri,
+        googleMapsUri = other.googleMapsUri ?: googleMapsUri,
+        internationalPhoneNumber = other.internationalPhoneNumber ?: internationalPhoneNumber,
+        formattedAddress = other.formattedAddress ?: formattedAddress,
+        instagram = other.instagram ?: instagram,
+        facebook = other.facebook ?: facebook,
+        twitter = other.twitter ?: twitter,
+        // discoveryContext intentionally NOT in mergeFrom — set at creation time in MapViewModel, never overwritten by enrichment
     )
 }

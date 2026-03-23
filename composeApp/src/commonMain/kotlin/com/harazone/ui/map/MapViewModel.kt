@@ -24,6 +24,8 @@ import com.harazone.location.LocationProvider
 import com.harazone.util.AnalyticsTracker
 import com.harazone.domain.companion.CompanionNudgeEngine
 import com.harazone.domain.model.AdvisoryLevel
+import com.harazone.domain.model.DiscoveryContext
+import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.NudgeType
 import com.harazone.domain.provider.AdvisoryProvider
@@ -1584,7 +1586,12 @@ class MapViewModel(
                                 isSearchingArea = false,
                                 isEnrichingArea = true,
                                 poiBatches = listOf(update.pois),
-                                allDiscoveredPois = update.pois,
+                                allDiscoveredPois = update.pois.withDiscoveryContext(
+                                    areaName = s.areaName,
+                                    advisory = s.advisory,
+                                    currencyText = s.areaCurrencyText,
+                                    languageText = s.areaLanguageText,
+                                ),
                                 activeBatchIndex = 0,
                                 isBackgroundFetching = true,
                                 showAllMode = false,
@@ -1603,7 +1610,12 @@ class MapViewModel(
                                 isEnrichingArea = true,
                                 isLoadingVibes = false,
                                 poiBatches = listOf(update.pois),
-                                allDiscoveredPois = update.pois,
+                                allDiscoveredPois = update.pois.withDiscoveryContext(
+                                    areaName = s.areaName,
+                                    advisory = s.advisory,
+                                    currencyText = s.areaCurrencyText,
+                                    languageText = s.areaLanguageText,
+                                ),
                                 activeBatchIndex = 0,
                                 isBackgroundFetching = true,
                                 showAllMode = false,
@@ -1632,7 +1644,13 @@ class MapViewModel(
                                     pois = pois,
                                     dynamicVibePoiCounts = computeDynamicVibePoiCounts(pois),
                                     // Only set allDiscoveredPois if not already populated by BackgroundBatchReady
-                                    allDiscoveredPois = if (s.allDiscoveredPois.size > pois.size) s.allDiscoveredPois else pois,
+                                    allDiscoveredPois = (if (s.allDiscoveredPois.size > pois.size) s.allDiscoveredPois else pois)
+                                        .withDiscoveryContext(
+                                            areaName = s.areaName,
+                                            advisory = s.advisory,
+                                            currencyText = update.currencyText,
+                                            languageText = update.languageText,
+                                        ),
                                     isLoadingVibes = false,
                                     // Only clear enriching if no background batches are in flight
                                     isEnrichingArea = s.isBackgroundFetching,
@@ -1677,7 +1695,12 @@ class MapViewModel(
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect
                             _uiState.value = s.copy(
                                 poiBatches = poiBatchesCache.toList(),
-                                allDiscoveredPois = allPois,
+                                allDiscoveredPois = allPois.withDiscoveryContext(
+                                    areaName = s.areaName,
+                                    advisory = s.advisory,
+                                    currencyText = s.areaCurrencyText,
+                                    languageText = s.areaLanguageText,
+                                ),
                                 dynamicVibePoiCounts = computeDynamicVibePoiCounts(allPois),
                             )
                             animatePoiCounter(allPois.size)
@@ -1704,7 +1727,12 @@ class MapViewModel(
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect
                             _uiState.value = s.copy(
                                 poiBatches = poiBatchesCache.toList(),
-                                allDiscoveredPois = allPois,
+                                allDiscoveredPois = allPois.withDiscoveryContext(
+                                    areaName = s.areaName,
+                                    advisory = s.advisory,
+                                    currencyText = s.areaCurrencyText,
+                                    languageText = s.areaLanguageText,
+                                ),
                                 dynamicVibePoiCounts = computeDynamicVibePoiCounts(allPois),
                             )
                         }
@@ -1918,6 +1946,23 @@ class MapViewModel(
         // Re-read after enqueueNudge — it mutates _uiState (sets isCompanionPulsing)
         val updated = _uiState.value as? MapUiState.Ready ?: return
         _uiState.value = updated.copy(hasPendingSafetyNudge = false)
+    }
+
+    private fun List<POI>.withDiscoveryContext(
+        areaName: String,
+        advisory: AreaAdvisory?,
+        currencyText: String?,
+        languageText: String?,
+    ): List<POI> {
+        val ctx = DiscoveryContext(
+            areaName = areaName,
+            countryCode = advisory?.countryCode ?: "",
+            currency = currencyText,
+            language = languageText,
+            advisoryLevel = advisory?.level,
+            advisoryBlurb = advisory?.summary,
+        )
+        return map { it.copy(discoveryContext = ctx) }
     }
 
     companion object {

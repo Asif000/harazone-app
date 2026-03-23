@@ -28,6 +28,7 @@ import com.harazone.util.ConnectivityMonitor
 import com.harazone.domain.companion.CompanionNudgeEngine
 import com.harazone.domain.provider.AdvisoryProvider
 import com.harazone.data.remote.FcdoAdvisoryProvider
+import com.harazone.data.remote.FoursquareProvider
 import com.harazone.data.remote.GooglePlacesProvider
 import com.harazone.domain.provider.PlacesProvider
 import com.harazone.util.SystemClock
@@ -54,6 +55,7 @@ val dataModule = module {
     single<AppClock> { SystemClock() }
     single(named("appScope")) { CoroutineScope(SupervisorJob() + Dispatchers.Default) }
     single<PlacesProvider> { GooglePlacesProvider(get(), get(), get(), get()) }
+    single { FoursquareProvider(get(), get(), get(), get()) }
     single<AreaRepository> {
         AreaRepositoryImpl(
             aiProvider = get(),
@@ -63,6 +65,7 @@ val dataModule = module {
             connectivityObserver = { get<ConnectivityMonitor>().observe() },
             wikipediaImageRepository = get(),
             placesProvider = get(),
+            foursquareProvider = get(),
         )
     }
     single { GetAreaPortraitUseCase(get()) }

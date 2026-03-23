@@ -2,8 +2,10 @@
 title: 'Google Places API Integration + Area Currency & Language Context'
 slug: 'google-places-poi-enrichment'
 created: '2026-03-22'
-status: 'ready-for-dev'
-stepsCompleted: [1, 2, 3, 4]
+status: 'implemented'
+stepsCompleted: [1, 2, 3, 4, 5]
+implementedDate: '2026-03-22'
+commits: ['baf07e3', 'efbe000', '6251832', '97fee01']
 tech_stack:
   - 'Kotlin Multiplatform (KMP) — commonMain only, no Android-only SDK'
   - 'Compose Multiplatform'

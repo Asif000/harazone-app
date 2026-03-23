@@ -158,6 +158,21 @@ internal class ChatViewModel(
         }
     }
 
+    fun refreshLocalTip(poi: POI, areaName: String) {
+        poiContextJob?.cancel()
+        val previousTip = _uiState.value.localTip
+        _uiState.value = _uiState.value.copy(localTip = null, isContextLoading = true)
+        poiContextJob = viewModelScope.launch {
+            val timeHint = currentTimeHint()
+            val result = aiProvider.generatePoiContext(poi.name, poi.type, areaName, timeHint, localeProvider.languageTag)
+            val newTip = result?.third?.ifBlank { null }
+            _uiState.value = _uiState.value.copy(
+                localTip = newTip ?: previousTip,
+                isContextLoading = false,
+            )
+        }
+    }
+
     fun openChatForPoiVisit(poi: POI, visitState: VisitState, areaName: String, pois: List<POI>, activeDynamicVibe: DynamicVibe?) {
         openChat(areaName, pois, activeDynamicVibe, ChatEntryPoint.VisitAction(poi, visitState), forceReset = true)
         tapIntentPill(ContextualPill(
@@ -204,17 +219,21 @@ internal class ChatViewModel(
         }
     }
 
-    private suspend fun fetchPoiContext(poi: POI, areaName: String) {
-        _uiState.value = _uiState.value.copy(
-            contextBlurb = null, whyNow = null, localTip = null, isContextLoading = true,
-        )
+    private fun currentTimeHint(): String {
         val hour = com.harazone.ui.components.currentHour()
-        val timeHint = when {
+        return when {
             hour in 5..10 -> "morning"
             hour in 11..16 -> "afternoon"
             hour in 17..20 -> "evening"
             else -> "night"
         }
+    }
+
+    private suspend fun fetchPoiContext(poi: POI, areaName: String) {
+        _uiState.value = _uiState.value.copy(
+            contextBlurb = null, whyNow = null, localTip = null, isContextLoading = true,
+        )
+        val timeHint = currentTimeHint()
         val result = aiProvider.generatePoiContext(poi.name, poi.type, areaName, timeHint, localeProvider.languageTag)
         val (blurb, whyNow, tip) = result ?: Triple(
             "${poi.name} is a ${poi.type} in $areaName.",

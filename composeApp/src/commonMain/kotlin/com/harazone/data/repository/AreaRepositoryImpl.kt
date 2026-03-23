@@ -9,6 +9,7 @@ import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.Confidence
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.BuildKonfig
+import com.harazone.data.remote.FoursquareProvider
 import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.domain.model.ConnectivityState
 import com.harazone.domain.model.POI
@@ -47,6 +48,7 @@ internal class AreaRepositoryImpl(
     private val connectivityObserver: () -> Flow<ConnectivityState>,
     private val wikipediaImageRepository: WikipediaImageRepository,
     private val placesProvider: PlacesProvider,
+    private val foursquareProvider: FoursquareProvider,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : AreaRepository {
 
@@ -307,9 +309,18 @@ internal class AreaRepositoryImpl(
         }
     }
 
+    private suspend fun enrichPoisWithSocial(pois: List<POI>): List<POI> = coroutineScope {
+        database.foursquare_social_cacheQueries.deleteExpired(clock.nowMs())
+        val semaphore = Semaphore(PLACES_MAX_CONCURRENT_REQUESTS)
+        pois.map { poi ->
+            async { semaphore.withPermit { foursquareProvider.enrichPoi(poi).getOrDefault(poi) } }
+        }.awaitAll()
+    }
+
     private suspend fun enrichPois(pois: List<POI>): List<POI> {
         val imageEnriched = enrichPoisWithImages(pois)
-        return enrichPoisWithPlaces(imageEnriched)
+        val placesEnriched = enrichPoisWithPlaces(imageEnriched)
+        return enrichPoisWithSocial(placesEnriched)
     }
 
     private fun mergeStage2OntoCached(stage1: List<POI>, stage2: List<POI>): List<POI> {

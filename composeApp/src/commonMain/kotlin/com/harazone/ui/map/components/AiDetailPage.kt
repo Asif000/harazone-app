@@ -25,12 +25,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
@@ -54,6 +61,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.Modifier
@@ -65,11 +73,18 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.font.FontStyle
+import androidx.compose.ui.text.font.FontWeight
 import com.harazone.ui.components.PlatformBackHandler
+import com.harazone.domain.model.AdvisoryLevel
+import com.harazone.domain.model.DiscoveryContext
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.Vibe
 import com.harazone.domain.model.VisitState
+import com.harazone.domain.provider.LocaleProvider
+import org.koin.compose.koinInject
 import com.harazone.ui.map.ChatBubbleItem
 import com.harazone.ui.map.ChatInputBar
 import com.harazone.ui.map.ChatPoiCard
@@ -78,14 +93,12 @@ import com.harazone.ui.map.ChatUiState
 import com.harazone.ui.map.ChatViewModel
 import com.harazone.ui.map.SkeletonSection
 import com.harazone.ui.map.pillDisplayLabel
-import com.harazone.ui.theme.DetailPageLight
 import com.harazone.ui.theme.toColor
 import org.jetbrains.compose.resources.stringResource
 import areadiscovery.composeapp.generated.resources.*
 
 private const val DETAIL_PAGE_CHAT_HINT = "Ask about this place..."
 // TODO(BACKLOG-LOW): extract DETAIL_PAGE_CHAT_HINT to strings.xml
-private val DetailPageTextDark = Color(0xFF2A2A2A)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -112,6 +125,7 @@ internal fun AiDetailPage(
 ) {
     var showGallery by remember(poi.savedId) { mutableStateOf(false) }
     val vibeColor = (Vibe.entries.firstOrNull { poi.vibe.contains(it.name, ignoreCase = true) } ?: Vibe.DEFAULT).toColor()
+    val localeProvider: LocaleProvider = koinInject()
 
     val listState = rememberLazyListState()
 
@@ -141,10 +155,12 @@ internal fun AiDetailPage(
         }
     }
 
-    PlatformBackHandler(enabled = true) { onDismiss() }
+    var overflowExpanded by remember { mutableStateOf(false) }
+    PlatformBackHandler(enabled = overflowExpanded) { overflowExpanded = false }
+    PlatformBackHandler(enabled = !overflowExpanded) { onDismiss() }
 
     Box(
-        modifier = modifier.background(DetailPageLight)
+        modifier = modifier.background(MaterialTheme.colorScheme.surface)
     ) {
         Column(Modifier.fillMaxSize()) {
             LazyColumn(
@@ -167,6 +183,9 @@ internal fun AiDetailPage(
                         onShowOnMap = onShowOnMap,
                         onDismiss = onDismiss,
                         onImageClick = { showGallery = true },
+                        overflowExpanded = overflowExpanded,
+                        onOverflowExpandedChange = { overflowExpanded = it },
+                        localeProvider = localeProvider,
                     )
                 }
 
@@ -201,9 +220,15 @@ internal fun AiDetailPage(
                             whyNow = chatState.whyNow,
                             localTip = chatState.localTip,
                             isLoading = chatState.isContextLoading,
+                            onRefreshTip = { chatViewModel.refreshLocalTip(poi, areaName) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
+                }
+
+                // Safety card — CAUTION+ only (Bug #10 fix: disclaimer label)
+                item(key = "safety_card") {
+                    SafetyCardSection(poi.discoveryContext)
                 }
 
                 // Chat bubbles with inline POI cards after each AI response
@@ -321,11 +346,12 @@ private fun PoiContextBlock(
     whyNow: String?,
     localTip: String?,
     isLoading: Boolean,
+    onRefreshTip: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier
-            .background(DetailPageLight)
+            .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 16.dp, vertical = 12.dp)
             .then(if (isLoading) Modifier.semantics { stateDescription = "Loading context" } else Modifier),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -341,8 +367,7 @@ private fun PoiContextBlock(
                 ),
                 label = "contextShimmerAlpha",
             )
-            val shimmerColor = Color(0xFFE0DDD9).copy(alpha = shimmerAlpha)
-            // Shimmer placeholders
+            val shimmerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = shimmerAlpha)
             repeat(3) {
                 Box(
                     modifier = Modifier
@@ -353,7 +378,6 @@ private fun PoiContextBlock(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            // whyNow shimmer
             Box(
                 modifier = Modifier
                     .fillMaxWidth(0.75f)
@@ -366,14 +390,14 @@ private fun PoiContextBlock(
                 Text(
                     text = contextBlurb,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = DetailPageTextDark,
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
             if (!whyNow.isNullOrBlank()) {
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFF0EDE9))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -382,25 +406,31 @@ private fun PoiContextBlock(
                     Text(
                         text = whyNow,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF4A4A4A),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-            if (!localTip.isNullOrBlank()) {
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFE8F5E9))
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("\uD83D\uDCA1", style = MaterialTheme.typography.bodySmall, modifier = Modifier.clearAndSetSemantics { })
-                    Text(
-                        text = localTip,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF2E7D32),
-                    )
+            // Local tip with refresh button
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.tertiaryContainer)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("\uD83D\uDCA1", style = MaterialTheme.typography.bodySmall, modifier = Modifier.clearAndSetSemantics { })
+                val tipText = localTip ?: if (!isLoading) stringResource(Res.string.poi_tip_refresh_fallback) else ""
+                Text(
+                    text = tipText,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.weight(1f),
+                )
+                if (onRefreshTip != null && !isLoading) {
+                    IconButton(onClick = onRefreshTip, modifier = Modifier.size(24.dp)) {
+                        Text("\u21BB", color = MaterialTheme.colorScheme.tertiary, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }
@@ -420,14 +450,18 @@ private fun PoiDetailHeader(
     onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
     onImageClick: () -> Unit = {},
+    overflowExpanded: Boolean = false,
+    onOverflowExpandedChange: (Boolean) -> Unit = {},
+    localeProvider: LocaleProvider,
 ) {
+    val surfaceColor = MaterialTheme.colorScheme.surface
 
     Column {
-        // Hero image
+        // Hero image — 250dp
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(160.dp)
+                .height(250.dp)
                 .then(
                     if (poi.imageUrls.isNotEmpty()) Modifier.clickable(
                         indication = null,
@@ -436,7 +470,7 @@ private fun PoiDetailHeader(
                     else Modifier
                 ),
         ) {
-            // Gradient fallback
+            // Vibe gradient fallback
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -454,20 +488,51 @@ private fun PoiDetailHeader(
                     placeholder = ColorPainter(vibeColor.copy(alpha = 0.15f)),
                     modifier = Modifier.matchParentSize(),
                 )
-            } else {
-                Text(
-                    text = stringResource(Res.string.poi_card_loading),
-                    color = Color.White.copy(alpha = 0.25f),
-                    style = MaterialTheme.typography.titleLarge,
-                    modifier = Modifier.align(Alignment.Center),
-                )
             }
-            // Image count badge — hide for single image
+            // Bottom gradient — blends into surface below
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(130.dp)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, surfaceColor))),
+            )
+            // Name + type + vibe chip overlaid bottom-left
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 12.dp, end = 60.dp),
+            ) {
+                Text(
+                    text = poi.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = poi.type.replaceFirstChar { it.uppercaseChar() },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.85f),
+                )
+                if (poi.vibe.isNotEmpty()) {
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = poi.vibe,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier
+                            .background(vibeColor.copy(alpha = 0.35f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
+            }
+            // Photo count badge
             if (poi.imageUrls.size > 1) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.BottomStart)
-                        .padding(8.dp)
+                        .padding(start = 16.dp, bottom = 80.dp)
                         .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
                         .padding(horizontal = 8.dp, vertical = 4.dp),
                 ) {
@@ -478,130 +543,107 @@ private fun PoiDetailHeader(
                     )
                 }
             }
-
-            // Close button
+            // Close button — top-left
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(4.dp)
-                    .size(32.dp)
-                    .background(Color.Black.copy(alpha = 0.4f), CircleShape),
+                    .align(Alignment.TopStart)
+                    .padding(top = 54.dp, start = 12.dp)
+                    .size(36.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), CircleShape),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Close,
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                     contentDescription = stringResource(Res.string.action_close),
                     tint = Color.White,
-                    modifier = Modifier.size(18.dp),
+                    modifier = Modifier.size(20.dp),
                 )
+            }
+            // Overflow button — top-right
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 54.dp, end = 12.dp),
+            ) {
+                IconButton(
+                    onClick = { onOverflowExpandedChange(true) },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(Color.Black.copy(alpha = 0.45f), CircleShape),
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "More options",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+                DropdownMenu(
+                    expanded = overflowExpanded,
+                    onDismissRequest = { onOverflowExpandedChange(false) },
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Share") },
+                        onClick = { onOverflowExpandedChange(false) },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Show on map") },
+                        onClick = {
+                            onOverflowExpandedChange(false)
+                            if (poi.latitude != null && poi.longitude != null) {
+                                onShowOnMap(poi.latitude, poi.longitude)
+                                onDismiss()
+                            }
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Report") },
+                        onClick = { onOverflowExpandedChange(false) },
+                    )
+                }
             }
         }
 
-        Column(modifier = Modifier.background(DetailPageLight).padding(16.dp)) {
-            // Name
-            Text(
-                text = poi.name,
-                style = MaterialTheme.typography.titleMedium,
-                color = DetailPageTextDark,
-            )
-            // Type
-            Text(
-                text = poi.type.replaceFirstChar { it.uppercaseChar() },
-                style = MaterialTheme.typography.labelMedium,
-                color = Color(0xFF6B6B6B),
-            )
-
-            // Vibe chip
-            if (poi.vibe.isNotEmpty()) {
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = poi.vibe,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DetailPageTextDark,
-                    modifier = Modifier
-                        .background(vibeColor.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 2.dp),
-                )
+        // Rating line
+        Row(
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            if (poi.rating != null) {
+                Icon(Icons.Default.Star, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(14.dp))
+                Text("${poi.rating}", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, color = Color(0xFFFFD700))
+                if ((poi.reviewCount ?: 0) > 0)
+                    Text("(${poi.reviewCount})", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("\u00B7", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Rating + live status + buzz meter
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (poi.rating != null) {
-                    Icon(
-                        Icons.Default.Star,
-                        contentDescription = null,
-                        tint = Color(0xFFFFD700),
-                        modifier = Modifier.size(16.dp),
-                    )
-                    Text(
-                        text = if ((poi.reviewCount ?: 0) > 0) " ${poi.rating} (${poi.reviewCount})" else " ${poi.rating}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DetailPageTextDark,
-                    )
-                    Spacer(Modifier.width(12.dp))
-                }
-                if (poi.liveStatus != null) {
-                    LiveStatusBadge(poi.liveStatus)
-                    Spacer(Modifier.width(12.dp))
-                    BuzzMeter(liveStatus = poi.liveStatus, vibeColor = vibeColor)
-                }
-            }
-
-            // Price range
             if (poi.priceRange != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = poi.priceRange,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF6B6B6B),
-                )
+                Text(poi.priceRange, style = MaterialTheme.typography.bodySmall, color = Color(0xFF3FB950), fontWeight = FontWeight.SemiBold)
+                Text("\u00B7", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-
-            // Hours
-            // TODO(BACKLOG-LOW): replace with "Today: X (tap for full schedule)" affordance post-beta
-            if (poi.hours != null) {
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = poi.hours,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF6B6B6B),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            if (poi.liveStatus != null) {
+                LiveStatusBadge(poi.liveStatus)
+                Text("\u00B7", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (poi.reviewCount != null) VerifiedByGoogleChip()
+        }
 
-            // Verified by Google chip
-            if (poi.reviewCount != null) {
-                Spacer(Modifier.height(6.dp))
-                VerifiedByGoogleChip()
-            }
+        // Safety ticker — CAUTION+ only
+        SafetyTicker(poi.discoveryContext)
 
-            // Insight
+        // Info ticker
+        InfoTicker(poi, localeProvider)
+
+        // Links + Social strip
+        LinksSocialStrip(poi, onShowOnMap)
+
+        // Insight
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
             if (poi.insight.isNotEmpty()) {
-                Spacer(Modifier.height(8.dp))
                 Text(
                     text = poi.insight,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Color(0xFF4A4A4A),
-                )
-            } else {
-                Spacer(Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.9f)
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0DDD9)),
-                )
-                Spacer(Modifier.height(4.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(0.65f)
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color(0xFFE0DDD9).copy(alpha = 0.6f)),
+                    color = MaterialTheme.colorScheme.onSurface,
                 )
             }
 
@@ -611,38 +653,36 @@ private fun PoiDetailHeader(
                 Text(
                     text = "\u270F\uFE0F ${poi.userNote}",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color(0xFF6B6B6B),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(Color(0xFFE8E5E1), RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp))
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 )
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // Action chips: Save, Directions, Show on Map
+            // Action chips
             val chipColors = AssistChipDefaults.assistChipColors(
-                labelColor = DetailPageTextDark,
-                leadingIconContentColor = DetailPageTextDark,
+                labelColor = MaterialTheme.colorScheme.onSurface,
+                leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
             )
-            val chipBorder = BorderStroke(1.dp, Color(0xFFCCC8C3))
+            val chipBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 if (isVisited && visitState != null) {
                     val (visitLabel, visitColor) = when (visitState) {
-                        VisitState.GO_NOW -> "✓ Go Now" to Color(0xFF4CAF50)
-                        VisitState.PLAN_SOON -> "✓ Plan Soon" to Color(0xFFFF9800)
-                        VisitState.WANT_TO_GO -> "✓ Want to Visit" to Color(0xFF9E9E9E)
+                        VisitState.GO_NOW -> "\u2713 Go Now" to Color(0xFF4CAF50)
+                        VisitState.PLAN_SOON -> "\u2713 Plan Soon" to Color(0xFFFF9800)
+                        VisitState.WANT_TO_GO -> "\u2713 Want to Visit" to Color(0xFF9E9E9E)
                     }
                     AssistChip(
                         onClick = onUnvisit,
                         label = { Text(visitLabel) },
-                        colors = AssistChipDefaults.assistChipColors(
-                            labelColor = visitColor,
-                        ),
+                        colors = AssistChipDefaults.assistChipColors(labelColor = visitColor),
                         border = BorderStroke(1.dp, visitColor.copy(alpha = 0.5f)),
                     )
                 } else {
@@ -669,6 +709,240 @@ private fun PoiDetailHeader(
                     label = { Text("\uD83D\uDCCD ${stringResource(Res.string.chat_poi_show_on_map)}") },
                     colors = chipColors,
                     border = chipBorder,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SafetyTicker(context: DiscoveryContext?, modifier: Modifier = Modifier) {
+    val level = context?.advisoryLevel ?: return
+    val (bgColor, dotColor, text) = when (level) {
+        AdvisoryLevel.CAUTION ->
+            Triple(Color(0xFFF0C040).copy(alpha = 0.08f), Color(0xFFF0C040),
+                "\u26A0 Exercise caution \u00B7 ${context.advisoryBlurb ?: context.areaName}")
+        AdvisoryLevel.RECONSIDER ->
+            Triple(Color(0xFFF08020).copy(alpha = 0.08f), Color(0xFFF08020),
+                "\u26A0 Reconsider travel \u00B7 ${context.advisoryBlurb ?: context.areaName}")
+        AdvisoryLevel.DO_NOT_TRAVEL ->
+            Triple(Color(0xFFF47067).copy(alpha = 0.10f), Color(0xFFF47067),
+                "\uD83D\uDEA8 Do not travel \u00B7 ${context.advisoryBlurb ?: context.areaName}")
+        else -> return // SAFE, UNKNOWN, null — don't render
+    }
+    val infiniteTransition = rememberInfiniteTransition(label = "safetyPulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.3f,
+        animationSpec = infiniteRepeatable(tween(1200), RepeatMode.Reverse),
+        label = "safePulse",
+    )
+    Row(
+        modifier = modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(bgColor)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Box(Modifier.size(6.dp).background(dotColor.copy(alpha = pulseAlpha), CircleShape))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall,
+            color = dotColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+    }
+}
+
+@Composable
+private fun InfoTicker(poi: POI, localeProvider: LocaleProvider, modifier: Modifier = Modifier) {
+    val uriHandler = LocalUriHandler.current
+    val items = buildList {
+        poi.formattedAddress?.let { add("address" to it) }
+        poi.internationalPhoneNumber?.let { add("phone" to it) }
+        // Show currency/language only when foreign
+        val ctx = poi.discoveryContext
+        if (ctx?.currency != null && ctx.currency != localeProvider.homeCurrencyCode) {
+            add("currency" to ctx.currency)
+        }
+        if (ctx?.language != null) {
+            val homeCountry = localeProvider.languageTag.substringAfterLast("-").uppercase()
+            val poiCountry = ctx.countryCode.uppercase()
+            if (homeCountry.length != 2 || homeCountry != poiCountry) {
+                add("language" to ctx.language)
+            }
+        }
+    }
+    if (items.isEmpty()) return
+
+    LazyRow(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items.forEachIndexed { index, (type, value) ->
+            item {
+                if (type == "phone") {
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF3FB950),
+                        modifier = Modifier.clickable { uriHandler.openUri("tel:$value") },
+                    )
+                } else {
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (index < items.lastIndex) {
+                item {
+                    Text("\u00B7", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LinksSocialStrip(
+    poi: POI,
+    onShowOnMap: (Double, Double) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val uriHandler = LocalUriHandler.current
+    val hasAny = poi.internationalPhoneNumber != null || poi.websiteUri != null ||
+        poi.googleMapsUri != null || poi.instagram != null || poi.facebook != null || poi.twitter != null
+    if (!hasAny) return
+
+    Row(
+        modifier = modifier.padding(horizontal = 20.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (poi.internationalPhoneNumber != null)
+            LinkIcon(
+                icon = { Icon(Icons.Default.Phone, contentDescription = null, tint = Color(0xFF3FB950), modifier = Modifier.size(18.dp)) },
+                bg = Color(0xFF3FB950).copy(alpha = 0.18f),
+                contentDescription = "Call ${poi.name}",
+                onClick = { uriHandler.openUri("tel:${poi.internationalPhoneNumber}") },
+            )
+        if (poi.websiteUri != null)
+            LinkIcon(
+                icon = { Icon(Icons.Default.Language, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)) },
+                bg = MaterialTheme.colorScheme.surfaceVariant,
+                contentDescription = "Website",
+                onClick = { uriHandler.openUri(poi.websiteUri) },
+            )
+        if (poi.googleMapsUri != null)
+            LinkIcon(
+                icon = { Icon(Icons.Default.Map, contentDescription = null, tint = Color(0xFF6AA3F4), modifier = Modifier.size(18.dp)) },
+                bg = Color(0xFF4285F4).copy(alpha = 0.20f),
+                contentDescription = "Open in Google Maps",
+                onClick = { uriHandler.openUri(poi.googleMapsUri) },
+            )
+
+        val hasSocial = poi.instagram != null || poi.facebook != null || poi.twitter != null
+        val hasUtility = poi.internationalPhoneNumber != null || poi.websiteUri != null || poi.googleMapsUri != null
+        if (hasSocial && hasUtility) {
+            Box(Modifier.width(1.dp).height(22.dp).background(MaterialTheme.colorScheme.outlineVariant))
+        }
+
+        if (poi.instagram != null)
+            LinkIcon(
+                icon = { Text("IG", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE94D82), fontWeight = FontWeight.Bold) },
+                bg = Color(0xFFE1306C).copy(alpha = 0.20f),
+                contentDescription = "Instagram",
+                onClick = { uriHandler.openUri("https://instagram.com/${poi.instagram}") },
+            )
+        if (poi.facebook != null)
+            LinkIcon(
+                icon = { Text("FB", style = MaterialTheme.typography.labelSmall, color = Color(0xFF5A7FC2), fontWeight = FontWeight.Bold) },
+                bg = Color(0xFF4267B2).copy(alpha = 0.20f),
+                contentDescription = "Facebook",
+                onClick = { uriHandler.openUri("https://facebook.com/${poi.facebook}") },
+            )
+        if (poi.twitter != null)
+            LinkIcon(
+                icon = { Text("X", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Bold) },
+                bg = MaterialTheme.colorScheme.surfaceVariant,
+                contentDescription = "X (Twitter)",
+                onClick = { uriHandler.openUri("https://x.com/${poi.twitter}") },
+            )
+    }
+}
+
+@Composable
+private fun LinkIcon(
+    icon: @Composable () -> Unit,
+    bg: Color,
+    contentDescription: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .background(bg, RoundedCornerShape(9.dp))
+            .clickable(onClickLabel = contentDescription) { onClick() }
+            .semantics { this.contentDescription = contentDescription },
+        contentAlignment = Alignment.Center,
+    ) {
+        icon()
+    }
+}
+
+@Composable
+private fun SafetyCardSection(context: DiscoveryContext?, modifier: Modifier = Modifier) {
+    val level = context?.advisoryLevel ?: return
+    if (level == AdvisoryLevel.SAFE || level == AdvisoryLevel.UNKNOWN) return
+    val (cardBg, dotColor, levelText) = when (level) {
+        AdvisoryLevel.CAUTION -> Triple(Color(0xFFF0C040).copy(alpha = 0.04f), Color(0xFFF0C040), "Exercise Caution")
+        AdvisoryLevel.RECONSIDER -> Triple(Color(0xFFF08020).copy(alpha = 0.06f), Color(0xFFF08020), "Reconsider Travel")
+        AdvisoryLevel.DO_NOT_TRAVEL -> Triple(Color(0xFFF47067).copy(alpha = 0.08f), Color(0xFFF47067), "Do Not Travel")
+        else -> return
+    }
+    Column(modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+        Text(
+            "TRAVEL ADVISORY",
+            style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 8.dp),
+        )
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(cardBg)
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Box(Modifier.size(8.dp).background(dotColor, CircleShape))
+                Text(levelText, style = MaterialTheme.typography.bodySmall, color = dotColor, fontWeight = FontWeight.SemiBold)
+            }
+            if (context.advisoryBlurb != null) {
+                Text(context.advisoryBlurb, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            // Bug #10 fix — AI-generated safety disclaimer
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("\u2139", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline,
+                    modifier = Modifier.clearAndSetSemantics { })
+                Text(
+                    stringResource(Res.string.advisory_ai_disclaimer),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline,
+                    fontStyle = FontStyle.Italic,
                 )
             }
         }

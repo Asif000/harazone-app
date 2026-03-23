@@ -39,6 +39,11 @@ buildkonfig {
         )
         buildConfigField(
             com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
+            "FOURSQUARE_API_KEY",
+            localProperties.getProperty("FOURSQUARE_API_KEY") ?: project.findProperty("FOURSQUARE_API_KEY")?.toString() ?: ""
+        )
+        buildConfigField(
+            com.codingfeline.buildkonfig.compiler.FieldSpec.Type.STRING,
             "VERSION_NAME",
             "1.0"
         )
