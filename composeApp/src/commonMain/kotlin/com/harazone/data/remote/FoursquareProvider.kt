@@ -50,8 +50,9 @@ internal class FoursquareProvider(
             }
 
             // Fetch from API
-            val responseText = httpClient.get("https://api.foursquare.com/v3/places/search") {
-                header("Authorization", apiKeyProvider.foursquareApiKey)
+            val responseText = httpClient.get("https://places-api.foursquare.com/places/search") {
+                header("Authorization", "Bearer ${apiKeyProvider.foursquareApiKey}")
+                header("X-Places-Api-Version", "2025-06-17")
                 url {
                     parameters.append("ll", "${poi.latitude},${poi.longitude}")
                     parameters.append("query", poi.name)
@@ -74,9 +75,9 @@ internal class FoursquareProvider(
             }
 
             val social = place["social_media"]?.jsonObject
-            val instagram = social?.get("instagramId")?.jsonPrimitive?.contentOrNull
-            val facebook = social?.get("facebookId")?.jsonPrimitive?.contentOrNull
-            val twitter = social?.get("twitterId")?.jsonPrimitive?.contentOrNull
+            val instagram = social?.get("instagram")?.jsonPrimitive?.contentOrNull
+            val facebook = social?.get("facebook_id")?.jsonPrimitive?.contentOrNull
+            val twitter = social?.get("twitter")?.jsonPrimitive?.contentOrNull
 
             cacheAndReturn(poi, instagram, facebook, twitter)
         } catch (e: CancellationException) {
