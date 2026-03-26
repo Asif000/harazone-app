@@ -1735,6 +1735,16 @@ class MapViewModel(
                                 ),
                                 dynamicVibePoiCounts = computeDynamicVibePoiCounts(allPois),
                             )
+                            // Refresh selectedPoi with enriched data (images, Places fields)
+                            val s2 = _uiState.value as? MapUiState.Ready
+                            if (s2 != null && s2.selectedPoi != null) {
+                                val updatedSelected = allPois.firstOrNull {
+                                    it.name.trim().lowercase() == s2.selectedPoi.name.trim().lowercase()
+                                }
+                                if (updatedSelected != null) {
+                                    _uiState.value = s2.copy(selectedPoi = updatedSelected)
+                                }
+                            }
                         }
                         is BucketUpdate.BackgroundFetchComplete -> {
                             val s = _uiState.value as? MapUiState.Ready ?: return@collect

@@ -2258,6 +2258,51 @@ class MapViewModelTest {
     }
 
     @Test
+    fun backgroundEnrichmentRefreshesSelectedPoi() = runTest(testDispatcher) {
+        // Regression: when a user taps a POI from a background batch, the detail page
+        // showed stale pre-enrichment data (no images) even after enrichment completed,
+        // because BackgroundEnrichmentComplete didn't update selectedPoi.
+        val enrichedD = makePoi("D").copy(rating = 4.5f, imageUrl = "https://photo.jpg")
+        var emitEnrichment: (() -> Unit)? = null
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = object : AreaRepository {
+                override fun getAreaPortrait(areaName: String, context: com.harazone.domain.model.AreaContext): Flow<BucketUpdate> = flow {
+                    emit(BucketUpdate.VibesReady(batchVibes, batch0Pois))
+                    emit(BucketUpdate.BackgroundBatchReady(batch1Pois, 1))
+                    // Pause here — enrichment arrives later via CompletableDeferred
+                    val deferred = CompletableDeferred<Unit>()
+                    emitEnrichment = { deferred.complete(Unit) }
+                    deferred.await()
+                    emit(BucketUpdate.BackgroundEnrichmentComplete(listOf(enrichedD), 1))
+                    emit(BucketUpdate.BackgroundFetchComplete)
+                }
+            },
+        )
+        // User taps POI "D" from batch 1 BEFORE enrichment
+        val preState = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val dUnenriched = preState.allDiscoveredPois.first { it.name == "D" }
+        assertNull(dUnenriched.imageUrl, "D should have no image before enrichment")
+        viewModel.selectPoi(dUnenriched)
+
+        val midState = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(midState.selectedPoi)
+        assertNull(midState.selectedPoi!!.imageUrl, "selectedPoi should be unenriched before enrichment arrives")
+
+        // Now enrichment arrives
+        emitEnrichment!!.invoke()
+
+        val finalState = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertNotNull(finalState.selectedPoi, "selectedPoi should still be set after enrichment")
+        assertEquals("D", finalState.selectedPoi!!.name)
+        assertEquals(4.5f, finalState.selectedPoi!!.rating, "selectedPoi should have enriched rating")
+        assertEquals("https://photo.jpg", finalState.selectedPoi!!.imageUrl, "selectedPoi should have enriched imageUrl")
+    }
+
+    @Test
     fun emptyBackgroundBatchIsSkipped() = runTest(testDispatcher) {
         val viewModel = createViewModel(
             locationProvider = FakeLocationProvider(

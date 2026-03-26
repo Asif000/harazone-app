@@ -11,7 +11,9 @@ import com.harazone.domain.model.ConnectivityState
 import com.harazone.domain.model.DomainError
 import com.harazone.domain.model.DomainErrorException
 import com.harazone.domain.model.POI
+import com.harazone.data.remote.FoursquareProvider
 import com.harazone.data.remote.WikipediaImageRepository
+import com.harazone.domain.provider.ApiKeyProvider
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
@@ -40,6 +42,11 @@ class AreaRepositoryTest {
     private val fakePlacesProvider = object : PlacesProvider {
         override suspend fun enrichPoi(poi: POI): Result<POI> = Result.success(poi)
     }
+    private val noopApiKeyProvider = object : ApiKeyProvider {
+        override val geminiApiKey: String = ""
+        override val placesApiKey: String = ""
+        override val foursquareApiKey: String = "" // blank = FoursquareProvider short-circuits
+    }
 
     private lateinit var driver: JdbcSqliteDriver
     private lateinit var database: AreaDiscoveryDatabase
@@ -65,11 +72,13 @@ class AreaRepositoryTest {
         fakeClock = FakeClock(nowMs = 1_000_000_000L)
         fakeConnectivity = FakeConnectivityMonitor()
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val noopHttpClient = HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) })
         repository = AreaRepositoryImpl(
             fakeProvider, database, testScope, fakeClock,
             connectivityObserver = { fakeConnectivity.observe() },
-            wikipediaImageRepository = WikipediaImageRepository(HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) })),
+            wikipediaImageRepository = WikipediaImageRepository(noopHttpClient),
             placesProvider = fakePlacesProvider,
+            foursquareProvider = FoursquareProvider(noopHttpClient, noopApiKeyProvider, database, fakeClock),
             ioDispatcher = testDispatcher
         )
     }
@@ -677,6 +686,7 @@ class AreaRepositoryTest {
             )
         }
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val noopClient = HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) })
         val enrichingRepo = AreaRepositoryImpl(
             aiProvider = fakeProvider,
             database = database,
@@ -685,6 +695,7 @@ class AreaRepositoryTest {
             connectivityObserver = { fakeConnectivity.observe() },
             wikipediaImageRepository = WikipediaImageRepository(HttpClient(wikiMockEngine)),
             placesProvider = fakePlacesProvider,
+            foursquareProvider = FoursquareProvider(noopClient, noopApiKeyProvider, database, fakeClock),
             ioDispatcher = testDispatcher,
         )
 
@@ -725,6 +736,7 @@ class AreaRepositoryTest {
             }
         }
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val noopClient2 = HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) })
         val mixedRepo = AreaRepositoryImpl(
             aiProvider = fakeProvider,
             database = database,
@@ -733,6 +745,7 @@ class AreaRepositoryTest {
             connectivityObserver = { fakeConnectivity.observe() },
             wikipediaImageRepository = WikipediaImageRepository(HttpClient(wikiMockEngine)),
             placesProvider = fakePlacesProvider,
+            foursquareProvider = FoursquareProvider(noopClient2, noopApiKeyProvider, database, fakeClock),
             ioDispatcher = testDispatcher,
         )
 
@@ -767,6 +780,7 @@ class AreaRepositoryTest {
             respond("{}", HttpStatusCode.OK)
         }
         val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
+        val noopClient3 = HttpClient(MockEngine { _ -> respond("{}", HttpStatusCode.OK) })
         val countingRepo = AreaRepositoryImpl(
             aiProvider = fakeProvider,
             database = database,
@@ -775,6 +789,7 @@ class AreaRepositoryTest {
             connectivityObserver = { fakeConnectivity.observe() },
             wikipediaImageRepository = WikipediaImageRepository(HttpClient(countingEngine)),
             placesProvider = fakePlacesProvider,
+            foursquareProvider = FoursquareProvider(noopClient3, noopApiKeyProvider, database, fakeClock),
             ioDispatcher = testDispatcher,
         )
 

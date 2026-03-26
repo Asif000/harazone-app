@@ -42,6 +42,7 @@ class GooglePlacesProviderTest {
     private val fakeApiKeyProvider = object : ApiKeyProvider {
         override val geminiApiKey: String = ""
         override val placesApiKey: String = "test-key"
+        override val foursquareApiKey: String = ""
     }
 
     @BeforeTest
@@ -162,31 +163,31 @@ class GooglePlacesProviderTest {
     @Test
     fun isConfidentMatch_returns_true_for_token_subset_match() {
         val provider = createProvider()
-        assertTrue(provider.isConfidentMatch("Kyoto Tower", "Kyoto Tower Observatory"))
+        assertTrue(PoiMatchUtils.isConfidentMatch("Kyoto Tower", "Kyoto Tower Observatory"))
     }
 
     @Test
     fun isConfidentMatch_returns_false_for_no_token_overlap() {
         val provider = createProvider()
-        assertFalse(provider.isConfidentMatch("Sakura Cafe", "Tokyo Ramen House"))
+        assertFalse(PoiMatchUtils.isConfidentMatch("Sakura Cafe", "Tokyo Ramen House"))
     }
 
     @Test
     fun isConfidentMatch_returns_false_for_empty_tokens() {
         val provider = createProvider()
-        assertFalse(provider.isConfidentMatch("ab", "cd"))
+        assertFalse(PoiMatchUtils.isConfidentMatch("ab", "cd"))
     }
 
     @Test
     fun isConfidentMatch_returns_true_for_exact_match() {
         val provider = createProvider()
-        assertTrue(provider.isConfidentMatch("Golden Gate Bridge", "Golden Gate Bridge"))
+        assertTrue(PoiMatchUtils.isConfidentMatch("Golden Gate Bridge", "Golden Gate Bridge"))
     }
 
     @Test
     fun isConfidentMatch_ignores_punctuation() {
         val provider = createProvider()
-        assertTrue(provider.isConfidentMatch("McDonald's", "McDonalds Restaurant"))
+        assertTrue(PoiMatchUtils.isConfidentMatch("McDonald's", "McDonalds Restaurant"))
     }
 
     // --- enrichPoi edge cases ---
@@ -242,6 +243,10 @@ class GooglePlacesProviderTest {
             price_range = "$$$",
             image_url = "https://cached-photo.jpg",
             image_urls = "https://cached-photo.jpg|https://cached-photo2.jpg",
+            website_uri = null,
+            google_maps_uri = null,
+            international_phone_number = null,
+            formatted_address = null,
             expires_at = clock.nowMs + GooglePlacesProvider.CACHE_TTL_MS,
             cached_at = clock.nowMs,
         )
@@ -278,6 +283,10 @@ class GooglePlacesProviderTest {
             price_range = "$",
             image_url = null,
             image_urls = null,
+            website_uri = null,
+            google_maps_uri = null,
+            international_phone_number = null,
+            formatted_address = null,
             expires_at = clock.nowMs - 1, // expired
             cached_at = clock.nowMs - GooglePlacesProvider.CACHE_TTL_MS - 1,
         )
