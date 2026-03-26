@@ -57,4 +57,5 @@ data class ChatUiState(
     val whyNow: String? = null,
     val localTip: String? = null,
     val isContextLoading: Boolean = false,
+    val isTipRefreshing: Boolean = false,
 )

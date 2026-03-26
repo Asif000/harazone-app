@@ -192,6 +192,7 @@
     <string name="advisory_last_updated">FCDO last updated %1$s</string>
     <string name="advisory_source">Source: UK FCDO</string>
     <string name="advisory_ai_disclaimer">AI-generated safety context</string>
+    <string name="poi_tip_refreshing">Fetching a fresh tip…</string>
     <string name="poi_tip_refresh_fallback">No new tip available — try again later.</string>
     <string name="advisory_nudge_caution">⚠ Heads up — exercise caution in %1$s. Tap for details.</string>
     <string name="advisory_nudge_reconsider">⚠ %1$s has an active travel advisory. Please review before exploring.</string>

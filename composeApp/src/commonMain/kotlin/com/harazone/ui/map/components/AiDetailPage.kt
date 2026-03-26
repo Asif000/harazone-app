@@ -220,6 +220,7 @@ internal fun AiDetailPage(
                             whyNow = chatState.whyNow,
                             localTip = chatState.localTip,
                             isLoading = chatState.isContextLoading,
+                            isTipRefreshing = chatState.isTipRefreshing,
                             onRefreshTip = { chatViewModel.refreshLocalTip(poi, areaName) },
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -346,6 +347,7 @@ private fun PoiContextBlock(
     whyNow: String?,
     localTip: String?,
     isLoading: Boolean,
+    isTipRefreshing: Boolean = false,
     onRefreshTip: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -420,7 +422,10 @@ private fun PoiContextBlock(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("\uD83D\uDCA1", style = MaterialTheme.typography.bodySmall, modifier = Modifier.clearAndSetSemantics { })
-                val tipText = localTip ?: if (!isLoading) stringResource(Res.string.poi_tip_refresh_fallback) else ""
+                val tipText = localTip
+                    ?: if (isTipRefreshing) stringResource(Res.string.poi_tip_refreshing)
+                    else if (!isLoading) stringResource(Res.string.poi_tip_refresh_fallback)
+                    else ""
                 Text(
                     text = tipText,
                     style = MaterialTheme.typography.bodySmall,

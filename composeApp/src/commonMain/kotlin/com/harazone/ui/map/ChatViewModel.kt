@@ -41,6 +41,7 @@ internal class ChatViewModel(
     private var conversationHistory: MutableList<ChatMessage> = mutableListOf()
     private var chatJob: Job? = null
     private var poiContextJob: Job? = null
+    private var tipRefreshJob: Job? = null
     private var nextId = 0L
     private fun nextId() = (nextId++).toString()
 
@@ -159,16 +160,16 @@ internal class ChatViewModel(
     }
 
     fun refreshLocalTip(poi: POI, areaName: String) {
-        poiContextJob?.cancel()
+        tipRefreshJob?.cancel()
         val previousTip = _uiState.value.localTip
-        _uiState.value = _uiState.value.copy(localTip = null, isContextLoading = true)
-        poiContextJob = viewModelScope.launch {
+        _uiState.value = _uiState.value.copy(localTip = null, isTipRefreshing = true)
+        tipRefreshJob = viewModelScope.launch {
             val timeHint = currentTimeHint()
             val result = aiProvider.generatePoiContext(poi.name, poi.type, areaName, timeHint, localeProvider.languageTag)
             val newTip = result?.third?.ifBlank { null }
             _uiState.value = _uiState.value.copy(
                 localTip = newTip ?: previousTip,
-                isContextLoading = false,
+                isTipRefreshing = false,
             )
         }
     }
