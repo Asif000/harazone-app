@@ -39,6 +39,10 @@ private fun SqlDriver.ensurePlacesEnrichmentCacheTable() {
             price_range TEXT,
             image_url   TEXT,
             image_urls  TEXT,
+            website_uri TEXT,
+            google_maps_uri TEXT,
+            international_phone_number TEXT,
+            formatted_address TEXT,
             expires_at  INTEGER NOT NULL,
             cached_at   INTEGER NOT NULL
         )
