@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Move Here — Phase 1a Prototype</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --map-bg: #0A0A0A;
+    --surface: #2D2520;
+    --surface-elevated: #3A302A;
+    --text-primary: #EDE0D4;
+    --text-secondary: #A89888;
+    --text-muted: #7A6E64;
+    --primary: #E89A5E;
+    --primary-dark: #C47A3E;
+    --teal: #2BBCB3;
+    --teal-muted: rgba(43,188,179,0.15);
+    --gold: #FFD700;
+    --green: #4CAF50;
+    --yellow: #FF9800;
+    --red: #EF5350;
+    --header-bg: rgba(22,16,22,0.88);
+    --card-bg: rgba(30,24,30,0.95);
+    --divider: rgba(255,255,255,0.06);
+    --confidence-high: #4CAF50;
+    --confidence-medium: #FF9800;
+    --confidence-low: #EF5350;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #111;
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+  }
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 32px;
+    text-align: center;
+  }
+
+  .scene-row {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    flex-wrap: wrap;
+    margin-bottom: 48px;
+    width: 100%;
+  }
+
+  .phone-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .label {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .label-accent { color: var(--teal); }
+  .label-scene {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 20px;
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  .phone-frame {
+    width: 375px;
+    height: 812px;
+    border-radius: 40px;
+    overflow: hidden;
+    border: 2px solid #333;
+    position: relative;
+    flex-shrink: 0;
+    background: var(--map-bg);
+  }
+
+  /* ============ MAP BACKDROP ============ */
+  .map-bg {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #1a2a2a 0%, #0d1a1a 40%, #0A0A0A 100%);
+    overflow: hidden;
+  }
+  .map-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 30% 30%, rgba(43,188,179,0.06) 0%, transparent 60%),
+      radial-gradient(ellipse at 70% 60%, rgba(232,154,94,0.04) 0%, transparent 50%);
+  }
+  /* Map grid lines */
+  .map-grid {
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* ============ STATUS BAR ============ */
+  .status-bar {
+    height: 54px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 0 24px 6px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    position: relative;
+    z-index: 10;
+  }
+  .status-time { font-size: 15px; }
+  .status-icons { font-size: 12px; letter-spacing: 2px; }
+
+  /* ============ DISCOVERY HEADER ============ */
+  .header-bar {
+    margin: 4px 8px;
+    height: 52px;
+    background: var(--header-bg);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    position: relative;
+    z-index: 10;
+    backdrop-filter: blur(20px);
+  }
+
+  .move-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .move-icon.inactive {
+    background: rgba(255,255,255,0.06);
+    opacity: 0.5;
+  }
+  .move-icon.active {
+    background: var(--teal-muted);
+    box-shadow: 0 0 12px rgba(43,188,179,0.3);
+  }
+
+  .area-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .area-name {
+    font-size: 15px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .area-name.resident-tint { color: var(--teal); }
+  .area-mode-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--teal);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+  .meta-ticker {
+    font-size: 11px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .meta-ticker.resident { color: var(--teal); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .count-pill {
+    background: rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .surprise-btn {
+    font-size: 18px;
+    opacity: 0.7;
+  }
+  .chevron {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* ============ MAP PINS ============ */
+  .pin {
+    position: absolute;
+    z-index: 5;
+    font-size: 20px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+    transition: all 0.3s;
+  }
+  .pin.daily-life { font-size: 18px; }
+  .pin-label {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    background: rgba(0,0,0,0.6);
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+
+  /* ============ PIN TOGGLE ============ */
+  .pin-toggle {
+    position: absolute;
+    top: 120px;
+    right: 12px;
+    z-index: 10;
+    display: flex;
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--header-bg);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .pin-toggle-btn {
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text-muted);
+  }
+  .pin-toggle-btn.active {
+    background: var(--teal-muted);
+    color: var(--teal);
+  }
+
+  /* ============ DASHBOARD CARD ============ */
+  .dashboard-card {
+    position: absolute;
+    bottom: 100px;
+    left: 8px;
+    right: 8px;
+    z-index: 10;
+    background: var(--card-bg);
+    border-radius: 20px;
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+
+  .dashboard-collapsed {
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+  }
+  .dashboard-headline {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .dashboard-headline .emoji { font-size: 14px; }
+  .dashboard-headline .value { color: var(--text-primary); }
+  .dashboard-dot { color: var(--text-muted); font-size: 10px; }
+  .dashboard-expand {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .dashboard-expanded {
+    max-height: 520px;
+    overflow-y: auto;
+  }
+  .dashboard-header {
+    padding: 14px 16px 8px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dashboard-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--teal);
+  }
+  .dashboard-origin {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .dashboard-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.05);
+    padding: 3px 8px;
+    border-radius: 8px;
+  }
+
+  .category-section {
+    padding: 10px 16px;
+    border-top: 1px solid var(--divider);
+  }
+  .category-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .category-icon { font-size: 16px; }
+  .category-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+  }
+  .ai-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: rgba(255,255,255,0.04);
+    padding: 2px 7px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .data-point {
+    padding: 6px 0 6px 24px;
+  }
+  .data-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .data-detail {
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+  .data-source {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 3px;
+  }
+
+  .confidence-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .confidence-dot.high { background: var(--confidence-high); }
+  .confidence-dot.medium { background: var(--confidence-medium); }
+  .confidence-dot.low { background: var(--confidence-low); }
+
+  .verify-link {
+    font-size: 10px;
+    color: var(--teal);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-top: 4px;
+    cursor: pointer;
+  }
+
+  .dashboard-footer {
+    padding: 10px 16px;
+    border-top: 1px solid var(--divider);
+    font-size: 9px;
+    color: var(--text-muted);
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* ============ BOTTOM BAR ============ */
+  .bottom-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 90px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 20px;
+  }
+  .orb {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: 0 4px 20px rgba(232,154,94,0.3);
+    position: relative;
+  }
+  .orb-ghost-text {
+    position: absolute;
+    top: -24px;
+    white-space: nowrap;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: rgba(0,0,0,0.5);
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
+
+  /* ============ DETAIL PAGE ============ */
+  .detail-page {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .detail-hero {
+    height: 200px;
+    background: linear-gradient(180deg, #2a3a2a 0%, #1a2a1a 100%);
+    position: relative;
+    display: flex;
+    align-items: flex-end;
+    padding: 16px;
+  }
+  .detail-hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(transparent 40%, rgba(0,0,0,0.7) 100%);
+  }
+  .detail-hero-text {
+    position: relative;
+    z-index: 1;
+  }
+  .detail-poi-name {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .detail-poi-type {
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    margin-top: 2px;
+  }
+
+  .detail-body {
+    flex: 1;
+    background: var(--card-bg);
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .detail-meta-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  .detail-meta-chip {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.05);
+    padding: 4px 10px;
+    border-radius: 8px;
+  }
+  .detail-meta-chip .green { color: var(--green); }
+
+  .living-here-section {
+    background: rgba(43,188,179,0.06);
+    border: 1px solid rgba(43,188,179,0.15);
+    border-radius: 16px;
+    padding: 14px;
+    margin-top: 16px;
+  }
+  .living-here-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .living-here-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--teal);
+  }
+  .living-here-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .proximity-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .proximity-icon { font-size: 16px; flex-shrink: 0; }
+  .proximity-text {
+    font-size: 12px;
+    color: var(--text-primary);
+    line-height: 1.3;
+  }
+  .proximity-sub {
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  /* ============ CHAT PERSONA ============ */
+  .chat-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    flex-direction: column;
+  }
+  .chat-header {
+    height: 80px;
+    background: var(--header-bg);
+    backdrop-filter: blur(20px);
+    display: flex;
+    align-items: flex-end;
+    padding: 0 16px 12px;
+    gap: 10px;
+  }
+  .chat-back {
+    font-size: 20px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .chat-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--teal);
+  }
+  .chat-persona-badge {
+    font-size: 10px;
+    color: var(--text-muted);
+    background: rgba(43,188,179,0.1);
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-left: auto;
+  }
+
+  .chat-body {
+    flex: 1;
+    background: #1A1412;
+    padding: 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .chat-bubble {
+    max-width: 85%;
+    padding: 12px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .chat-bubble.ai {
+    background: var(--surface);
+    color: var(--text-primary);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+  }
+  .chat-bubble.user {
+    background: var(--primary-dark);
+    color: #fff;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+  }
+  .chat-data-inline {
+    background: rgba(43,188,179,0.08);
+    border-left: 2px solid var(--teal);
+    padding: 6px 10px;
+    margin: 8px 0 4px;
+    border-radius: 0 8px 8px 0;
+    font-size: 11px;
+    color: var(--teal);
+  }
+  .chat-source {
+    font-size: 9px;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  .chat-input-bar {
+    padding: 12px 16px 30px;
+    background: #1A1412;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .chat-input {
+    flex: 1;
+    height: 40px;
+    border-radius: 20px;
+    background: var(--surface);
+    border: none;
+    padding: 0 16px;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+  }
+  .chat-input::placeholder { color: var(--text-muted); }
+  .chat-send {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: #fff;
+  }
+
+  /* ============ MODE INDICATOR ============ */
+  .mode-indicator {
+    position: absolute;
+    top: 118px;
+    left: 12px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--header-bg);
+    backdrop-filter: blur(20px);
+    padding: 5px 12px 5px 8px;
+    border-radius: 12px;
+    border: 1px solid rgba(43,188,179,0.2);
+  }
+  .mode-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--teal);
+    box-shadow: 0 0 8px rgba(43,188,179,0.5);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+  .mode-text {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--teal);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* ============ LOADING SHIMMER ============ */
+  .shimmer {
+    background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 8px;
+  }
+  @keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  /* ============ SCENE SEPARATOR ============ */
+  .scene-sep {
+    width: 100%;
+    max-width: 1200px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    margin: 16px 0 32px;
+  }
+
+  /* ============ TICKER ANIMATION ============ */
+  .ticker-anim {
+    animation: ticker-fade 8s infinite;
+  }
+  @keyframes ticker-fade {
+    0%, 30% { opacity: 1; }
+    33%, 36% { opacity: 0; }
+    39%, 63% { opacity: 1; }
+    66%, 69% { opacity: 0; }
+    72%, 100% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Move Here — Phase 1a Prototype</h1>
+<p class="subtitle">Resident-lens area intelligence: 6 UI surfaces + trust signals</p>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SCENE 1: Traveler vs Resident Header -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="label label-scene">Scene 1 — Header: Traveler vs Resident Mode</div>
+<div class="scene-row">
+
+  <!-- TRAVELER MODE -->
+  <div class="phone-col">
+    <div class="label">Traveler Mode (default)</div>
+    <div class="phone-frame">
+      <div class="map-bg"><div class="map-grid"></div></div>
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <span class="status-icons">●●● ▂▅▇</span>
+      </div>
+      <div class="header-bar">
+        <div class="move-icon inactive">🏠</div>
+        <div class="area-info">
+          <div class="area-name">Lisbon, Portugal</div>
+          <div class="meta-ticker">☀️ 22°C · 💵 € · ~1.08 EUR/USD · First visit</div>
+        </div>
+        <div class="header-right">
+          <div class="count-pill">9</div>
+          <div class="surprise-btn">🎲</div>
+          <div class="chevron">▼</div>
+        </div>
+      </div>
+      <!-- Traveler pins -->
+      <div class="pin" style="top:220px;left:80px">📍</div>
+      <div class="pin" style="top:310px;left:180px">📍</div>
+      <div class="pin" style="top:270px;left:290px">📍</div>
+      <div class="pin" style="top:400px;left:140px">📍</div>
+      <div class="pin" style="top:370px;left:250px">📍</div>
+      <div class="pin" style="top:460px;left:100px">📍</div>
+      <!-- Bottom bar -->
+      <div class="bottom-bar">
+        <div class="orb">💬
+          <div class="orb-ghost-text">Ask about Lisbon...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESIDENT MODE -->
+  <div class="phone-col">
+    <div class="label"><span class="label-accent">Resident Mode (active)</span></div>
+    <div class="phone-frame">
+      <div class="map-bg"><div class="map-grid"></div></div>
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <span class="status-icons">●●● ▂▅▇</span>
+      </div>
+      <div class="header-bar">
+        <div class="move-icon active">🏠</div>
+        <div class="area-info">
+          <div class="area-name resident-tint">Lisbon, Portugal</div>
+          <div class="area-mode-label">Living</div>
+          <div class="meta-ticker resident">🏠 Avg rent €950 · 📊 CoL index 58 · 🛡️ Safety: Above avg</div>
+        </div>
+        <div class="header-right">
+          <div class="count-pill">9</div>
+          <div class="surprise-btn">🎲</div>
+          <div class="chevron">▼</div>
+        </div>
+      </div>
+      <!-- Mode indicator -->
+      <div class="mode-indicator">
+        <div class="mode-dot"></div>
+        <span class="mode-text">Resident lens</span>
+      </div>
+      <!-- Pin toggle -->
+      <div class="pin-toggle">
+        <div class="pin-toggle-btn">Explore</div>
+        <div class="pin-toggle-btn active">Daily Life</div>
+      </div>
+      <!-- Daily life pins -->
+      <div class="pin daily-life" style="top:200px;left:60px">🛒<div class="pin-label">Pingo Doce</div></div>
+      <div class="pin daily-life" style="top:280px;left:170px">🏥<div class="pin-label">Hospital S. José</div></div>
+      <div class="pin daily-life" style="top:240px;left:290px">🚇<div class="pin-label">Marquês de Pombal</div></div>
+      <div class="pin daily-life" style="top:360px;left:120px">🏫<div class="pin-label">Escola Secundária</div></div>
+      <div class="pin daily-life" style="top:330px;left:260px">💊<div class="pin-label">Farmácia Central</div></div>
+      <div class="pin daily-life" style="top:420px;left:180px">🏋️<div class="pin-label">Holmes Place</div></div>
+      <!-- Bottom bar -->
+      <div class="bottom-bar">
+        <div class="orb">💬
+          <div class="orb-ghost-text">Ask about living here...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scene-sep"></div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SCENE 2: Dashboard Card (Collapsed + Expanded) -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="label label-scene">Scene 2 — Resident Dashboard Card</div>
+<div class="scene-row">
+
+  <!-- COLLAPSED -->
+  <div class="phone-col">
+    <div class="label">Collapsed (3 headlines)</div>
+    <div class="phone-frame">
+      <div class="map-bg"><div class="map-grid"></div></div>
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <span class="status-icons">●●● ▂▅▇</span>
+      </div>
+      <div class="header-bar">
+        <div class="move-icon active">🏠</div>
+        <div class="area-info">
+          <div class="area-name resident-tint">Lisbon, Portugal</div>
+          <div class="area-mode-label">Living</div>
+        </div>
+        <div class="header-right">
+          <div class="count-pill">9</div>
+          <div class="chevron">▼</div>
+        </div>
+      </div>
+      <div class="mode-indicator">
+        <div class="mode-dot"></div>
+        <span class="mode-text">Resident lens</span>
+      </div>
+      <!-- Daily life pins -->
+      <div class="pin daily-life" style="top:220px;left:80px">🛒</div>
+      <div class="pin daily-life" style="top:310px;left:200px">🚇</div>
+      <div class="pin daily-life" style="top:280px;left:300px">🏥</div>
+      <!-- Dashboard collapsed -->
+      <div class="dashboard-card">
+        <div class="dashboard-collapsed">
+          <div class="dashboard-headline">
+            <span class="emoji">🏠</span>
+            <span class="value">€950/mo</span>
+          </div>
+          <span class="dashboard-dot">·</span>
+          <div class="dashboard-headline">
+            <span class="emoji">📊</span>
+            <span class="value">CoL 58</span>
+          </div>
+          <span class="dashboard-dot">·</span>
+          <div class="dashboard-headline">
+            <span class="emoji">🛡️</span>
+            <span class="value">Above avg</span>
+          </div>
+          <span class="dashboard-expand">▼</span>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <div class="orb">💬</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPANDED -->
+  <div class="phone-col">
+    <div class="label"><span class="label-accent">Expanded (9 categories)</span></div>
+    <div class="phone-frame">
+      <div class="map-bg"><div class="map-grid"></div></div>
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <span class="status-icons">●●● ▂▅▇</span>
+      </div>
+      <div class="header-bar" style="opacity:0.5">
+        <div class="move-icon active">🏠</div>
+        <div class="area-info">
+          <div class="area-name resident-tint">Lisbon, Portugal</div>
+        </div>
+      </div>
+      <div class="dashboard-card" style="top:110px;bottom:auto;max-height:660px;">
+        <div class="dashboard-expanded">
+          <div class="dashboard-header">
+            <div>
+              <div class="dashboard-title">🏠 Living in Lisbon</div>
+              <div class="dashboard-origin">Compared to Miami, FL</div>
+            </div>
+            <div class="dashboard-badge">🤖 AI Insight</div>
+          </div>
+
+          <!-- D1: Rental -->
+          <div class="category-section">
+            <div class="category-header">
+              <span class="category-icon">🏠</span>
+              <span class="category-label">Rental Prices</span>
+              <span class="ai-badge">🤖 AI Insight</span>
+            </div>
+            <div class="data-point">
+              <div class="data-value">
+                ~€950/month
+                <span class="confidence-dot medium"></span>
+              </div>
+              <div class="data-detail">1-bedroom in city center · 40% less than Miami</div>
+              <div class="data-source">Gemini AI estimate · Mar 2026</div>
+            </div>
+            <div class="data-point">
+              <div class="data-value">
+                ~€650/month
+                <span class="confidence-dot medium"></span>
+              </div>
+              <div class="data-detail">1-bedroom outside center</div>
+              <div class="data-source">Gemini AI estimate · Mar 2026</div>
+            </div>
+          </div>
+
+          <!-- D3: CoL -->
+          <div class="category-section">
+            <div class="category-header">
+              <span class="category-icon">📊</span>
+              <span class="category-label">Cost of Living</span>
+              <span class="ai-badge">🤖 AI Insight</span>
+            </div>
+            <div class="data-point">
+              <div class="data-value">
+                Index: 58
+                <span class="confidence-dot medium"></span>
+              </div>
+              <div class="data-detail">38% lower than Miami · Groceries ~30% cheaper</div>
+              <div class="data-source">Gemini AI estimate · Mar 2026</div>
+            </div>
+          </div>
+
+          <!-- D4: Safety -->
+          <div class="category-section">
+            <div class="category-header">
+              <span class="category-icon">🛡️</span>
+              <span class="category-label">Safety</span>
+              <span class="ai-badge">🤖 AI Insight</span>
+            </div>
+            <div class="data-point">
+              <div class="data-value">
+                Above average
+                <span class="confidence-dot high"></span>
+              </div>
+              <div class="data-detail">Low violent crime · Petty theft in tourist areas (Baixa, Bairro Alto)</div>
+              <div class="data-source">Gemini AI estimate · Mar 2026</div>
+            </div>
+          </div>
+
+          <!-- D6: Jobs -->
+          <div class="category-section">
+            <div class="category-header">
+              <span class="category-icon">💼</span>
+              <span class="category-label">Job Market</span>
+              <span class="ai-badge">🤖 AI Insight</span>
+            </div>
+            <div class="data-point">
+              <div class="data-value">
+                Growing tech hub
+                <span class="confidence-dot medium"></span>
+              </div>
+              <div class="data-detail">Top industries: Tech, Tourism, Finance · Remote-friendly infrastructure</div>
+              <div class="data-source">Gemini AI estimate · Mar 2026</div>
+            </div>
+          </div>
+
+          <!-- D12: Visa (VOLATILE) -->
+          <div class="category-section">
+            <div class="category-header">
+              <span class="category-icon">🛂</span>
+              <span class="category-label">Visa & Immigration</span>
+              <span class="ai-badge">🤖 AI Insight</span>
+            </div>
+            <div class="data-point">
+              <div class="data-value">
+                D7 Visa or NHR
+                <span class="confidence-dot low"></span>
+              </div>
+              <div class="data-detail">US citizens: D7 passive income visa or Digital Nomad Visa · NHR tax regime may apply</div>
+              <div class="data-source">Gemini AI estimate · Mar 2026 · ⚠️ Verify before acting</div>
+              <a class="verify-link" href="#">🔗 Verify at sef.pt/en/visa →</a>
+            </div>
+          </div>
+
+          <!-- D10: Weather -->
+          <div class="category-section">
+            <div class="category-header">
+              <span class="category-icon">☀️</span>
+              <span class="category-label">Weather & Climate</span>
+              <span class="ai-badge" style="color:var(--teal);">📡 Open-Meteo</span>
+            </div>
+            <div class="data-point">
+              <div class="data-value">
+                Mediterranean climate
+                <span class="confidence-dot high"></span>
+              </div>
+              <div class="data-detail">300+ sunny days · Mild winters (8-15°C) · Hot summers (25-35°C)</div>
+              <div class="data-source">Open-Meteo · 2026</div>
+            </div>
+          </div>
+
+          <div class="dashboard-footer">
+            Data for informational purposes only. Verify before making decisions.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scene-sep"></div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SCENE 3: Detail Page — "Living Here" Section -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="label label-scene">Scene 3 — Detail Page: "Living Here" Proximity Section</div>
+<div class="scene-row">
+
+  <!-- TRAVELER DETAIL -->
+  <div class="phone-col">
+    <div class="label">Traveler (no section)</div>
+    <div class="phone-frame">
+      <div class="detail-page">
+        <div class="detail-hero">
+          <div class="detail-hero-overlay"></div>
+          <div class="detail-hero-text">
+            <div class="detail-poi-name">Time Out Market</div>
+            <div class="detail-poi-type">food · Cais do Sodré</div>
+          </div>
+        </div>
+        <div class="detail-body">
+          <div class="detail-meta-row">
+            <div class="detail-meta-chip"><span class="green">●</span> Open</div>
+            <div class="detail-meta-chip">⭐ 4.3</div>
+            <div class="detail-meta-chip">$$</div>
+            <div class="detail-meta-chip">10am-12am</div>
+          </div>
+          <div style="font-size:13px;line-height:1.6;color:var(--text-secondary);margin-top:8px;">
+            Lisbon's iconic food hall where you can sample dishes from the city's best chefs under one roof. The market hall dates to 1882 and was transformed into a culinary destination in 2014. Known for its fresh seafood, pastel de nata, and bustling atmosphere...
+          </div>
+          <div style="margin-top:16px;padding:12px;background:rgba(255,255,255,0.03);border-radius:12px;">
+            <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:6px;">💡 Local Tip</div>
+            <div style="font-size:12px;color:var(--text-secondary);">Go after 10pm when locals replace tourists. The rooftop terrace has stunning views of the 25 de Abril Bridge.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESIDENT DETAIL -->
+  <div class="phone-col">
+    <div class="label"><span class="label-accent">Resident (with Living Here)</span></div>
+    <div class="phone-frame">
+      <div class="detail-page">
+        <div class="detail-hero">
+          <div class="detail-hero-overlay"></div>
+          <div class="detail-hero-text">
+            <div class="detail-poi-name">Time Out Market</div>
+            <div class="detail-poi-type">food · Cais do Sodré</div>
+          </div>
+        </div>
+        <div class="detail-body">
+          <div class="detail-meta-row">
+            <div class="detail-meta-chip"><span class="green">●</span> Open</div>
+            <div class="detail-meta-chip">⭐ 4.3</div>
+            <div class="detail-meta-chip">$$</div>
+            <div class="detail-meta-chip">10am-12am</div>
+          </div>
+          <div style="font-size:13px;line-height:1.6;color:var(--text-secondary);margin-top:8px;">
+            Lisbon's iconic food hall where you can sample dishes from the city's best chefs under one roof...
+          </div>
+
+          <!-- LIVING HERE SECTION -->
+          <div class="living-here-section">
+            <div class="living-here-header">
+              <span style="font-size:16px;">🏠</span>
+              <span class="living-here-title">Living Here</span>
+              <span class="ai-badge">🤖 Based on Google Places</span>
+            </div>
+            <div class="living-here-grid">
+              <div class="proximity-item">
+                <span class="proximity-icon">🚇</span>
+                <div>
+                  <div class="proximity-text">3 min walk</div>
+                  <div class="proximity-sub">Cais do Sodré Station</div>
+                </div>
+              </div>
+              <div class="proximity-item">
+                <span class="proximity-icon">🛒</span>
+                <div>
+                  <div class="proximity-text">4 stores</div>
+                  <div class="proximity-sub">within 500m</div>
+                </div>
+              </div>
+              <div class="proximity-item">
+                <span class="proximity-icon">🏥</span>
+                <div>
+                  <div class="proximity-text">1.2 km</div>
+                  <div class="proximity-sub">Hospital S. José</div>
+                </div>
+              </div>
+              <div class="proximity-item">
+                <span class="proximity-icon">🏫</span>
+                <div>
+                  <div class="proximity-text">2 schools</div>
+                  <div class="proximity-sub">within 1 km</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scene-sep"></div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SCENE 4: Chat Persona Shift -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="label label-scene">Scene 4 — Chat: Honest Relocation Advisor Persona</div>
+<div class="scene-row">
+
+  <!-- TRAVELER CHAT -->
+  <div class="phone-col">
+    <div class="label">Traveler chat</div>
+    <div class="phone-frame">
+      <div class="chat-overlay">
+        <div class="chat-header">
+          <span class="chat-back">←</span>
+          <span class="chat-title">Lisbon</span>
+          <span class="chat-persona-badge">Travel guide</span>
+        </div>
+        <div class="chat-body">
+          <div class="chat-bubble user">What's the food scene like?</div>
+          <div class="chat-bubble ai">
+            Lisbon's food scene is incredible! 🎉 You HAVE to try pastéis de nata at Manteigaria — they're warm out of the oven. For seafood, hit up Cervejaria Ramiro — the garlic prawns are legendary. Time Out Market is great for variety. Don't miss bifana sandwiches from a street vendor!
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <input class="chat-input" placeholder="Ask about Lisbon..." disabled>
+          <div class="chat-send">↑</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESIDENT CHAT -->
+  <div class="phone-col">
+    <div class="label"><span class="label-accent">Resident chat (persona shift)</span></div>
+    <div class="phone-frame">
+      <div class="chat-overlay">
+        <div class="chat-header">
+          <span class="chat-back">←</span>
+          <span class="chat-title" style="color:var(--teal);">Living in Lisbon</span>
+          <span class="chat-persona-badge">🏠 Relocation advisor</span>
+        </div>
+        <div class="chat-body">
+          <div class="chat-bubble user">What's the food scene like?</div>
+          <div class="chat-bubble ai">
+            Lisbon has great food, but here's the resident reality: eating out regularly adds up. A typical lunch menu is €8-12, dinner €15-25.
+            <div class="chat-data-inline">
+              📊 Groceries are ~30% cheaper than Miami. Monthly grocery budget for a couple: €300-400.
+            </div>
+            For daily cooking, Pingo Doce and Continente are the go-to supermarkets — both have locations near Cais do Sodré. The Mercado da Ribeira (behind Time Out Market) sells fresh produce directly from farmers at much better prices than tourist restaurants.
+            <div class="chat-source">Based on Gemini AI estimate · Mar 2026</div>
+          </div>
+        </div>
+        <div class="chat-input-bar">
+          <input class="chat-input" placeholder="Ask about living here..." disabled>
+          <div class="chat-send">↑</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="scene-sep"></div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SCENE 5: Loading + Trust Signals Detail -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="label label-scene">Scene 5 — Loading State + Trust Signal Legend</div>
+<div class="scene-row">
+
+  <!-- LOADING -->
+  <div class="phone-col">
+    <div class="label">Loading resident data</div>
+    <div class="phone-frame">
+      <div class="map-bg"><div class="map-grid"></div></div>
+      <div class="status-bar">
+        <span class="status-time">9:41</span>
+        <span class="status-icons">●●● ▂▅▇</span>
+      </div>
+      <div class="header-bar">
+        <div class="move-icon active">🏠</div>
+        <div class="area-info">
+          <div class="area-name resident-tint">Lisbon, Portugal</div>
+          <div class="area-mode-label">Living</div>
+          <div class="meta-ticker resident">Loading resident data...</div>
+        </div>
+      </div>
+      <div class="mode-indicator">
+        <div class="mode-dot"></div>
+        <span class="mode-text">Resident lens</span>
+      </div>
+      <!-- Dashboard loading shimmer -->
+      <div class="dashboard-card">
+        <div class="dashboard-collapsed" style="gap:16px;">
+          <div class="shimmer" style="width:80px;height:20px;"></div>
+          <div class="shimmer" style="width:70px;height:20px;"></div>
+          <div class="shimmer" style="width:90px;height:20px;"></div>
+        </div>
+      </div>
+      <div class="bottom-bar">
+        <div class="orb">💬</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRUST SIGNAL LEGEND -->
+  <div class="phone-col">
+    <div class="label"><span class="label-accent">Trust signal reference</span></div>
+    <div style="width:375px;background:var(--card-bg);border-radius:20px;padding:24px;border:1px solid rgba(255,255,255,0.06);">
+
+      <div style="font-size:14px;font-weight:700;color:var(--teal);margin-bottom:16px;">Trust Signals</div>
+
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Confidence Dots</div>
+        <div style="display:flex;gap:16px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="confidence-dot high"></span>
+            <span style="font-size:11px;color:var(--text-secondary);">HIGH — well-known data</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:6px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="confidence-dot medium"></span>
+            <span style="font-size:11px;color:var(--text-secondary);">MEDIUM — AI estimate</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;margin-top:6px;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span class="confidence-dot low"></span>
+            <span style="font-size:11px;color:var(--text-secondary);">LOW — volatile, verify locally</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Source Badges</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div class="ai-badge" style="width:fit-content;">🤖 AI Insight</div>
+          <div class="ai-badge" style="width:fit-content;color:var(--teal);">📡 Open-Meteo</div>
+          <div class="ai-badge" style="width:fit-content;color:var(--teal);">📍 Google Places</div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:20px;">
+        <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Data Classification</div>
+        <div style="font-size:11px;color:var(--text-secondary);line-height:1.6;">
+          <div><strong style="color:var(--text-primary);">STATIC</strong> — "Gemini AI estimate · 2026"</div>
+          <div><strong style="color:var(--text-primary);">DYNAMIC</strong> — "Gemini AI estimate · Mar 2026"</div>
+          <div><strong style="color:var(--text-primary);">VOLATILE</strong> — "Gemini AI estimate · Mar 2026 · ⚠️ Verify before acting"</div>
+        </div>
+      </div>
+
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Verify Links (Volatile Data)</div>
+        <div style="background:rgba(239,83,80,0.08);border:1px solid rgba(239,83,80,0.15);border-radius:12px;padding:10px;">
+          <div style="font-size:11px;color:var(--red);font-weight:600;">⚠️ D12 Visa & Immigration</div>
+          <div style="font-size:10px;color:var(--text-secondary);margin-top:4px;">
+            Always verify visa requirements with official government sources before making any decisions.
+          </div>
+          <a class="verify-link" style="margin-top:8px;" href="#">🔗 Verify at sef.pt/en/visa →</a>
+        </div>
+      </div>
+
+      <div style="margin-top:20px;padding-top:12px;border-top:1px solid var(--divider);">
+        <div style="font-size:10px;color:var(--text-muted);text-align:center;font-style:italic;">
+          Data for informational purposes only.<br>AreaDiscovery is a helpful aggregator, not a source of truth.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
