@@ -10,7 +10,7 @@ import org.koin.dsl.module
 
 val uiModule = module {
     factory { AreaContextFactory(get(), get()) }
-    viewModel { MapViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
+    viewModel { MapViewModel(get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get(), get()) }
     viewModel { ChatViewModel(get(), get(), get(), get(), get()) }
     viewModel { SavedPlacesViewModel(get()) }
     viewModel { ProfileViewModel(get(), get(), get(), get(), get()) }

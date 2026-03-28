@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -54,10 +55,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.model.DynamicVibe
+import com.harazone.domain.model.FeatureFlags
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.RecentPlace
 import com.harazone.domain.model.WeatherState
+import com.harazone.ui.theme.MetaContextTeal
 import com.harazone.ui.components.currentHour
 import com.harazone.ui.components.currentMinute
 import com.harazone.ui.components.currentTimeMillis
@@ -96,6 +100,10 @@ fun SmartSearchPanel(
     // Actions
     onSurprise: () -> Unit,
     onRefresh: () -> Unit,
+    // Move Here mode
+    discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
+    moveHereEnabled: Boolean = false,
+    onMoveHereTap: () -> Unit = {},
     // Recent explorations
     recentExplorations: List<RecentPlace>,
     onTeleport: (RecentPlace) -> Unit,
@@ -155,10 +163,19 @@ fun SmartSearchPanel(
             Spacer(Modifier.height(12.dp))
         }
 
-        // 5. Action buttons
+        // 5. Move Here toggle (if feature flag enabled)
+        if (moveHereEnabled && FeatureFlags.MOVE_HERE_ENABLED) {
+            MoveHereToggle(
+                isActive = discoveryMode == DiscoveryMode.RESIDENT,
+                onTap = onMoveHereTap,
+            )
+            Spacer(Modifier.height(12.dp))
+        }
+
+        // 6. Action buttons (Surprise + Refresh)
         ActionButtons(onSurprise = onSurprise, onRefresh = onRefresh)
 
-        // 6. Recent explorations (hidden if empty)
+        // 7. Recent explorations (hidden if empty)
         if (recentExplorations.isNotEmpty()) {
             Spacer(Modifier.height(12.dp))
             RecentExplorations(recents = recentExplorations.take(3), onTap = onTeleport)
@@ -443,6 +460,56 @@ private fun IntelStrip(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+@Composable
+private fun MoveHereToggle(
+    isActive: Boolean,
+    onTap: () -> Unit,
+) {
+    val bg = if (isActive) MetaContextTeal.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f)
+    val border = if (isActive) MetaContextTeal else Color.White.copy(alpha = 0.15f)
+    val textColor = if (isActive) MetaContextTeal else Color.White.copy(alpha = 0.7f)
+
+    Surface(
+        onClick = onTap,
+        shape = RoundedCornerShape(12.dp),
+        color = bg,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp)
+            .border(1.dp, border, RoundedCornerShape(12.dp)),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        ) {
+            Text(text = "\uD83C\uDFE0", fontSize = 18.sp)
+            Spacer(Modifier.width(8.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = if (isActive) "Resident Mode ON" else "Move Here",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = textColor,
+                )
+                Text(
+                    text = if (isActive) "Viewing as a potential resident" else "See this area as a potential home",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = textColor.copy(alpha = 0.7f),
+                )
+            }
+            if (isActive) {
+                Text(
+                    text = "ON",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MetaContextTeal,
+                    modifier = Modifier
+                        .background(MetaContextTeal.copy(alpha = 0.2f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
+            }
         }
     }
 }

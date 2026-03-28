@@ -1,6 +1,7 @@
 package com.harazone.domain.service
 
 import com.harazone.domain.model.AreaContext
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.provider.LocaleProvider
 import com.harazone.util.AppClock
 
@@ -9,7 +10,7 @@ open class AreaContextFactory(
     private val localeProvider: LocaleProvider,
 ) {
 
-    open fun create(): AreaContext {
+    open fun create(discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER): AreaContext {
         val nowMs = clock.nowMs()
         return AreaContext(
             timeOfDay = resolveTimeOfDay(nowMs),
@@ -18,6 +19,7 @@ open class AreaContextFactory(
             preferredLanguage = localeProvider.languageTag,
             isRtl = localeProvider.isRtl,
             homeCurrencyCode = localeProvider.homeCurrencyCode,
+            discoveryMode = discoveryMode,
         )
     }
 

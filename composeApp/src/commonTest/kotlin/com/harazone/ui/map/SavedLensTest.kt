@@ -82,6 +82,7 @@ class SavedLensTest {
                     lastUpdated = 0L, cachedAt = 0L,
                 ))
         },
+        aiProvider = com.harazone.fakes.FakeAreaIntelligenceProvider(),
         clockMs = { 1000L },
     )
 

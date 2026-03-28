@@ -6,6 +6,7 @@ import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.ProfileIdentity
+import com.harazone.domain.model.ResidentData
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfile
 import kotlinx.coroutines.flow.Flow
@@ -34,4 +35,11 @@ interface AreaIntelligenceProvider {
         context: String,
         languageTag: String = "en",
     ): String?
+
+    suspend fun fetchResidentData(
+        areaName: String,
+        originCountryCode: String,
+        originCity: String?,
+        languageTag: String,
+    ): ResidentData
 }

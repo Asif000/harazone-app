@@ -14,6 +14,9 @@ sealed class MetaLine(val priority: Int) {
         val text: String get() = "From $fromCity \u00b7 $distance"
     }
 
+    /** Priority 2 — resident mode headline data. Teal text. */
+    data class ResidentHeadline(val text: String) : MetaLine(2)
+
     /** Priority 2 — local currency + exchange rate. Teal text. Remote areas only. */
     data class CurrencyContext(val text: String) : MetaLine(2)
 
@@ -48,6 +51,7 @@ val MetaLine.text: String
     get() = when (this) {
         is MetaLine.SafetyWarning -> text
         is MetaLine.RemoteContext -> text
+        is MetaLine.ResidentHeadline -> text
         is MetaLine.CurrencyContext -> text
         is MetaLine.LanguageContext -> text
         is MetaLine.VibeFilter -> text
@@ -85,6 +89,8 @@ fun buildMetaLines(
     currencyText: String? = null,
     languageText: String? = null,
     isSurprise: Boolean = false,
+    discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
+    residentData: ResidentData? = null,
 ): List<MetaLine> {
     if (isSearching) {
         return listOf(MetaLine.Discovering(areaName, isSurprise))
@@ -92,7 +98,9 @@ fun buildMetaLines(
 
     val lines = mutableListOf<MetaLine>()
 
-    // Priority 1: Safety warning (fixed, no rotation)
+    // Priority 1: Safety warning
+    // In resident mode with data: safety rotates with resident headlines instead of being fixed
+    val hasResidentData = discoveryMode == DiscoveryMode.RESIDENT && residentData != null
     if (advisoryLevel != null && advisoryLevel != AdvisoryLevel.SAFE && advisoryLevel != AdvisoryLevel.UNKNOWN) {
         val warningText = when (advisoryLevel) {
             AdvisoryLevel.CAUTION -> "\u26A0\uFE0F Exercise caution \u00b7 Check advisory"
@@ -101,19 +109,41 @@ fun buildMetaLines(
             else -> null
         }
         if (warningText != null) {
-            lines.add(MetaLine.SafetyWarning(warningText))
+            if (hasResidentData) {
+                lines.add(MetaLine.ResidentHeadline(warningText))
+            } else {
+                lines.add(MetaLine.SafetyWarning(warningText))
+            }
         }
     }
 
-    // Priority 2: Remote/teleported area
-    if (isRemote && homeCity != null && remoteDistance != null) {
-        lines.add(MetaLine.RemoteContext(homeCity, remoteDistance))
-    }
-    if (isRemote && currencyText != null) {
-        lines.add(MetaLine.CurrencyContext(currencyText))
-    }
-    if (isRemote && languageText != null) {
-        lines.add(MetaLine.LanguageContext(languageText))
+    // Priority 2: Remote/teleported area OR resident headlines
+    if (hasResidentData) {
+        // Resident mode: show top category headlines instead of currency/language
+        val categories = residentData.categories
+        categories.firstOrNull { it.id == ResidentData.CAT_RENTAL }?.points?.firstOrNull()?.let {
+            lines.add(MetaLine.ResidentHeadline("\uD83C\uDFE0 Avg rent ${it.value}"))
+        }
+        categories.firstOrNull { it.id == ResidentData.CAT_COL }?.points?.firstOrNull()?.let {
+            lines.add(MetaLine.ResidentHeadline("\uD83D\uDCCA CoL index ${it.value}"))
+        }
+        categories.firstOrNull { it.id == ResidentData.CAT_SAFETY }?.points?.firstOrNull()?.let {
+            lines.add(MetaLine.ResidentHeadline("\uD83D\uDEE1\uFE0F Safety: ${it.value}"))
+        }
+        // Still show remote context if teleported
+        if (isRemote && homeCity != null && remoteDistance != null) {
+            lines.add(MetaLine.RemoteContext(homeCity, remoteDistance))
+        }
+    } else {
+        if (isRemote && homeCity != null && remoteDistance != null) {
+            lines.add(MetaLine.RemoteContext(homeCity, remoteDistance))
+        }
+        if (isRemote && currencyText != null) {
+            lines.add(MetaLine.CurrencyContext(currencyText))
+        }
+        if (isRemote && languageText != null) {
+            lines.add(MetaLine.LanguageContext(languageText))
+        }
     }
 
     // Priority 3: Active vibe filter

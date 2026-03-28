@@ -53,7 +53,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.harazone.domain.model.AdvisoryLevel
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.model.DynamicVibe
+import com.harazone.domain.model.FeatureFlags
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.MetaLine
 import com.harazone.domain.model.RecentPlace
@@ -129,6 +131,11 @@ fun DiscoveryHeader(
     // Hoisted expansion state (caller owns for back handler priority — H2)
     isExpanded: Boolean,
     onExpandedChanged: (Boolean) -> Unit,
+    // Move Here mode
+    discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
+    residentAreaName: String? = null,
+    moveHereEnabled: Boolean = false,
+    onMoveHereTap: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     fun collapse() {
@@ -203,6 +210,10 @@ fun DiscoveryHeader(
                 activeVibeFilters = activeVibeFilters,
                 isExpanded = isExpanded,
                 onTap = { if (isExpanded) collapse() else expand() },
+                discoveryMode = discoveryMode,
+                residentAreaName = residentAreaName,
+                moveHereEnabled = moveHereEnabled,
+                onMoveHereTap = onMoveHereTap,
             )
 
             // Expanded panel
@@ -253,6 +264,12 @@ fun DiscoveryHeader(
                         collapse()
                         onRefresh()
                     },
+                    discoveryMode = discoveryMode,
+                    moveHereEnabled = moveHereEnabled,
+                    onMoveHereTap = {
+                        collapse()
+                        onMoveHereTap()
+                    },
                     recentExplorations = recentExplorations,
                     onTeleport = { recent ->
                         collapse()
@@ -288,6 +305,10 @@ private fun CollapsedBar(
     activeVibeFilters: Set<String>,
     isExpanded: Boolean,
     onTap: () -> Unit,
+    discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
+    residentAreaName: String? = null,
+    moveHereEnabled: Boolean = false,
+    onMoveHereTap: () -> Unit = {},
 ) {
     Surface(
         color = MapFloatingUiDark.copy(alpha = 0.85f),
@@ -317,6 +338,10 @@ private fun CollapsedBar(
                 savedCount = savedCount,
                 showDiscoverButton = showDiscoverButton,
                 onDiscover = onDiscover,
+                discoveryMode = discoveryMode,
+                residentAreaName = residentAreaName,
+                moveHereEnabled = moveHereEnabled,
+                onMoveHereTap = onMoveHereTap,
                 surpriseEnabled = surpriseEnabled,
                 onSurprise = onSurprise,
                 onSavedLensTap = onSavedLensTap,
@@ -340,6 +365,10 @@ private fun NormalRow(
     savedCount: Int,
     showDiscoverButton: Boolean,
     onDiscover: () -> Unit,
+    discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
+    residentAreaName: String? = null,
+    moveHereEnabled: Boolean = false,
+    onMoveHereTap: () -> Unit = {},
     surpriseEnabled: Boolean,
     onSurprise: () -> Unit,
     onSavedLensTap: () -> Unit,
@@ -355,6 +384,23 @@ private fun NormalRow(
             .clickable(onClick = onTap)
             .padding(horizontal = 12.dp),
     ) {
+        // Move Here indicator (left of area name) — only shown when viewing the resident area
+        if (moveHereEnabled && FeatureFlags.MOVE_HERE_ENABLED && residentAreaName != null && residentAreaName == areaName) {
+            val teal = com.harazone.ui.theme.MetaContextTeal
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clickable(onClick = onMoveHereTap),
+            ) {
+                Text(
+                    text = "\uD83C\uDFE0",
+                    fontSize = 18.sp,
+                    color = teal,
+                )
+            }
+        }
+
         // Area name + safety dot
         when {
             isGpsAcquiring -> {
@@ -377,10 +423,15 @@ private fun NormalRow(
                 )
             }
             else -> {
+                val areaNameColor = when {
+                    areaName.isBlank() -> Color.White.copy(alpha = 0.5f)
+                    discoveryMode == DiscoveryMode.RESIDENT -> com.harazone.ui.theme.MetaContextTeal
+                    else -> Color.White
+                }
                 Text(
                     text = areaName.ifBlank { "Unknown Area" },
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (areaName.isBlank()) Color.White.copy(alpha = 0.5f) else Color.White,
+                    color = areaNameColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.width(120.dp),

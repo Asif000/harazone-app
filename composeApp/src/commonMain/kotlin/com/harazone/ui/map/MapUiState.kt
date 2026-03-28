@@ -2,11 +2,13 @@ package com.harazone.ui.map
 
 import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.CompanionNudge
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.GhostPin
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.RecentPlace
+import com.harazone.domain.model.ResidentData
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.WeatherState
 
@@ -73,6 +75,12 @@ sealed class MapUiState {
         val areaLanguageText: String? = null,
         val savedLensActive: Boolean = false,
         val ghostPins: List<GhostPin> = emptyList(),
+        val discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
+        val residentAreaName: String? = null,
+        val residentData: ResidentData? = null,
+        val isLoadingResidentData: Boolean = false,
+        val dailyLifePois: List<POI> = emptyList(),
+        val showDailyLifePins: Boolean = false,
     ) : MapUiState()
     data class LocationFailed(val message: String) : MapUiState()
 }

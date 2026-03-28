@@ -6,10 +6,12 @@ import com.harazone.data.remote.GeminiPromptBuilder
 import com.harazone.domain.model.ChatIntent
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ContextualPill
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.MessageRole
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
+import com.harazone.domain.model.ResidentData
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfileBuilder
 import com.harazone.domain.model.VisitState
@@ -58,6 +60,7 @@ internal class ChatViewModel(
     private var isIntentSelected: Boolean = false
     private var currentEntryPoint: ChatEntryPoint = ChatEntryPoint.Default
     private val recommendedPoiNames: MutableList<String> = mutableListOf()
+    private var currentResidentData: ResidentData? = null
     private var injectedContextIndex: Int = -1
     private var activeVibeName: String? = null
     private var chatOpenedAt: Long = 0L
@@ -142,6 +145,8 @@ internal class ChatViewModel(
             inputText = preFillFor(entryPoint),
             contextBanner = bannerFor(entryPoint),
             depthLevel = 0,
+            // TODO(BACKLOG-LOW): Race condition — if chat opens before LaunchedEffect syncs discoveryMode, currentResidentData may be null while RESIDENT is active. Consider reading mode from MapViewModel state directly.
+            isResidentMode = currentResidentData != null,
         )
     }
 
@@ -271,6 +276,7 @@ internal class ChatViewModel(
                 areaName, sessionPois, pill.intent, currentEngagementLevel,
                 saves, tasteProfile, poiCount, pendingFramingHint, activeVibeName,
                 languageTag = localeProvider.languageTag,
+                residentData = currentResidentData,
             )
             conversationHistory.add(
                 ChatMessage(
@@ -293,6 +299,12 @@ internal class ChatViewModel(
     // Test-only accessor — allows ChatViewModelTest to verify system context injection
     internal val systemContextForTest: String
         get() = conversationHistory.firstOrNull()?.content.orEmpty()
+
+    fun updateDiscoveryMode(mode: DiscoveryMode, residentData: ResidentData?) {
+        val isResident = mode == DiscoveryMode.RESIDENT
+        currentResidentData = if (isResident) residentData else null
+        _uiState.value = _uiState.value.copy(isResidentMode = isResident)
+    }
 
     fun closeChat() {
         chatJob?.cancel()
@@ -685,12 +697,25 @@ internal class ChatViewModel(
         _uiState.value = _uiState.value.copy(contextBanner = null)
     }
 
-    private fun defaultPills(areaName: String): List<ContextualPill> = listOf(
+    private fun defaultPills(areaName: String): List<ContextualPill> =
+        if (_uiState.value.isResidentMode) residentPills(areaName)
+        else travelerPills(areaName)
+
+    private fun travelerPills(areaName: String): List<ContextualPill> = listOf(
         ContextualPill("What's on tonight in $areaName?", "What's on tonight in $areaName?", ChatIntent.TONIGHT, "🌙"),
         ContextualPill("Best food right now", "Where should I eat right now in $areaName?", ChatIntent.HUNGRY, "🍜"),
         ContextualPill("Show me hidden gems", "Show me hidden gems in $areaName", ChatIntent.DISCOVER, "🔍"),
         ContextualPill("Get me outside", "Get me outside in $areaName", ChatIntent.OUTSIDE, "🌳"),
         ContextualPill("Surprise me in $areaName", "Surprise me in $areaName", ChatIntent.SURPRISE, "🎲"),
+    )
+
+    // TODO(BACKLOG-LOW): All resident pills use ChatIntent.DISCOVER — add RESIDENT-specific intents for analytics differentiation
+    private fun residentPills(areaName: String): List<ContextualPill> = listOf(
+        ContextualPill("Cost of living in $areaName?", "What's the cost of living like in $areaName? Include rent, groceries, and transport.", ChatIntent.DISCOVER, "💰"),
+        ContextualPill("Best neighborhoods", "What are the best neighborhoods to live in $areaName?", ChatIntent.DISCOVER, "🏘️"),
+        ContextualPill("Is it safe?", "How safe is $areaName for residents? Any areas to avoid?", ChatIntent.DISCOVER, "🛡️"),
+        ContextualPill("Daily life essentials", "What's daily life like in $areaName? Groceries, healthcare, transport, schools.", ChatIntent.DISCOVER, "🏪"),
+        ContextualPill("Expat tips", "What should someone moving to $areaName know? Visa, banking, culture tips.", ChatIntent.DISCOVER, "🌍"),
     )
 
     private fun poiCardPills(poiName: String): List<ContextualPill> = listOf(

@@ -152,12 +152,13 @@ internal fun ChatOverlay(
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        stringResource(Res.string.chat_input_hint),
+                        if (chatState.isResidentMode) "Moving to this area?" else stringResource(Res.string.chat_input_hint),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     val subtitle = buildString {
-                        append("\uD83D\uDCCD ${chatState.areaName}")
+                        if (chatState.isResidentMode) append("\uD83C\uDFE0 ") else append("\uD83D\uDCCD ")
+                        append(chatState.areaName)
                         chatState.vibeName?.let { append(" · $it") }
                     }
                     Text(
@@ -203,7 +204,7 @@ internal fun ChatOverlay(
             ) {
                 if (chatState.bubbles.isEmpty() && chatState.persistentPills.isNotEmpty()) {
                     item(key = "empty_state") {
-                        EmptyStateText(areaName = chatState.areaName)
+                        EmptyStateText(areaName = chatState.areaName, isResidentMode = chatState.isResidentMode)
                     }
                 } else if (chatState.bubbles.isEmpty()) {
                     item(key = "empty_prompt") {
@@ -305,7 +306,7 @@ internal fun ChatOverlay(
 }
 
 @Composable
-private fun EmptyStateText(areaName: String) {
+private fun EmptyStateText(areaName: String, isResidentMode: Boolean = false) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -323,14 +324,16 @@ private fun EmptyStateText(areaName: String) {
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            stringResource(Res.string.chat_ask_anything, areaName),
+            if (isResidentMode) "Ask anything about living in $areaName"
+            else stringResource(Res.string.chat_ask_anything, areaName),
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            stringResource(Res.string.chat_suggestion_hint),
+            if (isResidentMode) "Tap a suggestion to explore as a future resident"
+            else stringResource(Res.string.chat_suggestion_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

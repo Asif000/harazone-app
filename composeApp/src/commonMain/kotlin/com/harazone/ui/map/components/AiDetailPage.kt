@@ -79,10 +79,13 @@ import androidx.compose.ui.text.font.FontWeight
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.domain.model.AdvisoryLevel
 import com.harazone.domain.model.DiscoveryContext
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
+import com.harazone.domain.model.ResidentData
 import com.harazone.domain.model.Vibe
 import com.harazone.domain.model.VisitState
+import com.harazone.util.haversineDistanceMeters
 import com.harazone.domain.provider.LocaleProvider
 import org.koin.compose.koinInject
 import com.harazone.ui.map.ChatBubbleItem
@@ -121,6 +124,9 @@ internal fun AiDetailPage(
     isGhostPin: Boolean = false,
     onDiscoverGhostPin: () -> Unit = {},
     onPoiCardClick: (ChatPoiCard) -> Unit = {},
+    discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
+    residentData: ResidentData? = null,
+    dailyLifePois: List<POI> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     var showGallery by remember(poi.savedId) { mutableStateOf(false) }
@@ -230,6 +236,16 @@ internal fun AiDetailPage(
                 // Safety card — CAUTION+ only (Bug #10 fix: disclaimer label)
                 item(key = "safety_card") {
                     SafetyCardSection(poi.discoveryContext)
+                }
+
+                // Living Here section — resident mode only
+                if (discoveryMode == DiscoveryMode.RESIDENT && residentData != null) {
+                    item(key = "living_here") {
+                        LivingHereSection(
+                            poi = poi,
+                            dailyLifePois = dailyLifePois,
+                        )
+                    }
                 }
 
                 // Chat bubbles with inline POI cards after each AI response
@@ -1018,6 +1034,80 @@ private fun VerifiedByGoogleChip() {
             text = "Verified by Google",
             style = MaterialTheme.typography.labelSmall,
             color = Color(0xFF5F6368),
+        )
+    }
+}
+
+@Composable
+private fun LivingHereSection(
+    poi: POI,
+    dailyLifePois: List<POI>,
+    modifier: Modifier = Modifier,
+) {
+    val poiLat = poi.latitude ?: return
+    val poiLng = poi.longitude ?: return
+    if (dailyLifePois.isEmpty()) return
+
+    val proximityItems = remember(poi.savedId, dailyLifePois) { buildList {
+        // Nearest transit
+        dailyLifePois.filter { it.type.contains("transit", ignoreCase = true) }
+            .minByOrNull { haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0) }
+            ?.let {
+                val dist = haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0)
+                val distText = if (dist < 1000) "${dist.toInt()}m" else "${"%.1f".format(dist / 1000)}km"
+                add("\uD83D\uDE89 Nearest transit: $distText")
+            }
+        // Grocery count within 500m
+        val groceryCount = dailyLifePois.count { poi2 ->
+            poi2.type.contains("grocery", ignoreCase = true) &&
+                haversineDistanceMeters(poiLat, poiLng, poi2.latitude ?: 0.0, poi2.longitude ?: 0.0) < 500
+        }
+        if (groceryCount > 0) add("\uD83D\uDED2 $groceryCount grocery store${if (groceryCount > 1) "s" else ""} within 500m")
+        // Nearest hospital
+        dailyLifePois.filter { it.type.contains("hospital", ignoreCase = true) }
+            .minByOrNull { haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0) }
+            ?.let {
+                val dist = haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0)
+                val distText = if (dist < 1000) "${dist.toInt()}m" else "${"%.1f".format(dist / 1000)}km"
+                add("\uD83C\uDFE5 Nearest hospital: $distText")
+            }
+        // School count within 1km
+        val schoolCount = dailyLifePois.count { poi2 ->
+            poi2.type.contains("school", ignoreCase = true) &&
+                haversineDistanceMeters(poiLat, poiLng, poi2.latitude ?: 0.0, poi2.longitude ?: 0.0) < 1000
+        }
+        if (schoolCount > 0) add("\uD83C\uDFEB $schoolCount school${if (schoolCount > 1) "s" else ""} within 1km")
+    } }
+    if (proximityItems.isEmpty()) return
+
+    Column(modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "LIVING HERE",
+                style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.8.sp),
+                color = com.harazone.ui.theme.MetaContextTeal,
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "\uD83E\uDD16 AI Insight",
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        proximityItems.forEach { item ->
+            Text(
+                text = item,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(vertical = 2.dp),
+            )
+        }
+        Text(
+            text = "Based on Google Places data",
+            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+            color = MaterialTheme.colorScheme.outline,
+            modifier = Modifier.padding(top = 4.dp),
         )
     }
 }

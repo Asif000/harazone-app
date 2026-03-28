@@ -7,9 +7,14 @@ import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.DataClassification
+import com.harazone.domain.model.DataConfidence
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.GeoArea
 import com.harazone.domain.model.ProfileIdentity
+import com.harazone.domain.model.ResidentCategory
+import com.harazone.domain.model.ResidentData
+import com.harazone.domain.model.ResidentDataPoint
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.Source
 import com.harazone.domain.model.TasteProfile
@@ -302,6 +307,56 @@ class MockAreaIntelligenceProvider : AreaIntelligenceProvider {
                     Source("Alfama Walking Tour Guide", null)
                 )
             )
+        )
+    }
+
+    override suspend fun fetchResidentData(
+        areaName: String,
+        originCountryCode: String,
+        originCity: String?,
+        languageTag: String,
+    ): ResidentData {
+        delay(1500) // Simulate network latency
+        return ResidentData(
+            areaName = areaName,
+            categories = listOf(
+                ResidentCategory("D1", "Rental Prices", "\uD83C\uDFE0", listOf(
+                    ResidentDataPoint("~\u20AC800/mo", "1-bedroom in city center", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                    ResidentDataPoint("~\u20AC550/mo", "1-bedroom outside center", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                )),
+                ResidentCategory("D2", "Buy Prices", "\uD83C\uDFD7\uFE0F", listOf(
+                    ResidentDataPoint("~\u20AC4,200/m\u00B2", "City center average", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                    ResidentDataPoint("~\u20AC2,800/m\u00B2", "Outside center average", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                )),
+                ResidentCategory("D3", "Cost of Living", "\uD83D\uDCCA", listOf(
+                    ResidentDataPoint("62/100", "Moderate — below EU average", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                    ResidentDataPoint("~\u20AC300/mo", "Groceries for one person", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                )),
+                ResidentCategory("D4", "Safety & Crime", "\uD83D\uDEE1\uFE0F", listOf(
+                    ResidentDataPoint("Above average", "Generally safe, low violent crime", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                    ResidentDataPoint("Pickpocketing", "Common in tourist areas and trams", DataConfidence.HIGH, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                )),
+                ResidentCategory("D6", "Job Market", "\uD83D\uDCBC", listOf(
+                    ResidentDataPoint("Tech & Tourism", "Top industries", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                    ResidentDataPoint("~6.5%", "Unemployment rate", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "Gemini AI estimate \u00b7 Mar 2026"),
+                )),
+                ResidentCategory("D9", "Community Vibe", "\uD83C\uDF1F", listOf(
+                    ResidentDataPoint("Creative & laid-back", "Growing expat and digital nomad scene", DataConfidence.HIGH, DataClassification.STATIC, "Gemini AI estimate \u00b7 2026"),
+                )),
+                ResidentCategory("D10", "Weather & Climate", "\u2600\uFE0F", listOf(
+                    ResidentDataPoint("Mediterranean", "300+ sunny days, mild winters", DataConfidence.HIGH, DataClassification.STATIC, "Gemini AI estimate \u00b7 2026"),
+                )),
+                ResidentCategory("D12", "Visa & Immigration", "\uD83D\uDDC2\uFE0F", listOf(
+                    ResidentDataPoint("D7 Visa", "Passive income visa for non-EU", DataConfidence.LOW, DataClassification.VOLATILE, "Gemini AI estimate \u00b7 Mar 2026 \u00b7 Verify locally", "https://www.sef.pt"),
+                    ResidentDataPoint("Digital Nomad Visa", "For remote workers", DataConfidence.LOW, DataClassification.VOLATILE, "Gemini AI estimate \u00b7 Mar 2026 \u00b7 Verify locally", "https://www.sef.pt"),
+                )),
+                ResidentCategory("D21", "Cultural & Community Fit", "\uD83C\uDF0D", listOf(
+                    ResidentDataPoint("Welcoming", "Large English-speaking expat community", DataConfidence.MEDIUM, DataClassification.STATIC, "Gemini AI estimate \u00b7 2026"),
+                    ResidentDataPoint("Fado culture", "Deep traditional music and arts scene", DataConfidence.HIGH, DataClassification.STATIC, "Gemini AI estimate \u00b7 2026"),
+                )),
+            ),
+            originContext = originCity?.let { "Compared to $it" },
+            fetchedAt = com.harazone.util.SystemClock().nowMs(),
         )
     }
 }

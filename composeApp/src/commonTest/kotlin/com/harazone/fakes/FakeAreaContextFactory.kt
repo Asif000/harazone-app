@@ -1,6 +1,7 @@
 package com.harazone.fakes
 
 import com.harazone.domain.model.AreaContext
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.service.AreaContextFactory
 
 class FakeAreaContextFactory(
@@ -15,8 +16,8 @@ class FakeAreaContextFactory(
     var callCount = 0
         private set
 
-    override fun create(): AreaContext {
+    override fun create(discoveryMode: DiscoveryMode): AreaContext {
         callCount++
-        return context
+        return context.copy(discoveryMode = discoveryMode)
     }
 }

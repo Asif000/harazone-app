@@ -5,6 +5,8 @@ import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.DataClassification
+import com.harazone.domain.model.DataConfidence
 import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.MessageRole
@@ -12,6 +14,9 @@ import com.harazone.domain.model.DomainError
 import com.harazone.domain.model.DomainErrorException
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.ProfileIdentity
+import com.harazone.domain.model.ResidentCategory
+import com.harazone.domain.model.ResidentData
+import com.harazone.domain.model.ResidentDataPoint
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfile
 import com.harazone.domain.provider.ApiKeyProvider
@@ -40,6 +45,10 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 
 @Serializable
 private data class GeminiRequest(
@@ -554,6 +563,108 @@ internal class GeminiAreaIntelligenceProvider(
                 "$toneInstruction $langInstruction\n$context\nThe user is looking at the map. Say something brief and evocative about this place or what's visible — like a knowledgeable friend leaning over their shoulder."
             else -> null
         }
+    }
+
+    override suspend fun fetchResidentData(
+        areaName: String,
+        originCountryCode: String,
+        originCity: String?,
+        languageTag: String,
+    ): ResidentData {
+        val apiKey = apiKeyProvider.geminiApiKey
+        if (apiKey.isBlank()) {
+            throw DomainErrorException(DomainError.ApiError(0, "Gemini API key not configured"))
+        }
+        val prompt = promptBuilder.buildResidentDataPrompt(areaName, originCountryCode, originCity, languageTag)
+        val requestBody = buildRequestBody(prompt)
+        val result = withRetry(
+            maxAttempts = MAX_RETRY_ATTEMPTS,
+            initialDelayMs = 200,
+            maxDelayMs = 2000,
+            isRetryable = { e -> e is Exception && isRetryableError(e as Exception) }
+        ) {
+            httpClient.post("$BASE_URL/$GEMINI_MODEL:generateContent") {
+                parameter("key", apiKey)
+                contentType(ContentType.Application.Json)
+                setBody(requestBody)
+            }.bodyAsText()
+        }
+        val responseJson = result.getOrThrow()
+        val text = responseParser.extractTextFromGenerateContent(responseJson)
+        return parseResidentDataResponse(text, areaName)
+    }
+
+    private fun parseResidentDataResponse(text: String, areaName: String): ResidentData {
+        val cleaned = stripMarkdownFences(text)
+        val jsonObj = json.parseToJsonElement(cleaned) as? JsonObject
+            ?: throw IllegalStateException("Resident data response is not a JSON object")
+
+        val categoriesArray = jsonObj["categories"] as? JsonArray ?: JsonArray(emptyList())
+        val originContext = (jsonObj["originContext"] as? JsonPrimitive)?.contentOrNull
+
+        val defaultConfidenceMap = mapOf(
+            ResidentData.CAT_RENTAL to DataConfidence.MEDIUM, ResidentData.CAT_BUY to DataConfidence.MEDIUM,
+            ResidentData.CAT_COL to DataConfidence.MEDIUM, ResidentData.CAT_SAFETY to DataConfidence.MEDIUM,
+            ResidentData.CAT_JOBS to DataConfidence.MEDIUM, ResidentData.CAT_COMMUNITY to DataConfidence.HIGH,
+            ResidentData.CAT_WEATHER to DataConfidence.HIGH, ResidentData.CAT_VISA to DataConfidence.LOW,
+            ResidentData.CAT_CULTURE to DataConfidence.MEDIUM,
+        )
+        val classificationMap = mapOf(
+            ResidentData.CAT_RENTAL to DataClassification.DYNAMIC, ResidentData.CAT_BUY to DataClassification.DYNAMIC,
+            ResidentData.CAT_COL to DataClassification.DYNAMIC, ResidentData.CAT_SAFETY to DataClassification.DYNAMIC,
+            ResidentData.CAT_JOBS to DataClassification.DYNAMIC, ResidentData.CAT_COMMUNITY to DataClassification.STATIC,
+            ResidentData.CAT_WEATHER to DataClassification.STATIC, ResidentData.CAT_VISA to DataClassification.VOLATILE,
+            ResidentData.CAT_CULTURE to DataClassification.STATIC,
+        )
+        val nowMs = com.harazone.util.SystemClock().nowMs()
+
+        val categories = categoriesArray.mapNotNull { catElement ->
+            val catObj = catElement as? JsonObject ?: return@mapNotNull null
+            val id = (catObj["id"] as? JsonPrimitive)?.content ?: return@mapNotNull null
+            val label = (catObj["label"] as? JsonPrimitive)?.content ?: return@mapNotNull null
+            val icon = (catObj["icon"] as? JsonPrimitive)?.content ?: ""
+            val pointsArray = catObj["points"] as? JsonArray ?: JsonArray(emptyList())
+
+            val classification = classificationMap[id] ?: DataClassification.DYNAMIC
+            val monthNames = arrayOf("Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec")
+            val totalDays = (nowMs / 86_400_000).toInt()
+            val approxYear = 1970 + totalDays / 365
+            val approxMonth = monthNames[((totalDays % 365) / 30).coerceIn(0, 11)]
+            val sourceLabel = when (classification) {
+                DataClassification.STATIC -> "Gemini AI estimate \u00b7 $approxYear"
+                DataClassification.DYNAMIC -> "Gemini AI estimate \u00b7 $approxMonth $approxYear"
+                DataClassification.VOLATILE -> "Gemini AI estimate \u00b7 $approxMonth $approxYear \u00b7 Verify locally"
+            }
+
+            val points = pointsArray.mapNotNull { ptElement ->
+                val ptObj = ptElement as? JsonObject ?: return@mapNotNull null
+                val value = (ptObj["value"] as? JsonPrimitive)?.content ?: return@mapNotNull null
+                val detail = (ptObj["detail"] as? JsonPrimitive)?.content ?: ""
+                val confidenceStr = (ptObj["confidence"] as? JsonPrimitive)?.content
+                val confidence = when (confidenceStr?.uppercase()) {
+                    "HIGH" -> DataConfidence.HIGH
+                    "LOW" -> DataConfidence.LOW
+                    else -> defaultConfidenceMap[id] ?: DataConfidence.MEDIUM
+                }
+                val verifyUrl = (ptObj["verifyUrl"] as? JsonPrimitive)?.contentOrNull
+                ResidentDataPoint(
+                    value = value,
+                    detail = detail,
+                    confidence = confidence,
+                    classification = classification,
+                    sourceLabel = sourceLabel,
+                    verifyUrl = verifyUrl,
+                )
+            }
+            ResidentCategory(id = id, label = label, icon = icon, points = points)
+        }
+
+        return ResidentData(
+            areaName = areaName,
+            categories = categories,
+            originContext = originContext,
+            fetchedAt = nowMs,
+        )
     }
 
     private fun buildRequestBody(prompt: String): String = json.encodeToString(

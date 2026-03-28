@@ -7,6 +7,8 @@ import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.DiscoveryMode
+import com.harazone.domain.model.FeatureFlags
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.DynamicVibe
@@ -107,6 +109,7 @@ class MapViewModelTest {
         ),
         localeProvider = com.harazone.fakes.FakeLocaleProvider(),
         advisoryProvider = advisoryProvider,
+        aiProvider = com.harazone.fakes.FakeAreaIntelligenceProvider(),
         clockMs = clockMs,
     )
 
@@ -2980,6 +2983,159 @@ class MapViewModelTest {
         testScheduler.advanceTimeBy(500)
         val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
         assertEquals(batch0Pois.size, state.poiStreamingCount)
+    }
+
+    // --- Move Here mode tests ---
+
+    @Test
+    fun toggleMoveHere_activates_resident_mode() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.TRAVELER, state.discoveryMode)
+        viewModel.toggleMoveHere()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.RESIDENT, after.discoveryMode, "Feature flag on = toggles to RESIDENT")
+    }
+
+    @Test
+    fun restoreResidentModeIfNeeded_defaults_to_traveler() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        viewModel.restoreResidentModeIfNeeded("Unknown Area")
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.TRAVELER, after.discoveryMode)
+        assertNull(after.residentData)
+    }
+
+    // ── Move Here: toggle sets residentAreaName ──
+
+    @Test
+    fun toggleMoveHere_sets_residentAreaName() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(25.77, -80.33)),
+                geocodeResult = Result.success("Doral, Florida"),
+            ),
+        )
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.TRAVELER, state.discoveryMode)
+        assertNull(state.residentAreaName)
+
+        viewModel.toggleMoveHere()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.RESIDENT, after.discoveryMode)
+        assertEquals("Doral, Florida", after.residentAreaName)
+    }
+
+    @Test
+    fun toggleMoveHere_off_clears_residentAreaName() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(25.77, -80.33)),
+                geocodeResult = Result.success("Doral, Florida"),
+            ),
+        )
+        viewModel.toggleMoveHere() // ON
+        viewModel.toggleMoveHere() // OFF
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.TRAVELER, after.discoveryMode)
+        assertNull(after.residentAreaName)
+        assertNull(after.residentData)
+    }
+
+    // ── Move Here: area change clears stale resident data ──
+
+    @Test
+    fun geocodingSelection_clears_resident_state() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(25.77, -80.33)),
+                geocodeResult = Result.success("Doral, Florida"),
+            ),
+        )
+        viewModel.toggleMoveHere()
+        testScheduler.advanceUntilIdle()
+        val before = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.RESIDENT, before.discoveryMode)
+
+        // Navigate to a different area via geocoding
+        viewModel.onGeocodingSuggestionSelected(
+            GeocodingSuggestion("Uvita, Costa Rica", "Uvita, Puntarenas, Costa Rica", 9.16, -83.74, null),
+        )
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.TRAVELER, after.discoveryMode)
+        assertNull(after.residentData)
+        assertFalse(after.isLoadingResidentData)
+        // residentAreaName should be preserved so the 🏠 icon stays visible
+        assertEquals("Doral, Florida", after.residentAreaName)
+    }
+
+    @Test
+    fun recentSelection_clears_resident_state() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(25.77, -80.33)),
+                geocodeResult = Result.success("Doral, Florida"),
+            ),
+        )
+        viewModel.toggleMoveHere()
+        testScheduler.advanceUntilIdle()
+
+        viewModel.onRecentSelected(RecentPlace("Lisbon", 38.72, -9.14))
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.TRAVELER, after.discoveryMode)
+        assertNull(after.residentData)
+    }
+
+    // ── Move Here: restore when navigating back ──
+
+    @Test
+    fun restoreResidentModeIfNeeded_restores_for_previously_activated_area() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(25.77, -80.33)),
+                geocodeResult = Result.success("Doral, Florida"),
+            ),
+        )
+        // Activate resident mode for Doral
+        viewModel.toggleMoveHere()
+        testScheduler.advanceUntilIdle()
+
+        // Simulate navigating away and back
+        viewModel.restoreResidentModeIfNeeded("Doral, Florida")
+        testScheduler.advanceUntilIdle()
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.RESIDENT, after.discoveryMode)
+        assertEquals("Doral, Florida", after.residentAreaName)
+    }
+
+    @Test
+    fun restoreResidentModeIfNeeded_stays_traveler_for_unactivated_area() = runTest(testDispatcher) {
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(25.77, -80.33)),
+                geocodeResult = Result.success("Doral, Florida"),
+            ),
+        )
+        // Activate resident mode for Doral
+        viewModel.toggleMoveHere()
+        testScheduler.advanceUntilIdle()
+
+        // Try restoring for a different area — should stay traveler
+        viewModel.restoreResidentModeIfNeeded("Lisbon")
+        val after = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertEquals(DiscoveryMode.TRAVELER, after.discoveryMode)
+        assertNull(after.residentData)
     }
 
 }

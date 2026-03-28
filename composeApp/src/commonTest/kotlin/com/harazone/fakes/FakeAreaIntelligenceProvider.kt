@@ -7,9 +7,14 @@ import com.harazone.domain.model.BucketUpdate
 import com.harazone.domain.model.ChatMessage
 import com.harazone.domain.model.ChatToken
 import com.harazone.domain.model.Confidence
+import com.harazone.domain.model.DataClassification
+import com.harazone.domain.model.DataConfidence
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.GeoArea
 import com.harazone.domain.model.ProfileIdentity
+import com.harazone.domain.model.ResidentCategory
+import com.harazone.domain.model.ResidentData
+import com.harazone.domain.model.ResidentDataPoint
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfile
 import com.harazone.domain.model.VibeInsight
@@ -130,6 +135,30 @@ class FakeAreaIntelligenceProvider : AreaIntelligenceProvider {
             if (shouldThrowProfileChat) throw RuntimeException("Profile chat test error")
             profileChatTokens.forEach { emit(it) }
         }
+    }
+
+    var residentDataResult: ResidentData = ResidentData(
+        areaName = "Test Area",
+        categories = listOf(
+            ResidentCategory("D1", "Rental Prices", "\uD83C\uDFE0", listOf(
+                ResidentDataPoint("~$1,400/mo", "1-bed center", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "src"),
+            )),
+        ),
+        originContext = null,
+        fetchedAt = 1000L,
+    )
+    var shouldThrowResidentData: Boolean = false
+    var residentDataCallCount = 0
+
+    override suspend fun fetchResidentData(
+        areaName: String,
+        originCountryCode: String,
+        originCity: String?,
+        languageTag: String,
+    ): ResidentData {
+        residentDataCallCount++
+        if (shouldThrowResidentData) throw RuntimeException("Resident data test error")
+        return residentDataResult.copy(areaName = areaName)
     }
 }
 

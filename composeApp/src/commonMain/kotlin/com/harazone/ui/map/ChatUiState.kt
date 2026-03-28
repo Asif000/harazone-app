@@ -58,4 +58,5 @@ data class ChatUiState(
     val localTip: String? = null,
     val isContextLoading: Boolean = false,
     val isTipRefreshing: Boolean = false,
+    val isResidentMode: Boolean = false,
 )

@@ -107,6 +107,7 @@ fun RotatingMetaTicker(
 fun MetaLine.displayColor(): Color = when (this) {
     is MetaLine.SafetyWarning -> Color(0xFFFFB300)
     is MetaLine.RemoteContext -> Color(0xFF26A69A)
+    is MetaLine.ResidentHeadline -> Color(0xFF26A69A)
     is MetaLine.CurrencyContext -> Color(0xFF26A69A)
     is MetaLine.LanguageContext -> Color(0xFF26A69A)
     is MetaLine.VibeFilter -> Color(0xFFB39DDB)

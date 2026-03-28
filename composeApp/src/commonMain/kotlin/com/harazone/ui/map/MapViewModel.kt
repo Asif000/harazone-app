@@ -7,11 +7,14 @@ import com.harazone.data.remote.MapTilerGeocodingProvider
 import com.harazone.data.remote.WikipediaImageRepository
 import com.harazone.domain.model.AreaContext
 import com.harazone.domain.model.BucketUpdate
+import com.harazone.domain.model.DiscoveryMode
 import com.harazone.domain.model.DynamicVibe
+import com.harazone.domain.model.FeatureFlags
 import com.harazone.domain.model.GeocodingSuggestion
 import com.harazone.domain.model.GhostPin
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.RecentPlace
+import com.harazone.domain.model.ResidentData
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.VisitState
 import com.harazone.domain.repository.RecentPlacesRepository
@@ -29,6 +32,7 @@ import com.harazone.domain.model.AreaAdvisory
 import com.harazone.domain.model.CompanionNudge
 import com.harazone.domain.model.NudgeType
 import com.harazone.domain.provider.AdvisoryProvider
+import com.harazone.domain.provider.AreaIntelligenceProvider
 import com.harazone.domain.provider.LocaleProvider
 import com.harazone.util.AppLogger
 import com.harazone.util.haversineDistanceMeters
@@ -62,6 +66,7 @@ class MapViewModel(
     private val companionEngine: CompanionNudgeEngine,
     private val localeProvider: LocaleProvider,
     private val advisoryProvider: AdvisoryProvider,
+    private val aiProvider: AreaIntelligenceProvider,
     private val clockMs: () -> Long = { com.harazone.util.SystemClock().nowMs() },
 ) : ViewModel() {
 
@@ -138,6 +143,11 @@ class MapViewModel(
     // Gallery image prefetch
     private val prefetchJobs = HashMap<String, Job>()
     private val imagePrefetchSemaphore = Semaphore(MAX_GALLERY_IMAGES)
+
+    // Move Here mode — area-scoped resident state
+    // TODO(BACKLOG-LOW): Add LRU eviction to residentAreas — unbounded map grows with each activated area
+    private val residentAreas = mutableMapOf<String, DiscoveryMode>()
+    private var residentFetchJob: Job? = null
 
     init {
         loadLocation()
@@ -680,7 +690,14 @@ class MapViewModel(
             advisory = null,
             isAdvisoryBannerDismissed = false,
             hasAcknowledgedGate = false,
+            discoveryMode = DiscoveryMode.TRAVELER,
+            residentAreaName = current.residentAreaName,
+            residentData = null,
+            isLoadingResidentData = false,
+            dailyLifePois = emptyList(),
+            showDailyLifePins = false,
         )
+        residentFetchJob?.cancel()
         fetchWeatherForLocation(suggestion.latitude, suggestion.longitude)
         fetchAdvisory(suggestion.latitude, suggestion.longitude, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
@@ -701,6 +718,7 @@ class MapViewModel(
                             showMyLocation = isAwayFromGps(suggestion.latitude, suggestion.longitude, state),
                             dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, suggestion.name),
                         )
+                        restoreResidentModeIfNeeded(suggestion.name)
                     },
                     onError = { e ->
                         preSearchSnapshot = null
@@ -770,7 +788,14 @@ class MapViewModel(
             advisory = null,
             isAdvisoryBannerDismissed = false,
             hasAcknowledgedGate = false,
+            discoveryMode = DiscoveryMode.TRAVELER,
+            residentAreaName = current.residentAreaName,
+            residentData = null,
+            isLoadingResidentData = false,
+            dailyLifePois = emptyList(),
+            showDailyLifePins = false,
         )
+        residentFetchJob?.cancel()
         fetchWeatherForLocation(recent.latitude, recent.longitude)
         fetchAdvisory(recent.latitude, recent.longitude, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
@@ -791,6 +816,7 @@ class MapViewModel(
                             showMyLocation = isAwayFromGps(recent.latitude, recent.longitude, state),
                             dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, recent.name),
                         )
+                        restoreResidentModeIfNeeded(recent.name)
                     },
                     onError = { e ->
                         preSearchSnapshot = null
@@ -867,7 +893,14 @@ class MapViewModel(
             isAdvisoryBannerDismissed = false,
             hasAcknowledgedGate = false,
             ghostPins = emptyList(),
+            discoveryMode = DiscoveryMode.TRAVELER,
+            residentAreaName = current.residentAreaName,
+            residentData = null,
+            isLoadingResidentData = false,
+            dailyLifePois = emptyList(),
+            showDailyLifePins = false,
         )
+        residentFetchJob?.cancel()
         fetchWeatherForLocation(lat, lng)
         fetchAdvisory(lat, lng, previousArea = PreviousAreaInfo(current.areaName, current.latitude, current.longitude))
         areaFetchJob = viewModelScope.launch {
@@ -889,6 +922,7 @@ class MapViewModel(
                             showMyLocation = isAwayFromGps(lat, lng, state),
                             dynamicVibeAreaSaveCounts = computeDynamicVibeAreaSaveCounts(latestSavedPois, areaName),
                         )
+                        restoreResidentModeIfNeeded(areaName)
                         if (pendingPostSearchSlideshow) {
                             pendingPostSearchSlideshow = false
                             schedulePostSearchSlideshow()
@@ -1129,6 +1163,23 @@ class MapViewModel(
                 // Always refresh weather + time for GPS location
                 fetchWeatherForLocation(coords.latitude, coords.longitude)
 
+                // Reset resident + advisory state — will restore below if GPS area has resident mode
+                residentFetchJob?.cancel()
+                val currentState = _uiState.value as? MapUiState.Ready
+                if (currentState != null) {
+                    _uiState.value = currentState.copy(
+                        discoveryMode = DiscoveryMode.TRAVELER,
+                        residentData = null,
+                        isLoadingResidentData = false,
+                        dailyLifePois = emptyList(),
+                        showDailyLifePins = false,
+                        advisory = null,
+                        isAdvisoryBannerDismissed = false,
+                        hasAcknowledgedGate = false,
+                    )
+                }
+                fetchAdvisory(coords.latitude, coords.longitude)
+
                 val homeSnapshot = preSearchSnapshot
                 preSearchSnapshot = null
 
@@ -1169,6 +1220,7 @@ class MapViewModel(
                         activeDynamicVibe = null,
                         isBackgroundFetching = false,
                     )
+                    restoreResidentModeIfNeeded(gpsAreaName)
                 } else {
                     // Check if we have cached POIs for the GPS area (avoids re-querying Gemini)
                     val hasCachedPois = gpsAreaNameCache != null &&
@@ -1206,6 +1258,7 @@ class MapViewModel(
                             selectedPinIndex = null,
                             areaHighlights = emptyList(),
                         )
+                        restoreResidentModeIfNeeded(gpsAreaNameCache!!)
                     } else {
                         _uiState.value = state.copy(
                             latitude = coords.latitude,
@@ -1245,6 +1298,7 @@ class MapViewModel(
                                 lastFetchLat = coords.latitude
                                 lastFetchLng = coords.longitude
                                 lastFetchMs = clockMs()
+                                restoreResidentModeIfNeeded(gpsAreaName)
                             },
                             onError = { e ->
                                 AppLogger.e(e) { "Return to location: portrait fetch failed" }
@@ -1973,6 +2027,104 @@ class MapViewModel(
             advisoryBlurb = advisory?.summary,
         )
         return map { it.copy(discoveryContext = ctx) }
+    }
+
+    // ── Move Here mode ──
+
+    fun toggleMoveHere() {
+        if (!FeatureFlags.MOVE_HERE_ENABLED) return
+        var areaToFetch: String? = null
+        _uiState.update { state ->
+            val ready = state as? MapUiState.Ready ?: return@update state
+            val newMode = if (ready.discoveryMode == DiscoveryMode.RESIDENT)
+                DiscoveryMode.TRAVELER else DiscoveryMode.RESIDENT
+            if (residentAreas.size > 20) residentAreas.clear()
+            residentAreas[ready.areaName] = newMode
+            if (newMode == DiscoveryMode.RESIDENT) {
+                areaToFetch = ready.areaName
+            } else {
+                residentFetchJob?.cancel()
+            }
+            ready.copy(
+                discoveryMode = newMode,
+                residentAreaName = if (newMode == DiscoveryMode.RESIDENT) ready.areaName else null,
+                residentData = if (newMode == DiscoveryMode.TRAVELER) null else ready.residentData,
+                isLoadingResidentData = newMode == DiscoveryMode.RESIDENT && ready.residentData == null,
+                dailyLifePois = if (newMode == DiscoveryMode.TRAVELER) emptyList() else ready.dailyLifePois,
+                showDailyLifePins = newMode == DiscoveryMode.RESIDENT,
+            )
+        }
+        areaToFetch?.let { fetchResidentData(it) }
+    }
+
+    fun togglePinLayer() {
+        _uiState.update { state ->
+            (state as? MapUiState.Ready)?.copy(
+                showDailyLifePins = !state.showDailyLifePins,
+            ) ?: state
+        }
+    }
+
+    private fun fetchResidentData(areaName: String) {
+        residentFetchJob?.cancel()
+        residentFetchJob = viewModelScope.launch {
+            try {
+                // TODO(BACKLOG-MEDIUM): originCountryCode derivation is fragile — breaks for es-419, zh-Hans-CN, fr. Phase 1b should use user profile or device region instead of languageTag.
+                val tag = localeProvider.languageTag
+                val originCountryCode = if (tag.contains("-")) tag.substringAfter("-").uppercase() else "US"
+                val data = aiProvider.fetchResidentData(
+                    areaName = areaName,
+                    originCountryCode = originCountryCode,
+                    originCity = null,
+                    languageTag = tag,
+                )
+                _uiState.update { state ->
+                    (state as? MapUiState.Ready)?.copy(
+                        residentData = data,
+                        isLoadingResidentData = false,
+                    ) ?: state
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.e(e) { "MapViewModel: fetchResidentData failed" }
+                _errorEvents.emit("Failed to load resident data")
+                _uiState.update { state ->
+                    (state as? MapUiState.Ready)?.copy(
+                        discoveryMode = DiscoveryMode.TRAVELER,
+                        residentData = null,
+                        isLoadingResidentData = false,
+                        dailyLifePois = emptyList(),
+                        showDailyLifePins = false,
+                    ) ?: state
+                }
+                residentAreas[areaName] = DiscoveryMode.TRAVELER
+            }
+        }
+    }
+
+    /** Restore resident mode when user navigates back to an area they previously activated RESIDENT for. */
+    internal fun restoreResidentModeIfNeeded(areaName: String) {
+        if (residentAreas[areaName] == DiscoveryMode.RESIDENT) {
+            _uiState.update { state ->
+                (state as? MapUiState.Ready)?.copy(
+                    discoveryMode = DiscoveryMode.RESIDENT,
+                    residentAreaName = areaName,
+                    isLoadingResidentData = true,
+                ) ?: state
+            }
+            fetchResidentData(areaName)
+        } else {
+            _uiState.update { state ->
+                (state as? MapUiState.Ready)?.copy(
+                    discoveryMode = DiscoveryMode.TRAVELER,
+                    residentData = null,
+                    isLoadingResidentData = false,
+                    dailyLifePois = emptyList(),
+                    showDailyLifePins = false,
+                ) ?: state
+            }
+        }
     }
 
     companion object {

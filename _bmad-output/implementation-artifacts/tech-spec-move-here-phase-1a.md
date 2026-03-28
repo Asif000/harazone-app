@@ -2,7 +2,7 @@
 title: 'Move Here — Phase 1a (Gemini-Powered Resident Lens)'
 slug: 'move-here-phase-1a'
 created: '2026-03-26'
-status: 'ready-for-dev'
+status: 'implementation-complete'
 stepsCompleted: [1, 2, 3, 4]
 tech_stack: ['Kotlin', 'Compose Multiplatform', 'Gemini API', 'Google Places API', 'Open-Meteo', 'SQLDelight', 'Koin', 'MapLibre']
 files_to_modify:
@@ -162,14 +162,14 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
 
 #### Layer 1: Domain Models (no dependencies)
 
-- [ ] **Task 1: Create `DiscoveryMode` enum**
+- [x] **Task 1: Create `DiscoveryMode` enum**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/domain/model/DiscoveryMode.kt` (NEW)
   - Action: Create enum with two values:
     ```kotlin
     enum class DiscoveryMode { TRAVELER, RESIDENT }
     ```
 
-- [ ] **Task 2: Create `ResidentData` domain model**
+- [x] **Task 2: Create `ResidentData` domain model**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/domain/model/ResidentData.kt` (NEW)
   - Action: Create data classes for resident intelligence:
     ```kotlin
@@ -200,31 +200,33 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     )
     ```
 
-- [ ] **Task 3: Create `FeatureFlags` object**
+- [x] **Task 3: Create `FeatureFlags` object**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/domain/model/FeatureFlags.kt` (NEW)
   - Action: Create simple flags object:
     ```kotlin
     object FeatureFlags {
-        const val MOVE_HERE_ENABLED = true
+        const val MOVE_HERE_ENABLED = false  // flip to true when ready to ship
     }
     ```
 
 #### Layer 2: State Integration (depends on Layer 1)
 
-- [ ] **Task 4: Add `discoveryMode` to `AreaContext`**
+- [x] **Task 4: Add `discoveryMode` to `AreaContext`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/domain/model/AreaContext.kt`
   - Action: Add field `val discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER` to `AreaContext` data class. This flows into prompt builders so they can detect mode.
 
-- [ ] **Task 5: Add resident state to `MapUiState.Ready`**
+- [x] **Task 5: Add resident state to `MapUiState.Ready`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/MapUiState.kt`
-  - Action: Add three fields to `MapUiState.Ready`:
+  - Action: Add five fields to `MapUiState.Ready` (consolidates all Move Here state — Task 14 does NOT add more fields):
     ```kotlin
     val discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
     val residentData: ResidentData? = null,
     val isLoadingResidentData: Boolean = false,
+    val dailyLifePois: List<POI> = emptyList(),
+    val showDailyLifePins: Boolean = false,  // toggle between explore/daily-life
     ```
 
-- [ ] **Task 6: Add resident `MetaLine` variants**
+- [x] **Task 6: Add resident `MetaLine` variants**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/domain/model/MetaLine.kt`
   - Action:
     1. Add new sealed class variant at priority 2:
@@ -233,7 +235,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
        data class ResidentHeadline(val text: String) : MetaLine(2)
        ```
     2. Add `is MetaLine.ResidentHeadline -> text` to `MetaLine.text` extension property
-    3. Update `buildMetaLines()`:
+    3. Update `buildMetaLines()` (already has 18 params — add 2 more with defaults to avoid breaking existing callers):
        - Add parameter `discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER`
        - Add parameter `residentData: ResidentData? = null`
        - When `discoveryMode == RESIDENT && residentData != null`:
@@ -246,7 +248,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
 
 #### Layer 3: Gemini Prompt + Data Fetch (depends on Layer 1)
 
-- [ ] **Task 7: Add `buildResidentDataPrompt()` to `GeminiPromptBuilder`**
+- [x] **Task 7: Add `buildResidentDataPrompt()` to `GeminiPromptBuilder`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/data/remote/GeminiPromptBuilder.kt`
   - Action: Add new method that returns a prompt requesting structured JSON for all 9 categories:
     ```kotlin
@@ -267,7 +269,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     - Language rule: respond in locale language if non-English
     - Output: single JSON object, no other text
 
-- [ ] **Task 8: Add `residentContextBlock()` to `GeminiPromptBuilder`**
+- [x] **Task 8: Add `residentContextBlock()` to `GeminiPromptBuilder`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/data/remote/GeminiPromptBuilder.kt`
   - Action: Add private method for chat prompt layering:
     ```kotlin
@@ -278,14 +280,15 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     - Adds rules: "Prioritize daily-life relevance over tourist appeal", "Compare to user's origin when relevant", "Be honest about downsides — groceries cost X% above average"
     - When `residentData == null`: returns empty string (no-op)
 
-- [ ] **Task 9: Wire `residentContextBlock` into `buildChatSystemContext()`**
+- [x] **Task 9: Wire `residentContextBlock` into `buildChatSystemContext()`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/data/remote/GeminiPromptBuilder.kt`
   - Action:
-    1. Add parameter `residentData: ResidentData? = null` to `buildChatSystemContext()`
+    1. Add parameter `residentData: ResidentData? = null` to `buildChatSystemContext()` (default null preserves all existing callers — no signature breakage)
     2. Add `residentContextBlock(residentData)` to the `listOf(...)` block assembly, after `contextShiftBlock()` and before `outputFormatBlock()`
     3. When in resident mode, modify `personaBlock()` call or add override: persona shifts from "passionate local who has lived here 20 years" to "honest relocation advisor who knows {areaName} inside out"
+    4. Update `ChatViewModel` call site (line ~270) to pass `residentData` when available. Update `systemContextForTest` accessor similarly. Update any test call sites in `GeminiPromptBuilderTest.kt`.
 
-- [ ] **Task 10: Add `fetchResidentData()` to `AreaIntelligenceProvider` interface**
+- [x] **Task 10: Add `fetchResidentData()` to `AreaIntelligenceProvider` interface**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/domain/provider/AreaIntelligenceProvider.kt`
   - Action: Add method to interface:
     ```kotlin
@@ -297,7 +300,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     ): ResidentData
     ```
 
-- [ ] **Task 11: Implement `fetchResidentData()` in `GeminiAreaIntelligenceProvider`**
+- [x] **Task 11: Implement `fetchResidentData()` in `GeminiAreaIntelligenceProvider`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/data/remote/GeminiAreaIntelligenceProvider.kt`
   - Action:
     1. Implement the interface method
@@ -312,13 +315,13 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     7. Generate `sourceLabel` based on classification rules (see Data Classification Citation Rules table)
     8. Set `fetchedAt` to current epoch ms
 
-- [ ] **Task 12: Add stub to `MockAreaIntelligenceProvider`**
+- [x] **Task 12: Add stub to `MockAreaIntelligenceProvider`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/data/remote/MockAreaIntelligenceProvider.kt`
   - Action: Add `fetchResidentData()` implementation returning hardcoded mock `ResidentData` for "Lisbon" with realistic values across all 9 categories. This supports offline development and testing.
 
 #### Layer 4: ViewModel Logic (depends on Layers 2 + 3)
 
-- [ ] **Task 13: Add mode management to `MapViewModel`**
+- [x] **Task 13: Add mode management to `MapViewModel`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/MapViewModel.kt`
   - Action:
     1. Add private state: `private val residentAreas = mutableMapOf<String, DiscoveryMode>()`
@@ -344,7 +347,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
        ```
     3. Add private method `fetchResidentData(areaName: String)`:
        - Launch coroutine in `viewModelScope`
-       - Get origin from `localeProvider.countryCode` + GPS home city (from `locationProvider`)
+       - Get origin country from `localeProvider.languageTag` (parse region subtag, e.g. "pt-BR" → "BR"; fall back to "US" if no region). NOTE: `LocaleProvider` has no `countryCode` property — derive from `languageTag`.
        - Call `getAreaPortrait.repository` or inject `AreaIntelligenceProvider` directly for `fetchResidentData()`
        - On success: update `_uiState` with `residentData`, `isLoadingResidentData = false`
        - On error: emit error event, reset mode to TRAVELER, clear loading
@@ -353,21 +356,15 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
        - If no entry, default to TRAVELER (clear `residentData`, set mode)
     5. Wire `discoveryMode` into `buildMetaLines()` calls (pass mode + residentData)
 
-- [ ] **Task 14: Add daily-life pin fetch to `MapViewModel`**
+- [x] **Task 14: Add daily-life pin fetch to `MapViewModel`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/MapViewModel.kt`
-  - Action:
-    1. Add state field to `MapUiState.Ready`:
-       ```kotlin
-       val dailyLifePois: List<POI> = emptyList(),
-       val showDailyLifePins: Boolean = false,  // toggle between explore/daily-life
-       ```
-    2. When mode switches to RESIDENT, trigger Google Places search for daily-life POI types near area center
-    3. Use existing `GooglePlacesProvider` — add new method `searchNearbyByType(lat, lng, type, radius)` or use existing text search with type keywords
-    4. Store results in `dailyLifePois`
-    5. Add `fun togglePinLayer()` to switch between explore pins and daily-life pins
-    6. Default: show daily-life pins when in RESIDENT mode, explore pins when in TRAVELER
+  - Action: (NOTE: `dailyLifePois` and `showDailyLifePins` fields already added to `MapUiState.Ready` in Task 5)
+    1. When mode switches to RESIDENT, trigger Google Places text search for daily-life POI type keywords near area center. Use existing `GooglePlacesProvider` — call existing search infrastructure with type keywords ("grocery store", "school", "hospital", "transit station", "gym", "pharmacy") as text queries. Do NOT add new methods to `PlacesProvider` interface — reuse existing text search capability.
+    2. Store results in `dailyLifePois`
+    3. Add `fun togglePinLayer()` to switch between explore pins and daily-life pins
+    4. Default: show daily-life pins when in RESIDENT mode, explore pins when in TRAVELER
 
-- [ ] **Task 15: Add mode-aware context to `ChatViewModel`**
+- [x] **Task 15: Add mode-aware context to `ChatViewModel`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/ChatViewModel.kt`
   - Action:
     1. Add field: `private var currentResidentData: ResidentData? = null`
@@ -382,7 +379,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
 
 #### Layer 5: UI Components (depends on Layer 4)
 
-- [ ] **Task 16: Add "Move Here" button + mode indicator to `DiscoveryHeader`**
+- [x] **Task 16: Add "Move Here" button + mode indicator to `DiscoveryHeader`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/components/DiscoveryHeader.kt`
   - Action:
     1. Add parameters to `DiscoveryHeader` composable:
@@ -407,7 +404,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
        - Area name text gets subtle teal tint to signal mode
        - Mode indicator: small "Living" label below area name (or inline after name, space permitting)
 
-- [ ] **Task 17: Create `ResidentDashboardCard` composable**
+- [x] **Task 17: Create `ResidentDashboardCard` composable**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/components/ResidentDashboardCard.kt` (NEW)
   - Action: Create expandable dashboard card showing all 9 resident categories:
     1. **Collapsed state:** Shows top 3 headline numbers in a horizontal row:
@@ -429,7 +426,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     5. **Origin comparison:** If `residentData.originContext != null`, show comparison header: "Compared to {originCity}"
     6. Style: Dark card matching `MapFloatingUiDark` theme. Rounded corners. Uses `PlatformBackHandler` to dismiss when expanded.
 
-- [ ] **Task 18: Add resident section to `AiDetailPage`**
+- [x] **Task 18: Add resident section to `AiDetailPage`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/components/AiDetailPage.kt`
   - Action:
     1. Add parameters:
@@ -437,18 +434,20 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
        discoveryMode: DiscoveryMode = DiscoveryMode.TRAVELER,
        residentData: ResidentData? = null,
        ```
-    2. When `discoveryMode == RESIDENT && residentData != null`:
+    2. Add parameter `dailyLifePois: List<POI> = emptyList()` to `AiDetailPage`
+    3. When `discoveryMode == RESIDENT && residentData != null`:
        - Add "Living Here" section after the existing POI metadata section
-       - Show 3-4 proximity data points for the current POI based on daily-life POIs:
+       - Show 3-4 proximity data points for the current POI based on `dailyLifePois` param:
          - "5 min walk to Metro" (nearest transit_station)
          - "3 grocery stores within 500m" (grocery_store count)
          - "Nearest hospital: 1.2 km" (nearest hospital)
          - "2 schools within 1 km" (school count)
-       - Proximity data comes from `dailyLifePois` in MapUiState — calculate distances from current POI's lat/lng using `haversineDistanceMeters()`
+       - Calculate distances from current POI's lat/lng using `haversineDistanceMeters()` (in `com.harazone.util.GeoUtils`)
        - Section has "🤖 AI Insight" badge + "Based on Google Places data" attribution
+       - `dailyLifePois` passed from `MapScreen` → `AiDetailPage` (wired in Task 20)
     3. When `discoveryMode == TRAVELER`: no change, section is hidden
 
-- [ ] **Task 19: Update ticker rendering for resident mode**
+- [x] **Task 19: Update ticker rendering for resident mode**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/components/RotatingMetaTicker.kt`
   - Action:
     1. Add handling for `MetaLine.ResidentHeadline` in the `when` block that determines text color
@@ -457,7 +456,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
 
 #### Layer 6: Wiring (depends on Layer 5)
 
-- [ ] **Task 20: Wire everything in `MapScreen`**
+- [x] **Task 20: Wire everything in `MapScreen`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/ui/map/MapScreen.kt`
   - Action:
     1. Extract `discoveryMode`, `residentData`, `isLoadingResidentData`, `dailyLifePois`, `showDailyLifePins` from `MapUiState.Ready`
@@ -478,24 +477,24 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
        - When `!showDailyLifePins`: pass existing `pois` (traveler pins)
        - Add pin layer toggle button (small chip above map: "Explore" / "Daily Life")
 
-- [ ] **Task 21: Update `AreaContextFactory` to include `discoveryMode`**
+- [x] **Task 21: Update `AreaContextFactory` to include `discoveryMode`**
   - File: `composeApp/src/commonMain/kotlin/com/harazone/domain/service/AreaContextFactory.kt`
   - Action: Pass `discoveryMode` through to `AreaContext` construction. This ensures prompts that use `AreaContext` are mode-aware.
 
 #### Layer 7: Tests (depends on all above)
 
-- [ ] **Task 22: Unit tests for domain models**
+- [x] **Task 22: Unit tests for domain models**
   - File: `composeApp/src/commonTest/kotlin/com/harazone/domain/model/ResidentDataTest.kt` (NEW)
   - Action: Test `ResidentData`, `ResidentCategory`, `ResidentDataPoint` construction + defaults. Test `DataClassification` citation rules.
 
-- [ ] **Task 23: Test `buildMetaLines()` with resident mode**
+- [x] **Task 23: Test `buildMetaLines()` with resident mode**
   - File: `composeApp/src/commonTest/kotlin/com/harazone/domain/model/DomainModelTest.kt` (existing)
   - Action: Add tests:
     - `buildMetaLines` with `discoveryMode = RESIDENT` and `residentData` produces `ResidentHeadline` lines
     - `buildMetaLines` with `discoveryMode = TRAVELER` produces no `ResidentHeadline` lines (regression)
     - `ResidentHeadline` lines have priority 2
 
-- [ ] **Task 24: Test `buildResidentDataPrompt()` and `residentContextBlock()`**
+- [x] **Task 24: Test `buildResidentDataPrompt()` and `residentContextBlock()`**
   - File: `composeApp/src/commonTest/kotlin/com/harazone/data/remote/GeminiPromptBuilderTest.kt` (existing)
   - Action: Add tests:
     - `buildResidentDataPrompt` includes all 9 category IDs
@@ -504,7 +503,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     - `buildChatSystemContext` with `residentData != null` includes "relocation advisor" persona
     - `buildChatSystemContext` with `residentData == null` omits resident block (regression)
 
-- [ ] **Task 25: Test `MapViewModel` mode toggle**
+- [x] **Task 25: Test `MapViewModel` mode toggle**
   - File: `composeApp/src/commonTest/kotlin/com/harazone/ui/map/MapViewModelTest.kt` (existing)
   - Action: Add tests:
     - `toggleMoveHere` flips mode from TRAVELER to RESIDENT and back
@@ -513,7 +512,7 @@ These are displayed as separate pin layer alongside (not replacing) existing tra
     - Resident data fetch error resets mode to TRAVELER
     - Area change with no resident entry defaults to TRAVELER
 
-- [ ] **Task 26: Add `FakeAreaIntelligenceProvider.fetchResidentData()`**
+- [x] **Task 26: Add `FakeAreaIntelligenceProvider.fetchResidentData()`**
   - File: `composeApp/src/commonTest/kotlin/com/harazone/fakes/FakeAreaIntelligenceProvider.kt` (existing)
   - Action: Add `fetchResidentData()` implementation returning configurable mock data. Support error simulation via flag.
 

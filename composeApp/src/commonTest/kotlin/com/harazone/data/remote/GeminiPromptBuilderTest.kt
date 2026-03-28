@@ -2,8 +2,13 @@ package com.harazone.data.remote
 
 import com.harazone.domain.model.AreaContext
 import com.harazone.domain.model.ChatIntent
+import com.harazone.domain.model.DataClassification
+import com.harazone.domain.model.DataConfidence
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.POI
+import com.harazone.domain.model.ResidentCategory
+import com.harazone.domain.model.ResidentData
+import com.harazone.domain.model.ResidentDataPoint
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfile
 import kotlin.test.Test
@@ -534,5 +539,70 @@ class GeminiPromptBuilderTest {
         val prompt = builder.buildAreaPortraitPrompt("Alfama, Lisbon", testContext)
         assertTrue(prompt.contains("\"ah\""))
         assertTrue(prompt.contains("ALWAYS include at least 2"))
+    }
+
+    // --- Move Here: buildResidentDataPrompt tests ---
+
+    private val testResidentData = ResidentData(
+        areaName = "Lisbon",
+        categories = listOf(
+            ResidentCategory("D1", "Rental Prices", "\uD83C\uDFE0", listOf(
+                ResidentDataPoint("~\u20AC800", "center", DataConfidence.MEDIUM, DataClassification.DYNAMIC, "src"),
+            )),
+        ),
+        originContext = "Compared to Miami",
+        fetchedAt = 1000L,
+    )
+
+    @Test
+    fun buildResidentDataPrompt_includes_all_9_category_IDs() {
+        val prompt = builder.buildResidentDataPrompt("Lisbon", "US", "Miami")
+        val requiredIds = listOf("D1", "D2", "D3", "D4", "D6", "D9", "D10", "D12", "D21")
+        requiredIds.forEach { id ->
+            assertTrue(prompt.contains(id), "Prompt must include category ID $id")
+        }
+    }
+
+    @Test
+    fun buildResidentDataPrompt_includes_origin_city_comparison() {
+        val prompt = builder.buildResidentDataPrompt("Lisbon", "US", "Miami")
+        assertTrue(prompt.contains("Miami"))
+        assertTrue(prompt.contains("Compared to Miami"))
+    }
+
+    @Test
+    fun buildResidentDataPrompt_applies_language_rule_for_non_English() {
+        val prompt = builder.buildResidentDataPrompt("Lisbon", "BR", null, "pt-BR")
+        assertTrue(prompt.contains("LANGUAGE RULE"))
+        assertTrue(prompt.contains("pt-BR"))
+    }
+
+    @Test
+    fun buildResidentDataPrompt_no_language_rule_for_English() {
+        val prompt = builder.buildResidentDataPrompt("Lisbon", "US", null, "en")
+        assertFalse(prompt.contains("LANGUAGE RULE"))
+    }
+
+    @Test
+    fun buildChatSystemContext_with_residentData_includes_relocation_advisor() {
+        val result = builder.buildChatSystemContext(
+            "Lisbon", emptyList(), ChatIntent.DISCOVER, EngagementLevel.LIGHT,
+            emptyList(), emptyProfile, 5, null, null,
+            languageTag = "en",
+            residentData = testResidentData,
+        )
+        assertTrue(result.contains("relocation advisor"))
+    }
+
+    @Test
+    fun buildChatSystemContext_without_residentData_omits_resident_block_regression() {
+        val result = builder.buildChatSystemContext(
+            "Lisbon", emptyList(), ChatIntent.DISCOVER, EngagementLevel.LIGHT,
+            emptyList(), emptyProfile, 5, null, null,
+            languageTag = "en",
+            residentData = null,
+        )
+        assertFalse(result.contains("relocation advisor"))
+        assertFalse(result.contains("RESIDENT MODE"))
     }
 }

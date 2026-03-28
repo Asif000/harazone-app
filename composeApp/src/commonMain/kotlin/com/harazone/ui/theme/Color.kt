@@ -16,6 +16,9 @@ val MapSurfaceDark = Color(0xFF161016)
 val MapFloatingUiDark = Color(0xFF0A0A0A)
 val DetailPageLight = Color(0xFFF5F2EF)
 
+// Meta context / resident mode accent
+val MetaContextTeal = Color(0xFF26A69A)
+
 // Saved Lens feature colors
 val SavedLensTeal = Color(0xFF00BFA5)
 val SavedLensBg = Color(0xFF1A3A36)

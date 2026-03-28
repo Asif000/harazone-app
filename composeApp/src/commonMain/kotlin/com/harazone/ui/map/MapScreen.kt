@@ -73,9 +73,12 @@ import com.harazone.ui.profile.ProfileViewModel
 import com.harazone.ui.saved.SavedPlacesScreen
 import com.harazone.domain.model.AdvisoryLevel
 import com.harazone.ui.map.components.SavedLensBanner
+import com.harazone.ui.map.components.ResidentDashboardCard
 import com.harazone.ui.map.components.SafetyBanner
 import com.harazone.ui.map.components.SafetyGateModal
 import com.harazone.ui.map.components.PoiCarousel
+import com.harazone.domain.model.DiscoveryMode
+import com.harazone.domain.model.FeatureFlags
 import com.harazone.ui.theme.MapFloatingUiDark
 import com.harazone.ui.theme.Spacing
 import com.harazone.ui.theme.spacing
@@ -404,6 +407,7 @@ private fun ReadyContent(
                 state.advisory, state.showMyLocation, state.activeVibeFilters,
                 state.areaHighlights, weatherText, timeText, state.visitTag, state.isSearchingArea, state.areaName,
                 state.areaCurrencyText, state.areaLanguageText, state.isSurpriseSearching,
+                state.discoveryMode, state.residentData,
             ) {
                 com.harazone.domain.model.buildMetaLines(
                     advisoryLevel = state.advisory?.level,
@@ -421,6 +425,8 @@ private fun ReadyContent(
                     currencyText = state.areaCurrencyText,
                     languageText = state.areaLanguageText,
                     isSurprise = state.isSurpriseSearching,
+                    discoveryMode = state.discoveryMode,
+                    residentData = state.residentData,
                 )
             }
 
@@ -483,11 +489,32 @@ private fun ReadyContent(
                 onTeleport = { viewModel.onRecentSelected(it) },
                 isExpanded = isHeaderExpanded,
                 onExpandedChanged = { isHeaderExpanded = it },
+                discoveryMode = state.discoveryMode,
+                residentAreaName = state.residentAreaName,
+                moveHereEnabled = FeatureFlags.MOVE_HERE_ENABLED,
+                onMoveHereTap = { viewModel.toggleMoveHere() },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
                     .zIndex(2f),
             )
+        }
+
+        // Resident dashboard card (below header, above map) — only in the resident area
+        if (state.discoveryMode == DiscoveryMode.RESIDENT && state.residentAreaName == state.areaName) {
+            ResidentDashboardCard(
+                residentData = state.residentData,
+                isLoading = state.isLoadingResidentData,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 90.dp)
+                    .zIndex(1.5f),
+            )
+        }
+
+        // Sync mode to ChatViewModel
+        LaunchedEffect(state.discoveryMode, state.residentData) {
+            chatViewModel.updateDiscoveryMode(state.discoveryMode, state.residentData)
         }
 
         // Safety banner (below Discovery Header)
@@ -642,6 +669,9 @@ private fun ReadyContent(
                     )
                     viewModel.selectPoiWithImageResolve(enriched ?: fallbackPoi)
                 },
+                discoveryMode = state.discoveryMode,
+                residentData = state.residentData,
+                dailyLifePois = state.dailyLifePois,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(

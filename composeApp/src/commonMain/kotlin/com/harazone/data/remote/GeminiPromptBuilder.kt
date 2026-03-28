@@ -4,6 +4,7 @@ import com.harazone.domain.model.AreaContext
 import com.harazone.domain.model.ChatIntent
 import com.harazone.domain.model.EngagementLevel
 import com.harazone.domain.model.POI
+import com.harazone.domain.model.ResidentData
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.TasteProfile
 
@@ -159,6 +160,49 @@ Rules:
         return """You are a knowledgeable local guide for $areaName. Answer the following question concisely as if you are a local expert: "$query". Keep your response under 120 words. Be specific and practical. Do not use bullet points."""
     }
 
+    fun buildResidentDataPrompt(
+        areaName: String,
+        originCountryCode: String,
+        originCity: String?,
+        languageTag: String = "en",
+    ): String {
+        val originHint = if (originCity != null) {
+            "\nUser's origin: $originCity ($originCountryCode). Include comparative framing where relevant (e.g., \"Compared to $originCity: rent is X% lower/higher\")."
+        } else {
+            "\nUser's origin country: $originCountryCode. Include comparative framing where relevant."
+        }
+        val langRule = if (!languageTag.startsWith("en")) {
+            "\nLANGUAGE RULE: All labels, values, and details MUST be in the language identified by locale '$languageTag'."
+        } else ""
+        return """You are a relocation advisor with deep knowledge of "$areaName".
+
+Return ONLY a JSON object — no markdown, no other text.
+$originHint$langRule
+Schema:
+{"areaName":"$areaName","categories":[{"id":"ID","label":"Category Name","icon":"emoji","points":[{"value":"headline value","detail":"supporting detail","confidence":"LOW|MEDIUM|HIGH"}]}],"originContext":"Compared to OriginCity" or null}
+
+REQUIRED categories (use exact IDs):
+D1 - Rental Prices: avg 1-bed city center, 1-bed outside, 3-bed city center. Confidence: MEDIUM.
+D2 - Buy Prices: avg price/sqm city center, outside. Confidence: MEDIUM.
+D3 - Cost of Living Index: relative index (100=baseline), groceries, dining, transport. Confidence: MEDIUM.
+D4 - Safety & Crime: overall safety rating, violent crime rate, areas to avoid. Confidence: MEDIUM.
+D6 - Job Market: top industries, unemployment rate, avg salary. Confidence: MEDIUM.
+D9 - Community Vibe: neighborhood character, demographics, lifestyle. Confidence: HIGH.
+D10 - Weather & Climate: climate summary only (app has detailed weather data). Confidence: HIGH.
+D12 - Visa & Immigration: visa requirements for $originCountryCode nationals, work permit process. Confidence: LOW. MUST include "verifyUrl" pointing to official government immigration page.
+D21 - Cultural & Community Fit: cultural norms, expat community, social scene. Confidence: MEDIUM.
+
+Rules:
+- Each category MUST have 2-4 data points.
+- "value" is headline (e.g., "~$1,400/mo", "Above national average", "72/100").
+- "detail" is supporting context (e.g., "1-bedroom in city center").
+- "confidence" is your self-assessment: LOW if uncertain, MEDIUM if reasonable estimate, HIGH if well-established.
+- For D12 (Visa): MUST include a "verifyUrl" field on each point linking to official gov immigration page.
+- For D10 (Weather): provide climate summary only — the app already shows detailed weather.
+- Be honest about data you're uncertain about — set confidence LOW rather than fabricating.
+- Output: single JSON object, no other text."""
+    }
+
     fun buildChatSystemContext(
         areaName: String,
         pois: List<POI>,
@@ -170,9 +214,11 @@ Rules:
         framingHint: String? = null,
         activeVibeName: String? = null,
         languageTag: String,
+        residentData: ResidentData? = null,
     ): String {
+        val persona = if (residentData != null) residentPersonaBlock(areaName) else personaBlock(areaName)
         return listOf(
-            personaBlock(areaName),
+            persona,
             areaContextBlock(areaName, pois),
             intentBlock(intent),
             vibeContextBlock(activeVibeName),
@@ -181,6 +227,7 @@ Rules:
             tasteProfileBlock(tasteProfile, intent, engagementLevel),
             confidenceBlock(poiCount),
             contextShiftBlock(),
+            residentContextBlock(residentData),
             outputFormatBlock(),
             framingBlock(framingHint),
             languageBlock(languageTag),
@@ -323,6 +370,25 @@ Rules:
 - DEDUPLICATION: If the user context mentions previously recommended places, do NOT include them in pois or mention them in prose.
 - LAND COORDINATES ONLY: Coordinates must correspond to a road, building, or walkable area — not open water. Waterfront venues (piers, marinas, riverside restaurants) are fine. If unsure, use the city center coordinates as fallback.
 Example: {"prose":"Check out **Brick Lane** for incredible street art — it changes weekly.\nWhat mood are you in — edgy underground spots or the well-known walls?","pois":[{"n":"Brick Lane","t":"arts","lat":51.5215,"lng":-0.0714,"w":"London's densest open-air gallery, curated by the street itself","insight":"Every Sunday morning the whole street transforms — murals painted overnight, artists you'll never find on Google","rating":4.7,"priceRange":"$","status":"open","hours":"Open 24/7"}]}"""
+
+    private fun residentPersonaBlock(areaName: String): String =
+        """You are an honest relocation advisor who knows "$areaName" inside out. You help people make informed decisions about moving here — no sugarcoating, no hype.
+HONESTY RULE: Be upfront about downsides. If groceries cost 40% above average, say so. If the job market is weak, say so.
+DAILY LIFE FOCUS: Prioritize daily-life relevance over tourist appeal. Schools, commutes, grocery stores matter more than landmarks.
+COMPARISON: When the user's origin is known, compare naturally — "rent here is about 30% less than Miami."
+NO CHAINS: Still avoid chain recommendations. Local markets, independent shops, neighborhood institutions."""
+
+    private fun residentContextBlock(residentData: ResidentData?): String {
+        if (residentData == null) return ""
+        val topLines = residentData.categories.take(4).mapNotNull { cat ->
+            cat.points.firstOrNull()?.let { "${cat.label}: ${it.value}" }
+        }
+        val grounding = topLines.joinToString(". ")
+        val origin = residentData.originContext?.let { "\nUser's origin: $it. Compare when relevant." } ?: ""
+        return """RESIDENT MODE CONTEXT: The user is exploring "${ residentData.areaName}" as a potential place to live, not visit.
+Grounding facts (do NOT contradict): $grounding.$origin
+Prioritize daily-life relevance over tourist appeal. Compare to user's origin when relevant. Be honest about downsides."""
+    }
 
     private fun framingBlock(framingHint: String?): String = framingHint ?: ""
 
