@@ -1054,7 +1054,7 @@ private fun LivingHereSection(
             .minByOrNull { haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0) }
             ?.let {
                 val dist = haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0)
-                val distText = if (dist < 1000) "${dist.toInt()}m" else "${"%.1f".format(dist / 1000)}km"
+                val distText = if (dist < 1000) "${dist.toInt()}m" else "${((dist / 100).toInt() / 10.0).toString()}km"
                 add("\uD83D\uDE89 Nearest transit: $distText")
             }
         // Grocery count within 500m
@@ -1068,7 +1068,7 @@ private fun LivingHereSection(
             .minByOrNull { haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0) }
             ?.let {
                 val dist = haversineDistanceMeters(poiLat, poiLng, it.latitude ?: 0.0, it.longitude ?: 0.0)
-                val distText = if (dist < 1000) "${dist.toInt()}m" else "${"%.1f".format(dist / 1000)}km"
+                val distText = if (dist < 1000) "${dist.toInt()}m" else "${((dist / 100).toInt() / 10.0).toString()}km"
                 add("\uD83C\uDFE5 Nearest hospital: $distText")
             }
         // School count within 1km
