@@ -819,10 +819,10 @@ private const val FAR_AWAY_KM = 500.0
 private fun buildGoLabel(distanceKm: Double?): Pair<String, String> {
     if (distanceKm == null) return "✈️" to ""
     return when {
-        distanceKm < 2.0 -> "🚶" to if (distanceKm < 1.0) "${(distanceKm * 1000).toInt()} m" else "${"%.1f".format(distanceKm)} km"
-        distanceKm < 50.0 -> "🧭" to "${"%.0f".format(distanceKm)} km"
-        distanceKm < FAR_AWAY_KM -> "🚗" to "${"%.0f".format(distanceKm)} km"
-        else -> "✈️" to "${"%.0f".format(distanceKm)} km"
+        distanceKm < 2.0 -> "🚶" to if (distanceKm < 1.0) "${(distanceKm * 1000).toInt()} m" else "${kotlin.math.round(distanceKm * 10) / 10.0} km"
+        distanceKm < 50.0 -> "🧭" to "${distanceKm.toInt()} km"
+        distanceKm < FAR_AWAY_KM -> "🚗" to "${distanceKm.toInt()} km"
+        else -> "✈️" to "${distanceKm.toInt()} km"
     }
 }
 
@@ -848,7 +848,7 @@ private fun GoFarAwaySheet(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            val distanceText = if (distanceKm != null) stringResource(Res.string.go_far_away_distance, "${"%.0f".format(distanceKm)}") else stringResource(Res.string.go_far_away_unknown)
+            val distanceText = if (distanceKm != null) stringResource(Res.string.go_far_away_distance, "${distanceKm.toInt()}") else stringResource(Res.string.go_far_away_unknown)
             Text(
                 text = stringResource(Res.string.go_far_away_body, poi.name, distanceText),
                 style = MaterialTheme.typography.bodyLarge,
