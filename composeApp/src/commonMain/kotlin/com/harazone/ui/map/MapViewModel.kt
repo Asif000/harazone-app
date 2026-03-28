@@ -371,6 +371,163 @@ class MapViewModel(
         }
     }
 
+    fun savePoi(poi: POI, areaName: String) {
+        val poiId = poi.savedId
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        if (poiId in current.visitedPoiIds) return
+        val savedPoiObj = SavedPoi(
+            id = poiId,
+            name = poi.name,
+            type = poi.type,
+            areaName = areaName,
+            lat = poi.latitude ?: 0.0,
+            lng = poi.longitude ?: 0.0,
+            whySpecial = poi.insight.ifEmpty { poi.description },
+            savedAt = clockMs(),
+            imageUrl = poi.imageUrl,
+            description = poi.description,
+            rating = poi.rating,
+            vibe = poi.primaryVibe ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
+        )
+        _uiState.value = current.copy(
+            visitedPoiIds = current.visitedPoiIds + poiId,
+            visitedPois = current.visitedPois + savedPoiObj,
+        )
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.save(savedPoiObj)
+            } catch (e: Exception) {
+                AppLogger.e(e) { "MapViewModel: savePoi failed" }
+                val s = _uiState.value as? MapUiState.Ready ?: return@launch
+                _uiState.value = s.copy(
+                    visitedPoiIds = s.visitedPoiIds - poiId,
+                    visitedPois = s.visitedPois.filter { it.id != poiId },
+                )
+            }
+        }
+    }
+
+    fun unsavePoi(poi: POI) = unvisitPoi(poi)
+
+    fun markBeen(poi: POI, areaName: String) {
+        val poiId = poi.savedId
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val existing = current.visitedPois.find { it.id == poiId }
+        val timestamp = clockMs()
+        val beenPoi = existing?.copy(visitedAt = timestamp) ?: SavedPoi(
+            id = poiId,
+            name = poi.name,
+            type = poi.type,
+            areaName = areaName,
+            lat = poi.latitude ?: 0.0,
+            lng = poi.longitude ?: 0.0,
+            whySpecial = poi.insight.ifEmpty { poi.description },
+            savedAt = timestamp,
+            imageUrl = poi.imageUrl,
+            description = poi.description,
+            rating = poi.rating,
+            vibe = poi.primaryVibe ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
+            visitedAt = timestamp,
+        )
+        val updatedPois = if (existing != null) {
+            current.visitedPois.map { if (it.id == poiId) beenPoi else it }
+        } else {
+            current.visitedPois + beenPoi
+        }
+        _uiState.value = current.copy(
+            visitedPoiIds = current.visitedPoiIds + poiId,
+            visitedPois = updatedPois,
+        )
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.markBeen(beenPoi)
+            } catch (e: Exception) {
+                AppLogger.e(e) { "MapViewModel: markBeen failed" }
+                val s = _uiState.value as? MapUiState.Ready ?: return@launch
+                if (existing == null) {
+                    _uiState.value = s.copy(
+                        visitedPoiIds = s.visitedPoiIds - poiId,
+                        visitedPois = s.visitedPois.filter { it.id != poiId },
+                    )
+                } else {
+                    _uiState.value = s.copy(
+                        visitedPois = s.visitedPois.map { if (it.id == poiId) existing else it },
+                    )
+                }
+            }
+        }
+    }
+
+    fun unmarkBeen(poi: POI) {
+        val poiId = poi.savedId
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val existing = current.visitedPois.find { it.id == poiId } ?: return
+        val updatedPoi = existing.copy(visitedAt = null)
+        _uiState.value = current.copy(
+            visitedPois = current.visitedPois.map { if (it.id == poiId) updatedPoi else it },
+        )
+        viewModelScope.launch {
+            try {
+                savedPoiRepository.unmarkBeen(poiId)
+            } catch (e: Exception) {
+                AppLogger.e(e) { "MapViewModel: unmarkBeen failed" }
+                val s = _uiState.value as? MapUiState.Ready ?: return@launch
+                _uiState.value = s.copy(
+                    visitedPois = s.visitedPois.map { if (it.id == poiId) existing else it },
+                )
+            }
+        }
+    }
+
+    fun recordGoIntent(poi: POI, areaName: String) {
+        val poiId = poi.savedId
+        val current = _uiState.value as? MapUiState.Ready ?: return
+        val timestamp = clockMs()
+        val needsSave = poiId !in current.visitedPoiIds
+        if (needsSave) {
+            // Optimistic UI update for save
+            val savedPoiObj = SavedPoi(
+                id = poiId,
+                name = poi.name,
+                type = poi.type,
+                areaName = areaName,
+                lat = poi.latitude ?: 0.0,
+                lng = poi.longitude ?: 0.0,
+                whySpecial = poi.insight.ifEmpty { poi.description },
+                savedAt = timestamp,
+                imageUrl = poi.imageUrl,
+                description = poi.description,
+                rating = poi.rating,
+                vibe = poi.primaryVibe ?: poi.vibe.split(",").firstOrNull()?.trim() ?: "",
+            )
+            _uiState.value = current.copy(
+                visitedPoiIds = current.visitedPoiIds + poiId,
+                visitedPois = current.visitedPois + savedPoiObj,
+            )
+            viewModelScope.launch {
+                try {
+                    savedPoiRepository.save(savedPoiObj)
+                    savedPoiRepository.recordGoIntent(poiId, timestamp)
+                } catch (e: Exception) {
+                    AppLogger.e(e) { "MapViewModel: recordGoIntent failed" }
+                    val s = _uiState.value as? MapUiState.Ready ?: return@launch
+                    _uiState.value = s.copy(
+                        visitedPoiIds = s.visitedPoiIds - poiId,
+                        visitedPois = s.visitedPois.filter { it.id != poiId },
+                    )
+                }
+            }
+        } else {
+            viewModelScope.launch {
+                try {
+                    savedPoiRepository.recordGoIntent(poiId, timestamp)
+                } catch (e: Exception) {
+                    AppLogger.e(e) { "MapViewModel: recordGoIntent failed" }
+                }
+            }
+        }
+    }
+
     // --- Companion Nudge Engine ---
 
     private fun enqueueNudge(nudge: CompanionNudge) {

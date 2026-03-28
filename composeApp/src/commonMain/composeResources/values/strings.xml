@@ -198,6 +198,15 @@
     <string name="advisory_nudge_reconsider">⚠ %1$s has an active travel advisory. Please review before exploring.</string>
     <string name="advisory_nudge_danger">🚨 %1$s — official advice is DO NOT TRAVEL. Tap for details.</string>
 
+    <!-- Save/Go/Been CTAs -->
+    <string name="cta_save">Save</string>
+    <string name="cta_go">Go</string>
+    <string name="cta_been">Been</string>
+    <string name="cta_plan_trip">Plan a trip</string>
+    <string name="go_far_away_distance">%1$s km from you</string>
+    <string name="go_far_away_unknown">a journey away</string>
+    <string name="go_far_away_body">%1$s is %2$s! Save it for the right moment, or start planning your trip?</string>
+
     <!-- Accessibility -->
     <string name="action_close">Close</string>
 </resources>

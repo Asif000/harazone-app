@@ -29,7 +29,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Map
@@ -43,6 +42,10 @@ import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SuggestionChip
@@ -58,6 +61,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -76,6 +80,7 @@ import coil3.compose.AsyncImage
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
 import com.harazone.ui.components.PlatformBackHandler
 import com.harazone.domain.model.AdvisoryLevel
 import com.harazone.domain.model.DiscoveryContext
@@ -84,7 +89,6 @@ import com.harazone.domain.model.DynamicVibe
 import com.harazone.domain.model.POI
 import com.harazone.domain.model.ResidentData
 import com.harazone.domain.model.Vibe
-import com.harazone.domain.model.VisitState
 import com.harazone.util.haversineDistanceMeters
 import com.harazone.domain.provider.LocaleProvider
 import org.koin.compose.koinInject
@@ -112,11 +116,15 @@ internal fun AiDetailPage(
     areaName: String,
     allPois: List<POI>,
     activeDynamicVibe: DynamicVibe?,
-    isVisited: Boolean,
-    visitState: VisitState?,
-    onVisit: () -> Unit,
-    onUnvisit: () -> Unit,
-    onDirectionsClick: (Double, Double, String) -> Unit,
+    isSaved: Boolean,
+    isBeen: Boolean,
+    userLat: Double,
+    userLng: Double,
+    onSave: () -> Unit,
+    onUnsave: () -> Unit,
+    onBeen: () -> Unit,
+    onUnbeen: () -> Unit,
+    onGoTapped: () -> Unit,
     onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
     onNavigateToMaps: (Double, Double, String) -> Boolean,
@@ -152,13 +160,9 @@ internal fun AiDetailPage(
         }
     }
 
-    // Pre-seed AI intro for this POI — visit-aware when opened via Visit tap
+    // Pre-seed AI intro for this POI
     LaunchedEffect(poi.savedId) {
-        if (visitState != null) {
-            chatViewModel.openChatForPoiVisit(poi, visitState, areaName, allPois, activeDynamicVibe)
-        } else {
-            chatViewModel.openChatForPoi(poi, areaName, allPois, activeDynamicVibe)
-        }
+        chatViewModel.openChatForPoi(poi, areaName, allPois, activeDynamicVibe)
     }
 
     var overflowExpanded by remember { mutableStateOf(false) }
@@ -181,13 +185,19 @@ internal fun AiDetailPage(
                     PoiDetailHeader(
                         poi = poi,
                         vibeColor = vibeColor,
-                        isVisited = isVisited,
-                        visitState = visitState,
-                        onVisit = onVisit,
-                        onUnvisit = onUnvisit,
-                        onDirectionsClick = onDirectionsClick,
+                        isSaved = isSaved,
+                        isBeen = isBeen,
+                        userLat = userLat,
+                        userLng = userLng,
+                        onSave = onSave,
+                        onUnsave = onUnsave,
+                        onBeen = onBeen,
+                        onUnbeen = onUnbeen,
+                        onGoTapped = onGoTapped,
                         onShowOnMap = onShowOnMap,
                         onDismiss = onDismiss,
+                        onNavigateToMaps = onNavigateToMaps,
+                        onDirectionsFailed = onDirectionsFailed,
                         onImageClick = { showGallery = true },
                         overflowExpanded = overflowExpanded,
                         onOverflowExpandedChange = { overflowExpanded = it },
@@ -196,7 +206,7 @@ internal fun AiDetailPage(
                 }
 
                 // Ghost pin CTA — "Discover this one too"
-                if (isGhostPin && !isVisited) {
+                if (isGhostPin && !isSaved) {
                     item(key = "ghost_cta") {
                         Button(
                             onClick = onDiscoverGhostPin,
@@ -463,13 +473,19 @@ private fun PoiContextBlock(
 private fun PoiDetailHeader(
     poi: POI,
     vibeColor: Color,
-    isVisited: Boolean,
-    visitState: VisitState?,
-    onVisit: () -> Unit,
-    onUnvisit: () -> Unit,
-    onDirectionsClick: (Double, Double, String) -> Unit,
+    isSaved: Boolean,
+    isBeen: Boolean,
+    userLat: Double,
+    userLng: Double,
+    onSave: () -> Unit,
+    onUnsave: () -> Unit,
+    onBeen: () -> Unit,
+    onUnbeen: () -> Unit,
+    onGoTapped: () -> Unit,
     onShowOnMap: (lat: Double, lng: Double) -> Unit,
     onDismiss: () -> Unit,
+    onNavigateToMaps: (Double, Double, String) -> Boolean,
+    onDirectionsFailed: () -> Unit,
     onImageClick: () -> Unit = {},
     overflowExpanded: Boolean = false,
     onOverflowExpandedChange: (Boolean) -> Unit = {},
@@ -682,56 +698,180 @@ private fun PoiDetailHeader(
                 )
             }
 
-            Spacer(Modifier.height(12.dp))
+        }
 
-            // Action chips
-            val chipColors = AssistChipDefaults.assistChipColors(
-                labelColor = MaterialTheme.colorScheme.onSurface,
-                leadingIconContentColor = MaterialTheme.colorScheme.onSurface,
+        SaveGoBeenStrip(
+            poi = poi,
+            isSaved = isSaved,
+            isBeen = isBeen,
+            userLat = userLat,
+            userLng = userLng,
+            onSave = onSave,
+            onUnsave = onUnsave,
+            onBeen = onBeen,
+            onUnbeen = onUnbeen,
+            onGoTapped = onGoTapped,
+            onNavigateToMaps = onNavigateToMaps,
+            onDirectionsFailed = onDirectionsFailed,
+        )
+    }
+}
+
+@Composable
+private fun SaveGoBeenStrip(
+    poi: POI,
+    isSaved: Boolean,
+    isBeen: Boolean,
+    userLat: Double,
+    userLng: Double,
+    onSave: () -> Unit,
+    onUnsave: () -> Unit,
+    onBeen: () -> Unit,
+    onUnbeen: () -> Unit,
+    onGoTapped: () -> Unit,
+    onNavigateToMaps: (Double, Double, String) -> Boolean,
+    onDirectionsFailed: () -> Unit,
+) {
+    var showGoSheet by remember { mutableStateOf(false) }
+    val distanceKm: Double? = remember(userLat, userLng, poi.latitude, poi.longitude) {
+        if (userLat == 0.0 && userLng == 0.0) null
+        else if (poi.latitude == null || poi.longitude == null) null
+        else haversineDistanceMeters(userLat, userLng, poi.latitude, poi.longitude) / 1000.0
+    }
+    val isFarAway = distanceKm == null || distanceKm >= FAR_AWAY_KM
+    val goLabelPair = remember(distanceKm) { buildGoLabel(distanceKm) }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        OutlinedButton(
+            onClick = { if (isSaved && !isBeen) onUnsave() else onSave() },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (isSaved) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                contentColor = if (isSaved) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+            ),
+            border = BorderStroke(1.dp, if (isSaved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Icon(
+                imageVector = if (isSaved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
             )
-            val chipBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (isVisited && visitState != null) {
-                    val (visitLabel, visitColor) = when (visitState) {
-                        VisitState.GO_NOW -> "\u2713 Go Now" to Color(0xFF4CAF50)
-                        VisitState.PLAN_SOON -> "\u2713 Plan Soon" to Color(0xFFFF9800)
-                        VisitState.WANT_TO_GO -> "\u2713 Want to Visit" to Color(0xFF9E9E9E)
-                    }
-                    AssistChip(
-                        onClick = onUnvisit,
-                        label = { Text(visitLabel) },
-                        colors = AssistChipDefaults.assistChipColors(labelColor = visitColor),
-                        border = BorderStroke(1.dp, visitColor.copy(alpha = 0.5f)),
-                    )
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(Res.string.cta_save))
+        }
+
+        Button(
+            onClick = {
+                onGoTapped()
+                if (isFarAway) {
+                    showGoSheet = true
                 } else {
-                    AssistChip(
-                        onClick = onVisit,
-                        label = { Text("Visit") },
-                        colors = chipColors,
-                        border = chipBorder,
-                    )
+                    val handled = onNavigateToMaps(poi.latitude!!, poi.longitude!!, poi.name)
+                    if (!handled) onDirectionsFailed()
                 }
-                if (poi.latitude != null && poi.longitude != null) {
-                    AssistChip(
-                        onClick = { onDirectionsClick(poi.latitude!!, poi.longitude!!, poi.name) },
-                        label = { Text(stringResource(Res.string.poi_card_directions)) },
-                        leadingIcon = {
-                            Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp))
-                        },
-                        colors = chipColors,
-                        border = chipBorder,
-                    )
+            },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (!isFarAway) Color(0xFF3FB950) else MaterialTheme.colorScheme.primary,
+            ),
+        ) {
+            val (goIcon, goLabel) = goLabelPair
+            Text("$goIcon ${stringResource(Res.string.cta_go)}${if (goLabel.isNotEmpty()) " \u00B7 $goLabel" else ""}")
+        }
+
+        OutlinedButton(
+            onClick = { if (isBeen) onUnbeen() else onBeen() },
+            modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.outlinedButtonColors(
+                containerColor = if (isBeen) Color(0xFF3FB950).copy(alpha = 0.15f) else Color.Transparent,
+                contentColor = if (isBeen) Color(0xFF3FB950) else MaterialTheme.colorScheme.onSurface,
+            ),
+            border = BorderStroke(1.dp, if (isBeen) Color(0xFF3FB950) else MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Icon(
+                imageVector = Icons.Default.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(16.dp),
+            )
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(Res.string.cta_been))
+        }
+    }
+
+    if (showGoSheet) {
+        GoFarAwaySheet(
+            poi = poi,
+            distanceKm = distanceKm,
+            isSaved = isSaved,
+            onSave = { onSave(); showGoSheet = false },
+            onDismiss = { showGoSheet = false },
+        )
+    }
+}
+
+private const val FAR_AWAY_KM = 500.0
+
+private fun buildGoLabel(distanceKm: Double?): Pair<String, String> {
+    if (distanceKm == null) return "✈️" to ""
+    return when {
+        distanceKm < 2.0 -> "🚶" to if (distanceKm < 1.0) "${(distanceKm * 1000).toInt()} m" else "${"%.1f".format(distanceKm)} km"
+        distanceKm < 50.0 -> "🧭" to "${"%.0f".format(distanceKm)} km"
+        distanceKm < FAR_AWAY_KM -> "🚗" to "${"%.0f".format(distanceKm)} km"
+        else -> "✈️" to "${"%.0f".format(distanceKm)} km"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun GoFarAwaySheet(
+    poi: POI,
+    distanceKm: Double?,
+    isSaved: Boolean,
+    onSave: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val coroutineScope = rememberCoroutineScope()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            val distanceText = if (distanceKm != null) stringResource(Res.string.go_far_away_distance, "${"%.0f".format(distanceKm)}") else stringResource(Res.string.go_far_away_unknown)
+            Text(
+                text = stringResource(Res.string.go_far_away_body, poi.name, distanceText),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                if (!isSaved) {
+                    OutlinedButton(
+                        onClick = onSave,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(Res.string.cta_save)) }
                 }
-                AssistChip(
-                    onClick = { if (poi.latitude != null && poi.longitude != null) onShowOnMap(poi.latitude!!, poi.longitude!!) },
-                    label = { Text("\uD83D\uDCCD ${stringResource(Res.string.chat_poi_show_on_map)}") },
-                    colors = chipColors,
-                    border = chipBorder,
-                )
+                Button(
+                    onClick = {
+                        // TODO(BACKLOG-MEDIUM): Plan a trip — post-beta
+                        coroutineScope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                    },
+                    modifier = Modifier.weight(1f),
+                ) { Text(stringResource(Res.string.cta_plan_trip)) }
             }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }

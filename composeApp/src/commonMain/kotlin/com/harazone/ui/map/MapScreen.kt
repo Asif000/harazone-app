@@ -618,22 +618,15 @@ private fun ReadyContent(
                 areaName = state.areaName,
                 allPois = state.allDiscoveredPois,
                 activeDynamicVibe = state.activeDynamicVibe,
-                isVisited = state.selectedPoi.savedId in state.visitedPoiIds,
-                visitState = state.visitedPois.find { it.id == state.selectedPoi.savedId }?.visitState,
-                onVisit = {
-                    val poi = state.selectedPoi
-                    val visitState = viewModel.visitPoi(poi, state.areaName)
-                    chatViewModel.sendVisitMessage(poi, visitState)
-                },
-                onUnvisit = { viewModel.unvisitPoi(state.selectedPoi) },
-                onDirectionsClick = { lat, lon, name ->
-                    val handled = onNavigateToMaps(lat, lon, name)
-                    if (!handled) {
-                        coroutineScope.launch {
-                            snackbarHostState.showSnackbar(noMapsAppMessage)
-                        }
-                    }
-                },
+                isSaved = state.selectedPoi.savedId in state.visitedPoiIds,
+                isBeen = state.visitedPois.find { it.id == state.selectedPoi.savedId }?.visitedAt != null,
+                userLat = state.gpsLatitude,
+                userLng = state.gpsLongitude,
+                onSave = { viewModel.savePoi(state.selectedPoi, state.areaName) },
+                onUnsave = { viewModel.unsavePoi(state.selectedPoi) },
+                onBeen = { viewModel.markBeen(state.selectedPoi, state.areaName) },
+                onUnbeen = { viewModel.unmarkBeen(state.selectedPoi) },
+                onGoTapped = { viewModel.recordGoIntent(state.selectedPoi, state.areaName) },
                 onShowOnMap = { lat, lng ->
                     chatViewModel.closeChat()
                     viewModel.clearPoiSelection()

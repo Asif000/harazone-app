@@ -18,4 +18,5 @@ data class SavedPoi(
     val vibe: String = "",
     val visitState: VisitState? = null,
     val visitedAt: Long? = null,
+    val goIntentAt: Long? = null,
 )

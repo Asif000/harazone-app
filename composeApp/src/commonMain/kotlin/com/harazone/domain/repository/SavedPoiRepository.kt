@@ -10,4 +10,7 @@ interface SavedPoiRepository {
     suspend fun unsave(poiId: String)
     suspend fun updateUserNote(poiId: String, note: String?)
     suspend fun visit(poi: SavedPoi)
+    suspend fun markBeen(poi: SavedPoi)
+    suspend fun unmarkBeen(poiId: String)
+    suspend fun recordGoIntent(poiId: String, timestamp: Long)
 }

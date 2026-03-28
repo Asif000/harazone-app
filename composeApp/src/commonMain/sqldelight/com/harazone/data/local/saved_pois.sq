@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS saved_pois (
     rating      REAL,
     vibe        TEXT NOT NULL DEFAULT '',
     visit_state TEXT,
-    visited_at  INTEGER
+    visited_at  INTEGER,
+    go_intent_at INTEGER
 );
 
 observeAll:
@@ -38,3 +39,12 @@ VALUES (:poi_id, :name, :type, :area_name, :lat, :lng, :why_special, :saved_at, 
 
 updateVisitState:
 UPDATE saved_pois SET visit_state = :visit_state, visited_at = :visited_at WHERE poi_id = :poi_id;
+
+updateGoIntentAt:
+UPDATE saved_pois SET go_intent_at = :go_intent_at WHERE poi_id = :poi_id;
+
+updateVisitedAt:
+UPDATE saved_pois SET visited_at = :visited_at WHERE poi_id = :poi_id;
+
+clearVisitedAt:
+UPDATE saved_pois SET visited_at = NULL WHERE poi_id = :poi_id;

@@ -16,7 +16,7 @@ import kotlinx.coroutines.withContext
 class SavedPoiRepositoryImpl(
     private val database: AreaDiscoveryDatabase,
     private val clock: AppClock,
-    private val ioDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : SavedPoiRepository {
 
     override fun observeAll(): Flow<List<SavedPoi>> =
@@ -44,6 +44,7 @@ class SavedPoiRepositoryImpl(
                             VisitState.entries.find { e -> e.name == raw }
                         },
                         visitedAt = it.visited_at,
+                        goIntentAt = it.go_intent_at,
                     )
                 }
             }
@@ -99,6 +100,53 @@ class SavedPoiRepositoryImpl(
                 vibe = poi.vibe,
                 visit_state = poi.visitState?.name,
                 visited_at = clock.nowMs(),
+            )
+        }
+    }
+
+    override suspend fun markBeen(poi: SavedPoi) {
+        withContext(ioDispatcher) {
+            database.transaction {
+                val exists = database.saved_poisQueries.observeSavedIds().executeAsList().contains(poi.id)
+                if (exists) {
+                    database.saved_poisQueries.updateVisitedAt(
+                        visited_at = clock.nowMs(),
+                        poi_id = poi.id,
+                    )
+                } else {
+                    database.saved_poisQueries.insertOrReplaceWithState(
+                        poi_id = poi.id,
+                        name = poi.name,
+                        type = poi.type,
+                        area_name = poi.areaName,
+                        lat = poi.lat,
+                        lng = poi.lng,
+                        why_special = poi.whySpecial,
+                        saved_at = poi.savedAt,
+                        user_note = poi.userNote,
+                        image_url = poi.imageUrl,
+                        description = poi.description,
+                        rating = poi.rating?.toDouble(),
+                        vibe = poi.vibe,
+                        visit_state = null,
+                        visited_at = clock.nowMs(),
+                    )
+                }
+            }
+        }
+    }
+
+    override suspend fun unmarkBeen(poiId: String) {
+        withContext(ioDispatcher) {
+            database.saved_poisQueries.clearVisitedAt(poiId)
+        }
+    }
+
+    override suspend fun recordGoIntent(poiId: String, timestamp: Long) {
+        withContext(ioDispatcher) {
+            database.saved_poisQueries.updateGoIntentAt(
+                go_intent_at = timestamp,
+                poi_id = poiId,
             )
         }
     }

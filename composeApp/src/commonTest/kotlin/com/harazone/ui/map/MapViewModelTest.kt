@@ -3119,6 +3119,91 @@ class MapViewModelTest {
         assertEquals("Doral, Florida", after.residentAreaName)
     }
 
+    // --- Save / Go / Been tests ---
+
+    @Test
+    fun savePoi_adds_to_visitedPoiIds_optimistically() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        testScheduler.advanceUntilIdle()
+        viewModel.savePoi(samplePoi, "Manhattan, New York")
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(samplePoi.savedId in state.visitedPoiIds)
+        assertTrue(state.visitedPois.any { it.id == samplePoi.savedId })
+    }
+
+    @Test
+    fun savePoi_rollback_on_failure() = runTest(testDispatcher) {
+        val fakeRepo = com.harazone.fakes.FakeSavedPoiRepository()
+        fakeRepo.shouldThrow = true
+        val viewModel = createViewModel(
+            locationProvider = FakeLocationProvider(
+                locationResult = Result.success(GpsCoordinates(40.7128, -74.0060)),
+                geocodeResult = Result.success("Manhattan, New York"),
+            ),
+            areaRepository = FakeAreaRepository(
+                updates = listOf(BucketUpdate.PortraitComplete(listOf(samplePoi)))
+            ),
+            savedPoiRepository = fakeRepo,
+        )
+        testScheduler.advanceUntilIdle()
+        viewModel.savePoi(samplePoi, "Manhattan, New York")
+        testScheduler.advanceUntilIdle()
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(samplePoi.savedId in state.visitedPoiIds)
+        assertFalse(state.visitedPois.any { it.id == samplePoi.savedId })
+    }
+
+    @Test
+    fun unsavePoi_removes_from_visitedPoiIds() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        testScheduler.advanceUntilIdle()
+        viewModel.savePoi(samplePoi, "Manhattan, New York")
+        viewModel.unsavePoi(samplePoi)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertFalse(samplePoi.savedId in state.visitedPoiIds)
+    }
+
+    @Test
+    fun markBeen_sets_visitedAt_on_existing_saved_poi() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        testScheduler.advanceUntilIdle()
+        viewModel.savePoi(samplePoi, "Manhattan, New York")
+        viewModel.markBeen(samplePoi, "Manhattan, New York")
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        val savedPoi = state.visitedPois.find { it.id == samplePoi.savedId }
+        assertNotNull(savedPoi?.visitedAt)
+    }
+
+    @Test
+    fun markBeen_auto_saves_unsaved_poi() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        testScheduler.advanceUntilIdle()
+        viewModel.markBeen(samplePoi, "Manhattan, New York")
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(samplePoi.savedId in state.visitedPoiIds)
+        assertNotNull(state.visitedPois.find { it.id == samplePoi.savedId }?.visitedAt)
+    }
+
+    @Test
+    fun unmarkBeen_clears_visitedAt_but_keeps_poi_saved() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        testScheduler.advanceUntilIdle()
+        viewModel.markBeen(samplePoi, "Manhattan, New York")
+        viewModel.unmarkBeen(samplePoi)
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(samplePoi.savedId in state.visitedPoiIds)
+        assertNull(state.visitedPois.find { it.id == samplePoi.savedId }?.visitedAt)
+    }
+
+    @Test
+    fun recordGoIntent_auto_saves_unsaved_poi() = runTest(testDispatcher) {
+        val (viewModel, _) = createReadyViewModel()
+        testScheduler.advanceUntilIdle()
+        viewModel.recordGoIntent(samplePoi, "Manhattan, New York")
+        val state = assertIs<MapUiState.Ready>(viewModel.uiState.value)
+        assertTrue(samplePoi.savedId in state.visitedPoiIds)
+    }
+
     @Test
     fun restoreResidentModeIfNeeded_stays_traveler_for_unactivated_area() = runTest(testDispatcher) {
         val viewModel = createViewModel(

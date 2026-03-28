@@ -33,6 +33,25 @@ class FakeSavedPoiRepository : SavedPoiRepository {
         _pois.value = _pois.value.filter { it.id != poi.id } + poi
     }
 
+    override suspend fun markBeen(poi: SavedPoi) {
+        if (shouldThrow) throw RuntimeException("Test error")
+        _pois.value = _pois.value.filter { it.id != poi.id } + poi.copy(visitedAt = poi.visitedAt ?: 1L)
+    }
+
+    override suspend fun unmarkBeen(poiId: String) {
+        if (shouldThrow) throw RuntimeException("Test error")
+        _pois.value = _pois.value.map {
+            if (it.id == poiId) it.copy(visitedAt = null) else it
+        }
+    }
+
+    override suspend fun recordGoIntent(poiId: String, timestamp: Long) {
+        if (shouldThrow) throw RuntimeException("Test error")
+        _pois.value = _pois.value.map {
+            if (it.id == poiId) it.copy(goIntentAt = timestamp) else it
+        }
+    }
+
     override suspend fun updateUserNote(poiId: String, note: String?) {
         if (shouldThrow) throw RuntimeException("Test error")
         lastUpdatedPoiId = poiId

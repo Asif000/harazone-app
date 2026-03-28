@@ -5,7 +5,9 @@ import app.cash.turbine.test
 import com.harazone.data.local.AreaDiscoveryDatabase
 import com.harazone.domain.model.SavedPoi
 import com.harazone.domain.model.VisitState
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlinx.coroutines.flow.first
 import com.harazone.fakes.FakeClock
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
@@ -150,6 +152,38 @@ class SavedPoiRepositoryTest {
             val list = awaitItem()
             assertNull(list.first().visitState)
             assertNull(list.first().visitedAt)
+        }
+    }
+
+    @Test
+    fun `markBeen inserts row with visitedAt set`() = testScope.runTest {
+        val poi = poi()
+        repository.markBeen(poi)
+        repository.observeAll().first().let { list ->
+            assertEquals(1, list.size)
+            assertNotNull(list.first().visitedAt)
+            assertNull(list.first().visitState)
+        }
+    }
+
+    @Test
+    fun `unmarkBeen clears visitedAt but keeps row`() = testScope.runTest {
+        val poi = poi().copy(visitedAt = 12345L)
+        repository.markBeen(poi)
+        repository.unmarkBeen(poi.id)
+        repository.observeAll().first().let { list ->
+            assertEquals(1, list.size)
+            assertNull(list.first().visitedAt)
+        }
+    }
+
+    @Test
+    fun `recordGoIntent updates go_intent_at on saved row`() = testScope.runTest {
+        val poi = poi()
+        repository.save(poi)
+        repository.recordGoIntent(poi.id, 99999L)
+        repository.observeAll().first().let { list ->
+            assertEquals(99999L, list.first().goIntentAt)
         }
     }
 
